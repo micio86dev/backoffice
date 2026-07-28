@@ -56,11 +56,14 @@ test.describe('SA-11 — every admin route redirects at a mobile viewport (task 
   // every project, not just the one whose device preset happens to be narrow.
   test.use({ viewport: { width: 375, height: 667 } })
 
-  // Every route that exists in this PR (B1): the pre-auth /login page and the
-  // authenticated dashboard shell (/). Participant list/detail and the report
-  // viewer (B2/B3) don't exist yet — they must be added to this list when
-  // those PRs land, so the SA-11 gate coverage doesn't silently go stale.
-  const ADMIN_ROUTES = ['/', '/login']
+  // Every route that exists as of this PR. B1: the pre-auth /login page and
+  // the authenticated dashboard shell (/). B2: the participant list and a
+  // participant detail route (fixed id — SA-11 fires in the browser-gate
+  // middleware, before the page ever mounts/fetches, so no live data is
+  // needed for this assertion). The report viewer (B3) doesn't exist yet —
+  // it must be added here when that PR lands, so SA-11 coverage doesn't
+  // silently go stale.
+  const ADMIN_ROUTES = ['/', '/login', '/participants', '/participants/1']
 
   for (const route of ADMIN_ROUTES) {
     test(`${route} renders /unsupported at a mobile viewport when unauthenticated`, async ({

@@ -18,7 +18,59 @@
     "logout": "Esci"
   },
   "dashboard": {
-    "title": "Dashboard"
+    "title": "Dashboard",
+    "kpi": {
+      "totalParticipants": "Candidati totali",
+      "completionRate": "Tasso di completamento",
+      "tokensUsed": "Token AI utilizzati",
+      "latency": "Latenza AI (p50 / p95)",
+      "noData": "Nessun dato disponibile"
+    }
+  },
+  "participants": {
+    "title": "Candidati",
+    "filters": {
+      "search": "Cerca",
+      "searchPlaceholder": "Cerca per nome o riferimento",
+      "status": "Stato",
+      "allStatuses": "Tutti gli stati"
+    },
+    "table": {
+      "candidate": "Candidato",
+      "role": "Ruolo",
+      "status": "Stato",
+      "createdAt": "Iniziato",
+      "empty": "Nessun candidato corrisponde ai filtri selezionati."
+    },
+    "pagination": {
+      "summary": "Visualizzati {from}–{to} di {total}",
+      "previous": "Precedente",
+      "next": "Successivo"
+    },
+    "status": {
+      "in_attesa": "In attesa",
+      "in_corso": "In corso",
+      "in_valutazione": "In valutazione",
+      "completato": "Completato",
+      "errore": "Errore"
+    },
+    "detail": {
+      "backToList": "Torna ai candidati",
+      "language": "Lingua",
+      "timeline": {
+        "title": "Cronologia del colloquio",
+        "startedAt": "Iniziato",
+        "completedAt": "Completato",
+        "sessionCount": "Sessioni"
+      },
+      "resources": {
+        "title": "Materiali",
+        "transcript": "Trascrizione",
+        "evaluation": "Report di valutazione",
+        "ready": "Disponibile",
+        "notReady": "Non ancora disponibile"
+      }
+    }
   },
   "unsupported": {
     "title": "Browser non supportato",

@@ -18,7 +18,59 @@
     "logout": "Log out"
   },
   "dashboard": {
-    "title": "Dashboard"
+    "title": "Dashboard",
+    "kpi": {
+      "totalParticipants": "Total candidates",
+      "completionRate": "Completion rate",
+      "tokensUsed": "AI tokens used",
+      "latency": "AI latency (p50 / p95)",
+      "noData": "No data yet"
+    }
+  },
+  "participants": {
+    "title": "Candidates",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Search by name or reference",
+      "status": "Status",
+      "allStatuses": "All statuses"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "role": "Role",
+      "status": "Status",
+      "createdAt": "Started",
+      "empty": "No candidates match the current filters."
+    },
+    "pagination": {
+      "summary": "Showing {from}–{to} of {total}",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "status": {
+      "in_attesa": "Waiting",
+      "in_corso": "In progress",
+      "in_valutazione": "Under evaluation",
+      "completato": "Completed",
+      "errore": "Error"
+    },
+    "detail": {
+      "backToList": "Back to candidates",
+      "language": "Language",
+      "timeline": {
+        "title": "Lifecycle timeline",
+        "startedAt": "Started",
+        "completedAt": "Completed",
+        "sessionCount": "Sessions"
+      },
+      "resources": {
+        "title": "Artifacts",
+        "transcript": "Transcript",
+        "evaluation": "Evaluation report",
+        "ready": "Ready",
+        "notReady": "Not ready yet"
+      }
+    }
   },
   "unsupported": {
     "title": "Unsupported Browser",

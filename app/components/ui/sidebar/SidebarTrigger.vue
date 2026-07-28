@@ -1,0 +1,28 @@
+<script setup lang="ts">
+import type { HTMLAttributes } from 'vue'
+
+import { Bars3Icon } from '@heroicons/vue/24/outline'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { useSidebar } from './utils'
+
+const props = defineProps<{
+  class?: HTMLAttributes['class']
+}>()
+
+const { toggleSidebar } = useSidebar()
+</script>
+
+<template>
+  <Button
+    data-sidebar="trigger"
+    data-slot="sidebar-trigger"
+    variant="ghost"
+    size="icon-sm"
+    :class="cn('', props.class)"
+    @click="toggleSidebar"
+  >
+    <Bars3Icon class="cn-rtl-flip" aria-hidden="true" />
+    <span class="sr-only">Toggle Sidebar</span>
+  </Button>
+</template>

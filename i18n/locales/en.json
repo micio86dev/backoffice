@@ -9,7 +9,37 @@
     "submitting": "Signing in…",
     "error": "Invalid credentials. Please try again."
   },
+  "head": {
+    "title": {
+      "dashboard": "Dashboard",
+      "login": "Sign in",
+      "participants": "Candidates",
+      "participantDetail": "Candidate detail",
+      "unsupported": "Unsupported browser"
+    }
+  },
+  "errors": {
+    "states": {
+      "notReady": {
+        "title": "Not ready yet",
+        "message": "This data is not available yet. It becomes visible once processing completes — simply reopen this page later."
+      },
+      "forbidden": {
+        "title": "Access denied",
+        "message": "You do not have permission to view this data."
+      },
+      "notFound": {
+        "title": "Not found",
+        "message": "This resource could not be found."
+      },
+      "error": {
+        "title": "Something went wrong",
+        "message": "The data could not be loaded. Please try again."
+      }
+    }
+  },
   "nav": {
+    "sidebarLabel": "Main navigation",
     "dashboard": "Dashboard",
     "projects": "Projects",
     "candidates": "Candidates",
@@ -24,6 +54,7 @@
       "completionRate": "Completion rate",
       "tokensUsed": "AI tokens used",
       "latency": "AI latency (p50 / p95)",
+      "latencyValue": "{p50} / {p95} ms",
       "noData": "No data yet"
     }
   },

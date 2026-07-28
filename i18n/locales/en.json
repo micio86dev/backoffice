@@ -1,5 +1,123 @@
 {
   "welcome": "Welcome",
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Sign in to the BEAI admin panel",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "error": "Invalid credentials. Please try again."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "candidates": "Candidates",
+    "reports": "Reports",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "kpi": {
+      "totalParticipants": "Total candidates",
+      "completionRate": "Completion rate",
+      "tokensUsed": "AI tokens used",
+      "latency": "AI latency (p50 / p95)",
+      "noData": "No data yet"
+    }
+  },
+  "participants": {
+    "title": "Candidates",
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Search by name or reference",
+      "status": "Status",
+      "allStatuses": "All statuses"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "role": "Role",
+      "status": "Status",
+      "createdAt": "Started",
+      "empty": "No candidates match the current filters."
+    },
+    "pagination": {
+      "summary": "Showing {from}–{to} of {total}",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "status": {
+      "in_attesa": "Waiting",
+      "in_corso": "In progress",
+      "in_valutazione": "Under evaluation",
+      "completato": "Completed",
+      "errore": "Error"
+    },
+    "detail": {
+      "backToList": "Back to candidates",
+      "language": "Language",
+      "timeline": {
+        "title": "Lifecycle timeline",
+        "startedAt": "Started",
+        "completedAt": "Completed",
+        "sessionCount": "Sessions"
+      },
+      "resources": {
+        "title": "Artifacts",
+        "transcript": "Transcript",
+        "evaluation": "Evaluation report",
+        "ready": "Ready",
+        "notReady": "Not ready yet"
+      }
+    }
+  },
+  "report": {
+    "title": "Evaluation report",
+    "reliability": "Reliability",
+    "chip": {
+      "low": "Score 1 out of 5 (needs improvement)",
+      "mid": "Score 3 out of 5 (developing)",
+      "high": "Score 5 out of 5 (strong evidence)",
+      "unassessable": "Not assessable — no evidence in the transcript"
+    },
+    "table": {
+      "caption": "BARS competency evaluation — indicator scores, competency mean, and reliability",
+      "competency": "Competency",
+      "mean": "Mean score",
+      "reliability": "Reliability",
+      "indicators": "Indicators"
+    },
+    "excerpts": {
+      "title": "Excerpts (verbatim from transcript)",
+      "empty": "No excerpts available for this indicator"
+    },
+    "states": {
+      "loading": "Loading the evaluation report…",
+      "notReady": {
+        "title": "Not ready yet",
+        "message": "The evaluation report is not available yet. It becomes available once scoring is complete — this page does not need to be refreshed manually, only reopened later."
+      },
+      "forbidden": {
+        "title": "Access denied",
+        "message": "You do not have permission to view this resource."
+      },
+      "notFound": {
+        "title": "Not found",
+        "message": "This resource could not be found."
+      },
+      "error": {
+        "title": "Something went wrong",
+        "message": "The report could not be loaded. Please try again."
+      }
+    },
+    "downloads": {
+      "title": "Downloads",
+      "transcript": "Download transcript",
+      "evaluation": "Download evaluation (JSON)",
+      "downloading": "Downloading…"
+    }
+  },
   "unsupported": {
     "title": "Unsupported Browser",
     "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."

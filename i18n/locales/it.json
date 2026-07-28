@@ -1,5 +1,123 @@
 {
   "welcome": "Benvenuto",
+  "login": {
+    "title": "Accedi",
+    "subtitle": "Accedi al pannello amministrativo BEAI",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Accedi",
+    "submitting": "Accesso in corso…",
+    "error": "Credenziali non valide. Riprova."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Progetti",
+    "candidates": "Candidati",
+    "reports": "Report",
+    "settings": "Impostazioni",
+    "logout": "Esci"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "kpi": {
+      "totalParticipants": "Candidati totali",
+      "completionRate": "Tasso di completamento",
+      "tokensUsed": "Token AI utilizzati",
+      "latency": "Latenza AI (p50 / p95)",
+      "noData": "Nessun dato disponibile"
+    }
+  },
+  "participants": {
+    "title": "Candidati",
+    "filters": {
+      "search": "Cerca",
+      "searchPlaceholder": "Cerca per nome o riferimento",
+      "status": "Stato",
+      "allStatuses": "Tutti gli stati"
+    },
+    "table": {
+      "candidate": "Candidato",
+      "role": "Ruolo",
+      "status": "Stato",
+      "createdAt": "Iniziato",
+      "empty": "Nessun candidato corrisponde ai filtri selezionati."
+    },
+    "pagination": {
+      "summary": "Visualizzati {from}–{to} di {total}",
+      "previous": "Precedente",
+      "next": "Successivo"
+    },
+    "status": {
+      "in_attesa": "In attesa",
+      "in_corso": "In corso",
+      "in_valutazione": "In valutazione",
+      "completato": "Completato",
+      "errore": "Errore"
+    },
+    "detail": {
+      "backToList": "Torna ai candidati",
+      "language": "Lingua",
+      "timeline": {
+        "title": "Cronologia del colloquio",
+        "startedAt": "Iniziato",
+        "completedAt": "Completato",
+        "sessionCount": "Sessioni"
+      },
+      "resources": {
+        "title": "Materiali",
+        "transcript": "Trascrizione",
+        "evaluation": "Report di valutazione",
+        "ready": "Disponibile",
+        "notReady": "Non ancora disponibile"
+      }
+    }
+  },
+  "report": {
+    "title": "Report di valutazione",
+    "reliability": "Affidabilità",
+    "chip": {
+      "low": "Punteggio 1 su 5 (da migliorare)",
+      "mid": "Punteggio 3 su 5 (in sviluppo)",
+      "high": "Punteggio 5 su 5 (evidenza solida)",
+      "unassessable": "Non valutabile — nessuna evidenza nella trascrizione"
+    },
+    "table": {
+      "caption": "Valutazione delle competenze BARS — punteggi degli indicatori, media della competenza e affidabilità",
+      "competency": "Competenza",
+      "mean": "Punteggio medio",
+      "reliability": "Affidabilità",
+      "indicators": "Indicatori"
+    },
+    "excerpts": {
+      "title": "Estratti (testuali dalla trascrizione)",
+      "empty": "Nessun estratto disponibile per questo indicatore"
+    },
+    "states": {
+      "loading": "Caricamento del report di valutazione…",
+      "notReady": {
+        "title": "Non ancora disponibile",
+        "message": "Il report di valutazione non è ancora disponibile. Sarà disponibile al termine della valutazione — non è necessario aggiornare questa pagina, basta riaprirla più tardi."
+      },
+      "forbidden": {
+        "title": "Accesso negato",
+        "message": "Non hai i permessi per visualizzare questa risorsa."
+      },
+      "notFound": {
+        "title": "Non trovato",
+        "message": "Questa risorsa non è stata trovata."
+      },
+      "error": {
+        "title": "Si è verificato un errore",
+        "message": "Non è stato possibile caricare il report. Riprova."
+      }
+    },
+    "downloads": {
+      "title": "Download",
+      "transcript": "Scarica trascrizione",
+      "evaluation": "Scarica valutazione (JSON)",
+      "downloading": "Download in corso…"
+    }
+  },
   "unsupported": {
     "title": "Browser non supportato",
     "message": "Questa applicazione richiede un browser desktop supportato (Chrome, Edge, Safari). Per favore accedi da un computer."

@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
-
+@import '@fontsource/open-sans';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -9,13 +8,20 @@
 
 @theme {
   /* === Colors === */
-  /* Source of truth: DESIGN.md at wrapper root. Keep in sync. */
-  --color-primary: #1e3a5f;
-  --color-primary-light: #2d5282;
-  --color-primary-dark: #132740;
-  --color-accent: #0d9488;
-  --color-accent-light: #14b8a6;
-  --color-accent-dark: #0f766e;
+  /* Source of truth: DESIGN.md §3.1 at wrapper root. Keep in sync. */
+  /* Normative Quint brand values (D10 — B1 theme reconciliation) */
+  --color-primary: #771aaf;
+  --color-primary-light: #c222d3;
+  --color-primary-dark: #4f1aaf;
+  --color-accent: #e45526;
+  --color-accent-light: #f19823;
+  --color-accent-dark: #b8431e;
+
+  /* Supporting secondary — subtle highlights, badges (DESIGN.md §3.1) */
+  --color-lavender: #8373d2;
+
+  /* Page background gradient — supersedes flat --color-neutral-50 for page backgrounds */
+  --color-bg-gradient: linear-gradient(135deg, #faf7fd 0%, #f6f1fc 45%, #fdf4ef 100%);
 
   --color-neutral-50: #f8fafc;
   --color-neutral-100: #f1f5f9;
@@ -38,7 +44,8 @@
   --color-avatar-bg: #0f172a;
 
   /* === Typography === */
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Open Sans — self-hosted via @fontsource/open-sans (GDPR-safe; no Google Fonts runtime call) */
+  --font-sans: 'Open Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* === Spacing === */
@@ -62,6 +69,17 @@
   --shadow-avatar: 0 25px 50px -12px rgb(0 0 0 / 0.5);
 }
 
+/*
+ * shadcn semantic bridge (D10). `--color-primary`, `--color-accent` and the four
+ * `--radius-*` keys are deliberately OMITTED here: they are already declared as
+ * literal brand values above in `@theme`, and re-declaring them here to
+ * `var(--primary)` / `var(--radius)` would shadow that literal (the LAST
+ * declaration of a CSS custom property in the same rule wins) — this is the
+ * confirmed bug in `frontend/app/assets/css/main.css`, where that exact
+ * re-declaration makes `bg-primary` resolve to shadcn's default grey instead of
+ * Quint purple. The six brand-carrying keys are bridged via §3's `:root` block
+ * below instead, so both resolution paths agree on the same brand value.
+ */
 @theme inline {
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -82,60 +100,83 @@
   --color-border: var(--border);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * shadcn semantic variables, brand-mapped (D10). OKLCH conversions below were
+ * produced by a standard sRGB -> OKLab -> OKLCH converter (CSS Color 4 algorithm),
+ * not eyeballed; the converter was verified against DESIGN.md §9.1's own
+ * pre-published contrast ratios (white-on-primary 8.2:1, white-on-accent 3.7:1,
+ * white-on-accent-dark 5.4:1, white-on-primary-light 4.7:1 all reproduced within
+ * 0.1). `--accent-foreground` uses `--color-neutral-900` rather than white: per
+ * DESIGN.md §9.1, white on `--color-accent` is 3.7:1 and FAILS the 4.5:1 AA
+ * threshold for normal text; neutral-900 on accent is 4.78:1 and passes.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --radius: 0.5rem;
+
+  --background: oklch(0.984 0.003 247.858); /* --color-neutral-50 */
+  --foreground: oklch(0.279 0.037 260.031); /* --color-neutral-800 */
+
+  --card: oklch(0.968 0.007 247.896); /* --color-neutral-100 */
+  --card-foreground: oklch(0.279 0.037 260.031); /* --color-neutral-800 */
+
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.279 0.037 260.031); /* --color-neutral-800 */
+
+  --primary: oklch(0.455 0.213 307.581); /* #771aaf */
+  --primary-foreground: oklch(0.985 0 0); /* white, 8.2:1 on primary */
+
+  --secondary: oklch(0.968 0.007 247.896); /* --color-neutral-100 */
+  --secondary-foreground: oklch(0.279 0.037 260.031); /* --color-neutral-800 */
+
+  --muted: oklch(0.968 0.007 247.896); /* --color-neutral-100 */
+  --muted-foreground: oklch(0.446 0.037 257.281); /* --color-neutral-600 */
+
+  --accent: oklch(0.634 0.187 37.49); /* #e45526 */
+  --accent-foreground: oklch(0.208 0.04 265.755); /* --color-neutral-900, AA-safe on accent */
+
+  --destructive: oklch(0.505 0.19 27.518); /* #b91c1c, not #ef4444 (DESIGN.md §9.1) */
+
+  --border: oklch(0.929 0.013 255.508); /* --color-neutral-200 */
+  --input: oklch(0.929 0.013 255.508); /* --color-neutral-200 */
+  --ring: oklch(0.634 0.187 37.49); /* accent — DESIGN.md §16 focus:ring-accent */
+
+  /* Chart palette — unbranded shadcn defaults; no C11 view consumes charts yet */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+
+  /* Sidebar — purple background, white foreground (DESIGN.md §8.1: "--color-primary
+     background, white text") */
+  --sidebar: oklch(0.455 0.213 307.581); /* #771aaf */
+  --sidebar-foreground: oklch(0.985 0 0); /* white, 8.2:1 on primary */
+  --sidebar-primary: oklch(0.455 0.213 307.581); /* active item — same brand purple */
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: oklch(0.406 0.209 289.368); /* hover — #4f1aaf primary-dark */
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 15%);
+  --sidebar-ring: oklch(0.634 0.187 37.49); /* accent */
 }
 
+/*
+ * Dark mode is out of scope for C11 — no view toggles the `.dark` class today.
+ * Left as shadcn's unbranded defaults so `@custom-variant dark` stays available
+ * without inventing an unratified dark-brand palette.
+ */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

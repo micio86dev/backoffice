@@ -38,6 +38,13 @@ RUN printf 'server {\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
 \n\
+    # Emit RELATIVE redirects. nginx listens on 80 but is published on another\n\
+    # port (3001 locally), and with the default absolute_redirect it answers\n\
+    # /login with "Location: http://localhost/login/" — dropping the published\n\
+    # port and sending the browser to a port where nothing serves. Every\n\
+    # directory-style route of the generated SPA was unreachable by direct URL.\n\
+    absolute_redirect off;\n\
+\n\
     # Security headers (D29 / task 7.8)\n\
     add_header X-Frame-Options "DENY" always;\n\
     add_header X-Content-Type-Options "nosniff" always;\n\

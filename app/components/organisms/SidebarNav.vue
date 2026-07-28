@@ -1,5 +1,15 @@
 <template>
-  <Sidebar>
+  <!--
+    The vendored shadcn `Sidebar` primitive renders generic <div>s with no
+    landmark role, so it can only be targeted by a CSS selector — which
+    AGENTS.md forbids for E2E locators. The role/label are applied HERE, at the
+    usage site, rather than inside the vendored primitive: this Sidebar IS the
+    app's primary navigation, but the primitive itself is generic and must not
+    claim a navigation landmark for every future consumer.
+    `Sidebar` sets `inheritAttrs: false` and re-binds `$attrs` onto its
+    rendered container, so both attributes land on a real element.
+  -->
+  <Sidebar role="navigation" :aria-label="$t('nav.sidebarLabel')">
     <SidebarHeader>
       <span class="px-2 text-lg font-semibold text-sidebar-foreground">BEAI</span>
     </SidebarHeader>

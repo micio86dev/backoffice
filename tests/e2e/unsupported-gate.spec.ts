@@ -91,6 +91,9 @@ test.describe('SA-11 — every admin route redirects at a mobile viewport (task 
     await expect(page.getByTestId('unsupported-gate')).toBeVisible()
     await expect(page).toHaveURL(/\/unsupported$/)
     // The full admin shell (sidebar nav) must never render at this viewport.
-    await expect(page.locator('[data-slot="sidebar"]')).toHaveCount(0)
+    // Role-based, not `[data-slot="sidebar"]`: AGENTS.md forbids CSS locators,
+    // and the landmark is asserted to EXIST by SidebarNav.spec.ts, so this
+    // count-0 assertion cannot be satisfied by simply deleting the role.
+    await expect(page.getByRole('navigation')).toHaveCount(0)
   })
 })

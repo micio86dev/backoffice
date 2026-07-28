@@ -1,5 +1,14 @@
 {
   "welcome": "Welcome",
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Sign in to the BEAI admin panel",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "error": "Invalid credentials. Please try again."
+  },
   "unsupported": {
     "title": "Unsupported Browser",
     "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."

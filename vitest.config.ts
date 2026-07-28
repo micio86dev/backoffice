@@ -22,8 +22,13 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '~': resolve(__dirname, '.'),
-      '@': resolve(__dirname, '.'),
+      // Nuxt 4's default srcDir is `<rootDir>/app` — both `~` and `@` alias to
+      // it there (and in components.json's `aliases` block for shadcn-vue).
+      // Vitest doesn't run through Nuxt's config, so this must be mirrored
+      // explicitly or any `@/...`/`~/...` import (all vendored ui/** components
+      // use `@/lib/utils`, `@/components/ui/*`) fails to resolve under test.
+      '~': resolve(__dirname, 'app'),
+      '@': resolve(__dirname, 'app'),
     },
   },
 })

@@ -53,9 +53,7 @@
           </TableCell>
           <TableCell>{{ participant.role_code }}</TableCell>
           <TableCell>
-            <Badge :variant="statusBadgeVariant(participant.status)">
-              {{ $t(`participants.status.${participant.status}`) }}
-            </Badge>
+            <StatusBadge :status="participant.status" />
           </TableCell>
           <TableCell>{{ formatDate(participant.created_at, locale) }}</TableCell>
         </TableRow>
@@ -109,9 +107,9 @@ import {
 } from '@/components/ui/table'
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { PARTICIPANT_STATUSES, statusBadgeVariant } from '@/utils/participant-lifecycle'
+import StatusBadge from '@/components/atoms/StatusBadge.vue'
+import { PARTICIPANT_STATUSES } from '@/utils/participant-lifecycle'
 import { formatDate } from '@/utils/format'
 
 export interface CandidateTableParticipant {

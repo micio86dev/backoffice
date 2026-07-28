@@ -72,6 +72,52 @@
       }
     }
   },
+  "report": {
+    "title": "Evaluation report",
+    "reliability": "Reliability",
+    "chip": {
+      "low": "Score 1 out of 5 (needs improvement)",
+      "mid": "Score 3 out of 5 (developing)",
+      "high": "Score 5 out of 5 (strong evidence)",
+      "unassessable": "Not assessable — no evidence in the transcript"
+    },
+    "table": {
+      "caption": "BARS competency evaluation — indicator scores, competency mean, and reliability",
+      "competency": "Competency",
+      "mean": "Mean score",
+      "reliability": "Reliability",
+      "indicators": "Indicators"
+    },
+    "excerpts": {
+      "title": "Excerpts (verbatim from transcript)",
+      "empty": "No excerpts available for this indicator"
+    },
+    "states": {
+      "loading": "Loading the evaluation report…",
+      "notReady": {
+        "title": "Not ready yet",
+        "message": "The evaluation report is not available yet. It becomes available once scoring is complete — this page does not need to be refreshed manually, only reopened later."
+      },
+      "forbidden": {
+        "title": "Access denied",
+        "message": "You do not have permission to view this resource."
+      },
+      "notFound": {
+        "title": "Not found",
+        "message": "This resource could not be found."
+      },
+      "error": {
+        "title": "Something went wrong",
+        "message": "The report could not be loaded. Please try again."
+      }
+    },
+    "downloads": {
+      "title": "Downloads",
+      "transcript": "Download transcript",
+      "evaluation": "Download evaluation (JSON)",
+      "downloading": "Downloading…"
+    }
+  },
   "unsupported": {
     "title": "Unsupported Browser",
     "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."

@@ -33,8 +33,10 @@
 
   --color-success: #22c55e;
   --color-success-light: #dcfce7;
+  --color-success-dark: #166534;
   --color-warning: #f59e0b;
   --color-warning-light: #fef3c7;
+  --color-warning-dark: #92400e;
   --color-error: #ef4444;
   --color-error-light: #fee2e2;
   --color-info: #3b82f6;

@@ -45,5 +45,9 @@
     "typescript": "^5.8",
     "vitest": "^3.0",
     "vue-tsc": "^3.3.7"
+  },
+  "overrides": {
+    "js-yaml": "^4.3.0",
+    "tar": "^7.5.22"
   }
 }

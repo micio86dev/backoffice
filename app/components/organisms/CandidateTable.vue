@@ -111,28 +111,23 @@ import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
 import { PARTICIPANT_STATUSES } from '@/utils/participant-lifecycle'
 import { formatDate } from '@/utils/format'
+import type { components, paths } from '../../../types/api'
 
-export interface CandidateTableParticipant {
-  id: string
-  candidate_ref: string
-  display_name: string
-  role_code: string
-  language: string
-  status: string
-  project_id: string
-  started_at: string | null
-  completed_at: string | null
-  created_at: string
-}
+/**
+ * Row and pagination contracts are DERIVED from the generated OpenAPI client
+ * (`types/api.ts`), never hand-copied (AGENTS.md — "never hand-maintain
+ * request/response types"). A field-for-field local duplicate compiles green
+ * forever: codegen updates, the drift check stays green, `nuxi typecheck`
+ * stays green, and the table renders `undefined` in production. Deriving here
+ * makes that failure a compile error at the call site instead.
+ *
+ * `tests/nuxt/candidate-table-contract.ts` asserts the derivation explicitly
+ * so reintroducing a duplicate fails the typecheck gate.
+ */
+export type CandidateTableParticipant = components['schemas']['ParticipantResource']
 
-export interface CandidateTableMeta {
-  current_page: number
-  last_page: number
-  total: number
-  from: number | null
-  to: number | null
-  per_page: number
-}
+export type CandidateTableMeta =
+  paths['/participants']['get']['responses']['200']['content']['application/json']['meta']
 
 export interface CandidateTableFilters {
   status: string

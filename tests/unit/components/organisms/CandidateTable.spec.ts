@@ -59,7 +59,7 @@ describe('CandidateTable', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'useI18n',
-      vi.fn(() => ({ locale: ref('en') }))
+      vi.fn(() => ({ t: (key: string) => key, locale: ref('en') }))
     )
   })
 

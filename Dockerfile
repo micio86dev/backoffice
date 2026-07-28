@@ -19,6 +19,20 @@ RUN bun install --frozen-lockfile
 # Copy source
 COPY . .
 
+# The API base is BAKED IN at build time. This is a statically generated SPA, so
+# a runtime `environment:` entry in docker-compose has no effect whatsoever — the
+# value is compiled into the JS bundle here and cannot be changed afterwards.
+#
+# It MUST include the `/api` suffix: the composables build `${apiBase}/auth/login`,
+# and Laravel's CORS middleware only covers `api/*`. Without the suffix the browser
+# hits `/auth/login`, gets a 404 carrying no Access-Control-Allow-Origin header,
+# and reports it as a CORS failure — masking a simple wrong-URL bug.
+#
+# Declaring it as an ARG makes the built image explicit and independent of whatever
+# `.env` happens to sit in the build context on a given developer's machine.
+ARG NUXT_PUBLIC_API_BASE=http://localhost:8000/api
+ENV NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE}
+
 # Generate the static SPA output (Nuxt SPA mode: ssr: false → nuxt generate)
 RUN bun run generate
 

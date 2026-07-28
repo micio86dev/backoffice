@@ -59,9 +59,13 @@ definePageMeta({
   layout: false,
 })
 
+const { t } = useI18n()
+
 useHead({
-  // WCAG 2.4.2 (Page Titled): non-empty <title> required.
-  title: 'Login',
+  // WCAG 2.4.2 (Page Titled): non-empty <title> required — and the title is
+  // user-facing (browser tab, bookmark, window switcher, and the first thing a
+  // screen reader announces on navigation), so it goes through i18n.
+  title: () => t('head.title.login'),
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 

@@ -55,6 +55,8 @@ import { useAuth } from '@/composables/useAuth'
 
 definePageMeta({
   name: 'login',
+  // Pre-auth surface — never wrapped in the authenticated admin shell (D11/task 15.3).
+  layout: false,
 })
 
 useHead({

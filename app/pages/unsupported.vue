@@ -8,6 +8,8 @@
 <script setup lang="ts">
 definePageMeta({
   name: 'unsupported',
+  // Pre-gate surface — never wrapped in the authenticated admin shell (D11/task 15.3).
+  layout: false,
 })
 
 useHead({

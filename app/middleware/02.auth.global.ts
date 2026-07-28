@@ -11,11 +11,16 @@
  * not depend on execution order alone. Without this, a mobile visitor whose
  * browser-gate check somehow didn't fire first would be redirected to /login
  * instead of /unsupported, breaking SA-11.
+ *
+ * `/health` is also exempt: it is a machine-readable infra health check
+ * (C1), never a gated admin view, and must stay reachable without a session.
  */
 import { useAuth } from '@/composables/useAuth'
 
+const PUBLIC_PATHS = ['/unsupported', '/login', '/health']
+
 export default defineNuxtRouteMiddleware((to) => {
-  if (to.path.endsWith('/unsupported') || to.path.endsWith('/login')) {
+  if (PUBLIC_PATHS.some((path) => to.path.endsWith(path))) {
     return
   }
 

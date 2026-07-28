@@ -9,6 +9,17 @@
     "submitting": "Accesso in corso…",
     "error": "Credenziali non valide. Riprova."
   },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Progetti",
+    "candidates": "Candidati",
+    "reports": "Report",
+    "settings": "Impostazioni",
+    "logout": "Esci"
+  },
+  "dashboard": {
+    "title": "Dashboard"
+  },
   "unsupported": {
     "title": "Browser non supportato",
     "message": "Questa applicazione richiede un browser desktop supportato (Chrome, Edge, Safari). Per favore accedi da un computer."

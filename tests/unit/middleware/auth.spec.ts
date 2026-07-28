@@ -58,4 +58,14 @@ describe('02.auth.global.ts', () => {
 
     expect(navigateToMock).not.toHaveBeenCalled()
   })
+
+  it('never redirects on /health, even when unauthenticated (regression guard — E2E caught this: the global auth middleware initially had no exemption and silently redirected the machine-readable health-check page to /login)', async () => {
+    const navigateToMock = vi.fn()
+    vi.stubGlobal('navigateTo', navigateToMock)
+
+    const middleware = (await import('../../../app/middleware/02.auth.global')).default
+    middleware({ path: '/health' } as never, {} as never)
+
+    expect(navigateToMock).not.toHaveBeenCalled()
+  })
 })

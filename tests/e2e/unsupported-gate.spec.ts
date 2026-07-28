@@ -45,3 +45,49 @@ test.describe('SA-11 — Unsupported experience gate', () => {
     await expect(page).toHaveScreenshot('unsupported-gate.png', { fullPage: true })
   })
 })
+
+test.describe('SA-11 — every admin route redirects at a mobile viewport (task 15.1)', () => {
+  // Explicit 375px viewport regardless of which project runs this file — the
+  // `mobile` project's own device viewport would already satisfy this, but
+  // `chromium`/`webkit` run the full suite (this file included) at their
+  // normal desktop viewport, where the SA-11 gate would NOT fire and these
+  // assertions would be meaningless. Forcing the viewport here makes the test
+  // literally match the spec scenario ("GIVEN a viewport width of 375px") on
+  // every project, not just the one whose device preset happens to be narrow.
+  test.use({ viewport: { width: 375, height: 667 } })
+
+  // Every route that exists in this PR (B1): the pre-auth /login page and the
+  // authenticated dashboard shell (/). Participant list/detail and the report
+  // viewer (B2/B3) don't exist yet — they must be added to this list when
+  // those PRs land, so the SA-11 gate coverage doesn't silently go stale.
+  const ADMIN_ROUTES = ['/', '/login']
+
+  for (const route of ADMIN_ROUTES) {
+    test(`${route} renders /unsupported at a mobile viewport when unauthenticated`, async ({
+      page,
+    }) => {
+      await page.goto(route)
+      await expect(page.getByTestId('unsupported-gate')).toBeVisible()
+      await expect(page).toHaveURL(/\/unsupported$/)
+    })
+  }
+
+  test('an authenticated visitor is STILL sent to /unsupported at a mobile viewport (the browser gate runs before the auth gate)', async ({
+    page,
+  }) => {
+    // No live API in this environment — a session token is injected directly
+    // into sessionStorage (exactly what useAuth().setSession() writes) to
+    // prove the SA-11 gate fires regardless of auth state, without depending
+    // on a running backend for a UI-only assertion.
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem('beai_access_token', 'e2e-fake-session-token')
+    })
+
+    await page.goto('/')
+
+    await expect(page.getByTestId('unsupported-gate')).toBeVisible()
+    await expect(page).toHaveURL(/\/unsupported$/)
+    // The full admin shell (sidebar nav) must never render at this viewport.
+    await expect(page.locator('[data-slot="sidebar"]')).toHaveCount(0)
+  })
+})

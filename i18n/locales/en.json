@@ -9,6 +9,17 @@
     "submitting": "Signing in…",
     "error": "Invalid credentials. Please try again."
   },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "candidates": "Candidates",
+    "reports": "Reports",
+    "settings": "Settings",
+    "logout": "Log out"
+  },
+  "dashboard": {
+    "title": "Dashboard"
+  },
   "unsupported": {
     "title": "Unsupported Browser",
     "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."

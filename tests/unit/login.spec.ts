@@ -22,7 +22,7 @@ describe('LoginPage', () => {
   it('renders the login form with email, password and submit', () => {
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
     const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
 
@@ -42,7 +42,7 @@ describe('LoginPage', () => {
     vi.stubGlobal('navigateTo', navigateToMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
@@ -52,7 +52,7 @@ describe('LoginPage', () => {
     await new Promise((r) => setTimeout(r, 0))
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.test/auth/login',
+      'https://api.test/api/auth/login',
       expect.objectContaining({
         method: 'POST',
         body: { email: 'admin@example.com', password: 'secret' },
@@ -71,7 +71,7 @@ describe('LoginPage', () => {
     vi.stubGlobal('navigateTo', navigateToMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
@@ -83,5 +83,24 @@ describe('LoginPage', () => {
     expect(navigateToMock).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="login-error"]').exists()).toBe(true)
     expect(sessionStorage.getItem('beai_access_token')).toBeNull()
+  })
+
+  it('routes the <title> through i18n instead of a hardcoded English literal', () => {
+    const useHeadMock = vi.fn()
+    vi.stubGlobal('useHead', useHeadMock)
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: (key: string) => key }))
+    )
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+
+    mount(LoginPage, { global: { mocks: { $t: tMock } } })
+
+    const head = useHeadMock.mock.calls[0]?.[0] as { title?: () => string }
+    expect(typeof head?.title).toBe('function')
+    expect(head?.title?.()).toBe('head.title.login')
   })
 })

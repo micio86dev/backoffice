@@ -11,6 +11,7 @@
     "postinstall": "nuxt prepare",
     "prepare": "husky",
     "typecheck": "nuxi typecheck",
+    "lint": "eslint .",
     "test:unit": "node node_modules/.bin/vitest run",
     "test:unit:coverage": "node node_modules/.bin/vitest run --coverage",
     "test:e2e": "node node_modules/.bin/playwright test",

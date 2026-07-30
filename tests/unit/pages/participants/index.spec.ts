@@ -33,14 +33,21 @@ function listResponse(page: number) {
   }
 }
 
+function httpError(status: number): Error & { status: number } {
+  return Object.assign(new Error(`HTTP ${status}`), { status })
+}
+
+let useHeadMock: ReturnType<typeof vi.fn>
+
 describe('pages/participants/index.vue', () => {
   beforeEach(() => {
     vi.resetModules()
+    useHeadMock = vi.fn()
     vi.stubGlobal('definePageMeta', vi.fn())
-    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal('useHead', useHeadMock)
     vi.stubGlobal(
       'useI18n',
-      vi.fn(() => ({ locale: ref('en') }))
+      vi.fn(() => ({ t: (key: string) => key, locale: ref('en') }))
     )
   })
 
@@ -119,6 +126,112 @@ describe('pages/participants/index.vue', () => {
     expect(listParticipantsMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ page: 1, status: 'completato' })
     )
+  })
+
+  it('routes the <title> through i18n instead of a hardcoded English literal', async () => {
+    vi.doMock('../../../../app/composables/useParticipants', () => ({
+      useParticipants: () => ({ listParticipants: vi.fn().mockResolvedValue(listResponse(1)) }),
+    }))
+
+    const IndexPage = (await import('../../../../app/pages/participants/index.vue')).default
+    mount(IndexPage, {
+      global: {
+        mocks: { $t: tMock },
+        stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+      },
+    })
+
+    const head = useHeadMock.mock.calls[0]?.[0] as { title?: () => string }
+    expect(typeof head?.title).toBe('function')
+    expect(head?.title?.()).toBe('head.title.participants')
+  })
+
+  describe('failed list fetch (D4 — a failure must never render as an empty result set)', () => {
+    async function mountWithStatus(status: number) {
+      vi.doMock('../../../../app/composables/useParticipants', () => ({
+        useParticipants: () => ({
+          listParticipants: vi.fn().mockRejectedValue(httpError(status)),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/participants/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        global: {
+          mocks: { $t: tMock },
+          stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+        },
+      })
+      await flushPromises()
+      return wrapper
+    }
+
+    it.each([
+      [403, 'errors.states.forbidden', ['errors.states.notFound', 'errors.states.notReady']],
+      [404, 'errors.states.notFound', ['errors.states.forbidden', 'errors.states.notReady']],
+      [409, 'errors.states.notReady', ['errors.states.forbidden', 'errors.states.notFound']],
+      [500, 'errors.states.error', ['errors.states.forbidden', 'errors.states.notFound']],
+    ])(
+      'renders the %i state distinctly, never the table empty state',
+      async (status, expectedKey, otherKeys) => {
+        const wrapper = await mountWithStatus(status as number)
+
+        expect(wrapper.find('[data-testid="participants-error"]').exists()).toBe(true)
+        expect(wrapper.text()).toContain(`${expectedKey}.title`)
+        expect(wrapper.text()).toContain(`${expectedKey}.message`)
+        // "No candidates match the current filters" is indistinguishable from a
+        // genuinely empty page — a failed fetch must never reach it.
+        expect(wrapper.text()).not.toContain('participants.table.empty')
+        for (const otherKey of otherKeys as string[]) {
+          expect(wrapper.text()).not.toContain(`${otherKey}.title`)
+        }
+      }
+    )
+
+    it('keeps 409 and 403 distinct on the error element itself', async () => {
+      const notReady = await mountWithStatus(409)
+      vi.resetModules()
+      const forbidden = await mountWithStatus(403)
+
+      const notReadyState = notReady
+        .find('[data-testid="participants-error"]')
+        .attributes('data-state')
+      const forbiddenState = forbidden
+        .find('[data-testid="participants-error"]')
+        .attributes('data-state')
+
+      expect(notReadyState).toBe('not-ready')
+      expect(forbiddenState).toBe('forbidden')
+      expect(notReadyState).not.toBe(forbiddenState)
+    })
+
+    it('recovers to the table when a later fetch succeeds (the error state is not sticky)', async () => {
+      const listParticipantsMock = vi
+        .fn()
+        .mockRejectedValueOnce(httpError(500))
+        .mockResolvedValueOnce(listResponse(2))
+      vi.doMock('../../../../app/composables/useParticipants', () => ({
+        useParticipants: () => ({ listParticipants: listParticipantsMock }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/participants/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        global: {
+          mocks: { $t: tMock },
+          stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+        },
+      })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="participants-error"]').exists()).toBe(true)
+
+      // The table (and its filter controls) are hidden while the error shows,
+      // so recovery is driven through the page's own filter handler.
+      const page = wrapper.vm as unknown as { onFiltersChange: (f: unknown) => void }
+      page.onFiltersChange({ status: '', q: '' })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="participants-error"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Candidate 2')
+    })
   })
 })
 

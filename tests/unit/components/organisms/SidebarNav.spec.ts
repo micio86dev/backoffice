@@ -80,4 +80,35 @@ describe('SidebarNav', () => {
     const wrapper = mountSidebarNav('/login')
     expect(wrapper.findAll('a[aria-current="page"]')).toHaveLength(0)
   })
+
+  it('exposes a labelled navigation landmark, so E2E can target it by ROLE instead of a CSS selector', () => {
+    // The vendored shadcn Sidebar renders bare <div>s. Without this landmark
+    // the only way to reach it from Playwright is `[data-slot="sidebar"]`,
+    // which AGENTS.md forbids — and a screen-reader user gets no landmark at
+    // all. The E2E counterpart asserts ABSENCE (count 0), which would pass
+    // trivially if the role were dropped; this test asserts PRESENCE.
+    const wrapper = mountSidebarNav('/')
+
+    const landmark = wrapper.find('[role="navigation"]')
+    expect(landmark.exists()).toBe(true)
+    expect(landmark.attributes('aria-label')).toBe('nav.sidebarLabel')
+  })
+
+  it('routes the navigation landmark label through i18n, never hardcoded text', () => {
+    const tSpy = vi.fn((key: string) => `translated:${key}`)
+    vi.stubGlobal(
+      'useRoute',
+      vi.fn(() => ({ path: '/' }))
+    )
+    const wrapper = mount(Harness, {
+      global: {
+        mocks: { $t: tSpy },
+        stubs: { NuxtLink: NuxtLinkStub },
+      },
+    })
+
+    expect(wrapper.find('[role="navigation"]').attributes('aria-label')).toBe(
+      'translated:nav.sidebarLabel'
+    )
+  })
 })

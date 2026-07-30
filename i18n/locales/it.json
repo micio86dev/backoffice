@@ -9,7 +9,37 @@
     "submitting": "Accesso in corso…",
     "error": "Credenziali non valide. Riprova."
   },
+  "head": {
+    "title": {
+      "dashboard": "Dashboard",
+      "login": "Accedi",
+      "participants": "Candidati",
+      "participantDetail": "Dettaglio candidato",
+      "unsupported": "Browser non supportato"
+    }
+  },
+  "errors": {
+    "states": {
+      "notReady": {
+        "title": "Non ancora disponibile",
+        "message": "Questi dati non sono ancora disponibili. Saranno visibili al termine dell'elaborazione — basta riaprire questa pagina più tardi."
+      },
+      "forbidden": {
+        "title": "Accesso negato",
+        "message": "Non hai i permessi per visualizzare questi dati."
+      },
+      "notFound": {
+        "title": "Non trovato",
+        "message": "Questa risorsa non è stata trovata."
+      },
+      "error": {
+        "title": "Si è verificato un errore",
+        "message": "Non è stato possibile caricare i dati. Riprova."
+      }
+    }
+  },
   "nav": {
+    "sidebarLabel": "Navigazione principale",
     "dashboard": "Dashboard",
     "projects": "Progetti",
     "candidates": "Candidati",
@@ -24,6 +54,7 @@
       "completionRate": "Tasso di completamento",
       "tokensUsed": "Token AI utilizzati",
       "latency": "Latenza AI (p50 / p95)",
+      "latencyValue": "{p50} / {p95} ms",
       "noData": "Nessun dato disponibile"
     }
   },

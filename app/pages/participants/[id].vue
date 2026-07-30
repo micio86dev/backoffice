@@ -4,7 +4,17 @@
       {{ $t('participants.detail.backToList') }}
     </NuxtLink>
 
-    <div v-if="participant" class="flex flex-col gap-6">
+    <Alert
+      v-if="participantState !== 'loading' && participantState !== 'ready'"
+      :variant="participantState === 'not-ready' ? 'default' : 'destructive'"
+      :data-state="participantState"
+      data-testid="participant-error"
+    >
+      <AlertTitle>{{ $t(participantErrorTitleKey) }}</AlertTitle>
+      <AlertDescription>{{ $t(participantErrorMessageKey) }}</AlertDescription>
+    </Alert>
+
+    <div v-else-if="participant" class="flex flex-col gap-6">
       <div>
         <h1 class="text-2xl font-semibold text-foreground">{{ participant.display_name }}</h1>
         <p class="text-muted-foreground text-sm">
@@ -182,39 +192,52 @@ import { useEvaluationReport, type EvaluationReportData } from '@/composables/us
 import { useDownloads } from '@/composables/useDownloads'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
 import { formatDate } from '@/utils/format'
-import { getErrorStatus } from '@/utils/http-error'
+import {
+  resolveResourceErrorState,
+  resourceErrorKey,
+  type ResourceErrorState,
+  type ResourceState,
+} from '@/utils/error-state'
 
 definePageMeta({
   name: 'participant-detail',
 })
 
+const route = useRoute()
+const { t, locale } = useI18n()
+
 useHead({
-  title: 'Candidate detail',
+  // A <title> is user-facing (browser tab, bookmark, window switcher, and the
+  // first thing a screen reader announces on navigation) — it goes through
+  // i18n like every other user-facing string.
+  title: () => t('head.title.participantDetail'),
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-type GatedState = 'loading' | 'ready' | 'not-ready' | 'forbidden' | 'not-found' | 'error'
-
-function resolveGatedState(error: unknown): Exclude<GatedState, 'loading' | 'ready'> {
-  switch (getErrorStatus(error)) {
-    case 409:
-      return 'not-ready'
-    case 403:
-      return 'forbidden'
-    case 404:
-      return 'not-found'
-    default:
-      return 'error'
-  }
-}
-
-const route = useRoute()
-const { locale } = useI18n()
 const { fetchParticipant } = useParticipants()
 const { fetchEvaluation } = useEvaluationReport()
 const { downloadTranscript, downloadEvaluation } = useDownloads()
 
 const participant = ref<ParticipantDetailResponse['data'] | null>(null)
+
+// The PRIMARY resource fetch gets the same treatment the evaluation and the
+// downloads already had (D4). Without it a failure left `participant` null,
+// `v-if="participant"` never rendered, and the operator got a blank page with
+// a back-link — a failure state that looks like an empty page, not an error.
+const participantState = ref<ResourceState>('loading')
+
+const participantErrorState = computed<ResourceErrorState>(() =>
+  participantState.value === 'loading' || participantState.value === 'ready'
+    ? 'error'
+    : participantState.value
+)
+
+const participantErrorTitleKey = computed(() =>
+  resourceErrorKey(participantErrorState.value, 'title')
+)
+const participantErrorMessageKey = computed(() =>
+  resourceErrorKey(participantErrorState.value, 'message')
+)
 
 const transcriptReady = computed(() =>
   participant.value ? isParticipantResourceReady(participant.value.status, 'transcript') : false
@@ -223,32 +246,22 @@ const evaluationReady = computed(() =>
   participant.value ? isParticipantResourceReady(participant.value.status, 'evaluation') : false
 )
 
-const evaluationState = ref<GatedState>('loading')
+const evaluationState = ref<ResourceState>('loading')
 const evaluationData = ref<EvaluationReportData | null>(null)
 
 const transcriptDownloading = ref(false)
 const evaluationDownloading = ref(false)
-const downloadError = ref<Exclude<GatedState, 'loading' | 'ready'> | null>(null)
+const downloadError = ref<ResourceErrorState | null>(null)
 
-const downloadErrorTitleKey = computed(
-  () => `report.states.${gatedStateKey(downloadError.value)}.title`
+// The report/download surfaces keep their report-specific wording, so they
+// resolve their keys against the `report.states` namespace rather than the
+// generic `errors.states` one.
+const downloadErrorTitleKey = computed(() =>
+  resourceErrorKey(downloadError.value ?? 'error', 'title', 'report.states')
 )
-const downloadErrorMessageKey = computed(
-  () => `report.states.${gatedStateKey(downloadError.value)}.message`
+const downloadErrorMessageKey = computed(() =>
+  resourceErrorKey(downloadError.value ?? 'error', 'message', 'report.states')
 )
-
-function gatedStateKey(state: Exclude<GatedState, 'loading' | 'ready'> | null): string {
-  switch (state) {
-    case 'not-ready':
-      return 'notReady'
-    case 'forbidden':
-      return 'forbidden'
-    case 'not-found':
-      return 'notFound'
-    default:
-      return 'error'
-  }
-}
 
 function downloadFilename(type: 'transcript' | 'evaluation', extension: string): string {
   const ref = participant.value?.candidate_ref ?? 'candidate'
@@ -264,7 +277,7 @@ async function onDownloadTranscript(): Promise<void> {
   try {
     await downloadTranscript(id, downloadFilename('transcript', 'txt'))
   } catch (error) {
-    downloadError.value = resolveGatedState(error)
+    downloadError.value = resolveResourceErrorState(error)
   } finally {
     transcriptDownloading.value = false
   }
@@ -278,7 +291,7 @@ async function onDownloadEvaluation(): Promise<void> {
   try {
     await downloadEvaluation(id, downloadFilename('evaluation', 'json'))
   } catch (error) {
-    downloadError.value = resolveGatedState(error)
+    downloadError.value = resolveResourceErrorState(error)
   } finally {
     evaluationDownloading.value = false
   }
@@ -286,14 +299,24 @@ async function onDownloadEvaluation(): Promise<void> {
 
 onMounted(async () => {
   const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
-  const response = await fetchParticipant(id as string)
-  participant.value = response.data
+
+  try {
+    const response = await fetchParticipant(id as string)
+    participant.value = response.data
+    participantState.value = 'ready'
+  } catch (error) {
+    participantState.value = resolveResourceErrorState(error)
+    // The evaluation belongs to a participant we could not read (403 / 404 /
+    // transport failure) — fetching it would only produce a second, noisier
+    // failure for a resource the operator cannot see anyway.
+    return
+  }
 
   try {
     evaluationData.value = await fetchEvaluation(id as string)
     evaluationState.value = 'ready'
   } catch (error) {
-    evaluationState.value = resolveGatedState(error)
+    evaluationState.value = resolveResourceErrorState(error)
   }
 })
 </script>

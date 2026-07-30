@@ -12,9 +12,12 @@ definePageMeta({
   layout: false,
 })
 
+const { t } = useI18n()
+
 useHead({
-  // WCAG 2.4.2 (Page Titled): non-empty <title> required.
-  title: 'Unsupported browser',
+  // WCAG 2.4.2 (Page Titled): non-empty <title> required — and the title is
+  // user-facing, so it goes through i18n exactly like the <h1> below it.
+  title: () => t('head.title.unsupported'),
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 </script>

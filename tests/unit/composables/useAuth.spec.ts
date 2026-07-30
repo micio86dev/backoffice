@@ -25,7 +25,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
 
   it('issues exactly ONE /api/auth/refresh call for 2+ concurrent refresh() callers, and both resolve to the new token', async () => {
     const fetchMock = vi.fn(async (url: string) => {
-      expect(url).toContain('/auth/refresh')
+      expect(url).toBe('https://api.test/api/auth/refresh')
       // Simulate real latency so both callers are genuinely concurrent.
       await new Promise((r) => setTimeout(r, 10))
       return { access_token: 'new-token-after-rotation', token_type: 'bearer' }
@@ -33,7 +33,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
     vi.stubGlobal('$fetch', fetchMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const { useAuth } = await import('../../../app/composables/useAuth')
@@ -62,7 +62,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
     vi.stubGlobal('$fetch', fetchMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const { useAuth } = await import('../../../app/composables/useAuth')
@@ -84,7 +84,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
     vi.stubGlobal('$fetch', fetchMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const { useAuth } = await import('../../../app/composables/useAuth')
@@ -99,14 +99,14 @@ describe('useAuth — single-flight refresh (D11)', () => {
   it('logout() calls POST /api/auth/logout, clears the session, and navigates to /login regardless of the response (task 14.4)', async () => {
     const navigateToMock = vi.fn()
     const fetchMock = vi.fn(async (url: string) => {
-      expect(url).toContain('/auth/logout')
+      expect(url).toBe('https://api.test/api/auth/logout')
       return { message: 'Successfully logged out.' }
     })
     vi.stubGlobal('$fetch', fetchMock)
     vi.stubGlobal('navigateTo', navigateToMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const { useAuth } = await import('../../../app/composables/useAuth')
@@ -129,7 +129,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
     vi.stubGlobal('navigateTo', navigateToMock)
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
     const { useAuth } = await import('../../../app/composables/useAuth')
@@ -145,7 +145,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
   it('setSession persists to sessionStorage and clearSession removes it', () => {
     vi.stubGlobal(
       'useRuntimeConfig',
-      vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
     const KEY = 'beai_access_token'
 

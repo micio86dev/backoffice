@@ -7,7 +7,7 @@
  * authorized query, never a client-side slice of a superset.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 const tMock = (key: string) => key

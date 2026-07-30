@@ -4,7 +4,7 @@
  * green throughout).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 const tMock = vi.fn((key: string) => (key === 'dashboard.title' ? 'Dashboard' : key))

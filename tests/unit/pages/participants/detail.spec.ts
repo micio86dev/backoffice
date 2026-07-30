@@ -7,7 +7,7 @@
  * not a live 409 fetch: full transcript/evaluation viewing is PR B3).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
 
 const tMock = (key: string) => key

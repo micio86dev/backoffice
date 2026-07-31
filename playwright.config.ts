@@ -54,6 +54,19 @@ export default defineConfig({
   webServer: {
     command: 'bun run generate && bunx serve .output/public -p 3000 -s --no-port-switching',
     url: 'http://127.0.0.1:3000/health',
+    env: {
+      // C13 task 5.6: the consent banner only appears where there is something
+      // to ask permission FOR, so E2E needs a measurement ID configured.
+      //
+      // Set at GENERATE time, not serve time, and that is not incidental: this
+      // app is a static SPA with no server to read the environment at runtime,
+      // so a value supplied later would never reach the bundle.
+      //
+      // The ID is fake and analytics-consent.spec.ts blocks the third-party
+      // hosts at the network layer — a suite that phoned Google on every run
+      // would be slow, flaky, and reporting CI traffic into a real property.
+      NUXT_PUBLIC_GA_MEASUREMENT_ID: 'G-E2ETEST',
+    },
     reuseExistingServer: !process.env['CI'],
     timeout: 180_000,
   },

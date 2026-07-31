@@ -68,6 +68,13 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: '',
+      // C13 task 5.3 — analytics. EMPTY means the tool does not load at all,
+      // which is the correct default: these are per-deployment IDs, and a
+      // committed one would have every developer's local session reported into
+      // a production property. Consent gates them independently
+      // (app/utils/analytics-consent.ts) and defaults to denied.
+      gaMeasurementId: '',
+      clarityProjectId: '',
     },
   },
 })

@@ -12,6 +12,15 @@ vi.stubGlobal('toRef', toRef)
 vi.stubGlobal('toRefs', toRefs)
 
 // Stub Nuxt compiler macros that are unavailable in Vitest context
+// Nuxt auto-import. Stubbed globally rather than per-spec because it is a
+// global in the running app: app.vue reads the route to tell the consent banner
+// where it is, and a spec that mounts the app shell should not have to know
+// that a component three levels down cares about the URL.
+vi.stubGlobal(
+  'useRoute',
+  vi.fn(() => ({ fullPath: '/', path: '/', params: {}, query: {} }))
+)
+
 vi.stubGlobal('definePageMeta', vi.fn())
 vi.stubGlobal('useHead', vi.fn())
 // apiBase carries the `/api` suffix, exactly like .env.example / Dockerfile.

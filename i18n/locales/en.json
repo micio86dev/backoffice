@@ -155,5 +155,12 @@
   },
   "health": {
     "status": "ok"
+  },
+  "analytics_consent": {
+    "region_label": "Analytics cookie consent",
+    "title": "Help us improve the backoffice?",
+    "description": "We would like to use analytics cookies to understand how the backoffice is used. We do not collect candidate data or the pages that show it. You can refuse with no consequences.",
+    "accept": "Accept",
+    "reject": "Refuse"
   }
 }

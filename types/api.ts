@@ -596,6 +596,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["queueHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/candidate/session": {
         parameters: {
             query?: never;
@@ -754,6 +770,7 @@ export interface components {
                 language: string;
                 assessment_type: string;
                 exit_redirect_url: string;
+                error_redirect_url: string;
             } | null;
         };
         /** BarsIndicatorResource */
@@ -851,6 +868,7 @@ export interface components {
             nudge_min_chars: string;
             exit_redirect_url: string;
             webhook_url: string;
+            webhook_events: string;
             /** @description webhook_secret intentionally excluded (hidden + encrypted) */
             deadline_at: string | null;
             goes_live_at: string | null;
@@ -902,8 +920,15 @@ export interface components {
             /** Format: uri */
             exit_redirect_url?: string | null;
             /** Format: uri */
+            error_redirect_url?: string | null;
+            /** Format: uri */
             webhook_url?: string | null;
             webhook_secret?: string | null;
+            /**
+             * @description Closed event-type set (C10 D10) — not env-overridable, so Rule::in reads
+             *     the config, never a hardcoded list.
+             */
+            webhook_events?: ("progress" | "evaluation")[];
             /** Format: date-time */
             deadline_at?: string | null;
             /** Format: date-time */
@@ -1860,6 +1885,60 @@ export interface operations {
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
+        };
+    };
+    queueHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "degraded" | "ok";
+                        worker: {
+                            alive: boolean;
+                            last_heartbeat_age_seconds: Record<string, never> | null;
+                        };
+                        queue: {
+                            depth: number;
+                            last_processed_age_seconds: Record<string, never> | null;
+                            stalled: string;
+                            oldest_reserved_age_seconds: number | null;
+                            reservation_stalled: string;
+                        };
+                        failed: {
+                            count: number;
+                            oldest_age_seconds: Record<string, never> | null;
+                        };
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "down";
+                        worker: {
+                            alive: boolean;
+                            last_heartbeat_age_seconds: Record<string, never> | null;
+                        };
+                        queue: null;
+                        failed: null;
+                    };
+                };
+            };
         };
     };
     "session.show": {

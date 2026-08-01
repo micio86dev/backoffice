@@ -1,13 +1,28 @@
 /**
  * Avatar template shapes (C14).
  *
- * Hand-written rather than pulled from `types/api.ts`, and that is a temporary
- * state worth naming: the generated client is produced from the API's published
- * OpenAPI spec, and these endpoints postdate the last generation. Regenerating
- * it is the correct fix, and these types should be deleted the moment it
- * happens — two definitions of one contract is exactly the drift this project
- * avoids everywhere else.
+ * DERIVED from the generated client wherever the generator gets it right, and
+ * narrowed — with a reason — in the two places it cannot.
+ *
+ * Scramble infers the response envelope, the ids, the names and the timestamps
+ * correctly, so those come from `paths` and stay correct for free. It cannot
+ * infer:
+ *
+ *   - `config`, which it reports as `unknown[]`. PHP has one `array` type for
+ *     both lists and maps, and this one is a MAP. Adopting the generated type
+ *     would mean the client believing an object is an array — worse than a
+ *     hand-written type, because it is confidently wrong rather than absent.
+ *
+ *   - `provider`, which it reports as `string`. The union lives in a PHP
+ *     `match` and a database CHECK, neither of which reaches OpenAPI.
+ *
+ * Both narrowings are `Omit` + re-add rather than a parallel definition, so
+ * every OTHER field still tracks the API automatically. If a field is added
+ * server-side it appears here without an edit; if one is removed, this file
+ * stops compiling.
  */
+
+import type { components, paths } from '../../types/api'
 
 export type ProviderName = 'heygen' | 'tavus'
 
@@ -16,9 +31,13 @@ export type FieldType = 'text' | 'number' | 'select' | 'checkbox'
 /**
  * One configurable knob, as the API describes it.
  *
+ * Hand-written, because the endpoint returns a provider-keyed map of arbitrary
+ * field descriptors and Scramble types it as `data: string`. There is nothing
+ * to derive from.
+ *
  * The form is BUILT from these rather than hand-written, so a knob added
- * server-side appears here without a frontend change — and, more importantly,
- * a knob the server does not know about cannot appear at all.
+ * server-side appears without a frontend change — and a knob the server does
+ * not know about cannot appear at all.
  */
 export interface FieldSpec {
   key: string
@@ -35,15 +54,11 @@ export type FieldSpecsResponse = {
   data: Record<ProviderName, FieldSpec[]>
 }
 
-export interface AvatarTemplate {
-  id: number
-  name: string
-  description: string | null
-  provider: ProviderName
+type GeneratedTemplate = components['schemas']['AvatarTemplateResource']
+
+export type AvatarTemplate = Omit<GeneratedTemplate, 'config' | 'provider'> & {
   config: Record<string, unknown>
-  is_active: boolean
-  created_at: string | null
-  updated_at: string | null
+  provider: ProviderName
 }
 
 /**
@@ -53,12 +68,16 @@ export interface AvatarTemplate {
  * provider — never the provider's own words. The save itself succeeded; the
  * operator needs to know a knob has not taken effect yet, and telling them in
  * the vendor's language would name the vendor.
+ *
+ * Absent from the generated schema because it is conditional: Scramble sees the
+ * resource, not the `additional()` an unhappy path attaches.
  */
 export interface TemplateResponse {
   data: AvatarTemplate
   warning?: string
 }
 
-export interface TemplateListResponse {
-  data: AvatarTemplate[]
-}
+export type TemplateListResponse = Omit<
+  paths['/avatar-templates']['get']['responses']['200']['content']['application/json'],
+  'data'
+> & { data: AvatarTemplate[] }

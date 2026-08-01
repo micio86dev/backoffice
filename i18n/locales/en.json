@@ -45,7 +45,8 @@
     "candidates": "Candidates",
     "reports": "Reports",
     "settings": "Settings",
-    "logout": "Log out"
+    "logout": "Log out",
+    "avatarTemplates": "Avatar templates"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -162,5 +163,76 @@
     "description": "We would like to use analytics cookies to understand how the backoffice is used. We do not collect candidate data or the pages that show it. You can refuse with no consequences.",
     "accept": "Accept",
     "reject": "Refuse"
+  },
+  "avatar_templates": {
+    "title": "Avatar templates",
+    "intro": "Defines the face and voice every candidate of this organization meets. One template is active at a time.",
+    "empty": "No templates yet. Until you activate one, interviews use the provider's own defaults.",
+    "active": "Active",
+    "provider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
+    },
+    "action": {
+      "new": "New template",
+      "edit": "Edit",
+      "activate": "Activate",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "form": {
+      "new_title": "New template",
+      "edit_title": "Edit template",
+      "name": "Name",
+      "description": "Description",
+      "provider": "Service",
+      "provider_locked": "The service cannot be changed after creation: the settings belong to one service only. Create a new template instead.",
+      "settings": "Settings",
+      "default": "Default",
+      "required": "Required",
+      "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it."
+    },
+    "error": {
+      "load_title": "Could not load templates",
+      "load_body": "Try again. If it keeps failing, check that you hold the administrator role."
+    },
+    "warning": {
+      "title": "Saved, with a warning",
+      "pal_sync_failed": "Some advanced settings have not reached the service yet. Save again to retry.",
+      "pal_sync_unreachable": "The service is unreachable: advanced settings are not live yet. Save again to retry.",
+      "tavus_key_missing": "The service access key is missing: advanced settings cannot be applied.",
+      "pal_id_missing": "The persona ID is missing: advanced settings cannot be applied."
+    },
+    "field": {
+      "avatarId": "Avatar ID",
+      "voiceId": "Voice ID",
+      "language": "Language",
+      "interactivityType": "Interaction mode",
+      "maxSessionDurationSec": "Maximum session duration (s)",
+      "videoQuality": "Video quality",
+      "videoEncoding": "Video encoding",
+      "voiceSpeed": "Voice speed",
+      "voiceStability": "Voice stability",
+      "voiceSimilarityBoost": "Timbre fidelity",
+      "voiceStyle": "Voice expressiveness",
+      "voiceUseSpeakerBoost": "Voice emphasis",
+      "faceId": "Face ID",
+      "palId": "Persona ID",
+      "audioOnly": "Audio only",
+      "maxCallDurationSec": "Maximum call duration (s)",
+      "participantAbsentTimeoutSec": "Candidate absence timeout (s)",
+      "enableRecording": "Recording",
+      "enableClosedCaptions": "Closed captions",
+      "llmModel": "Language model",
+      "llmTemperature": "Temperature",
+      "llmSpeculativeInference": "Speculative inference",
+      "ttsEngine": "Speech synthesis engine",
+      "ttsExternalVoiceId": "External voice ID",
+      "turnTakingPatience": "Turn-taking patience",
+      "interruptibility": "Interruptibility",
+      "voiceIsolation": "Voice isolation",
+      "idleEngagement": "Idle engagement"
+    }
   }
 }

@@ -57,6 +57,9 @@ const navItems = [
   { to: '/projects', labelKey: 'nav.projects', icon: FolderIcon },
   { to: '/participants', labelKey: 'nav.candidates', icon: UsersIcon },
   { to: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon },
+  // C14. Configuration rather than a record, so it sits beside Settings and
+  // after the pages an operator opens daily.
+  { to: '/avatar-templates', labelKey: 'nav.avatarTemplates', icon: Cog6ToothIcon },
   { to: '/settings', labelKey: 'nav.settings', icon: Cog6ToothIcon },
 ] as const
 

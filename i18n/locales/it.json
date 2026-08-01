@@ -1,10 +1,238 @@
 {
   "welcome": "Benvenuto",
+  "login": {
+    "title": "Accedi",
+    "subtitle": "Accedi al pannello amministrativo BEAI",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Accedi",
+    "submitting": "Accesso in corso…",
+    "error": "Credenziali non valide. Riprova."
+  },
+  "head": {
+    "title": {
+      "dashboard": "Dashboard",
+      "login": "Accedi",
+      "participants": "Candidati",
+      "participantDetail": "Dettaglio candidato",
+      "unsupported": "Browser non supportato"
+    }
+  },
+  "errors": {
+    "states": {
+      "notReady": {
+        "title": "Non ancora disponibile",
+        "message": "Questi dati non sono ancora disponibili. Saranno visibili al termine dell'elaborazione — basta riaprire questa pagina più tardi."
+      },
+      "forbidden": {
+        "title": "Accesso negato",
+        "message": "Non hai i permessi per visualizzare questi dati."
+      },
+      "notFound": {
+        "title": "Non trovato",
+        "message": "Questa risorsa non è stata trovata."
+      },
+      "error": {
+        "title": "Si è verificato un errore",
+        "message": "Non è stato possibile caricare i dati. Riprova."
+      }
+    }
+  },
+  "nav": {
+    "sidebarLabel": "Navigazione principale",
+    "dashboard": "Dashboard",
+    "projects": "Progetti",
+    "candidates": "Candidati",
+    "reports": "Report",
+    "settings": "Impostazioni",
+    "logout": "Esci",
+    "avatarTemplates": "Template avatar"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "kpi": {
+      "totalParticipants": "Candidati totali",
+      "completionRate": "Tasso di completamento",
+      "tokensUsed": "Token AI utilizzati",
+      "latency": "Latenza AI (p50 / p95)",
+      "latencyValue": "{p50} / {p95} ms",
+      "noData": "Nessun dato disponibile"
+    }
+  },
+  "participants": {
+    "title": "Candidati",
+    "filters": {
+      "search": "Cerca",
+      "searchPlaceholder": "Cerca per nome o riferimento",
+      "status": "Stato",
+      "allStatuses": "Tutti gli stati"
+    },
+    "table": {
+      "candidate": "Candidato",
+      "role": "Ruolo",
+      "status": "Stato",
+      "createdAt": "Iniziato",
+      "empty": "Nessun candidato corrisponde ai filtri selezionati."
+    },
+    "pagination": {
+      "summary": "Visualizzati {from}–{to} di {total}",
+      "previous": "Precedente",
+      "next": "Successivo"
+    },
+    "status": {
+      "in_attesa": "In attesa",
+      "in_corso": "In corso",
+      "in_valutazione": "In valutazione",
+      "completato": "Completato",
+      "errore": "Errore"
+    },
+    "detail": {
+      "backToList": "Torna ai candidati",
+      "language": "Lingua",
+      "timeline": {
+        "title": "Cronologia del colloquio",
+        "startedAt": "Iniziato",
+        "completedAt": "Completato",
+        "sessionCount": "Sessioni"
+      },
+      "resources": {
+        "title": "Materiali",
+        "transcript": "Trascrizione",
+        "evaluation": "Report di valutazione",
+        "ready": "Disponibile",
+        "notReady": "Non ancora disponibile"
+      }
+    }
+  },
+  "report": {
+    "title": "Report di valutazione",
+    "reliability": "Affidabilità",
+    "chip": {
+      "low": "Punteggio 1 su 5 (da migliorare)",
+      "mid": "Punteggio 3 su 5 (in sviluppo)",
+      "high": "Punteggio 5 su 5 (evidenza solida)",
+      "unassessable": "Non valutabile — nessuna evidenza nella trascrizione"
+    },
+    "table": {
+      "caption": "Valutazione delle competenze BARS — punteggi degli indicatori, media della competenza e affidabilità",
+      "competency": "Competenza",
+      "mean": "Punteggio medio",
+      "reliability": "Affidabilità",
+      "indicators": "Indicatori"
+    },
+    "excerpts": {
+      "title": "Estratti (testuali dalla trascrizione)",
+      "empty": "Nessun estratto disponibile per questo indicatore"
+    },
+    "states": {
+      "loading": "Caricamento del report di valutazione…",
+      "notReady": {
+        "title": "Non ancora disponibile",
+        "message": "Il report di valutazione non è ancora disponibile. Sarà disponibile al termine della valutazione — non è necessario aggiornare questa pagina, basta riaprirla più tardi."
+      },
+      "forbidden": {
+        "title": "Accesso negato",
+        "message": "Non hai i permessi per visualizzare questa risorsa."
+      },
+      "notFound": {
+        "title": "Non trovato",
+        "message": "Questa risorsa non è stata trovata."
+      },
+      "error": {
+        "title": "Si è verificato un errore",
+        "message": "Non è stato possibile caricare il report. Riprova."
+      }
+    },
+    "downloads": {
+      "title": "Download",
+      "transcript": "Scarica trascrizione",
+      "evaluation": "Scarica valutazione (JSON)",
+      "downloading": "Download in corso…"
+    }
+  },
   "unsupported": {
     "title": "Browser non supportato",
     "message": "Questa applicazione richiede un browser desktop supportato (Chrome, Edge, Safari). Per favore accedi da un computer."
   },
   "health": {
     "status": "ok"
+  },
+  "analytics_consent": {
+    "region_label": "Consenso ai cookie di analisi",
+    "title": "Ci aiuti a migliorare il backoffice?",
+    "description": "Vorremmo usare cookie di analisi per capire come viene usato il backoffice. Non raccogliamo dati dei candidati né le pagine che li riguardano. Puoi rifiutare senza alcuna conseguenza.",
+    "accept": "Accetta",
+    "reject": "Rifiuta"
+  },
+  "avatar_templates": {
+    "title": "Template avatar",
+    "intro": "Definisce il volto e la voce che ogni candidato di questa organizzazione incontra. È attivo un solo template alla volta.",
+    "empty": "Nessun template. Finché non ne attivi uno, i colloqui usano le impostazioni predefinite del fornitore.",
+    "active": "Attivo",
+    "provider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
+    },
+    "action": {
+      "new": "Nuovo template",
+      "edit": "Modifica",
+      "activate": "Attiva",
+      "delete": "Elimina",
+      "save": "Salva",
+      "cancel": "Annulla"
+    },
+    "form": {
+      "new_title": "Nuovo template",
+      "edit_title": "Modifica template",
+      "name": "Nome",
+      "description": "Descrizione",
+      "provider": "Servizio",
+      "provider_locked": "Il servizio non è modificabile dopo la creazione: le impostazioni appartengono a un solo servizio. Crea un nuovo template.",
+      "settings": "Impostazioni",
+      "default": "Predefinito",
+      "required": "Obbligatorio",
+      "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai."
+    },
+    "error": {
+      "load_title": "Impossibile caricare i template",
+      "load_body": "Riprova. Se il problema persiste, controlla di avere il ruolo di amministratore."
+    },
+    "warning": {
+      "title": "Salvato, con un avviso",
+      "pal_sync_failed": "Alcune impostazioni avanzate non sono ancora arrivate al servizio. Salva di nuovo per riprovare.",
+      "pal_sync_unreachable": "Il servizio non è raggiungibile: le impostazioni avanzate non sono ancora attive. Salva di nuovo per riprovare.",
+      "tavus_key_missing": "Manca la chiave di accesso al servizio: le impostazioni avanzate non possono essere applicate.",
+      "pal_id_missing": "Manca l'ID persona: le impostazioni avanzate non possono essere applicate."
+    },
+    "field": {
+      "avatarId": "ID avatar",
+      "voiceId": "ID voce",
+      "language": "Lingua",
+      "interactivityType": "Modalità di interazione",
+      "maxSessionDurationSec": "Durata massima sessione (s)",
+      "videoQuality": "Qualità video",
+      "videoEncoding": "Codifica video",
+      "voiceSpeed": "Velocità voce",
+      "voiceStability": "Stabilità voce",
+      "voiceSimilarityBoost": "Fedeltà al timbro",
+      "voiceStyle": "Espressività voce",
+      "voiceUseSpeakerBoost": "Enfasi voce",
+      "faceId": "ID volto",
+      "palId": "ID persona",
+      "audioOnly": "Solo audio",
+      "maxCallDurationSec": "Durata massima chiamata (s)",
+      "participantAbsentTimeoutSec": "Timeout assenza candidato (s)",
+      "enableRecording": "Registrazione",
+      "enableClosedCaptions": "Sottotitoli",
+      "llmModel": "Modello linguistico",
+      "llmTemperature": "Temperatura",
+      "llmSpeculativeInference": "Inferenza speculativa",
+      "ttsEngine": "Motore di sintesi vocale",
+      "ttsExternalVoiceId": "ID voce esterna",
+      "turnTakingPatience": "Pazienza nei turni di parola",
+      "interruptibility": "Interrompibilità",
+      "voiceIsolation": "Isolamento vocale",
+      "idleEngagement": "Coinvolgimento nelle pause"
+    }
   }
 }

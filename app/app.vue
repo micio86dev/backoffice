@@ -1,14 +1,58 @@
 <template>
   <div>
     <NuxtRouteAnnouncer />
-    <NuxtPage />
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+    <ConsentBanner :path="route.fullPath" :enabled="analyticsConfigured" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
+// WCAG 3.1.1 (Language of Page, Level A) — `<html lang>` must follow the
+// ACTIVE locale, not a build-time constant. `nuxt.config.ts` only supplies the
+// pre-hydration default for the generated SPA shell; with
+// `strategy: 'prefix_except_default'` a static `lang="it"` means every
+// `/en/*` route serves English content announced with Italian phonetics.
+//
+// This is invisible to axe: `html-has-lang` and `html-lang-valid` both PASS on
+// the broken version, because a lang attribute IS present and IS valid —
+// neither rule can tell that it is the WRONG one. Only a test that compares
+// the value ACROSS two locales discriminates (tests/unit/app.spec.ts and
+// tests/e2e/html-lang.spec.ts).
+//
+// Depends on every locale declaring a `language` tag in nuxt.config.ts —
+// localeHead reads `locale.language`, never `locale.code`, and silently emits
+// nothing when it is absent. tests/unit/nuxt-config.spec.ts guards that.
+const localeHead = useLocaleHead()
+const htmlLang = computed(() => localeHead.value.htmlAttrs?.lang ?? 'it')
+
 // D30 — backoffice ALWAYS injects noindex in every environment.
 // The admin panel must never be indexed by search engines.
 useHead({
+  htmlAttrs: { lang: htmlLang },
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
+
+const runtimeConfig = useRuntimeConfig()
+const route = useRoute()
+
+/**
+ * Whether this deployment has anything to ask permission FOR.
+ *
+ * With no measurement or project ID configured, nothing would load whatever the
+ * operator answered — so the banner would be asking about a decision that has
+ * no effect, which is worse than not asking.
+ *
+ * Computed here rather than inside the banner: the runtime config belongs to
+ * the app shell, and a component that reaches for it is a component that cannot
+ * be mounted in a test without one.
+ */
+const analyticsConfigured = computed(
+  () =>
+    String(runtimeConfig.public.gaMeasurementId ?? '') !== '' ||
+    String(runtimeConfig.public.clarityProjectId ?? '') !== ''
+)
 </script>

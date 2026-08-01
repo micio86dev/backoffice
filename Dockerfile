@@ -6,7 +6,7 @@
 # Per D17 (non-root, healthchecked, small final image) and D18 (Bun build → static serve).
 
 # ─── Stage 1: Build ──────────────────────────────────────────────────────────
-FROM oven/bun:1.3 AS builder
+FROM oven/bun:1.3.14 AS builder
 
 WORKDIR /app
 
@@ -37,7 +37,7 @@ ENV NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE}
 RUN bun run generate
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.27.5-alpine AS runtime
 
 # Remove default nginx config; replace with SPA-friendly config
 RUN rm /etc/nginx/conf.d/default.conf

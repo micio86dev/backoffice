@@ -45,7 +45,8 @@
     "candidates": "Candidati",
     "reports": "Report",
     "settings": "Impostazioni",
-    "logout": "Esci"
+    "logout": "Esci",
+    "avatarTemplates": "Template avatar"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -162,5 +163,76 @@
     "description": "Vorremmo usare cookie di analisi per capire come viene usato il backoffice. Non raccogliamo dati dei candidati né le pagine che li riguardano. Puoi rifiutare senza alcuna conseguenza.",
     "accept": "Accetta",
     "reject": "Rifiuta"
+  },
+  "avatar_templates": {
+    "title": "Template avatar",
+    "intro": "Definisce il volto e la voce che ogni candidato di questa organizzazione incontra. È attivo un solo template alla volta.",
+    "empty": "Nessun template. Finché non ne attivi uno, i colloqui usano le impostazioni predefinite del fornitore.",
+    "active": "Attivo",
+    "provider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
+    },
+    "action": {
+      "new": "Nuovo template",
+      "edit": "Modifica",
+      "activate": "Attiva",
+      "delete": "Elimina",
+      "save": "Salva",
+      "cancel": "Annulla"
+    },
+    "form": {
+      "new_title": "Nuovo template",
+      "edit_title": "Modifica template",
+      "name": "Nome",
+      "description": "Descrizione",
+      "provider": "Servizio",
+      "provider_locked": "Il servizio non è modificabile dopo la creazione: le impostazioni appartengono a un solo servizio. Crea un nuovo template.",
+      "settings": "Impostazioni",
+      "default": "Predefinito",
+      "required": "Obbligatorio",
+      "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai."
+    },
+    "error": {
+      "load_title": "Impossibile caricare i template",
+      "load_body": "Riprova. Se il problema persiste, controlla di avere il ruolo di amministratore."
+    },
+    "warning": {
+      "title": "Salvato, con un avviso",
+      "pal_sync_failed": "Alcune impostazioni avanzate non sono ancora arrivate al servizio. Salva di nuovo per riprovare.",
+      "pal_sync_unreachable": "Il servizio non è raggiungibile: le impostazioni avanzate non sono ancora attive. Salva di nuovo per riprovare.",
+      "tavus_key_missing": "Manca la chiave di accesso al servizio: le impostazioni avanzate non possono essere applicate.",
+      "pal_id_missing": "Manca l'ID persona: le impostazioni avanzate non possono essere applicate."
+    },
+    "field": {
+      "avatarId": "ID avatar",
+      "voiceId": "ID voce",
+      "language": "Lingua",
+      "interactivityType": "Modalità di interazione",
+      "maxSessionDurationSec": "Durata massima sessione (s)",
+      "videoQuality": "Qualità video",
+      "videoEncoding": "Codifica video",
+      "voiceSpeed": "Velocità voce",
+      "voiceStability": "Stabilità voce",
+      "voiceSimilarityBoost": "Fedeltà al timbro",
+      "voiceStyle": "Espressività voce",
+      "voiceUseSpeakerBoost": "Enfasi voce",
+      "faceId": "ID volto",
+      "palId": "ID persona",
+      "audioOnly": "Solo audio",
+      "maxCallDurationSec": "Durata massima chiamata (s)",
+      "participantAbsentTimeoutSec": "Timeout assenza candidato (s)",
+      "enableRecording": "Registrazione",
+      "enableClosedCaptions": "Sottotitoli",
+      "llmModel": "Modello linguistico",
+      "llmTemperature": "Temperatura",
+      "llmSpeculativeInference": "Inferenza speculativa",
+      "ttsEngine": "Motore di sintesi vocale",
+      "ttsExternalVoiceId": "ID voce esterna",
+      "turnTakingPatience": "Pazienza nei turni di parola",
+      "interruptibility": "Interrompibilità",
+      "voiceIsolation": "Isolamento vocale",
+      "idleEngagement": "Coinvolgimento nelle pause"
+    }
   }
 }

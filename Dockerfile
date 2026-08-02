@@ -30,11 +30,33 @@ COPY . .
 #
 # Declaring it as an ARG makes the built image explicit and independent of whatever
 # `.env` happens to sit in the build context on a given developer's machine.
-ARG NUXT_PUBLIC_API_BASE=http://localhost:8000/api
+#
+# NO DEFAULT, deliberately. This used to fall back to http://localhost:8000/api,
+# and a production build that never received the arg baked that in — producing an
+# image that passed its healthcheck, served the login page correctly, and sent
+# every visitor's credentials to a port on THEIR OWN machine. The symptom was a
+# 401 that looked exactly like a wrong password. docker-compose already passes
+# this arg explicitly, so nothing legitimate depended on the default.
+ARG NUXT_PUBLIC_API_BASE
+RUN test -n "$NUXT_PUBLIC_API_BASE" || { \
+      echo "ERROR: build arg NUXT_PUBLIC_API_BASE is required."; \
+      echo "  It is baked into the static bundle and cannot be set at runtime."; \
+      echo "  Example: --build-arg NUXT_PUBLIC_API_BASE=https://api.example.com/api"; \
+      exit 1; \
+    }
 ENV NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE}
 
 # Generate the static SPA output (Nuxt SPA mode: ssr: false → nuxt generate)
 RUN bun run generate
+
+# Assert the value REACHED the bundle. The check above only proves the arg was
+# passed; this proves Nuxt inlined it. They are different failures, and the
+# second one is just as invisible from the outside as the first was.
+RUN grep -q "apiBase:\"${NUXT_PUBLIC_API_BASE}\"" .output/public/index.html || { \
+      echo "ERROR: NUXT_PUBLIC_API_BASE was set to '${NUXT_PUBLIC_API_BASE}' but is not in the generated bundle."; \
+      echo "  Found instead: $(grep -o 'apiBase:\"[^\"]*\"' .output/public/index.html || echo '<nothing>')"; \
+      exit 1; \
+    }
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
 FROM nginx:1.27.5-alpine AS runtime

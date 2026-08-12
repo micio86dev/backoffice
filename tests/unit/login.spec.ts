@@ -103,4 +103,92 @@ describe('LoginPage', () => {
     expect(typeof head?.title).toBe('function')
     expect(head?.title?.()).toBe('head.title.login')
   })
+
+  // DESIGN.md §16: a field's error renders under that field, carries the id its
+  // input points at via aria-describedby, and never travels to a sibling field.
+  it('renders a validation message under each invalid field, not on the form', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+
+    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    await wrapper.find('[data-testid="login-form"]').trigger('submit')
+
+    const emailError = wrapper.find('[data-testid="login-email-error"]')
+    const passwordError = wrapper.find('[data-testid="login-password-error"]')
+
+    expect(emailError.exists()).toBe(true)
+    expect(passwordError.exists()).toBe(true)
+    // Both, from a single submit. Short-circuiting the second check would flag
+    // one field at a time and make the user submit twice to see two problems.
+    expect(emailError.text()).toBe('login.emailRequired')
+    expect(passwordError.text()).toBe('login.passwordRequired')
+
+    expect(wrapper.find('[data-testid="login-email"]').attributes('aria-describedby')).toBe(
+      'login-email-error'
+    )
+    expect(emailError.attributes('id')).toBe('login-email-error')
+
+    // A blocked submit must not reach the network.
+    expect(fetchMock).not.toHaveBeenCalled()
+    // …and must not render the form-level banner: nothing was attempted, so
+    // there is no outcome to report next to the CTA.
+    expect(wrapper.find('[data-testid="login-error"]').exists()).toBe(false)
+  })
+
+  it('flags a malformed email on the field rather than at form level', async () => {
+    vi.stubGlobal('$fetch', vi.fn())
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+
+    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    await wrapper.find('[data-testid="login-email"]').setValue('not-an-email')
+    await wrapper.find('[data-testid="login-password"]').setValue('secret')
+    await wrapper.find('[data-testid="login-form"]').trigger('submit')
+
+    expect(wrapper.find('[data-testid="login-email-error"]').text()).toBe('login.emailInvalid')
+    expect(wrapper.find('[data-testid="login-password-error"]').exists()).toBe(false)
+  })
+
+  // The 401 banner is a FORM-level outcome and belongs beside the submit
+  // control: attributing it to the email or the password field would leak which
+  // half of the credential pair was wrong.
+  it('renders the rejected-credentials message next to the submit CTA', async () => {
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(async () => {
+        throw Object.assign(new Error('Invalid credentials.'), { status: 401 })
+      })
+    )
+    vi.stubGlobal('navigateTo', vi.fn())
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+
+    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    await wrapper.find('[data-testid="login-email"]').setValue('admin@example.com')
+    await wrapper.find('[data-testid="login-password"]').setValue('wrong')
+    await wrapper.find('[data-testid="login-form"]').trigger('submit')
+    await new Promise((r) => setTimeout(r, 0))
+
+    const banner = wrapper.find('[data-testid="login-error"]')
+    expect(banner.exists()).toBe(true)
+    expect(banner.attributes('role')).toBe('alert')
+    expect(banner.text()).toContain('login.error')
+
+    // Not on either field.
+    expect(wrapper.find('[data-testid="login-email-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="login-password-error"]').exists()).toBe(false)
+
+    // Adjacent to the CTA, which is what "near the submit button" has to mean
+    // in a test: the banner is the submit control's immediate previous sibling.
+    const html = wrapper.html()
+    expect(html.indexOf('login-error')).toBeLessThan(html.indexOf('login-submit'))
+  })
 })

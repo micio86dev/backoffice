@@ -147,6 +147,45 @@ describe('ProjectForm', () => {
     expect((secretInput.element as HTMLInputElement).value).toBe('')
   })
 
+  // The sibling assertion to the one above, and the one that was missing.
+  // "The input is empty" is correct write-only behaviour and says nothing about
+  // whether a secret exists. Without this, `:configured` was hardcoded to false
+  // and every project reported "not set" — a claim the suite could not see.
+  it('reports an existing webhook secret as configured without revealing it', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          webhook_url: 'https://example.com/hook',
+          has_webhook_secret: true,
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-form-webhook-secret-status"]').text()).toBe(
+      'projects.secret.configured'
+    )
+    expect(
+      (wrapper.get('[data-testid="project-form-webhook-secret"]').element as HTMLInputElement).value
+    ).toBe('')
+  })
+
+  it('reports a project with no webhook secret as not set', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({ status: 'draft', has_webhook_secret: false }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-form-webhook-secret-status"]').text()).toBe(
+      'projects.secret.notSet'
+    )
+  })
+
   it('offers only the legal draft→active transition for a draft project', async () => {
     const wrapper = mount(ProjectForm, {
       props: { project: activeProject({ status: 'draft' }) },

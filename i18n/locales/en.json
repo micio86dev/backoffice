@@ -7,7 +7,11 @@
     "password": "Password",
     "submit": "Sign in",
     "submitting": "Signing in…",
-    "error": "Invalid credentials. Please try again."
+    "error": "Invalid credentials. Please try again.",
+    "emailRequired": "Enter your email address.",
+    "emailInvalid": "Enter a valid email address.",
+    "passwordRequired": "Enter your password.",
+    "success": "Signed in. Taking you to the dashboard…"
   },
   "head": {
     "title": {
@@ -15,7 +19,10 @@
       "login": "Sign in",
       "participants": "Candidates",
       "participantDetail": "Candidate detail",
-      "unsupported": "Unsupported browser"
+      "unsupported": "Unsupported browser",
+      "projects": "Projects",
+      "reports": "Reports",
+      "settings": "Settings"
     }
   },
   "errors": {
@@ -102,6 +109,77 @@
         "ready": "Ready",
         "notReady": "Not ready yet"
       }
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "table": {
+      "name": "Name",
+      "assessmentType": "Assessment type",
+      "status": "Status",
+      "actions": "Actions",
+      "empty": "No projects yet."
+    },
+    "action": {
+      "new": "New project",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "activate": "Activate",
+      "archive": "Archive"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "assessmentType": {
+      "standard": "Standard",
+      "potential": "Potential"
+    },
+    "roleCode": {
+      "ICO": "Individual Contributor",
+      "FLL": "Frontline Leader",
+      "MLL": "Mid-Level Leader",
+      "BUL": "Business Unit Leader",
+      "SRX": "Senior Executive"
+    },
+    "form": {
+      "newTitle": "New project",
+      "editTitle": "Edit project",
+      "name": "Name",
+      "slug": "Slug",
+      "language": "Language",
+      "assessmentType": "Assessment type",
+      "roleCode": "Role",
+      "roleCodeRequiredForStandard": "Required for a standard assessment.",
+      "frameworkVersion": "Framework version",
+      "frameworkVersionImmutable": "The framework version is fixed at creation and can never change afterwards, so every scored result stays comparable against the same catalogue.",
+      "immutableWhenLive": "This field is locked once the project is active or archived, so a live assessment always stays comparable to itself.",
+      "competencies": "Competencies",
+      "pauseEveryNCompetencies": "Pause every N competencies",
+      "nudgeMinChars": "Minimum characters before a nudge",
+      "exitRedirectUrl": "Exit redirect URL",
+      "webhookUrl": "Webhook URL",
+      "webhookSecret": "Webhook secret",
+      "nameRequired": "Enter a project name.",
+      "slugRequired": "Enter a slug.",
+      "roleCodeRequired": "Select a role.",
+      "invalidUrl": "Enter a valid URL.",
+      "outOfRange": "Enter a value between {min} and {max}.",
+      "saveError": "This project could not be saved. Please review the highlighted fields.",
+      "saveSuccess": "Project saved.",
+      "onlyLegalTransition": "Only the next lifecycle step is offered here: {transition}."
+    },
+    "secret": {
+      "notSet": "No secret configured.",
+      "configured": "A secret is configured.",
+      "setNew": "Set a new secret",
+      "placeholder": "Enter a new secret"
+    },
+    "competencyPicker": {
+      "legend": "Competencies",
+      "empty": "No competencies available for this selection."
     }
   },
   "report": {

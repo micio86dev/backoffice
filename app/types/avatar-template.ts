@@ -20,6 +20,18 @@
  * every OTHER field still tracks the API automatically. If a field is added
  * server-side it appears here without an edit; if one is removed, this file
  * stops compiling.
+ *
+ * A third narrowing, `description`, was added by `backoffice-missing-pages`:
+ * regenerating `types/api.ts` from the api's post-C11-slices `openapi.json`
+ * (task: "regenerate the backoffice typed client" first step) revealed that
+ * Scramble's nullability inference regressed ACROSS THE WHOLE export, not
+ * just the new endpoints — every `?string` PHP property that used to render
+ * as `string | null` (this one included) now renders as plain `string`. This
+ * is a pre-existing upstream (`api` submodule) regression, not something
+ * introduced here; it is flagged, not silently patched into the generated
+ * file. `AvatarTemplateForm.vue:278` deliberately sends `null` to clear the
+ * description, so the local type is re-widened here rather than the runtime
+ * behavior changed.
  */
 
 import type { components, paths } from '../../types/api'
@@ -56,9 +68,10 @@ export type FieldSpecsResponse = {
 
 type GeneratedTemplate = components['schemas']['AvatarTemplateResource']
 
-export type AvatarTemplate = Omit<GeneratedTemplate, 'config' | 'provider'> & {
+export type AvatarTemplate = Omit<GeneratedTemplate, 'config' | 'provider' | 'description'> & {
   config: Record<string, unknown>
   provider: ProviderName
+  description: string | null
 }
 
 /**

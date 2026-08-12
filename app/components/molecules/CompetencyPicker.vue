@@ -32,10 +32,10 @@ import { Field, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 export interface CompetencyOption {
   code: string
   name: string
-  // Optional: see the id/scope gap documented in ProjectForm.vue — the C3
-  // role-competencies endpoint does not currently expose a competency id,
-  // only its `code`, so a selection without an `id` cannot be submitted as a
-  // `competency_ids` entry yet.
+  // Optional only because the `potential` path builds its two fixed options
+  // (MTG/LAT) locally. Everything sourced from the catalog carries an id, and
+  // an option without one cannot be selected — `toggle()` returns early rather
+  // than emitting a selection the server would reject.
   id?: number
 }
 

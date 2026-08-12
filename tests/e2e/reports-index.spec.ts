@@ -119,6 +119,15 @@ test.describe('Reports index (Unit 7)', () => {
     await expect(page).toHaveURL('/reports')
     await expect(page.getByRole('link', { name: 'Mario Rossi' })).toBeVisible()
 
+    // The analytics consent banner is fixed to the bottom of the viewport and
+    // sits over the table, so it swallows the click on the row link — the
+    // element is visible, enabled and stable, and the pointer never reaches it.
+    // Dismissed through the app's own control rather than by seeding its
+    // storage key, so this does not silently keep passing if the persistence
+    // mechanism changes.
+    await page.getByTestId('analytics-consent-reject').click()
+    await expect(page.getByTestId('analytics-consent')).toBeHidden()
+
     await page.getByRole('link', { name: 'Mario Rossi' }).click()
     await expect(page).toHaveURL('/participants/1')
     await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()

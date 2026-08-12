@@ -256,7 +256,7 @@
 // operator sees a disabled control with a reason instead of an unexplained
 // 422. Self-contained (owns its own submit/validation), matching login.vue's
 // pattern rather than delegating persistence to the parent.
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -286,12 +286,9 @@ import { getErrorFields } from '@/utils/http-error'
 const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
 
 // The C3 role-competencies endpoint (`GET /framework/roles/{roleCode}/competencies`)
-// serves `code`/`name` only, with no competency `id` — yet
-// `StoreProjectRequest.competency_ids` requires integer PKs. D9 assumed this
-// endpoint already served the picker's need; it doesn't fully. Options render
-// either way (so the operator can see what a role covers), but a selection
-// without a resolvable `id` cannot be submitted — see CompetencyPicker.vue's
-// own note. Flagged; not silently worked around.
+// now serves the competency `id` alongside `code`/`name`, which is what
+// `StoreProjectRequest.competency_ids` validates against. It did not when D9
+// was written, and the gap made every competency selection a no-op.
 const POTENTIAL_COMPETENCIES: CompetencyOption[] = [{ code: 'MTG' }, { code: 'LAT' }].map((c) => ({
   ...c,
   name: c.code,
@@ -420,6 +417,13 @@ async function loadCompetencyOptions(): Promise<void> {
   try {
     const response = await fetchRoleCompetencies(roleCode.value)
     competencyOptions.value = response.data.map((competency) => ({
+      // Carried through because `StoreProjectRequest.competency_ids` validates
+      // integer primary keys. Dropping it made `CompetencyPicker.toggle()`
+      // return early on every click — the boxes rendered, refused to tick, and
+      // the form could never assemble a submittable payload. The catalog
+      // endpoint exposes the id now (see CompetencyResource); the picker's and
+      // this file's notes about the missing id are resolved.
+      id: competency.id,
       code: competency.code,
       // Scramble types `CompetencyResource.name` as `unknown[]` (it cannot
       // resolve the PHP model's locale-dependent accessor), but
@@ -515,6 +519,22 @@ async function onTransition(status: 'active' | 'archived'): Promise<void> {
 }
 
 onMounted(() => {
+  void loadCompetencyOptions()
+})
+
+// Reloading on change is what makes the picker usable at all, not a
+// refinement. `onMounted` alone meant the options were fetched once, for
+// whatever role the form opened with — which on CREATE is none. Picking a role
+// then left the list permanently empty ("no competencies available"), and since
+// a standard project requires at least one competency, no project could ever be
+// created through this form. Unit tests missed it because they mock the
+// composable and never drive the select; E2E caught it on the first real run.
+//
+// Clearing the selection is deliberate: competency ids belong to the role they
+// were listed for, so carrying them across a role change would submit ids that
+// the server's cross-field rule rejects as not assigned to the new role.
+watch([roleCode, assessmentType], () => {
+  competencyIds.value = []
   void loadCompetencyOptions()
 })
 </script>

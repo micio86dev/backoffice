@@ -116,7 +116,12 @@ const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null
 function validateEmail(): boolean {
   if (email.value.trim() === '') {
     emailError.value = t('login.emailRequired')
-  } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.value.trim())) {
+    // Domain labels exclude the dot, which is the whole point: the previous
+    // `[^@\s]+\.[^@\s]+` let the separator also be matched by the surrounding
+    // class, so the engine had exponentially many ways to split a long domain
+    // and a crafted address could pin the main thread. Ambiguity in a regex on
+    // user input is a denial-of-service surface, not a style preference.
+  } else if (!/^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$/.test(email.value.trim())) {
     emailError.value = t('login.emailInvalid')
   } else {
     emailError.value = ''

@@ -19,7 +19,15 @@
     <ProjectTable v-else :projects="projects" @edit="onEdit" />
 
     <Dialog :open="editing !== null" @update:open="(open) => !open && (editing = null)">
-      <DialogContent class="sm:max-w-lg">
+      <!--
+        The height cap and internal scroll are load-bearing, not polish. The
+        project form is the longest in the product, and without them the dialog
+        grew past the viewport and took its submit button with it: the control
+        was visible, enabled and stable, and simply not reachable — E2E caught
+        it as a click that retried until it timed out. A form you cannot submit
+        is not a styling issue.
+      -->
+      <DialogContent class="flex max-h-[85vh] flex-col overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {{ editing === 'new' ? $t('projects.form.newTitle') : $t('projects.form.editTitle') }}

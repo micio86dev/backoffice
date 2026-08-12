@@ -27,9 +27,26 @@ export default defineConfig({
 
   use: {
     // IPv4 explicitly to avoid IPv6 `localhost` resolution timeouts.
-    baseURL: 'http://127.0.0.1:3000',
+    //
+    // NOT 3000. `docker-compose.yml` publishes the candidate `frontend` on
+    // 3000, and that collision silently defeated this entire suite: `serve`
+    // could not bind, fell back to a random port, and the readiness probe
+    // below was answered 200 by the FRONTEND's own `/health` route — so
+    // Playwright declared the server ready and every test then navigated the
+    // candidate app, which has no `/projects`, `/settings` or `/reports` and
+    // returned its own Nuxt 404. The failure looked like broken routing in
+    // the backoffice; nothing was broken except the port.
+    baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+
+    // Pinned, because @nuxtjs/i18n's browser-language detection otherwise
+    // decides it from `Accept-Language` — which Playwright sends as en-US by
+    // default, overriding `defaultLocale: 'it'`. Every locator that matches an
+    // accessible name then depends on the machine running the suite, so the
+    // same spec passes locally and fails in CI (or vice versa) for reasons
+    // that have nothing to do with the code under test.
+    locale: 'it-IT',
   },
 
   projects: [
@@ -52,8 +69,11 @@ export default defineConfig({
   // Generate the static SPA and serve it with SPA fallback (-s). Readiness is
   // checked against the /health route (served as the SPA shell → 200).
   webServer: {
-    command: 'bun run generate && bunx serve .output/public -p 3000 -s --no-port-switching',
-    url: 'http://127.0.0.1:3000/health',
+    // `-l tcp://…` rather than `-p`: serve 14 does not honour `-p`, and it
+    // silently port-switches instead of failing, which is exactly how the
+    // collision above went unnoticed. `-l` binds where told or errors out.
+    command: 'bun run generate && bunx serve .output/public -l tcp://127.0.0.1:4173 -s',
+    url: 'http://127.0.0.1:4173/health',
     env: {
       // C13 task 5.6: the consent banner only appears where there is something
       // to ask permission FOR, so E2E needs a measurement ID configured.

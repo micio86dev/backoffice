@@ -232,6 +232,138 @@
     "title": "Browser non supportato",
     "message": "Questa applicazione richiede un browser desktop supportato (Chrome, Edge, Safari). Per favore accedi da un computer."
   },
+  "settings": {
+    "title": "Impostazioni",
+    "tabs": {
+      "organization": "Profilo organizzazione",
+      "apiKeys": "Chiavi API",
+      "webhooks": "Valori predefiniti webhook",
+      "users": "Utenti e ruoli"
+    },
+    "organization": {
+      "name": "Nome",
+      "slug": "Slug",
+      "slugReadOnly": "Lo slug è un identificatore del tenant e non può essere modificato.",
+      "nameRequired": "Inserisci il nome dell'organizzazione.",
+      "saveError": "Non è stato possibile salvare il profilo dell'organizzazione. Controlla i campi evidenziati."
+    },
+    "webhooks": {
+      "url": "URL webhook predefinito",
+      "secret": "Segreto webhook predefinito",
+      "events": "Eventi webhook predefiniti",
+      "eventProgress": "Avanzamento",
+      "eventEvaluation": "Valutazione",
+      "saveError": "Non è stato possibile salvare i valori predefiniti del webhook. Controlla i campi evidenziati.",
+      "invalidUrl": "Inserisci un URL valido.",
+      "note": "Questi valori predefiniti vengono copiati su un nuovo progetto solo al momento della creazione; modificarli non ridirige mai il webhook live di un progetto esistente."
+    },
+    "apiKeys": {
+      "title": "Chiavi API",
+      "new": "Nuova chiave API",
+      "name": "Nome",
+      "nameRequired": "Inserisci un nome per questa chiave.",
+      "abilities": "Permessi",
+      "abilitiesRequired": "Seleziona almeno un permesso.",
+      "expiresAt": "Scadenza",
+      "create": "Crea chiave",
+      "createError": "Non è stato possibile creare questa chiave. Controlla i campi evidenziati.",
+      "rawKeyTitle": "Copia questa chiave ora",
+      "rawKeyWarning": "Questa è l'unica volta in cui la chiave in chiaro viene mostrata. Non potrà più essere recuperata dopo aver chiuso questa finestra.",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "close": "Chiudi",
+      "revoke": "Revoca",
+      "confirmRevokeTitle": "Revocare questa chiave API?",
+      "confirmRevokeDescription": "Qualsiasi integrazione che utilizza questa chiave smetterà immediatamente di funzionare. Questa azione non può essere annullata.",
+      "empty": "Nessuna chiave API ancora presente.",
+      "table": {
+        "name": "Nome",
+        "createdAt": "Creata",
+        "expiresAt": "Scadenza",
+        "lastUsedAt": "Ultimo utilizzo",
+        "actions": "Azioni"
+      }
+    }
+  },
+  "users": {
+    "title": "Utenti e ruoli",
+    "new": "Nuovo utente",
+    "edit": "Modifica",
+    "name": "Nome",
+    "email": "Email",
+    "password": "Password",
+    "accessLevel": "Livello di accesso",
+    "role": {
+      "admin": "Amministratore",
+      "operator": "Operatore",
+      "viewer": "Osservatore"
+    },
+    "state": {
+      "active": "Attivo",
+      "deactivated": "Disattivato"
+    },
+    "action": {
+      "deactivate": "Disattiva",
+      "activate": "Attiva"
+    },
+    "confirm": {
+      "action": "Conferma",
+      "deactivateTitle": "Disattivare questo utente?",
+      "deactivateDescription": "Perderà immediatamente l'accesso. Puoi riattivarlo in qualsiasi momento.",
+      "activateTitle": "Riattivare questo utente?",
+      "activateDescription": "Riacquisterà l'accesso con la password esistente."
+    },
+    "form": {
+      "nameRequired": "Inserisci un nome.",
+      "emailRequired": "Inserisci un indirizzo email.",
+      "emailInvalid": "Inserisci un indirizzo email valido.",
+      "passwordRequired": "Imposta una password iniziale.",
+      "passwordTooShort": "La password deve contenere almeno 8 caratteri.",
+      "roleRequired": "Seleziona un livello di accesso.",
+      "saveError": "Non è stato possibile salvare questo utente. Controlla i campi evidenziati."
+    },
+    "table": {
+      "name": "Nome",
+      "email": "Email",
+      "accessLevel": "Livello di accesso",
+      "state": "Stato",
+      "actions": "Azioni",
+      "empty": "Nessun utente ancora presente."
+    }
+  },
+  "reports": {
+    "title": "Report",
+    "filters": {
+      "project": "Progetto",
+      "assessmentType": "Tipo di valutazione",
+      "roleCode": "Ruolo",
+      "status": "Stato",
+      "from": "Da",
+      "to": "A",
+      "allProjects": "Tutti i progetti",
+      "allTypes": "Tutti i tipi",
+      "allRoles": "Tutti i ruoli",
+      "statusCompleted": "Completato",
+      "statusPending": "In corso"
+    },
+    "table": {
+      "candidate": "Candidato",
+      "project": "Progetto",
+      "assessmentType": "Tipo di valutazione",
+      "roleCode": "Ruolo",
+      "evaluatedAt": "Valutato",
+      "status": "Stato",
+      "reliability": "Affidabilità",
+      "empty": "Nessuna valutazione corrisponde ai filtri correnti.",
+      "notYetScored": "Non ancora valutato"
+    },
+    "summary": {
+      "title": "Riepilogo",
+      "byStatus": "Per stato",
+      "byCompetency": "Punteggio medio per competenza",
+      "scoredOf": "{scored} di {result} valutati"
+    }
+  },
   "health": {
     "status": "ok"
   },

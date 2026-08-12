@@ -232,6 +232,138 @@
     "title": "Unsupported Browser",
     "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."
   },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "organization": "Organization profile",
+      "apiKeys": "API keys",
+      "webhooks": "Webhook defaults",
+      "users": "Users & roles"
+    },
+    "organization": {
+      "name": "Name",
+      "slug": "Slug",
+      "slugReadOnly": "The slug is a tenancy identifier and cannot be changed.",
+      "nameRequired": "Enter an organization name.",
+      "saveError": "The organization profile could not be saved. Please review the highlighted fields."
+    },
+    "webhooks": {
+      "url": "Default webhook URL",
+      "secret": "Default webhook secret",
+      "events": "Default webhook events",
+      "eventProgress": "Progress",
+      "eventEvaluation": "Evaluation",
+      "saveError": "The webhook defaults could not be saved. Please review the highlighted fields.",
+      "invalidUrl": "Enter a valid URL.",
+      "note": "These defaults are copied onto a new project only at the moment it is created; changing them never retargets an existing project's live webhook."
+    },
+    "apiKeys": {
+      "title": "API keys",
+      "new": "New API key",
+      "name": "Name",
+      "nameRequired": "Enter a name for this key.",
+      "abilities": "Abilities",
+      "abilitiesRequired": "Select at least one ability.",
+      "expiresAt": "Expires at",
+      "create": "Create key",
+      "createError": "This key could not be created. Please review the highlighted fields.",
+      "rawKeyTitle": "Copy this key now",
+      "rawKeyWarning": "This is the only time the raw key is shown. It cannot be retrieved again after you close this dialog.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "close": "Close",
+      "revoke": "Revoke",
+      "confirmRevokeTitle": "Revoke this API key?",
+      "confirmRevokeDescription": "Any integration using this key will immediately stop working. This cannot be undone.",
+      "empty": "No API keys yet.",
+      "table": {
+        "name": "Name",
+        "createdAt": "Created",
+        "expiresAt": "Expires",
+        "lastUsedAt": "Last used",
+        "actions": "Actions"
+      }
+    }
+  },
+  "users": {
+    "title": "Users & roles",
+    "new": "New user",
+    "edit": "Edit",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "accessLevel": "Access level",
+    "role": {
+      "admin": "Admin",
+      "operator": "Operator",
+      "viewer": "Viewer"
+    },
+    "state": {
+      "active": "Active",
+      "deactivated": "Deactivated"
+    },
+    "action": {
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
+    "confirm": {
+      "action": "Confirm",
+      "deactivateTitle": "Deactivate this user?",
+      "deactivateDescription": "They will immediately lose access. You can reactivate them at any time.",
+      "activateTitle": "Reactivate this user?",
+      "activateDescription": "They will regain access with their existing password."
+    },
+    "form": {
+      "nameRequired": "Enter a name.",
+      "emailRequired": "Enter an email address.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordRequired": "Set an initial password.",
+      "passwordTooShort": "The password must be at least 8 characters.",
+      "roleRequired": "Select an access level.",
+      "saveError": "This user could not be saved. Please review the highlighted fields."
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "accessLevel": "Access level",
+      "state": "State",
+      "actions": "Actions",
+      "empty": "No users yet."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "filters": {
+      "project": "Project",
+      "assessmentType": "Assessment type",
+      "roleCode": "Role",
+      "status": "Status",
+      "from": "From",
+      "to": "To",
+      "allProjects": "All projects",
+      "allTypes": "All types",
+      "allRoles": "All roles",
+      "statusCompleted": "Completed",
+      "statusPending": "Pending"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "project": "Project",
+      "assessmentType": "Assessment type",
+      "roleCode": "Role",
+      "evaluatedAt": "Evaluated",
+      "status": "Status",
+      "reliability": "Reliability",
+      "empty": "No evaluations match the current filters.",
+      "notYetScored": "Not yet scored"
+    },
+    "summary": {
+      "title": "Summary",
+      "byStatus": "By status",
+      "byCompetency": "Mean score by competency",
+      "scoredOf": "{scored} of {result} scored"
+    }
+  },
   "health": {
     "status": "ok"
   },

@@ -27,6 +27,23 @@ function isUnauthorized(error: unknown): boolean {
   return status === 401
 }
 
+/**
+ * D5: a valid JWT can outlive a mid-session deactivation by up to the
+ * token's TTL. `TenantContext` folds that into `403 {"error":"account_deactivated"}`
+ * on every subsequent request — deliberately NOT 401, so it never enters the
+ * single-flight refresh path above (which would just issue the deactivated
+ * account a new valid token). A GENERIC 403 (an RBAC denial) must not match:
+ * the `error` code is the only reliable signal, not the status code alone.
+ */
+function isAccountDeactivated(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const status = (error as { status?: unknown }).status
+  if (status !== 403) return false
+  const data = (error as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return false
+  return (data as { error?: unknown }).error === 'account_deactivated'
+}
+
 export function useApi() {
   async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
     const { accessToken, refresh } = useAuth()
@@ -50,6 +67,12 @@ export function useApi() {
     try {
       return await attempt(accessToken.value)
     } catch (error) {
+      if (isAccountDeactivated(error)) {
+        useAuth().clearSession()
+        await navigateTo('/login')
+        throw error
+      }
+
       if (!isUnauthorized(error)) throw error
 
       try {

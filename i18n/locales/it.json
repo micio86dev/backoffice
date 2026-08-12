@@ -7,7 +7,11 @@
     "password": "Password",
     "submit": "Accedi",
     "submitting": "Accesso in corso…",
-    "error": "Credenziali non valide. Riprova."
+    "error": "Credenziali non valide. Riprova.",
+    "emailRequired": "Inserisci il tuo indirizzo email.",
+    "emailInvalid": "Inserisci un indirizzo email valido.",
+    "passwordRequired": "Inserisci la tua password.",
+    "success": "Accesso effettuato. Ti portiamo alla dashboard…"
   },
   "head": {
     "title": {
@@ -15,7 +19,10 @@
       "login": "Accedi",
       "participants": "Candidati",
       "participantDetail": "Dettaglio candidato",
-      "unsupported": "Browser non supportato"
+      "unsupported": "Browser non supportato",
+      "projects": "Progetti",
+      "reports": "Report",
+      "settings": "Impostazioni"
     }
   },
   "errors": {
@@ -102,6 +109,77 @@
         "ready": "Disponibile",
         "notReady": "Non ancora disponibile"
       }
+    }
+  },
+  "projects": {
+    "title": "Progetti",
+    "table": {
+      "name": "Nome",
+      "assessmentType": "Tipo di valutazione",
+      "status": "Stato",
+      "actions": "Azioni",
+      "empty": "Nessun progetto ancora presente."
+    },
+    "action": {
+      "new": "Nuovo progetto",
+      "edit": "Modifica",
+      "save": "Salva",
+      "cancel": "Annulla",
+      "activate": "Attiva",
+      "archive": "Archivia"
+    },
+    "status": {
+      "draft": "Bozza",
+      "active": "Attivo",
+      "archived": "Archiviato"
+    },
+    "assessmentType": {
+      "standard": "Standard",
+      "potential": "Potenziale"
+    },
+    "roleCode": {
+      "ICO": "Contributore individuale",
+      "FLL": "Team leader di prima linea",
+      "MLL": "Middle manager",
+      "BUL": "Responsabile di business unit",
+      "SRX": "Dirigente senior"
+    },
+    "form": {
+      "newTitle": "Nuovo progetto",
+      "editTitle": "Modifica progetto",
+      "name": "Nome",
+      "slug": "Slug",
+      "language": "Lingua",
+      "assessmentType": "Tipo di valutazione",
+      "roleCode": "Ruolo",
+      "roleCodeRequiredForStandard": "Obbligatorio per una valutazione standard.",
+      "frameworkVersion": "Versione del framework",
+      "frameworkVersionImmutable": "La versione del framework è fissata alla creazione e non può più cambiare, così ogni risultato valutato resta confrontabile con lo stesso catalogo.",
+      "immutableWhenLive": "Questo campo è bloccato quando il progetto è attivo o archiviato, così una valutazione live resta sempre confrontabile con se stessa.",
+      "competencies": "Competenze",
+      "pauseEveryNCompetencies": "Pausa ogni N competenze",
+      "nudgeMinChars": "Caratteri minimi prima di un sollecito",
+      "exitRedirectUrl": "URL di reindirizzamento in uscita",
+      "webhookUrl": "URL webhook",
+      "webhookSecret": "Segreto webhook",
+      "nameRequired": "Inserisci il nome del progetto.",
+      "slugRequired": "Inserisci uno slug.",
+      "roleCodeRequired": "Seleziona un ruolo.",
+      "invalidUrl": "Inserisci un URL valido.",
+      "outOfRange": "Inserisci un valore tra {min} e {max}.",
+      "saveError": "Non è stato possibile salvare questo progetto. Controlla i campi evidenziati.",
+      "saveSuccess": "Progetto salvato.",
+      "onlyLegalTransition": "Qui è disponibile solo il prossimo passaggio del ciclo di vita: {transition}."
+    },
+    "secret": {
+      "notSet": "Nessun segreto configurato.",
+      "configured": "Un segreto è configurato.",
+      "setNew": "Imposta un nuovo segreto",
+      "placeholder": "Inserisci un nuovo segreto"
+    },
+    "competencyPicker": {
+      "legend": "Competenze",
+      "empty": "Nessuna competenza disponibile per questa selezione."
     }
   },
   "report": {

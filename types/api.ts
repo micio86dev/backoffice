@@ -1162,7 +1162,16 @@ export interface components {
             exit_redirect_url: string;
             webhook_url: string;
             webhook_events: string;
-            /** @description webhook_secret intentionally excluded (hidden + encrypted) */
+            /**
+             * @description webhook_secret intentionally excluded (hidden + encrypted).
+             *     A PRESENCE BOOLEAN is exposed instead, never the value — mirroring
+             *     OrganizationResource::has_default_webhook_secret. Without it the
+             *     edit form cannot distinguish "no secret configured" from "a secret
+             *      exists but is write-only", so it renders "not set" over a project
+             *     that has one. On a security-relevant field that is not a cosmetic
+             *     gap: it invites an operator to believe no secret is in place.
+             */
+            has_webhook_secret: boolean;
             deadline_at: string | null;
             goes_live_at: string | null;
             created_at: string | null;

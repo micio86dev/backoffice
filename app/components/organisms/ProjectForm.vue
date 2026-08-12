@@ -191,10 +191,18 @@
         />
       </Field>
 
+      <!--
+        `configured` reports whether a secret already exists — it is NOT the
+        secret, which is write-only and never leaves the server. This was
+        hardcoded to false, so editing a project that already had a webhook
+        secret told the operator none was set. On a security-relevant field
+        that is a lie, not a rough edge: it invites someone to conclude their
+        webhooks are unsigned and to go set a secret that was already there.
+      -->
       <WriteOnlySecretField
         id="project-form-webhook-secret"
         :label="$t('projects.form.webhookSecret')"
-        :configured="false"
+        :configured="project?.has_webhook_secret ?? false"
         @update:value="(value) => (webhookSecret = value)"
       />
 

@@ -36,6 +36,8 @@ import { compile } from '@tailwindcss/node'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Window } from 'happy-dom'
+import { mount } from '@vue/test-utils'
+import Input from '@/components/ui/input/Input.vue'
 
 const MAIN_CSS_PATH = resolve(__dirname, '../../app/assets/css/main.css')
 const MAIN_CSS_DIR = resolve(__dirname, '../../app/assets/css')
@@ -99,6 +101,31 @@ function computedBackgroundColor(compiledCss: string, className: string): string
   return window.getComputedStyle(el).backgroundColor
 }
 
+/**
+ * Same mount-a-real-element-under-the-compiled-stylesheet technique as
+ * `computedBackgroundColor`, generalized to an arbitrary `getComputedStyle`
+ * property. happy-dom cannot parse `oklch()` color functions (verified during
+ * RED: an `oklch(...)` custom property resolves to `""`, not the color), which
+ * is exactly why D12 maps `--input` to `var(--color-neutral-500)` — a
+ * `@theme`-literal hex custom property — rather than a fresh oklch literal;
+ * see the `--input` comment in `main.css`.
+ */
+function computedStyleProperty(
+  compiledCss: string,
+  className: string,
+  property: 'backgroundColor' | 'borderColor' | 'height'
+): string {
+  const window = new Window()
+  const document = window.document
+  const style = document.createElement('style')
+  style.textContent = compiledCss
+  document.head.appendChild(style)
+  const el = document.createElement('div')
+  el.className = className
+  document.body.appendChild(el)
+  return window.getComputedStyle(el)[property]
+}
+
 /** Extracts the body of the first `<selector> { ... }` block from raw CSS source. */
 function extractBlock(css: string, selector: string): string {
   const start = css.indexOf(selector)
@@ -146,6 +173,22 @@ describe('brand theme tokens (D10)', () => {
       .bg-primary { background-color: var(--color-primary); }
     `
     expect(computedBackgroundColor(buggyCss, 'bg-primary')).not.toBe('#771aaf')
+  })
+})
+
+// task 2.1 (backoffice-missing-pages) — D12/D11 §9: shadcn's default `--input`
+// (`#e2e8f0` on `#f8fafc`/white) measures ≈1.18:1, failing DESIGN.md §9's
+// binding ≥3:1 non-text-contrast minimum for form control borders. Mounts the
+// REAL `Input` component (not a literal class string) so this discriminates a
+// regression in the component's own class list, not just the token's existence
+// in the stylesheet.
+describe('form control border contrast token (D12, DESIGN.md §9)', () => {
+  it("Input's rendered border-color resolves to --color-neutral-500 (#64748b), not the pre-fix #e2e8f0", async () => {
+    const wrapper = mount(Input)
+    const classAttr = wrapper.attributes('class') ?? ''
+    expect(classAttr).not.toBe('')
+    const compiled = await compileForCandidates(classAttr.split(/\s+/).filter(Boolean))
+    expect(computedStyleProperty(compiled, classAttr, 'borderColor')).toBe('#64748b')
   })
 })
 

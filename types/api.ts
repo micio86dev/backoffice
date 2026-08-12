@@ -1034,6 +1034,15 @@ export interface components {
         };
         /** CompetencyResource */
         CompetencyResource: {
+            /**
+             * @description Exposed because `StoreProjectRequest` validates `competency_ids[]`
+             *     against primary keys, and this catalog is the only surface a
+             *     client can discover competencies through. Without it the project
+             *     form can render a competency picker it is structurally unable to
+             *     submit. The catalog is global — `framework_competencies` carries
+             *     no `organization_id` — so the key leaks nothing tenant-specific.
+             */
+            id: number;
             code: string;
             name: unknown[];
             definition: unknown[];

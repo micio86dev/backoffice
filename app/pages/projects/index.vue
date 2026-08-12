@@ -18,19 +18,29 @@
     </Alert>
     <ProjectTable v-else :projects="projects" @edit="onEdit" />
 
-    <!--
-      Unit 2b (task 21.5) wires the actual ProjectForm/Dialog here, as a
-      defineAsyncComponent (D10 — code-split, only loaded once an operator
-      opens create/edit). This slice (2a) only owns the `editing` ref and the
-      triggers that set it.
-    -->
+    <Dialog :open="editing !== null" @update:open="(open) => !open && (editing = null)">
+      <DialogContent class="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {{ editing === 'new' ? $t('projects.form.newTitle') : $t('projects.form.editTitle') }}
+          </DialogTitle>
+        </DialogHeader>
+        <ProjectForm
+          v-if="editing !== null"
+          :project="editingProject"
+          @close="editing = null"
+          @saved="onFormSaved"
+        />
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
 import {
@@ -38,6 +48,10 @@ import {
   resourceErrorKey,
   type ResourceErrorState,
 } from '@/utils/error-state'
+
+// The form organism is code-split (D10): only needed once an operator opens
+// create/edit, never on the list's initial route chunk.
+const ProjectForm = defineAsyncComponent(() => import('@/components/organisms/ProjectForm.vue'))
 
 definePageMeta({
   name: 'projects',
@@ -56,6 +70,11 @@ const projects = ref<Project[]>([])
 
 // null = closed, 'new' = create form, string id = edit form for that project.
 const editing = ref<'new' | string | null>(null)
+
+const editingProject = computed<Project | null>(() => {
+  if (editing.value === null || editing.value === 'new') return null
+  return projects.value.find((project) => project.id === editing.value) ?? null
+})
 
 // A failed list fetch must NEVER fall through to the table's empty state —
 // same D4 discipline as pages/participants/index.vue.
@@ -76,6 +95,11 @@ async function load(): Promise<void> {
 
 function onEdit(id: string): void {
   editing.value = id
+}
+
+async function onFormSaved(): Promise<void> {
+  editing.value = null
+  await load()
 }
 
 onMounted(() => {

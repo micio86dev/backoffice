@@ -1,6 +1,11 @@
 <template>
   <div class="flex flex-col gap-6">
-    <h1 class="text-2xl font-semibold text-foreground">{{ $t('reports.title') }}</h1>
+    <header class="flex max-w-[65ch] flex-col gap-1.5">
+      <h1 class="text-2xl font-semibold tracking-tight text-foreground">
+        {{ $t('reports.title') }}
+      </h1>
+      <p class="text-sm text-muted-foreground">{{ $t('reports.subtitle') }}</p>
+    </header>
 
     <Alert
       v-if="loadError"

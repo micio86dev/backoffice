@@ -1,11 +1,6 @@
 <template>
   <div class="flex flex-col gap-8">
-    <header class="flex max-w-[65ch] flex-col gap-1.5">
-      <h1 class="text-2xl font-semibold tracking-tight text-foreground">
-        {{ $t('settings.title') }}
-      </h1>
-      <p class="text-sm text-muted-foreground">{{ $t('settings.subtitle') }}</p>
-    </header>
+    <PageHeader :title="$t('settings.title')" :subtitle="$t('settings.subtitle')" />
 
     <Alert
       v-if="loadError"
@@ -79,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { BuildingOffice2Icon, KeyIcon, BoltIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'

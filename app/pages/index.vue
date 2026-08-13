@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-6">
-    <h1 class="text-2xl font-semibold text-foreground">{{ $t('dashboard.title') }}</h1>
+    <PageHeader :title="$t('dashboard.title')" :subtitle="$t('dashboard.subtitle')" />
 
     <Alert
       v-if="loadError"
@@ -35,6 +35,7 @@
 <script setup lang="ts">
 // Usage + AI-cost KPI cards only (D7) — no billing/MRR/trial widget, not
 // even disabled/placeholder (observability delta scenario).
+import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import MetricCard from '@/components/molecules/MetricCard.vue'

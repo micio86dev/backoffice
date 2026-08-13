@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-6">
-    <h1 class="text-2xl font-semibold text-foreground">{{ $t('participants.title') }}</h1>
+    <PageHeader :title="$t('participants.title')" :subtitle="$t('participants.subtitle')" />
     <Alert
       v-if="loadError"
       :variant="loadError === 'not-ready' ? 'default' : 'destructive'"
@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import CandidateTable, {

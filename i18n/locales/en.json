@@ -57,6 +57,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "subtitle": "How much assessment work is in flight right now.",
     "kpi": {
       "totalParticipants": "Total candidates",
       "completionRate": "Completion rate",
@@ -68,6 +69,7 @@
   },
   "participants": {
     "title": "Candidates",
+    "subtitle": "Who has been given an entry link, and where each of them got to.",
     "filters": {
       "search": "Search",
       "searchPlaceholder": "Search by name or reference",
@@ -113,6 +115,7 @@
   },
   "projects": {
     "title": "Projects",
+    "subtitle": "Each project defines what an assessment measures and where its results are delivered.",
     "table": {
       "name": "Name",
       "assessmentType": "Assessment type",

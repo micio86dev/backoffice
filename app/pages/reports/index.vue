@@ -1,11 +1,6 @@
 <template>
   <div class="flex flex-col gap-6">
-    <header class="flex max-w-[65ch] flex-col gap-1.5">
-      <h1 class="text-2xl font-semibold tracking-tight text-foreground">
-        {{ $t('reports.title') }}
-      </h1>
-      <p class="text-sm text-muted-foreground">{{ $t('reports.subtitle') }}</p>
-    </header>
+    <PageHeader :title="$t('reports.title')" :subtitle="$t('reports.subtitle')" />
 
     <Alert
       v-if="loadError"
@@ -29,6 +24,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import ReportFilters from '@/components/molecules/ReportFilters.vue'

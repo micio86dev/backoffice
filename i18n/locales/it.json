@@ -57,6 +57,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "subtitle": "Quante valutazioni sono in corso in questo momento.",
     "kpi": {
       "totalParticipants": "Candidati totali",
       "completionRate": "Tasso di completamento",
@@ -68,6 +69,7 @@
   },
   "participants": {
     "title": "Candidati",
+    "subtitle": "Chi ha ricevuto un link di accesso e a che punto è arrivato.",
     "filters": {
       "search": "Cerca",
       "searchPlaceholder": "Cerca per nome o riferimento",
@@ -113,6 +115,7 @@
   },
   "projects": {
     "title": "Progetti",
+    "subtitle": "Ogni progetto definisce cosa misura una valutazione e dove finiscono i risultati.",
     "table": {
       "name": "Nome",
       "assessmentType": "Tipo di valutazione",

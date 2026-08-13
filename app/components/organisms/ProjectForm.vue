@@ -142,11 +142,16 @@
           id="project-form-pause-every-n"
           v-model="pauseEveryNCompetencies"
           type="number"
+          :aria-invalid="Boolean(errors.pauseEveryNCompetencies)"
+          :aria-describedby="
+            errors.pauseEveryNCompetencies ? 'project-form-pause-every-n-error' : undefined
+          "
           data-testid="project-form-pause-every-n"
           @blur="validatePauseEveryNCompetencies"
         />
         <FieldError
           v-if="errors.pauseEveryNCompetencies"
+          id="project-form-pause-every-n-error"
           data-testid="project-form-pause-every-n-error"
         >
           {{ errors.pauseEveryNCompetencies }}
@@ -161,10 +166,18 @@
           id="project-form-nudge-min-chars"
           v-model="nudgeMinChars"
           type="number"
+          :aria-invalid="Boolean(errors.nudgeMinChars)"
+          :aria-describedby="
+            errors.nudgeMinChars ? 'project-form-nudge-min-chars-error' : undefined
+          "
           data-testid="project-form-nudge-min-chars"
           @blur="validateNudgeMinChars"
         />
-        <FieldError v-if="errors.nudgeMinChars" data-testid="project-form-nudge-min-chars-error">
+        <FieldError
+          v-if="errors.nudgeMinChars"
+          id="project-form-nudge-min-chars-error"
+          data-testid="project-form-nudge-min-chars-error"
+        >
           {{ errors.nudgeMinChars }}
         </FieldError>
       </Field>

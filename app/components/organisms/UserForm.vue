@@ -7,10 +7,16 @@
           id="user-form-name"
           v-model="name"
           :aria-invalid="Boolean(errors.name)"
+          :aria-describedby="errors.name ? 'user-form-name-error' : undefined"
           data-testid="user-form-name"
           @blur="validateName"
         />
-        <FieldError v-if="errors.name">{{ errors.name }}</FieldError>
+        <FieldError
+          v-if="errors.name"
+          id="user-form-name-error"
+          data-testid="user-form-name-error"
+          >{{ errors.name }}</FieldError
+        >
       </Field>
 
       <Field :data-invalid="Boolean(errors.email)">
@@ -41,10 +47,16 @@
           type="password"
           autocomplete="new-password"
           :aria-invalid="Boolean(errors.password)"
+          :aria-describedby="errors.password ? 'user-form-password-error' : undefined"
           data-testid="user-form-password"
           @blur="validatePassword"
         />
-        <FieldError v-if="errors.password">{{ errors.password }}</FieldError>
+        <FieldError
+          v-if="errors.password"
+          id="user-form-password-error"
+          data-testid="user-form-password-error"
+          >{{ errors.password }}</FieldError
+        >
       </Field>
 
       <Field>

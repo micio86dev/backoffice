@@ -65,7 +65,18 @@ const navItems = [
 
 const route = useRoute()
 
+/**
+ * Trailing slashes are stripped before comparing.
+ *
+ * The generated SPA is served as directory-style URLs, so a hard load or a
+ * deep link lands on `/projects/` while the nav item is `/projects`. A strict
+ * `===` therefore matched only after a CLIENT-SIDE navigation: reload any page
+ * and the sidebar stopped showing where you were, which is exactly when a
+ * bookmarked or shared link needs it most.
+ */
 function isCurrent(to: string): boolean {
-  return route.path === to
+  const normalize = (path: string): string => path.replace(/\/+$/, '') || '/'
+
+  return normalize(route.path) === normalize(to)
 }
 </script>

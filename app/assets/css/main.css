@@ -3,6 +3,33 @@
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
+
+/*
+ * reka-ui state variants.
+ *
+ * reka-ui exposes component state as `data-state="active|checked|open|closed"`
+ * and axis as `data-orientation="vertical|horizontal"`. The vendored
+ * shadcn-vue components style those states with Tailwind's BARE data variants
+ * (`data-active:`, `data-checked:`, `data-open:`, `data-vertical:`), which
+ * compile to attribute-PRESENCE selectors — `[data-active]`, `[data-checked]`
+ * — and reka-ui never emits those attributes. Verified by compiling the
+ * utilities against tailwindcss 4.3.3: without these mappings every one of
+ * the ~90 such rules in app/components/ui is dead CSS. Concretely, the active
+ * tab rendered identically to the inactive ones and a checked Checkbox never
+ * filled.
+ *
+ * Redefining the bare names (rather than rewriting every vendored class to
+ * `data-[state=…]:`) keeps future `shadcn-vue add` output working unmodified.
+ * They compose with `group-*` as usual, e.g.
+ * `group-data-vertical/tabs:flex-col` -> `.group\/tabs[data-orientation="vertical"] &`.
+ */
+@custom-variant data-active (&[data-state='active']);
+@custom-variant data-checked (&[data-state='checked']);
+@custom-variant data-open (&[data-state='open']);
+@custom-variant data-closed (&[data-state='closed']);
+@custom-variant data-vertical (&[data-orientation='vertical']);
+@custom-variant data-horizontal (&[data-orientation='horizontal']);
+
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 

@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 const listClientsMock = vi.fn()
@@ -25,17 +26,14 @@ vi.mock('../../../../app/composables/useApiClients', () => ({
 
 const ApiKeysPanel = (await import('../../../../app/components/organisms/ApiKeysPanel.vue')).default
 
-// Teleported Dialog content can take a render cycle beyond a single
-// microtask flush to settle (observed intermittently in this suite for
-// other Dialog-based organisms too, e.g. `pages/projects/index.vue`'s
-// dialog tests) — combines a microtask flush with a real timer tick so
-// interacting with the freshly-opened dialog's fields is never a race.
-async function settle(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
-    await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-}
+// Teleported Dialog content takes render cycles beyond a single microtask
+// flush to appear (observed intermittently across this suite's Dialog-based
+// organisms). Every wait below is therefore on the CONDITION, never on a
+// fixed timer budget: the previous fixed ~50 ms loop was simply too short
+// under a full parallel `vitest run`.
+const dialogForm = () => document.body.querySelector('[data-testid="api-key-form"]')
+
+const waitForDialogOpen = () => waitFor(dialogForm, 'the API key dialog to mount')
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -60,13 +58,19 @@ describe('ApiKeysPanel', () => {
     revokeClientMock.mockReset().mockResolvedValue(undefined)
   })
 
+  /**
+   * `abilityIds` are the DOM-safe ids of `M2M_ABILITIES` entries (e.g.
+   * `participants-read` for `participants:read`). Abilities are a closed set
+   * rendered as checkboxes, so the test clicks the same control an operator
+   * does rather than typing an ability name no UI ever offered.
+   */
   async function openCreateDialogAndFill(
     wrapper: ReturnType<typeof mount>,
     name: string,
-    abilities: string
+    abilityIds: string[]
   ): Promise<void> {
     await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
-    await settle()
+    await waitForDialogOpen()
 
     const nameInput = document.body.querySelector<HTMLInputElement>(
       '[data-testid="api-key-form-name"]'
@@ -75,17 +79,22 @@ describe('ApiKeysPanel', () => {
     nameInput!.dispatchEvent(new Event('input'))
     await flushPromises()
 
-    const abilitiesInput = document.body.querySelector<HTMLInputElement>(
-      '[data-testid="api-key-form-abilities"]'
-    )
-    abilitiesInput!.value = abilities
-    abilitiesInput!.dispatchEvent(new Event('input'))
-    await flushPromises()
+    for (const abilityId of abilityIds) {
+      const checkbox = document.body.querySelector<HTMLElement>(
+        `[data-testid="api-key-ability-${abilityId}"]`
+      )
+      expect(checkbox).not.toBeNull()
+      checkbox!.click()
+      await flushPromises()
+    }
 
     document.body
       .querySelector<HTMLFormElement>('[data-testid="api-key-form"]')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await settle()
+    await waitFor(
+      () => document.body.querySelector('[data-testid="api-key-raw-value"]'),
+      'the raw key reveal dialog to render'
+    )
   }
 
   it('lists existing keys without ever rendering a key_hash', async () => {
@@ -116,9 +125,12 @@ describe('ApiKeysPanel', () => {
     })
     await flushPromises()
 
-    await openCreateDialogAndFill(wrapper, 'New key', 'read')
+    await openCreateDialogAndFill(wrapper, 'New key', ['participants-read'])
 
-    expect(createClientMock).toHaveBeenCalledWith({ name: 'New key', abilities: ['read'] })
+    expect(createClientMock).toHaveBeenCalledWith({
+      name: 'New key',
+      abilities: ['participants:read'],
+    })
     expect(document.body.textContent).toContain('beai_live_raw_secret')
 
     wrapper.unmount()
@@ -144,11 +156,14 @@ describe('ApiKeysPanel', () => {
     })
     await flushPromises()
 
-    await openCreateDialogAndFill(wrapper, 'New key', 'read')
+    await openCreateDialogAndFill(wrapper, 'New key', ['participants-read'])
     expect(document.body.textContent).toContain('beai_live_raw_secret')
 
     document.body.querySelector<HTMLButtonElement>('[data-testid="api-key-reveal-close"]')?.click()
-    await settle()
+    await waitFor(
+      () => !(document.body.textContent ?? '').includes('beai_live_raw_secret'),
+      'the raw key reveal to be dismissed'
+    )
 
     expect(document.body.textContent).not.toContain('beai_live_raw_secret')
 
@@ -163,7 +178,10 @@ describe('ApiKeysPanel', () => {
     await flushPromises()
 
     await wrapper.get('[data-testid="api-key-revoke-1"]').trigger('click')
-    await settle()
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+      'the revoke confirmation dialog to mount'
+    )
     expect(revokeClientMock).not.toHaveBeenCalled()
 
     const confirmButton = document.body.querySelector<HTMLButtonElement>(
@@ -177,7 +195,7 @@ describe('ApiKeysPanel', () => {
     // matching real pointer-driven interaction.
     confirmButton?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await settle()
+    await waitFor(() => revokeClientMock.mock.calls.length > 0, 'the revoke call to fire')
 
     expect(revokeClientMock).toHaveBeenCalledWith('1')
 

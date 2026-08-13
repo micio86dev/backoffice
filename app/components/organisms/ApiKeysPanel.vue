@@ -81,11 +81,19 @@
             >
               <FieldLegend variant="label">{{ $t('settings.apiKeys.abilities') }}</FieldLegend>
               <FieldDescription>{{ $t('settings.apiKeys.abilitiesDescription') }}</FieldDescription>
+              <Alert
+                v-if="abilitiesError"
+                variant="destructive"
+                data-testid="api-key-abilities-error"
+              >
+                <AlertDescription>{{ $t('settings.apiKeys.abilitiesLoadError') }}</AlertDescription>
+              </Alert>
               <ul
+                v-else
                 class="divide-y divide-border overflow-hidden rounded-lg border border-border"
                 :data-invalid="Boolean(errors.abilities)"
               >
-                <li v-for="ability in M2M_ABILITIES" :key="ability.value">
+                <li v-for="ability in abilities" :key="ability.value">
                   <div
                     class="flex items-center gap-3 px-3 py-2.5 transition-colors has-data-checked:bg-primary/5 hover:bg-muted"
                   >
@@ -111,7 +119,7 @@
                         toggleAbility(ability.value, !selectedAbilities.includes(ability.value))
                       "
                     >
-                      <span class="text-foreground">{{ $t(ability.labelKey) }}</span>
+                      <span class="text-foreground">{{ ability.label }}</span>
                       <code class="font-mono text-xs font-normal text-muted-foreground">{{
                         ability.value
                       }}</code>
@@ -190,7 +198,7 @@
 // this component's own lifetime (`rawKeyReveal`), never round-tripped
 // through the list endpoint (`ApiClientResource` does not even carry a
 // `key_hash`, structurally preventing that leak).
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
   Table,
   TableBody,
@@ -219,55 +227,51 @@ import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useApiClients, type ApiClient } from '@/composables/useApiClients'
 
 /**
- * Canonical M2M ability set.
- *
- * MIRRORS `api/config/m2m_abilities.php`, which is the single source of truth
- * and rejects anything outside it with a 422. The API publishes no endpoint
- * for this list today, so it is duplicated here rather than fetched; adding an
- * ability server-side means adding it here and in both locale files too.
- * `id` is the DOM-safe form of `value` (`:` is not usable in an i18n path).
+ * DOM-safe id for an ability name (`participants:create` -> `participants-create`).
+ * `:` is not usable in an element id or a `data-testid` selector.
  */
-const M2M_ABILITIES = [
-  {
-    value: 'participants:create',
-    id: 'participants-create',
-    labelKey: 'settings.apiKeys.ability.participantsCreate',
-  },
-  {
-    value: 'participants:read',
-    id: 'participants-read',
-    labelKey: 'settings.apiKeys.ability.participantsRead',
-  },
-  {
-    value: 'evaluations:read',
-    id: 'evaluations-read',
-    labelKey: 'settings.apiKeys.ability.evaluationsRead',
-  },
-  {
-    value: 'progress:read',
-    id: 'progress-read',
-    labelKey: 'settings.apiKeys.ability.progressRead',
-  },
-  {
-    value: 'projects:read',
-    id: 'projects-read',
-    labelKey: 'settings.apiKeys.ability.projectsRead',
-  },
-  {
-    value: 'sso_link:generate',
-    id: 'sso-link-generate',
-    labelKey: 'settings.apiKeys.ability.ssoLinkGenerate',
-  },
-] as const
+function abilityId(value: string): string {
+  return value.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+}
 
-const { listClients, createClient, revokeClient } = useApiClients()
-const { t } = useI18n()
+/**
+ * i18n key for an ability name (`sso_link:generate` -> `ssoLinkGenerate`).
+ *
+ * Derived rather than looked up in a table, so the only thing this file knows
+ * about the ability set is how to SPELL a key — never which abilities exist.
+ * That list belongs to the API and is fetched from it.
+ */
+function abilityLabelKey(value: string): string {
+  const parts = value.split(/[^a-z0-9]+/i).filter(Boolean)
+
+  return parts
+    .map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join('')
+}
+
+const { listClients, listAbilities, createClient, revokeClient } = useApiClients()
+const { t, te } = useI18n()
 
 const clients = ref<ApiClient[]>([])
 const creating = ref(false)
 const creatingKey = ref(false)
 const name = ref('')
 const selectedAbilities = ref<string[]>([])
+const abilityCatalog = ref<string[]>([])
+const abilitiesError = ref(false)
+
+/**
+ * An ability the server advertises but this build has no translation for still
+ * has to be selectable — showing its literal name is honest, and better than a
+ * raw i18n key or silently dropping a permission the operator may need.
+ */
+const abilities = computed(() =>
+  abilityCatalog.value.map((value) => {
+    const key = `settings.apiKeys.ability.${abilityLabelKey(value)}`
+
+    return { value, id: abilityId(value), label: te(key) ? t(key) : value }
+  })
+)
 const errors = ref<{ name?: string; abilities?: string }>({})
 const formMessage = ref<string | null>(null)
 const rawKeyReveal = ref<string | null>(null)
@@ -277,6 +281,21 @@ const revokeTarget = ref<ApiClient | null>(null)
 async function load(): Promise<void> {
   const response = await listClients()
   clients.value = response.data
+}
+
+async function loadAbilities(): Promise<void> {
+  try {
+    const response = await listAbilities()
+    abilityCatalog.value = response.data
+    abilitiesError.value = false
+  } catch {
+    // Non-fatal for the LIST, which is the primary content here — but the
+    // create form cannot offer a grant it could not look up, so it says so
+    // rather than rendering an empty checkbox group that reads as "no
+    // permissions exist".
+    abilityCatalog.value = []
+    abilitiesError.value = true
+  }
 }
 
 function toggleAbility(ability: string, checked: boolean | 'indeterminate'): void {
@@ -291,9 +310,9 @@ function toggleAbility(ability: string, checked: boolean | 'indeterminate'): voi
 async function onCreate(): Promise<void> {
   formMessage.value = null
   errors.value.name = name.value.trim() === '' ? t('settings.apiKeys.nameRequired') : undefined
-  // Emitted in the canonical config order, not click order, so two keys with
-  // the same grants always produce the same payload.
-  const parsedAbilities = M2M_ABILITIES.map((ability) => ability.value).filter((value) =>
+  // Emitted in the server's own catalogue order, not click order, so two keys
+  // with the same grants always produce the same payload.
+  const parsedAbilities = abilityCatalog.value.filter((value) =>
     selectedAbilities.value.includes(value)
   )
   errors.value.abilities =
@@ -302,7 +321,7 @@ async function onCreate(): Promise<void> {
 
   creatingKey.value = true
   try {
-    const response = await createClient({ name: name.value, abilities: [...parsedAbilities] })
+    const response = await createClient({ name: name.value, abilities: parsedAbilities })
     rawKeyReveal.value = response.api_key
     copied.value = false
     creating.value = false
@@ -338,5 +357,6 @@ async function onRevokeConfirmed(): Promise<void> {
 
 onMounted(() => {
   void load()
+  void loadAbilities()
 })
 </script>

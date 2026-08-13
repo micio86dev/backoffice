@@ -271,6 +271,7 @@
       "nameRequired": "Enter a name for this key.",
       "abilities": "Abilities",
       "abilitiesDescription": "Pick what this key is allowed to do. These are the only values the API accepts.",
+      "abilitiesLoadError": "The list of abilities could not be loaded, so no key can be created right now. Reload the page to try again.",
       "abilitiesRequired": "Select at least one ability.",
       "ability": {
         "participantsCreate": "Create candidates",

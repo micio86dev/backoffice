@@ -37,9 +37,13 @@ vi.stubGlobal(
 )
 // @nuxtjs/i18n auto-imports; pages call `useI18n().t` for their <title>.
 // Identity `t` keeps assertions on the KEY, not on translated copy.
+// `te` reports whether a key has a translation. Stubbed as always-true so the
+// identity `t` above stays the observed value: a component that falls back when
+// a key is MISSING is exercised by its own spec re-stubbing `te`, not by every
+// unrelated spec silently taking the fallback branch.
 vi.stubGlobal(
   'useI18n',
-  vi.fn(() => ({ t: (key: string) => key, locale: ref('it') }))
+  vi.fn(() => ({ t: (key: string) => key, te: () => true, locale: ref('it') }))
 )
 vi.stubGlobal(
   'useLocaleHead',

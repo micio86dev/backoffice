@@ -24,11 +24,28 @@ export interface CreateApiClientResponse {
   api_key: string
 }
 
+export interface AbilityCatalogResponse {
+  data: string[]
+}
+
 export function useApiClients() {
   const { apiFetch } = useApi()
 
   async function listClients(): Promise<ApiClientListResponse> {
     return apiFetch<ApiClientListResponse>('/m2m/clients')
+  }
+
+  /**
+   * The abilities an API client may be granted.
+   *
+   * Fetched, never mirrored: the canonical set lives in the API's
+   * `config/m2m_abilities.php` and is enforced by `AbilitiesValidator`, so a
+   * copy here would go stale the first time an ability is added or removed —
+   * and go stale silently, because a name the server no longer accepts looks
+   * exactly like a valid one until the create call is refused.
+   */
+  async function listAbilities(): Promise<AbilityCatalogResponse> {
+    return apiFetch<AbilityCatalogResponse>('/m2m/abilities')
   }
 
   async function createClient(payload: CreateApiClientPayload): Promise<CreateApiClientResponse> {
@@ -39,5 +56,5 @@ export function useApiClients() {
     await apiFetch<null>(`/m2m/clients/${id}`, { method: 'DELETE' })
   }
 
-  return { listClients, createClient, revokeClient }
+  return { listClients, listAbilities, createClient, revokeClient }
 }

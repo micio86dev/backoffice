@@ -271,6 +271,7 @@
       "nameRequired": "Inserisci un nome per questa chiave.",
       "abilities": "Permessi",
       "abilitiesDescription": "Scegli cosa può fare questa chiave. Sono gli unici valori accettati dall'API.",
+      "abilitiesLoadError": "L'elenco dei permessi non è stato caricato, quindi al momento non è possibile creare una chiave. Ricarica la pagina per riprovare.",
       "abilitiesRequired": "Seleziona almeno un permesso.",
       "ability": {
         "participantsCreate": "Creare candidati",

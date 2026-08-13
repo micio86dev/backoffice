@@ -8,6 +8,15 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/unit/setup.ts'],
+    // Several page specs `await import()` a route module inside the test, and
+    // call `vi.resetModules()` between tests, so each one pays a cold Vite
+    // transform of that module's whole tree. That cost is bound by the
+    // machine, not by the code under test: on a loaded host the import alone
+    // has been observed to exceed the 5s default, failing as "Test timed out"
+    // with nothing wrong in the assertion. A genuine hang still fails here,
+    // just later — which is the right trade for a suite that must be
+    // trustworthy on a busy CI runner.
+    testTimeout: 20_000,
     // Only run unit tests; Playwright E2E runs separately via playwright test
     include: ['tests/unit/**/*.spec.ts', 'tests/unit/**/*.test.ts'],
     exclude: ['tests/e2e/**', 'node_modules/**', '.nuxt/**'],

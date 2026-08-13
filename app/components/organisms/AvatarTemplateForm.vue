@@ -21,7 +21,7 @@
         type="text"
         required
         maxlength="120"
-        class="rounded-md border border-border px-3 py-2"
+        :class="formControlClass"
       />
     </label>
 
@@ -33,7 +33,7 @@
         data-testid="template-field-description"
         type="text"
         maxlength="500"
-        class="rounded-md border border-border px-3 py-2"
+        :class="formControlClass"
       />
     </label>
 
@@ -51,7 +51,7 @@
         v-model="draft.provider"
         data-testid="template-field-provider"
         :disabled="!isNew"
-        class="rounded-md border border-border px-3 py-2"
+        :class="formControlClass"
       >
         <option v-for="name in providers" :key="name" :value="name">
           {{ $t(`avatar_templates.provider.${name}`) }}
@@ -96,7 +96,7 @@
           :id="`template-config-${field.key}`"
           :data-testid="`template-config-${field.key}`"
           :value="stringValue(field.key)"
-          class="rounded-md border border-border px-3 py-2"
+          :class="formControlClass"
           @change="setValue(field, ($event.target as HTMLSelectElement).value)"
         >
           <!--
@@ -116,7 +116,7 @@
           :data-testid="`template-config-${field.key}`"
           type="checkbox"
           :checked="draft.config[field.key] === true"
-          class="size-4 self-start"
+          class="size-4 self-start accent-primary"
           @change="setValue(field, ($event.target as HTMLInputElement).checked)"
         />
 
@@ -129,29 +129,19 @@
           :max="field.max"
           :step="field.step"
           :value="stringValue(field.key)"
-          class="rounded-md border border-border px-3 py-2"
+          :class="formControlClass"
           @input="setValue(field, ($event.target as HTMLInputElement).value)"
         />
       </label>
     </fieldset>
 
     <div class="flex gap-2">
-      <button
-        type="submit"
-        data-testid="template-save"
-        :disabled="saving"
-        class="rounded-md border border-border px-4 py-2 text-sm font-medium"
-      >
+      <Button type="submit" data-testid="template-save" :disabled="saving">
         {{ $t('avatar_templates.action.save') }}
-      </button>
-      <button
-        type="button"
-        data-testid="template-cancel"
-        class="rounded-md border border-border px-4 py-2 text-sm font-medium"
-        @click="emit('cancel')"
-      >
+      </Button>
+      <Button type="button" variant="outline" data-testid="template-cancel" @click="emit('cancel')">
         {{ $t('avatar_templates.action.cancel') }}
-      </button>
+      </Button>
     </div>
   </form>
 </template>
@@ -170,6 +160,8 @@
  * does not work.
  */
 import { computed, ref, watch } from 'vue'
+import { Button } from '@/components/ui/button'
+import { formControlClass } from '@/components/ui/form-control'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 
 const props = defineProps<{

@@ -7,7 +7,11 @@
     "password": "Password",
     "submit": "Sign in",
     "submitting": "Signing in…",
-    "error": "Invalid credentials. Please try again."
+    "error": "Invalid credentials. Please try again.",
+    "emailRequired": "Enter your email address.",
+    "emailInvalid": "Enter a valid email address.",
+    "passwordRequired": "Enter your password.",
+    "success": "Signed in. Taking you to the dashboard…"
   },
   "head": {
     "title": {
@@ -15,7 +19,10 @@
       "login": "Sign in",
       "participants": "Candidates",
       "participantDetail": "Candidate detail",
-      "unsupported": "Unsupported browser"
+      "unsupported": "Unsupported browser",
+      "projects": "Projects",
+      "reports": "Reports",
+      "settings": "Settings"
     }
   },
   "errors": {
@@ -104,6 +111,77 @@
       }
     }
   },
+  "projects": {
+    "title": "Projects",
+    "table": {
+      "name": "Name",
+      "assessmentType": "Assessment type",
+      "status": "Status",
+      "actions": "Actions",
+      "empty": "No projects yet."
+    },
+    "action": {
+      "new": "New project",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "activate": "Activate",
+      "archive": "Archive"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "archived": "Archived"
+    },
+    "assessmentType": {
+      "standard": "Standard",
+      "potential": "Potential"
+    },
+    "roleCode": {
+      "ICO": "Individual Contributor",
+      "FLL": "Frontline Leader",
+      "MLL": "Mid-Level Leader",
+      "BUL": "Business Unit Leader",
+      "SRX": "Senior Executive"
+    },
+    "form": {
+      "newTitle": "New project",
+      "editTitle": "Edit project",
+      "name": "Name",
+      "slug": "Slug",
+      "language": "Language",
+      "assessmentType": "Assessment type",
+      "roleCode": "Role",
+      "roleCodeRequiredForStandard": "Required for a standard assessment.",
+      "frameworkVersion": "Framework version",
+      "frameworkVersionImmutable": "The framework version is fixed at creation and can never change afterwards, so every scored result stays comparable against the same catalogue.",
+      "immutableWhenLive": "This field is locked once the project is active or archived, so a live assessment always stays comparable to itself.",
+      "competencies": "Competencies",
+      "pauseEveryNCompetencies": "Pause every N competencies",
+      "nudgeMinChars": "Minimum characters before a nudge",
+      "exitRedirectUrl": "Exit redirect URL",
+      "webhookUrl": "Webhook URL",
+      "webhookSecret": "Webhook secret",
+      "nameRequired": "Enter a project name.",
+      "slugRequired": "Enter a slug.",
+      "roleCodeRequired": "Select a role.",
+      "invalidUrl": "Enter a full address starting with http:// or https://",
+      "outOfRange": "Enter a value between {min} and {max}.",
+      "saveError": "This project could not be saved. Please review the highlighted fields.",
+      "saveSuccess": "Project saved.",
+      "onlyLegalTransition": "Only the next lifecycle step is offered here: {transition}."
+    },
+    "secret": {
+      "notSet": "No secret configured.",
+      "configured": "A secret is configured.",
+      "setNew": "Set a new secret",
+      "placeholder": "Enter a new secret"
+    },
+    "competencyPicker": {
+      "legend": "Competencies",
+      "empty": "No competencies available for this selection."
+    }
+  },
   "report": {
     "title": "Evaluation report",
     "reliability": "Reliability",
@@ -153,6 +231,159 @@
   "unsupported": {
     "title": "Unsupported Browser",
     "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Organization details, integration credentials and team access.",
+    "tabs": {
+      "organization": "Organization profile",
+      "apiKeys": "API keys",
+      "webhooks": "Webhook defaults",
+      "users": "Users & roles"
+    },
+    "sectionDescription": {
+      "organization": "Name and tenancy identifier",
+      "apiKeys": "Credentials for machine-to-machine access",
+      "webhooks": "Where BEAI delivers progress and evaluation events",
+      "users": "Who can sign in, and what they are allowed to do"
+    },
+    "organization": {
+      "name": "Name",
+      "slug": "Slug",
+      "slugReadOnly": "The slug is a tenancy identifier and cannot be changed.",
+      "nameRequired": "Enter an organization name.",
+      "saveError": "The organization profile could not be saved. Please review the highlighted fields."
+    },
+    "webhooks": {
+      "url": "Default webhook URL",
+      "secret": "Default webhook secret",
+      "events": "Default webhook events",
+      "eventProgress": "Progress",
+      "eventEvaluation": "Evaluation",
+      "saveError": "The webhook defaults could not be saved. Please review the highlighted fields.",
+      "invalidUrl": "Enter a full address starting with http:// or https://",
+      "note": "These defaults are copied onto a new project only at the moment it is created; changing them never retargets an existing project's live webhook."
+    },
+    "apiKeys": {
+      "title": "API keys",
+      "new": "New API key",
+      "name": "Name",
+      "nameRequired": "Enter a name for this key.",
+      "abilities": "Abilities",
+      "abilitiesDescription": "Pick what this key is allowed to do. These are the only values the API accepts.",
+      "abilitiesLoadError": "The list of abilities could not be loaded, so no key can be created right now. Reload the page to try again.",
+      "abilitiesRequired": "Select at least one ability.",
+      "ability": {
+        "participantsCreate": "Create candidates",
+        "participantsRead": "Read candidates",
+        "evaluationsRead": "Read evaluations",
+        "progressRead": "Read interview progress",
+        "projectsRead": "Read projects",
+        "ssoLinkGenerate": "Generate SSO entry links"
+      },
+      "expiresAt": "Expires at",
+      "create": "Create key",
+      "createError": "This key could not be created. Please review the highlighted fields.",
+      "rawKeyTitle": "Copy this key now",
+      "rawKeyWarning": "This is the only time the raw key is shown. It cannot be retrieved again after you close this dialog.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "close": "Close",
+      "revoke": "Revoke",
+      "confirmRevokeTitle": "Revoke this API key?",
+      "confirmRevokeDescription": "Any integration using this key will immediately stop working. This cannot be undone.",
+      "empty": "No API keys yet.",
+      "table": {
+        "name": "Name",
+        "createdAt": "Created",
+        "expiresAt": "Expires",
+        "lastUsedAt": "Last used",
+        "actions": "Actions"
+      }
+    }
+  },
+  "users": {
+    "title": "Users & roles",
+    "new": "New user",
+    "edit": "Edit",
+    "name": "Name",
+    "email": "Email",
+    "password": "Password",
+    "accessLevel": "Access level",
+    "role": {
+      "admin": "Admin",
+      "operator": "Operator",
+      "viewer": "Viewer"
+    },
+    "state": {
+      "active": "Active",
+      "deactivated": "Deactivated"
+    },
+    "action": {
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
+    "confirm": {
+      "action": "Confirm",
+      "deactivateTitle": "Deactivate this user?",
+      "deactivateDescription": "They will immediately lose access. You can reactivate them at any time.",
+      "activateTitle": "Reactivate this user?",
+      "activateDescription": "They will regain access with their existing password."
+    },
+    "form": {
+      "nameRequired": "Enter a name.",
+      "emailRequired": "Enter an email address.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordRequired": "Set an initial password.",
+      "passwordTooShort": "The password must be at least 8 characters.",
+      "roleRequired": "Select an access level.",
+      "saveError": "This user could not be saved. Please review the highlighted fields."
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "accessLevel": "Access level",
+      "state": "State",
+      "actions": "Actions",
+      "empty": "No users yet."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Every completed evaluation, filtered by project, role and period.",
+    "filters": {
+      "legend": "Filters",
+      "clear": "Clear all",
+      "period": "Evaluation period",
+      "project": "Project",
+      "assessmentType": "Assessment type",
+      "roleCode": "Role",
+      "status": "Status",
+      "from": "From",
+      "to": "To",
+      "allProjects": "All projects",
+      "allTypes": "All types",
+      "allRoles": "All roles",
+      "statusCompleted": "Completed",
+      "statusPending": "Pending"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "project": "Project",
+      "assessmentType": "Assessment type",
+      "roleCode": "Role",
+      "evaluatedAt": "Evaluated",
+      "status": "Status",
+      "reliability": "Reliability",
+      "empty": "No evaluations match the current filters.",
+      "notYetScored": "Not yet scored"
+    },
+    "summary": {
+      "title": "Summary",
+      "byStatus": "By status",
+      "byCompetency": "Mean score by competency",
+      "scoredOf": "{scored} of {result} scored"
+    }
   },
   "health": {
     "status": "ok"
@@ -233,6 +464,128 @@
       "interruptibility": "Interruptibility",
       "voiceIsolation": "Voice isolation",
       "idleEngagement": "Idle engagement"
+    }
+  },
+  "help": {
+    "label": "Help",
+    "open": "Open the help panel for this page",
+    "stepsTitle": "How this page works",
+    "glossaryTitle": "Words used on this page",
+    "topics": {
+      "dashboard": {
+        "title": "Dashboard",
+        "summary": "A standing view of how much assessment work is in flight right now.",
+        "steps": {
+          "0": "Read the counters as a snapshot: they follow the candidates already created by the calling system, not people you invite from here.",
+          "1": "Open Projects to change what an assessment measures, or Candidates to see where individual people are stuck.",
+          "2": "A figure that looks wrong is almost always a filter question. Reports is where you narrow it down."
+        }
+      },
+      "projects": {
+        "title": "Projects",
+        "summary": "A project is one assessment configuration: what it measures, in which language, and where results are delivered.",
+        "steps": {
+          "0": "Create the project and pick its assessment type. Standard measures the competencies of a role; Potential measures only MTG and LAT. This choice is permanent once the project goes live.",
+          "1": "For a Standard project, choose the role. That decides which competencies the interview covers.",
+          "2": "Set the webhook URL if the calling system should be notified of progress and results, and the exit URL for where the candidate is sent afterwards.",
+          "3": "Activate the project. From then on the calling system can mint entry links for it; assessment type and role can no longer change."
+        }
+      },
+      "participants": {
+        "title": "Candidates",
+        "summary": "Everyone who has been given an entry link for one of your projects, and where each of them got to.",
+        "steps": {
+          "0": "Candidates appear here when the calling system creates them. BEAI never invites anyone and holds no contact details.",
+          "1": "Follow the status to see progress: waiting, in progress, being evaluated, then completed or failed.",
+          "2": "A transcript is readable from \"being evaluated\" onward; the scored report only once the candidate is completed."
+        }
+      },
+      "reports": {
+        "title": "Reports",
+        "summary": "Every completed evaluation, and the BARS scores behind it.",
+        "steps": {
+          "0": "Narrow the list first: project, assessment type, role and period all combine, and the counter shows how many filters are active.",
+          "1": "Open an evaluation to see each competency, its indicator scores and the verbatim excerpts they came from.",
+          "2": "Check reliability before comparing two candidates. A low value means much of the interview gave nothing to score, not that the person scored badly."
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "summary": "Your organization, the credentials other systems use to reach BEAI, and who on your team can sign in.",
+        "steps": {
+          "0": "Organization profile carries your name; the slug identifies your tenant and cannot change.",
+          "1": "API keys are for other systems, not people. Grant only the abilities that system actually needs, and copy the key immediately: it is shown exactly once.",
+          "2": "Webhook defaults apply to projects that do not set their own.",
+          "3": "Users and roles controls who can sign in to this backoffice, and what they may change."
+        }
+      },
+      "avatarTemplates": {
+        "title": "Avatar templates",
+        "summary": "The reusable voice and appearance settings an interview runs with.",
+        "steps": {
+          "0": "A template belongs to one service, and the service cannot be changed afterwards. Create a new template instead.",
+          "1": "Leave a setting empty to accept the service default.",
+          "2": "Templates are configuration, not records: changing one affects every future interview that uses it."
+        }
+      }
+    },
+    "glossary": {
+      "project": {
+        "term": "Project",
+        "definition": "One assessment configuration: role, language, competencies and delivery settings."
+      },
+      "participant": {
+        "term": "Candidate",
+        "definition": "A person given an entry link for a project. Created by the calling system, never here."
+      },
+      "assessmentType": {
+        "term": "Assessment type",
+        "definition": "Standard scores the competencies of a role. Potential scores only MTG and LAT, from four fixed questions. Permanent once live."
+      },
+      "roleCode": {
+        "term": "Role",
+        "definition": "ICO, FLL, MLL, BUL or SRX. Determines which competencies the interview covers."
+      },
+      "frameworkVersion": {
+        "term": "Framework version",
+        "definition": "The competency catalogue a project was created against. Pinned at creation, so a later revision never rescores a live project."
+      },
+      "lifecycle": {
+        "term": "Status",
+        "definition": "Waiting, in progress, being evaluated, then completed or failed. Reading rights depend on it."
+      },
+      "ssoLink": {
+        "term": "Entry link",
+        "definition": "The short-lived personal link a candidate uses to start. Minted by the calling system through the API."
+      },
+      "bars": {
+        "term": "BARS",
+        "definition": "Behaviourally Anchored Rating Scale. Each answer is matched against written reference behaviours and scored 1, 3 or 5 — never a value in between."
+      },
+      "competency": {
+        "term": "Competency",
+        "definition": "One assessed capability. Its score is the average of the indicators that could actually be scored."
+      },
+      "reliability": {
+        "term": "Reliability",
+        "definition": "The share of indicators the interview produced evidence for. Low reliability means thin evidence, not a low score."
+      },
+      "apiKey": {
+        "term": "API key",
+        "definition": "A credential for another system. Shown once, at creation, and never retrievable again."
+      },
+      "ability": {
+        "term": "Ability",
+        "definition": "One permission on an API key. A key can do only what its abilities allow."
+      },
+      "webhook": {
+        "term": "Webhook",
+        "definition": "An address BEAI calls to report progress and results. Signed, and retried if it fails."
+      },
+      "avatarTemplate": {
+        "term": "Avatar template",
+        "definition": "Reusable voice and appearance settings for the interviewer."
+      }
     }
   }
 }

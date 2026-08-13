@@ -113,4 +113,71 @@ describe('useApi — session-aware $fetch wrapper (D11)', () => {
 
     expect(navigateToMock).toHaveBeenCalledWith('/login')
   })
+
+  // D5: a valid JWT can outlive a mid-session deactivation by up to the
+  // token's TTL. `TenantContext` folds that into a 403 `account_deactivated`
+  // on every subsequent request — a DIFFERENT path than the 401 single-flight
+  // refresh above, because refreshing would only issue the deactivated user a
+  // NEW valid token.
+  it('clears the session and redirects to /login on a 403 account_deactivated, without attempting a refresh', async () => {
+    const navigateToMock = vi.fn()
+    const fetchMock = vi.fn()
+    fetchMock.mockRejectedValueOnce(
+      Object.assign(new Error('Forbidden'), {
+        status: 403,
+        data: { error: 'account_deactivated' },
+      })
+    )
+
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal('navigateTo', navigateToMock)
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: API_BASE } }))
+    )
+
+    const { useAuth } = await import('../../../app/composables/useAuth')
+    const { useApi } = await import('../../../app/composables/useApi')
+
+    useAuth().setSession('still-technically-valid-token')
+    const { apiFetch } = useApi()
+
+    await expect(apiFetch('/participants')).rejects.toThrow()
+
+    // Exactly one call: the original request. No /auth/refresh attempt — a
+    // deactivated account would just receive a NEW valid token for an
+    // account that must not authenticate.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(navigateToMock).toHaveBeenCalledWith('/login')
+    expect(useAuth().isAuthenticated.value).toBe(false)
+  })
+
+  // A generic 403 (an RBAC denial, not deactivation) must NOT be treated as
+  // account_deactivated — that would forcibly log out an operator who is
+  // simply not allowed to do the one thing they just tried.
+  it('does not clear the session on a generic 403 without the account_deactivated body', async () => {
+    const navigateToMock = vi.fn()
+    const fetchMock = vi.fn()
+    fetchMock.mockRejectedValueOnce(
+      Object.assign(new Error('Forbidden'), { status: 403, data: {} })
+    )
+
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal('navigateTo', navigateToMock)
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: API_BASE } }))
+    )
+
+    const { useAuth } = await import('../../../app/composables/useAuth')
+    const { useApi } = await import('../../../app/composables/useApi')
+
+    useAuth().setSession('still-valid-token')
+    const { apiFetch } = useApi()
+
+    await expect(apiFetch('/users')).rejects.toThrow()
+
+    expect(navigateToMock).not.toHaveBeenCalledWith('/login')
+    expect(useAuth().isAuthenticated.value).toBe(true)
+  })
 })

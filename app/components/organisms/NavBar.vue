@@ -2,6 +2,7 @@
   <header class="flex h-(--spacing-nav) items-center gap-4 border-b border-border px-4">
     <SidebarTrigger />
     <div class="flex-1" />
+    <HelpSheet />
     <Button
       variant="ghost"
       size="sm"
@@ -19,6 +20,7 @@
 import { ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
+import HelpSheet from '@/components/organisms/HelpSheet.vue'
 import { useAuth } from '@/composables/useAuth'
 
 async function onLogout(): Promise<void> {

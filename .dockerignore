@@ -1,0 +1,56 @@
+# Build context exclusions for the backoffice image.
+#
+# WHY THIS FILE EXISTS
+# The Dockerfile runs `bun install --frozen-lockfile` and then `COPY . .`.
+# Without this file that COPY overwrites the clean install with whatever sits in
+# the developer's working tree — 488 MB of host-built `node_modules`, plus a
+# stale `.nuxt` cache, shipped into the build context on every single build.
+# `api/.dockerignore` documents where that already cost this project a boot
+# crash loop; the two Nuxt apps simply never got the same treatment.
+#
+# Scope note: this does NOT fix the arm64 `bun run generate` failure in this
+# image. That was investigated separately and is a toolchain issue, not a
+# context issue — the build fails identically with a clean context. Claiming
+# otherwise here would send the next person down the wrong path.
+#
+# It also keeps `.env` and `.git` OUT of the image. This app's API base is baked
+# into the bundle at build time from a build ARG; a local `.env` in the context
+# could silently win over it, which is exactly the failure that sent production
+# logins to http://localhost:8000.
+
+# ── Secrets and local configuration ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Version control and CI metadata ─────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+.github
+
+# ── Dependencies: installed inside the image, never copied from the host ────
+node_modules
+
+# ── Generated output and caches: rebuilt in the image, never inherited ──────
+.nuxt
+.output
+dist
+.data
+.cache
+
+# ── Test artefacts: never part of a runtime image ───────────────────────────
+coverage
+playwright-report
+test-results
+blob-report
+.playwright
+
+# ── Editor and OS noise ─────────────────────────────────────────────────────
+.DS_Store
+.idea
+.vscode
+
+# ── Docker's own files: changing them must not invalidate the build context ─
+Dockerfile
+.dockerignore

@@ -26,7 +26,16 @@ import { computed } from 'vue'
 // Depends on every locale declaring a `language` tag in nuxt.config.ts —
 // localeHead reads `locale.language`, never `locale.code`, and silently emits
 // nothing when it is absent. tests/unit/nuxt-config.spec.ts guards that.
-const localeHead = useLocaleHead()
+//
+// `seo: false` because the ONLY thing wanted here is `htmlAttrs.lang`. Left on,
+// @nuxtjs/i18n also emits canonical + hreflang link tags, which need an absolute
+// origin it cannot infer — hence the console warning "I18n `baseUrl` is required
+// to generate valid SEO tag links". Supplying a `baseUrl` would silence the
+// warning by producing those tags, which is the wrong resolution: this app sets
+// `noindex, nofollow` on every route in every environment (D30), so hreflang and
+// canonical describe an indexing decision that has already been refused. Turning
+// the SEO tags off removes both the warning and the dead markup.
+const localeHead = useLocaleHead({ seo: false })
 const htmlLang = computed(() => localeHead.value.htmlAttrs?.lang ?? 'it')
 
 // D30 — backoffice ALWAYS injects noindex in every environment.

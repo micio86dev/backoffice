@@ -39,7 +39,7 @@ export function useAvatarTemplates() {
   }
 
   async function updateTemplate(
-    id: number,
+    id: number | string,
     payload: { name?: string; description?: string | null; config?: Record<string, unknown> }
   ): Promise<TemplateResponse> {
     // `provider` is deliberately absent from the accepted payload. The API
@@ -49,11 +49,11 @@ export function useAvatarTemplates() {
     return apiFetch<TemplateResponse>(`/avatar-templates/${id}`, { method: 'PATCH', body: payload })
   }
 
-  async function activateTemplate(id: number): Promise<TemplateResponse> {
+  async function activateTemplate(id: number | string): Promise<TemplateResponse> {
     return apiFetch<TemplateResponse>(`/avatar-templates/${id}/activate`, { method: 'POST' })
   }
 
-  async function deleteTemplate(id: number): Promise<void> {
+  async function deleteTemplate(id: number | string): Promise<void> {
     // <null>, not <void>: the endpoint answers 204 with no body, and `void` is
     // not a valid type argument — it describes a return position, not a value.
     await apiFetch<null>(`/avatar-templates/${id}`, { method: 'DELETE' })

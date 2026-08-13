@@ -16,10 +16,17 @@ const Harness = defineComponent({
 describe('NavBar', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    // Wipes setup.ts's globals too, so anything NavBar's subtree auto-imports
+    // has to be restored here. `useRoute` is HelpSheet's — it picks its topic
+    // from the current path.
     vi.unstubAllGlobals()
     vi.stubGlobal(
       'useRuntimeConfig',
       vi.fn(() => ({ public: { apiBase: 'https://api.test' } }))
+    )
+    vi.stubGlobal(
+      'useRoute',
+      vi.fn(() => ({ path: '/', fullPath: '/', params: {}, query: {} }))
     )
   })
 

@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { waitFor } from '../../support/wait-for'
 import { ref } from 'vue'
 
 // Pre-warm every panel loaded via `defineAsyncComponent` (D10 code-split).
@@ -41,12 +42,10 @@ function organizationResponse() {
 
 let useHeadMock: ReturnType<typeof vi.fn>
 
-async function settle(): Promise<void> {
-  for (let i = 0; i < 8; i += 1) {
-    await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 15))
-  }
-}
+// Waits on the CONDITION, not a fixed timer budget: the panels are
+// `defineAsyncComponent` chunks (D10) whose dynamic import takes real
+// wall-clock time, and `vi.resetModules()` above makes every test pay it
+// again. A fixed ~120 ms budget did not survive a full parallel run.
 
 describe('pages/settings/index.vue', () => {
   beforeEach(() => {
@@ -90,7 +89,10 @@ describe('pages/settings/index.vue', () => {
 
     const SettingsPage = (await import('../../../../app/pages/settings/index.vue')).default
     const wrapper = mount(SettingsPage, { global: { mocks: { $t: tMock } } })
-    await settle()
+    await waitFor(
+      () => wrapper.find('[data-testid="organization-profile-form"]').exists(),
+      'the organization profile panel to mount'
+    )
 
     expect(wrapper.find('[data-testid="organization-profile-form"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="api-keys-new"]').exists()).toBe(false)

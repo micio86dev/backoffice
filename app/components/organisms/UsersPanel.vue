@@ -1,7 +1,8 @@
 <template>
   <div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-medium text-foreground">{{ $t('users.title') }}</h2>
+    <!-- The section title lives in the settings page header; repeating it here
+         would give the panel two competing headings. -->
+    <div class="flex items-center justify-end">
       <Button data-testid="users-new" @click="editing = 'new'">{{ $t('users.new') }}</Button>
     </div>
 

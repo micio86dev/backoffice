@@ -89,6 +89,26 @@ describe('UserForm', () => {
     )
   })
 
+  // DESIGN.md §16 / the admin-backoffice form contract: `aria-invalid` alone
+  // announces "this field is wrong" and stops there. Without `aria-describedby`
+  // pointing at the message, a screen-reader user is told something is invalid
+  // and never told what — the explanation is on screen and programmatically
+  // unreachable. The pairing is the requirement, not either half of it.
+  it.each([
+    ['name', 'user-form-name'],
+    ['password', 'user-form-password'],
+  ])('pairs aria-invalid with aria-describedby on the %s field', async (_label, testid) => {
+    const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
+
+    const input = wrapper.get(`[data-testid="${testid}"]`)
+    await input.trigger('blur')
+
+    const error = wrapper.get(`[data-testid="${testid}-error"]`)
+    expect(error.attributes('id')).toBeTruthy()
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
+  })
+
   it('creates via useUsers on submit and emits saved', async () => {
     const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
 

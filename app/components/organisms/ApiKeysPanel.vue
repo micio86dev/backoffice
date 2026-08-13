@@ -55,9 +55,15 @@
                 id="api-key-form-name"
                 v-model="name"
                 :aria-invalid="Boolean(errors.name)"
+                :aria-describedby="errors.name ? 'api-key-form-name-error' : undefined"
                 data-testid="api-key-form-name"
               />
-              <FieldError v-if="errors.name">{{ errors.name }}</FieldError>
+              <FieldError
+                v-if="errors.name"
+                id="api-key-form-name-error"
+                data-testid="api-key-form-name-error"
+                >{{ errors.name }}</FieldError
+              >
             </Field>
             <Field>
               <FieldLabel for="api-key-form-abilities">{{
@@ -66,9 +72,16 @@
               <Input
                 id="api-key-form-abilities"
                 v-model="abilities"
+                :aria-invalid="Boolean(errors.abilities)"
+                :aria-describedby="errors.abilities ? 'api-key-form-abilities-error' : undefined"
                 data-testid="api-key-form-abilities"
               />
-              <FieldError v-if="errors.abilities">{{ errors.abilities }}</FieldError>
+              <FieldError
+                v-if="errors.abilities"
+                id="api-key-form-abilities-error"
+                data-testid="api-key-form-abilities-error"
+                >{{ errors.abilities }}</FieldError
+              >
             </Field>
             <Alert
               v-if="formMessage"

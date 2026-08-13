@@ -183,4 +183,40 @@ describe('ApiKeysPanel', () => {
 
     wrapper.unmount()
   })
+
+  // The abilities field previously had NEITHER aria-invalid nor
+  // aria-describedby despite being validated and rendering its own message —
+  // the error was visible and, to assistive tech, did not exist.
+  //
+  // The form lives inside a teleported Dialog, so it is queried off
+  // document.body rather than the wrapper, matching this file's other tests.
+  it.each([
+    ['name', 'api-key-form-name'],
+    ['abilities', 'api-key-form-abilities'],
+  ])('pairs aria-invalid with aria-describedby on the %s field', async (_label, testid) => {
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+    await flushPromises()
+
+    // Validation runs on submit, and an empty form trips both fields at once —
+    // which is the state this contract has to hold in.
+    const form = document.body.querySelector<HTMLFormElement>('[data-testid="api-key-form"]')
+    expect(form).not.toBeNull()
+    form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    const input = document.body.querySelector(`[data-testid="${testid}"]`)
+    const error = document.body.querySelector(`[data-testid="${testid}-error"]`)
+    expect(input).not.toBeNull()
+    expect(error).not.toBeNull()
+
+    expect(error?.getAttribute('id')).toBeTruthy()
+    expect(input?.getAttribute('aria-invalid')).toBe('true')
+    expect(input?.getAttribute('aria-describedby')).toBe(error?.getAttribute('id'))
+
+    wrapper.unmount()
+  })
 })

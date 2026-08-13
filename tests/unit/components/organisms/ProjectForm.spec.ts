@@ -344,4 +344,24 @@ describe('ProjectForm', () => {
     const [, payload] = updateProjectMock.mock.calls[0] as [string, Record<string, unknown>]
     expect(payload).not.toHaveProperty('framework_version_id')
   })
+
+  it.each([
+    ['pause-every-n', 'project-form-pause-every-n'],
+    ['nudge-min-chars', 'project-form-nudge-min-chars'],
+  ])('pairs aria-invalid with aria-describedby on the %s field', async (_label, testid) => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    const input = wrapper.get(`[data-testid="${testid}"]`)
+    await input.setValue('-5')
+    await input.trigger('blur')
+
+    const error = wrapper.get(`[data-testid="${testid}-error"]`)
+    expect(error.attributes('id')).toBeTruthy()
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
+  })
 })

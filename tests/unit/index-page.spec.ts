@@ -50,7 +50,10 @@ describe('IndexPage (dashboard)', () => {
 
   it('renders an i18n-labelled heading', async () => {
     vi.doMock('../../app/composables/useDashboardMetrics', () => ({
-      useDashboardMetrics: () => ({ fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()) }),
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
     }))
     const IndexPage = (await import('../../app/pages/index.vue')).default
     const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
@@ -60,7 +63,10 @@ describe('IndexPage (dashboard)', () => {
   it('fetches dashboard metrics on mount and renders the total-participants KPI card', async () => {
     const fetchMetricsMock = vi.fn().mockResolvedValue(metricsResponse())
     vi.doMock('../../app/composables/useDashboardMetrics', () => ({
-      useDashboardMetrics: () => ({ fetchMetrics: fetchMetricsMock }),
+      useDashboardMetrics: () => ({
+        fetchMetrics: fetchMetricsMock,
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
     }))
 
     const IndexPage = (await import('../../app/pages/index.vue')).default
@@ -82,7 +88,10 @@ describe('IndexPage (dashboard)', () => {
       },
     })
     vi.doMock('../../app/composables/useDashboardMetrics', () => ({
-      useDashboardMetrics: () => ({ fetchMetrics: fetchMetricsMock }),
+      useDashboardMetrics: () => ({
+        fetchMetrics: fetchMetricsMock,
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
     }))
 
     const IndexPage = (await import('../../app/pages/index.vue')).default
@@ -99,7 +108,10 @@ describe('IndexPage (dashboard)', () => {
       resolveFetch = resolve
     })
     vi.doMock('../../app/composables/useDashboardMetrics', () => ({
-      useDashboardMetrics: () => ({ fetchMetrics: vi.fn().mockReturnValue(pending) }),
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockReturnValue(pending),
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
     }))
 
     const IndexPage = (await import('../../app/pages/index.vue')).default
@@ -114,7 +126,10 @@ describe('IndexPage (dashboard)', () => {
   describe('page title (i18n)', () => {
     it('routes the <title> through i18n instead of a hardcoded English literal', async () => {
       vi.doMock('../../app/composables/useDashboardMetrics', () => ({
-        useDashboardMetrics: () => ({ fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()) }),
+        useDashboardMetrics: () => ({
+          fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+          fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+        }),
       }))
       const IndexPage = (await import('../../app/pages/index.vue')).default
       mount(IndexPage, { global: { mocks: { $t: tMock } } })
@@ -129,7 +144,10 @@ describe('IndexPage (dashboard)', () => {
     it('routes the latency value through i18n — the unit and separator are copy, not code', async () => {
       const fetchMetricsMock = vi.fn().mockResolvedValue(metricsResponse())
       vi.doMock('../../app/composables/useDashboardMetrics', () => ({
-        useDashboardMetrics: () => ({ fetchMetrics: fetchMetricsMock }),
+        useDashboardMetrics: () => ({
+          fetchMetrics: fetchMetricsMock,
+          fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+        }),
       }))
 
       const IndexPage = (await import('../../app/pages/index.vue')).default
@@ -202,6 +220,53 @@ describe('IndexPage (dashboard)', () => {
       expect(forbidden.attributes('data-state')).toBe('forbidden')
       expect(notReady.attributes('data-state')).not.toBe(forbidden.attributes('data-state'))
     })
+  })
+
+  // The activity feed is SECONDARY content. The KPI cards are what the
+  // dashboard is for, and failing the whole page because a side panel could not
+  // load reports the wrong problem: the operator reads "the dashboard is
+  // broken" when the truth is "one panel is".
+  it('still renders the KPI cards when the activity request fails', async () => {
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockRejectedValue(new Error('boom')),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('dashboard.kpi.totalParticipants')
+    expect(wrapper.find('[data-testid="activity-empty"]').exists()).toBe(true)
+  })
+
+  it('renders the activity rows the API returns', async () => {
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockResolvedValue({
+          data: [
+            {
+              candidate_ref: 'ref-1',
+              display_name: 'Mario Rossi',
+              status: 'in_corso',
+              project_name: 'Demo Project',
+              updated_at: '2026-03-01T10:00:00+00:00',
+            },
+          ],
+        }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="activity-list"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Mario Rossi')
   })
 })
 

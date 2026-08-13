@@ -106,7 +106,11 @@ test.describe('Settings tabs (Unit 6)', () => {
     await page.goto('/settings')
 
     await expect(page.getByRole('tab', { name: 'Profilo organizzazione' })).toBeVisible()
-    await expect(page.getByText('Acme')).toBeVisible()
+    // Targets the organization profile PANEL, not the bare string: the topbar
+    // now also shows the organization name, so `getByText('Acme')` matches two
+    // elements and fails strict mode. What this line means is "the profile
+    // panel has loaded", and it should say so.
+    await expect(page.getByTestId('organization-profile-name')).toHaveValue('Acme')
 
     await page.getByRole('tab', { name: 'Utenti e ruoli' }).click()
     await expect(page.getByText('Ada Lovelace')).toBeVisible()
@@ -119,7 +123,11 @@ test.describe('Settings tabs (Unit 6)', () => {
     await mockAdminApi(page)
     await login(page)
     await page.goto('/settings')
-    await expect(page.getByText('Acme')).toBeVisible()
+    // Targets the organization profile PANEL, not the bare string: the topbar
+    // now also shows the organization name, so `getByText('Acme')` matches two
+    // elements and fails strict mode. What this line means is "the profile
+    // panel has loaded", and it should say so.
+    await expect(page.getByTestId('organization-profile-name')).toHaveValue('Acme')
 
     await checkA11y(page)
 

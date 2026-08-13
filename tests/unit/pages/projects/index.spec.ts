@@ -6,9 +6,18 @@
  * resolveResourceErrorState/resourceErrorKey — same house pattern as
  * `pages/participants/index.vue`.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
+
+// `ProjectForm.vue` is loaded by the page via `defineAsyncComponent` (D10 —
+// code-split). Pre-warming its module (and its own transitive tree: Select,
+// Dialog, ToggleGroup, Checkbox, CompetencyPicker...) here means the dynamic
+// `import()` the page triggers resolves from Vite's already-populated module
+// cache on the next microtask; without this, the FIRST cold transform of
+// that whole tree can take real wall-clock time that plain `flushPromises()`
+// (a microtask-only flush) does not wait for.
+await import('../../../../app/components/organisms/ProjectForm.vue')
 
 const tMock = (key: string) => key
 
@@ -112,6 +121,176 @@ describe('pages/projects/index.vue', () => {
     await wrapper.get('[data-testid="project-row-edit-1"]').trigger('click')
 
     expect((wrapper.vm as unknown as { editing: unknown }).editing).toBe('1')
+  })
+
+  describe('the create/edit dialog (task 21.5)', () => {
+    // reka-ui's DialogContent teleports to `document.body` (real Teleport,
+    // not stubbed) — mounted `attachTo: document.body` so the teleported
+    // node is a descendant of the wrapper's own document, then queried via
+    // `document.body` directly rather than `wrapper.find`, which only
+    // searches the wrapper's own root subtree.
+    function dialogBody(): HTMLElement {
+      return document.body
+    }
+
+    // The async `ProjectForm` chunk (D10) can take real wall-clock time to
+    // resolve on a cold module graph — `vi.resetModules()` in this file's
+    // `beforeEach` means every test pays that cost again, and a
+    // microtask-only `flushPromises()` does not wait for it. Combines a
+    // microtask flush with real timer ticks.
+    async function flushAsyncComponent(): Promise<void> {
+      for (let i = 0; i < 10; i += 1) {
+        await flushPromises()
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      }
+    }
+
+    // A failed assertion mid-test would otherwise skip the trailing
+    // `wrapper.unmount()`, leaving teleported Dialog content orphaned in
+    // `document.body` for the NEXT test — `querySelector` then silently
+    // matches that stale node instead of the new mount's. Runs regardless
+    // of pass/fail.
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    it('renders the ProjectForm dialog once "New project" is clicked, in create mode', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue(listResponse()),
+          createProject: vi.fn(),
+          updateProject: vi.fn(),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      // The form organism is code-split (defineAsyncComponent, D10) — its own
+      // dynamic import can take real wall-clock time to resolve.
+      await flushAsyncComponent()
+
+      const nameInput = dialogBody().querySelector<HTMLInputElement>(
+        '[data-testid="project-form-name"]'
+      )
+      expect(dialogBody().querySelector('[data-testid="project-form"]')).not.toBeNull()
+      // Create mode: no existing project name is prefilled.
+      expect(nameInput?.value).toBe('')
+
+      wrapper.unmount()
+    })
+
+    it('renders the ProjectForm dialog pre-filled when a table row edit is clicked', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue(listResponse()),
+          createProject: vi.fn(),
+          updateProject: vi.fn(),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-row-edit-1"]').trigger('click')
+      await flushAsyncComponent()
+
+      const nameInput = dialogBody().querySelector<HTMLInputElement>(
+        '[data-testid="project-form-name"]'
+      )
+      expect(nameInput?.value).toBe('Demo Project')
+
+      wrapper.unmount()
+    })
+
+    it('closes the dialog when the form emits close', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue(listResponse()),
+          createProject: vi.fn(),
+          updateProject: vi.fn(),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      await flushAsyncComponent()
+
+      // The button lives inside the teleported Dialog content — `wrapper.get`
+      // only searches the wrapper's own (non-teleported) subtree, so this
+      // interacts with the real DOM node directly, same as the assertions
+      // above and below.
+      dialogBody().querySelector<HTMLButtonElement>('[data-testid="project-form-cancel"]')?.click()
+      await flushAsyncComponent()
+
+      expect((wrapper.vm as unknown as { editing: unknown }).editing).toBeNull()
+      expect(dialogBody().querySelector('[data-testid="project-form"]')).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('closes the dialog and refetches the list when the form emits saved', async () => {
+      const listProjectsMock = vi.fn().mockResolvedValue(listResponse())
+      const createProjectMock = vi.fn().mockResolvedValue({ data: listResponse().data[0] })
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: listProjectsMock,
+          createProject: createProjectMock,
+          updateProject: vi.fn(),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      await flushAsyncComponent()
+
+      // Same teleport constraint as the "closes ... emits close" test above:
+      // interacting with the real DOM node directly rather than `wrapper.get`.
+      const nameInput = dialogBody().querySelector<HTMLInputElement>(
+        '[data-testid="project-form-name"]'
+      )
+      const slugInput = dialogBody().querySelector<HTMLInputElement>(
+        '[data-testid="project-form-slug"]'
+      )
+      nameInput!.value = 'New Demo'
+      nameInput!.dispatchEvent(new Event('input'))
+      slugInput!.value = 'new-demo'
+      slugInput!.dispatchEvent(new Event('input'))
+      dialogBody()
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="project-form-assessment-type"] button:last-child'
+        )
+        ?.click()
+      await flushAsyncComponent()
+      dialogBody()
+        .querySelector<HTMLFormElement>('[data-testid="project-form"]')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await flushAsyncComponent()
+
+      expect(listProjectsMock).toHaveBeenCalledTimes(2)
+      expect(dialogBody().querySelector('[data-testid="project-form"]')).toBeNull()
+
+      wrapper.unmount()
+    })
   })
 
   describe('failed list fetch (D4 — a failure must never render as an empty result set)', () => {

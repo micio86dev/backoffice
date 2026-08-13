@@ -170,6 +170,8 @@
         </CardContent>
       </Card>
     </div>
+
+    <SessionList v-if="participantState === 'ready'" :sessions="sessions" :locale="locale" />
   </div>
 </template>
 
@@ -180,6 +182,7 @@
 // (forbidden, permanent), 404 (not found), and a generic fallback are always
 // rendered as three-plus distinct, meaningful states, never collapsed into
 // one generic error toast.
+import SessionList from '@/components/organisms/SessionList.vue'
 import { ref, computed, onMounted } from 'vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -190,6 +193,7 @@ import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
 import { useEvaluationReport, type EvaluationReportData } from '@/composables/useEvaluationReport'
 import { useDownloads } from '@/composables/useDownloads'
+import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
 import { formatDate } from '@/utils/format'
 import {
@@ -297,6 +301,19 @@ async function onDownloadEvaluation(): Promise<void> {
   }
 }
 
+const sessions = ref<SessionSummary[]>([])
+const { listSessions } = useSessionReview()
+
+async function loadSessions(id: string): Promise<void> {
+  try {
+    sessions.value = (await listSessions(id)).data
+  } catch {
+    // Secondary content: a failed session list must not blank the participant
+    // detail, which is what the operator actually came for.
+    sessions.value = []
+  }
+}
+
 onMounted(async () => {
   const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
 
@@ -318,5 +335,7 @@ onMounted(async () => {
   } catch (error) {
     evaluationState.value = resolveResourceErrorState(error)
   }
+
+  await loadSessions(id as string)
 })
 </script>

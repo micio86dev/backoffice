@@ -23,7 +23,15 @@
  * They compose with `group-*` as usual, e.g.
  * `group-data-vertical/tabs:flex-col` -> `.group\/tabs[data-orientation="vertical"] &`.
  */
-@custom-variant data-active (&[data-state='active']);
+/*
+ * `data-active` is emitted BOTH ways in this codebase, so the variant must match
+ * both: reka-ui exposes `data-state="active"` (Tabs), while the vendored
+ * shadcn sidebar sets a real `data-active` attribute
+ * (SidebarMenuButtonChild.vue). Matching only the reka-ui form silently killed
+ * the sidebar's current-page highlight — the nav stopped showing which page you
+ * were on, which is how this was caught.
+ */
+@custom-variant data-active (&[data-state='active'], &[data-active]);
 @custom-variant data-checked (&[data-state='checked']);
 @custom-variant data-open (&[data-state='open']);
 @custom-variant data-closed (&[data-state='closed']);

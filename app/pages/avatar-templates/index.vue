@@ -7,6 +7,7 @@
           {{ $t('avatar_templates.intro') }}
         </p>
       </div>
+      <TemplatePortability :is-admin="isAdmin" @imported="load" />
       <button
         type="button"
         data-testid="template-new"
@@ -114,6 +115,8 @@
 </template>
 
 <script setup lang="ts">
+import TemplatePortability from '@/components/organisms/TemplatePortability.vue'
+import { useCurrentUser } from '@/composables/useCurrentUser'
 /**
  * Avatar templates — the operator's control over the face and voice every
  * candidate of this organization meets (C14 PR6).
@@ -169,7 +172,19 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(load)
+const isAdmin = ref(false)
+
+onMounted(async () => {
+  await load()
+
+  try {
+    // Affordance only — the server enforces. Failing closed keeps a transient
+    // error from handing an operator controls they cannot use.
+    isAdmin.value = (await useCurrentUser().fetchMe()).roles.includes('admin')
+  } catch {
+    isAdmin.value = false
+  }
+})
 
 function startCreate(): void {
   formErrors.value = []

@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-6">
-    <h1 class="text-2xl font-semibold text-foreground">{{ $t('dashboard.title') }}</h1>
+    <PageHeader :title="$t('dashboard.title')" :subtitle="$t('dashboard.subtitle')" />
 
     <Alert
       v-if="loadError"
@@ -29,16 +29,24 @@
       />
       <MetricCard :label="$t('dashboard.kpi.latency')" :value="latencyLabel" />
     </div>
+
+    <RecentActivity v-if="!loadError" :rows="activity" :locale="locale" />
   </div>
 </template>
 
 <script setup lang="ts">
 // Usage + AI-cost KPI cards only (D7) — no billing/MRR/trial widget, not
 // even disabled/placeholder (observability delta scenario).
+import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import RecentActivity from '@/components/organisms/RecentActivity.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
-import { useDashboardMetrics, type DashboardMetrics } from '@/composables/useDashboardMetrics'
+import {
+  useDashboardMetrics,
+  type DashboardMetrics,
+  type DashboardActivityRow,
+} from '@/composables/useDashboardMetrics'
 import { formatNumber, formatPercent } from '@/utils/format'
 import {
   resolveResourceErrorState,
@@ -60,9 +68,10 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-const { fetchMetrics } = useDashboardMetrics()
+const { fetchMetrics, fetchActivity } = useDashboardMetrics()
 
 const metrics = ref<DashboardMetrics | null>(null)
+const activity = ref<DashboardActivityRow[]>([])
 
 // A failed metrics fetch must NEVER fall through to the "no data yet"
 // placeholder: that reports a 403 to the operator as an empty tenant (D4).
@@ -96,6 +105,15 @@ onMounted(async () => {
     const response = await fetchMetrics()
     metrics.value = response.data
     loadError.value = null
+
+    // Deliberately AFTER the metrics call and deliberately swallowed: the feed
+    // is context, and a dashboard that refuses to render its counters because a
+    // secondary panel failed reports the wrong problem to the operator.
+    try {
+      activity.value = (await fetchActivity()).data
+    } catch {
+      activity.value = []
+    }
   } catch (error) {
     loadError.value = resolveResourceErrorState(error)
   }

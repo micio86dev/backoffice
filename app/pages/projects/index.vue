@@ -1,11 +1,12 @@
 <template>
   <div class="flex flex-col gap-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold text-foreground">{{ $t('projects.title') }}</h1>
-      <Button data-testid="projects-new" @click="editing = 'new'">
-        {{ $t('projects.action.new') }}
-      </Button>
-    </div>
+    <PageHeader :title="$t('projects.title')" :subtitle="$t('projects.subtitle')">
+      <template #actions>
+        <Button data-testid="projects-new" @click="editing = 'new'">
+          {{ $t('projects.action.new') }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <Alert
       v-if="loadError"
@@ -45,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'

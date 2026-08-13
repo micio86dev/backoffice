@@ -112,3 +112,39 @@ describe('SidebarNav', () => {
     )
   })
 })
+
+// The generated SPA serves directory-style URLs, so a reload or a deep link
+// arrives as `/projects/`. Comparing that to the nav item `/projects` with a
+// strict `===` silently dropped the current-page highlight on every hard load —
+// precisely when a bookmarked or shared link needs it most.
+describe('SidebarNav — current page on a hard load', () => {
+  function mountAt(path: string) {
+    vi.stubGlobal(
+      'useRoute',
+      vi.fn(() => ({ path, fullPath: path, params: {}, query: {} }))
+    )
+
+    return mount(Harness, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
+  }
+
+  it.each(['/projects/', '/reports/', '/settings/', '/participants/'])(
+    'marks exactly one item current when the path arrives as %s',
+    (path) => {
+      expect(mountAt(path).findAll('[aria-current="page"]')).toHaveLength(1)
+    }
+  )
+
+  it('still matches the un-slashed form', () => {
+    expect(mountAt('/projects').findAll('[aria-current="page"]')).toHaveLength(1)
+  })
+
+  it('marks the dashboard current at the root', () => {
+    expect(mountAt('/').findAll('[aria-current="page"]')).toHaveLength(1)
+  })
+
+  it('marks nothing current on a route that is not in the nav', () => {
+    expect(mountAt('/unknown/').findAll('[aria-current="page"]')).toHaveLength(0)
+  })
+})

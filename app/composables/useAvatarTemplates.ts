@@ -59,7 +59,24 @@ export function useAvatarTemplates() {
     await apiFetch<null>(`/avatar-templates/${id}`, { method: 'DELETE' })
   }
 
+  /**
+   * Admin-only. Export is a read of configuration an operator can already see
+   * field by field, but as one file it is also the fastest way to lift
+   * configuration out of a tenant.
+   */
+  async function exportTemplates(): Promise<Record<string, unknown>> {
+    return apiFetch<Record<string, unknown>>('/avatar-templates/export')
+  }
+
+  async function importTemplates(
+    document: Record<string, unknown>
+  ): Promise<{ data: Array<{ id: number; name: string; provider: string }> }> {
+    return apiFetch('/avatar-templates/import', { method: 'POST', body: document })
+  }
+
   return {
+    exportTemplates,
+    importTemplates,
     listTemplates,
     fetchFieldSpecs,
     createTemplate,

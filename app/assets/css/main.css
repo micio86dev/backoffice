@@ -27,6 +27,11 @@
   --color-neutral-100: #f1f5f9;
   --color-neutral-200: #e2e8f0;
   --color-neutral-400: #94a3b8;
+  /* D12 — form control border contrast fix (DESIGN.md §9, §3.1). #94a3b8
+     (neutral-400) measured 2.6:1 and #475569 (neutral-600) 7.5:1-but-heavy;
+     #64748b clears the ≥3:1 minimum at ≈4.55:1 on --color-neutral-50 while
+     staying visually light. */
+  --color-neutral-500: #64748b;
   --color-neutral-600: #475569;
   --color-neutral-800: #1e293b;
   --color-neutral-900: #0f172a;
@@ -56,6 +61,14 @@
   --spacing-avatar-panel: 2rem;
   --spacing-nav: 4rem;
   --spacing-sidebar: 16rem;
+
+  /* D12 — control sizing. 44px is WCAG 2.2 SC 2.5.5 (Enhanced, AAA); a
+     deliberate step above the 24px AA floor the previous 32px already
+     cleared. 36px keeps dense contexts (table filter rows, inline table
+     actions) comfortably above the AA floor. Applied to both Nuxt apps in
+     the same commit per §17. */
+  --spacing-control: 2.75rem;
+  --spacing-control-sm: 2.25rem;
 
   /* === Border radius === */
   --radius-sm: 0.25rem;
@@ -152,7 +165,14 @@
   --destructive: oklch(0.505 0.19 27.518); /* #b91c1c, not #ef4444 (DESIGN.md §9.1) */
 
   --border: oklch(0.929 0.013 255.508); /* --color-neutral-200 */
-  --input: oklch(0.929 0.013 255.508); /* --color-neutral-200 */
+  /* D12 — was oklch(0.929 0.013 255.508) / --color-neutral-200 (#e2e8f0 on
+     #f8fafc/white ≈ 1.18:1, failing DESIGN.md §9's binding ≥3:1). Referenced
+     via var(), not a fresh oklch literal, so this can never drift from the
+     --theme-literal hex value DESIGN.md §3.1 documents as the source of
+     truth — and because happy-dom's test DOM cannot parse oklch() at all
+     (verified during RED), a literal oklch recomputation here would be
+     untestable by tests/unit/theme.spec.ts. */
+  --input: var(--color-neutral-500);
   --ring: oklch(0.634 0.187 37.49); /* accent — DESIGN.md §16 focus:ring-accent */
 
   /* Chart palette — unbranded shadcn defaults; no C11 view consumes charts yet */

@@ -45,3 +45,12 @@ vi.stubGlobal(
   'useLocaleHead',
   vi.fn(() => ref({ htmlAttrs: { lang: 'it' } }))
 )
+// Nuxt auto-import. Stubbed globally for the same reason as `useI18n` above:
+// the app shell reaches for the route (NavBar renders HelpSheet, which picks
+// its topic from the current path), and a spec that mounts a shell component
+// should not have to know which of its descendants reads the route. Specs that
+// care about a SPECIFIC path re-stub it themselves.
+vi.stubGlobal(
+  'useRoute',
+  vi.fn(() => ({ path: '/', fullPath: '/', params: {}, query: {} }))
+)

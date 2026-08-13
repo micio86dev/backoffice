@@ -165,7 +165,7 @@
       "nameRequired": "Inserisci il nome del progetto.",
       "slugRequired": "Inserisci uno slug.",
       "roleCodeRequired": "Seleziona un ruolo.",
-      "invalidUrl": "Inserisci un URL valido.",
+      "invalidUrl": "Inserisci un indirizzo completo che inizi con http:// o https://",
       "outOfRange": "Inserisci un valore tra {min} e {max}.",
       "saveError": "Non è stato possibile salvare questo progetto. Controlla i campi evidenziati.",
       "saveSuccess": "Progetto salvato.",
@@ -234,11 +234,18 @@
   },
   "settings": {
     "title": "Impostazioni",
+    "subtitle": "Dati dell'organizzazione, credenziali di integrazione e accessi del team.",
     "tabs": {
       "organization": "Profilo organizzazione",
       "apiKeys": "Chiavi API",
       "webhooks": "Valori predefiniti webhook",
       "users": "Utenti e ruoli"
+    },
+    "sectionDescription": {
+      "organization": "Nome e identificatore del tenant",
+      "apiKeys": "Credenziali per l'accesso machine-to-machine",
+      "webhooks": "Dove BEAI recapita gli eventi di avanzamento e valutazione",
+      "users": "Chi può accedere e cosa può fare"
     },
     "organization": {
       "name": "Nome",
@@ -254,7 +261,7 @@
       "eventProgress": "Avanzamento",
       "eventEvaluation": "Valutazione",
       "saveError": "Non è stato possibile salvare i valori predefiniti del webhook. Controlla i campi evidenziati.",
-      "invalidUrl": "Inserisci un URL valido.",
+      "invalidUrl": "Inserisci un indirizzo completo che inizi con http:// o https://",
       "note": "Questi valori predefiniti vengono copiati su un nuovo progetto solo al momento della creazione; modificarli non ridirige mai il webhook live di un progetto esistente."
     },
     "apiKeys": {
@@ -263,7 +270,16 @@
       "name": "Nome",
       "nameRequired": "Inserisci un nome per questa chiave.",
       "abilities": "Permessi",
+      "abilitiesDescription": "Scegli cosa può fare questa chiave. Sono gli unici valori accettati dall'API.",
       "abilitiesRequired": "Seleziona almeno un permesso.",
+      "ability": {
+        "participantsCreate": "Creare candidati",
+        "participantsRead": "Leggere i candidati",
+        "evaluationsRead": "Leggere le valutazioni",
+        "progressRead": "Leggere l'avanzamento dell'intervista",
+        "projectsRead": "Leggere i progetti",
+        "ssoLinkGenerate": "Generare i link di accesso SSO"
+      },
       "expiresAt": "Scadenza",
       "create": "Crea chiave",
       "createError": "Non è stato possibile creare questa chiave. Controlla i campi evidenziati.",
@@ -333,7 +349,11 @@
   },
   "reports": {
     "title": "Report",
+    "subtitle": "Tutte le valutazioni completate, filtrate per progetto, ruolo e periodo.",
     "filters": {
+      "legend": "Filtri",
+      "clear": "Azzera tutto",
+      "period": "Periodo di valutazione",
       "project": "Progetto",
       "assessmentType": "Tipo di valutazione",
       "roleCode": "Ruolo",
@@ -443,6 +463,128 @@
       "interruptibility": "Interrompibilità",
       "voiceIsolation": "Isolamento vocale",
       "idleEngagement": "Coinvolgimento nelle pause"
+    }
+  },
+  "help": {
+    "label": "Aiuto",
+    "open": "Apri il pannello di aiuto per questa pagina",
+    "stepsTitle": "Come funziona questa pagina",
+    "glossaryTitle": "Le parole usate in questa pagina",
+    "topics": {
+      "dashboard": {
+        "title": "Dashboard",
+        "summary": "Una vista sempre aggiornata di quante valutazioni sono in corso in questo momento.",
+        "steps": {
+          "0": "Leggi i contatori come una fotografia: seguono i candidati già creati dal sistema chiamante, non persone che inviti da qui.",
+          "1": "Apri Progetti per cambiare cosa misura una valutazione, o Candidati per vedere dove si sono fermate le singole persone.",
+          "2": "Un numero che sembra sbagliato è quasi sempre una questione di filtri. Report è il posto dove restringere il campo."
+        }
+      },
+      "projects": {
+        "title": "Progetti",
+        "summary": "Un progetto è una configurazione di valutazione: cosa misura, in che lingua e dove vengono recapitati i risultati.",
+        "steps": {
+          "0": "Crea il progetto e scegli il tipo di valutazione. Standard misura le competenze di un ruolo; Potenziale misura solo MTG e LAT. La scelta è definitiva una volta che il progetto è attivo.",
+          "1": "Per un progetto Standard scegli il ruolo: decide quali competenze copre il colloquio.",
+          "2": "Imposta l'URL webhook se il sistema chiamante deve ricevere avanzamento e risultati, e l'URL di uscita per dove mandare il candidato alla fine.",
+          "3": "Attiva il progetto. Da quel momento il sistema chiamante può generare link di accesso; tipo di valutazione e ruolo non si possono più cambiare."
+        }
+      },
+      "participants": {
+        "title": "Candidati",
+        "summary": "Tutte le persone che hanno ricevuto un link di accesso a un tuo progetto, e a che punto sono arrivate.",
+        "steps": {
+          "0": "I candidati compaiono qui quando il sistema chiamante li crea. BEAI non invita nessuno e non conserva contatti.",
+          "1": "Segui lo stato per vedere il progresso: in attesa, in corso, in valutazione, poi completato o errore.",
+          "2": "La trascrizione è leggibile da \"in valutazione\" in poi; il report con i punteggi solo a candidato completato."
+        }
+      },
+      "reports": {
+        "title": "Report",
+        "summary": "Tutte le valutazioni completate e i punteggi BARS che ci stanno dietro.",
+        "steps": {
+          "0": "Prima restringi la lista: progetto, tipo, ruolo e periodo si combinano, e il contatore mostra quanti filtri sono attivi.",
+          "1": "Apri una valutazione per vedere ogni competenza, i punteggi dei suoi indicatori e gli estratti testuali da cui derivano.",
+          "2": "Controlla l'affidabilità prima di confrontare due candidati: un valore basso vuol dire che gran parte del colloquio non ha dato elementi da valutare, non che la persona ha ottenuto un punteggio basso."
+        }
+      },
+      "settings": {
+        "title": "Impostazioni",
+        "summary": "La tua organizzazione, le credenziali con cui gli altri sistemi raggiungono BEAI e chi del tuo team può accedere.",
+        "steps": {
+          "0": "Il profilo organizzazione contiene il nome; lo slug identifica il tenant e non è modificabile.",
+          "1": "Le chiavi API servono ad altri sistemi, non a persone. Concedi solo i permessi che quel sistema usa davvero, e copia la chiave subito: viene mostrata una volta sola.",
+          "2": "I valori predefiniti dei webhook valgono per i progetti che non ne impostano di propri.",
+          "3": "Utenti e ruoli decide chi può accedere a questo backoffice e cosa può modificare."
+        }
+      },
+      "avatarTemplates": {
+        "title": "Template avatar",
+        "summary": "Le impostazioni riutilizzabili di voce e aspetto con cui viene condotto il colloquio.",
+        "steps": {
+          "0": "Un template appartiene a un solo servizio, e il servizio non si può cambiare dopo. Crea invece un nuovo template.",
+          "1": "Lascia vuota un'impostazione per accettare il valore predefinito del servizio.",
+          "2": "I template sono configurazione, non archivio: modificarne uno influenza tutti i colloqui futuri che lo usano."
+        }
+      }
+    },
+    "glossary": {
+      "project": {
+        "term": "Progetto",
+        "definition": "Una configurazione di valutazione: ruolo, lingua, competenze e impostazioni di consegna."
+      },
+      "participant": {
+        "term": "Candidato",
+        "definition": "Una persona che ha ricevuto un link di accesso a un progetto. Creata dal sistema chiamante, mai da qui."
+      },
+      "assessmentType": {
+        "term": "Tipo di valutazione",
+        "definition": "Standard valuta le competenze di un ruolo. Potenziale valuta solo MTG e LAT, con quattro domande fisse. Definitivo una volta attivo."
+      },
+      "roleCode": {
+        "term": "Ruolo",
+        "definition": "ICO, FLL, MLL, BUL o SRX. Determina quali competenze copre il colloquio."
+      },
+      "frameworkVersion": {
+        "term": "Versione del framework",
+        "definition": "Il catalogo di competenze con cui è nato il progetto. Fissato alla creazione, così una revisione successiva non rivaluta mai un progetto attivo."
+      },
+      "lifecycle": {
+        "term": "Stato",
+        "definition": "In attesa, in corso, in valutazione, poi completato o errore. I diritti di lettura dipendono da questo."
+      },
+      "ssoLink": {
+        "term": "Link di accesso",
+        "definition": "Il link personale a breve scadenza con cui il candidato inizia. Generato dal sistema chiamante tramite API."
+      },
+      "bars": {
+        "term": "BARS",
+        "definition": "Scala di valutazione ancorata a comportamenti. Ogni risposta viene confrontata con comportamenti di riferimento scritti e valutata 1, 3 o 5 — mai un valore intermedio."
+      },
+      "competency": {
+        "term": "Competenza",
+        "definition": "Una capacità valutata. Il punteggio è la media degli indicatori che è stato possibile valutare."
+      },
+      "reliability": {
+        "term": "Affidabilità",
+        "definition": "La quota di indicatori per cui il colloquio ha prodotto elementi. Affidabilità bassa significa pochi elementi, non punteggio basso."
+      },
+      "apiKey": {
+        "term": "Chiave API",
+        "definition": "Una credenziale per un altro sistema. Mostrata una volta sola, alla creazione, e mai più recuperabile."
+      },
+      "ability": {
+        "term": "Permesso",
+        "definition": "Una autorizzazione su una chiave API. Una chiave può fare solo ciò che i suoi permessi consentono."
+      },
+      "webhook": {
+        "term": "Webhook",
+        "definition": "Un indirizzo che BEAI chiama per comunicare avanzamento e risultati. Firmato, e ritentato se fallisce."
+      },
+      "avatarTemplate": {
+        "term": "Template avatar",
+        "definition": "Impostazioni riutilizzabili di voce e aspetto dell'intervistatore."
+      }
     }
   }
 }

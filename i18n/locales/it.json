@@ -22,7 +22,8 @@
       "unsupported": "Browser non supportato",
       "projects": "Progetti",
       "reports": "Report",
-      "settings": "Impostazioni"
+      "settings": "Impostazioni",
+      "review": "Resoconto sessione — BEAI"
     }
   },
   "errors": {
@@ -472,6 +473,13 @@
       "interruptibility": "Interrompibilità",
       "voiceIsolation": "Isolamento vocale",
       "idleEngagement": "Coinvolgimento nelle pause"
+    },
+    "portability": {
+      "export": "Esporta JSON",
+      "import": "Importa JSON",
+      "importDone": "Importati {count} template, disattivi.",
+      "importFailed": "Import rifiutato: {reason}",
+      "adminOnly": "Solo gli amministratori possono esportare e importare."
     }
   },
   "help": {
@@ -594,6 +602,55 @@
         "term": "Template avatar",
         "definition": "Impostazioni riutilizzabili di voce e aspetto dell'intervistatore."
       }
+    }
+  },
+  "review": {
+    "title": "Resoconto sessione",
+    "subtitle": "Cosa è successo durante questo colloquio: tempi, controlli di integrità e fotogrammi.",
+    "duration": "Durata",
+    "durationValue": "{minutes} min {seconds} s",
+    "provider": "Servizio",
+    "status": "Stato",
+    "costEstimate": "Costo stimato",
+    "costValue": "≈ $ {usd}",
+    "integrity": {
+      "title": "Controlli di integrità",
+      "score": "Punteggio {score}",
+      "none": "Nessun evento registrato durante questa sessione.",
+      "forSeconds": "per {seconds} s",
+      "band": {
+        "low": "Rischio basso",
+        "medium": "Rischio medio",
+        "high": "Rischio alto"
+      },
+      "kind": {
+        "tab_hidden": "Uscita dalla scheda",
+        "focus_lost": "Finestra fuori fuoco",
+        "second_monitor": "Secondo monitor",
+        "face_absent": "Volto assente",
+        "looking_away": "Sguardo altrove",
+        "looking_down": "Sguardo verso il basso",
+        "too_far": "Troppo lontano dalla webcam",
+        "multiple_faces": "Più persone",
+        "fullscreen_exit": "Uscita dal fullscreen",
+        "clipboard_copy": "Copia testo",
+        "clipboard_paste": "Incolla testo",
+        "second_voice": "Seconda voce rilevata",
+        "phone_detected": "Telefono rilevato"
+      }
+    },
+    "snapshots": {
+      "title": "Fotogrammi",
+      "none": "Nessun fotogramma registrato.",
+      "alt": "Fotogramma webcam delle {time}"
+    },
+    "sessions": {
+      "title": "Sessioni del colloquio",
+      "none": "Nessuna sessione registrata.",
+      "competency": "Competenza",
+      "startedAt": "Inizio",
+      "events": "Eventi",
+      "open": "Apri resoconto"
     }
   }
 }

@@ -22,7 +22,8 @@
       "unsupported": "Unsupported browser",
       "projects": "Projects",
       "reports": "Reports",
-      "settings": "Settings"
+      "settings": "Settings",
+      "review": "Session review — BEAI"
     }
   },
   "errors": {
@@ -472,6 +473,13 @@
       "interruptibility": "Interruptibility",
       "voiceIsolation": "Voice isolation",
       "idleEngagement": "Idle engagement"
+    },
+    "portability": {
+      "export": "Export JSON",
+      "import": "Import JSON",
+      "importDone": "Imported {count} templates, inactive.",
+      "importFailed": "Import refused: {reason}",
+      "adminOnly": "Only admins can export and import."
     }
   },
   "help": {
@@ -594,6 +602,55 @@
         "term": "Avatar template",
         "definition": "Reusable voice and appearance settings for the interviewer."
       }
+    }
+  },
+  "review": {
+    "title": "Session review",
+    "subtitle": "What happened during this interview: timing, integrity checks and snapshots.",
+    "duration": "Duration",
+    "durationValue": "{minutes} min {seconds} s",
+    "provider": "Service",
+    "status": "Status",
+    "costEstimate": "Estimated cost",
+    "costValue": "≈ $ {usd}",
+    "integrity": {
+      "title": "Integrity checks",
+      "score": "Score {score}",
+      "none": "No events recorded during this session.",
+      "forSeconds": "for {seconds} s",
+      "band": {
+        "low": "Low risk",
+        "medium": "Medium risk",
+        "high": "High risk"
+      },
+      "kind": {
+        "tab_hidden": "Left the tab",
+        "focus_lost": "Window lost focus",
+        "second_monitor": "Second monitor",
+        "face_absent": "Face absent",
+        "looking_away": "Looking away",
+        "looking_down": "Looking down",
+        "too_far": "Too far from the webcam",
+        "multiple_faces": "More than one person",
+        "fullscreen_exit": "Left fullscreen",
+        "clipboard_copy": "Copied text",
+        "clipboard_paste": "Pasted text",
+        "second_voice": "Second voice detected",
+        "phone_detected": "Phone detected"
+      }
+    },
+    "snapshots": {
+      "title": "Snapshots",
+      "none": "No snapshots recorded.",
+      "alt": "Webcam snapshot at {time}"
+    },
+    "sessions": {
+      "title": "Interview sessions",
+      "none": "No sessions recorded.",
+      "competency": "Competency",
+      "startedAt": "Started",
+      "events": "Events",
+      "open": "Open review"
     }
   }
 }

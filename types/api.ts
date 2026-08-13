@@ -265,6 +265,45 @@ export interface paths {
         patch: operations["avatarTemplate.update"];
         trace?: never;
     };
+    "/avatar-templates/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GET /api/avatar-templates/export */
+        get: operations["avatarTemplatePortability.export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/avatar-templates/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /api/avatar-templates/import
+         * @description All-or-nothing. A partial import leaves the operator believing a
+         *     configuration is present when it is not, which is worse than a refusal:
+         *     they find out at interview time, on a candidate.
+         */
+        post: operations["avatarTemplatePortability.import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/metrics": {
         parameters: {
             query?: never;
@@ -835,6 +874,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/participants/{participant}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sessions of one participant, newest first
+         * @description GET /api/participants/{participant}/sessions
+         */
+        get: operations["sessionReview.index"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/interview-sessions/{session}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One session, with its evidence
+         * @description GET /api/interview-sessions/{session}/review
+         */
+        get: operations["sessionReview.show"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/candidate/interview/snapshot": {
         parameters: {
             query?: never;
@@ -1107,7 +1186,7 @@ export interface components {
             display_name: string;
             status: string;
             project_name: string;
-            updated_at: string | null;
+            updated_at: string;
         };
         /** DashboardMetricsResource */
         DashboardMetricsResource: {
@@ -1252,6 +1331,65 @@ export interface components {
             name: unknown[];
             responsibilities: unknown[];
             competency_count: number;
+        };
+        /** SessionReviewResource */
+        SessionReviewResource: {
+            id: string;
+            participant_id: string;
+            competency_code: string;
+            question_index: string;
+            provider: string;
+            provider_session_ref: string;
+            status: string;
+            ended_reason: string;
+            started_at: string | null;
+            ended_at: string | null;
+            duration_seconds: number | null;
+            integrity: {
+                score: number;
+                /** @enum {string} */
+                band: "medium" | "low" | "high";
+                counts: string;
+                total: number;
+                tab_hidden_sec: number;
+                face_absent_sec: number;
+                looking_away_sec: number;
+                multiple_faces_sec: number;
+                second_voice_sec: number;
+                second_monitor: boolean;
+                fullscreen_exits: string | 0;
+                clipboard_copies: string | 0;
+                clipboard_pastes: string | 0;
+                events: unknown[];
+            };
+            snapshots: unknown[];
+            /**
+             * @description Avatar minutes only. `ai_requests` has no interview_session_id,
+             *     so LLM spend cannot be attributed to one session without
+             *     inventing the link — and a plausible number with no basis is
+             *     worse than an absent one (D5).
+             */
+            cost: {
+                avatar: {
+                    provider: string;
+                    minutes: number;
+                    usd: number;
+                } | null;
+                is_estimate: boolean;
+            };
+        };
+        /** SessionSummaryResource */
+        SessionSummaryResource: {
+            id: string;
+            competency_code: string;
+            question_index: string;
+            provider: string;
+            status: string;
+            ended_reason: string;
+            started_at: string | null;
+            ended_at: string | null;
+            duration_seconds: string | null;
+            integrity_event_count: string | 0;
         };
         /**
          * StoreProjectRequest
@@ -1911,6 +2049,70 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["AvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "avatarTemplatePortability.export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        schema: "beai.avatar-template/1";
+                        exported_at: string;
+                        templates: {
+                            name: string;
+                            description: string;
+                            provider: string;
+                            config: string;
+                            /** @description Persona is optional: a template may be pure provider config. */
+                            persona: string | null;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "avatarTemplatePortability.import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    schema: string;
+                    templates: string[];
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: unknown[];
                     };
                 };
             };
@@ -2790,6 +2992,56 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["App.Http.Resources.ParticipantResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+        };
+    };
+    "sessionReview.index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participant: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of `SessionSummaryResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SessionSummaryResource"][];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+        };
+    };
+    "sessionReview.show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `SessionReviewResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SessionReviewResource"];
                     };
                 };
             };

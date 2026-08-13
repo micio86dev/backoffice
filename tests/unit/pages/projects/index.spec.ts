@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
+import { waitFor } from '../../support/wait-for'
 
 // `ProjectForm.vue` is loaded by the page via `defineAsyncComponent` (D10 —
 // code-split). Pre-warming its module (and its own transitive tree: Select,
@@ -136,14 +137,16 @@ describe('pages/projects/index.vue', () => {
     // The async `ProjectForm` chunk (D10) can take real wall-clock time to
     // resolve on a cold module graph — `vi.resetModules()` in this file's
     // `beforeEach` means every test pays that cost again, and a
-    // microtask-only `flushPromises()` does not wait for it. Combines a
-    // microtask flush with real timer ticks.
-    async function flushAsyncComponent(): Promise<void> {
-      for (let i = 0; i < 10; i += 1) {
-        await flushPromises()
-        await new Promise((resolve) => setTimeout(resolve, 20))
-      }
-    }
+    // microtask-only `flushPromises()` does not wait for it. Waiting on the
+    // CONDITION rather than a fixed number of timer ticks is what makes this
+    // deterministic: the previous fixed ~200 ms budget was routinely exceeded
+    // under a full parallel `vitest run` and this file failed intermittently.
+    const projectForm = () => dialogBody().querySelector('[data-testid="project-form"]')
+
+    const waitForFormOpen = () => waitFor(projectForm, 'the project form dialog to mount')
+
+    const waitForFormClosed = () =>
+      waitFor(() => projectForm() === null, 'the project form dialog to unmount')
 
     // A failed assertion mid-test would otherwise skip the trailing
     // `wrapper.unmount()`, leaving teleported Dialog content orphaned in
@@ -173,7 +176,7 @@ describe('pages/projects/index.vue', () => {
       await wrapper.get('[data-testid="projects-new"]').trigger('click')
       // The form organism is code-split (defineAsyncComponent, D10) — its own
       // dynamic import can take real wall-clock time to resolve.
-      await flushAsyncComponent()
+      await waitForFormOpen()
 
       const nameInput = dialogBody().querySelector<HTMLInputElement>(
         '[data-testid="project-form-name"]'
@@ -202,7 +205,7 @@ describe('pages/projects/index.vue', () => {
       await flushPromises()
 
       await wrapper.get('[data-testid="project-row-edit-1"]').trigger('click')
-      await flushAsyncComponent()
+      await waitForFormOpen()
 
       const nameInput = dialogBody().querySelector<HTMLInputElement>(
         '[data-testid="project-form-name"]'
@@ -228,14 +231,14 @@ describe('pages/projects/index.vue', () => {
       })
       await flushPromises()
       await wrapper.get('[data-testid="projects-new"]').trigger('click')
-      await flushAsyncComponent()
+      await waitForFormOpen()
 
       // The button lives inside the teleported Dialog content — `wrapper.get`
       // only searches the wrapper's own (non-teleported) subtree, so this
       // interacts with the real DOM node directly, same as the assertions
       // above and below.
       dialogBody().querySelector<HTMLButtonElement>('[data-testid="project-form-cancel"]')?.click()
-      await flushAsyncComponent()
+      await waitForFormClosed()
 
       expect((wrapper.vm as unknown as { editing: unknown }).editing).toBeNull()
       expect(dialogBody().querySelector('[data-testid="project-form"]')).toBeNull()
@@ -261,7 +264,7 @@ describe('pages/projects/index.vue', () => {
       })
       await flushPromises()
       await wrapper.get('[data-testid="projects-new"]').trigger('click')
-      await flushAsyncComponent()
+      await waitForFormOpen()
 
       // Same teleport constraint as the "closes ... emits close" test above:
       // interacting with the real DOM node directly rather than `wrapper.get`.
@@ -280,11 +283,11 @@ describe('pages/projects/index.vue', () => {
           '[data-testid="project-form-assessment-type"] button:last-child'
         )
         ?.click()
-      await flushAsyncComponent()
+      await flushPromises()
       dialogBody()
         .querySelector<HTMLFormElement>('[data-testid="project-form"]')
         ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-      await flushAsyncComponent()
+      await waitForFormClosed()
 
       expect(listProjectsMock).toHaveBeenCalledTimes(2)
       expect(dialogBody().querySelector('[data-testid="project-form"]')).toBeNull()

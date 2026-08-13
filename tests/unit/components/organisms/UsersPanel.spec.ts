@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 const listUsersMock = vi.fn()
@@ -25,12 +26,9 @@ vi.mock('../../../../app/composables/useUsers', () => ({
 
 const UsersPanel = (await import('../../../../app/components/organisms/UsersPanel.vue')).default
 
-async function settle(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
-    await flushPromises()
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-}
+// Waits on the CONDITION, not on a fixed timer budget: the previous
+// fixed-iteration loop assumed the confirm -> API call round trip always fit
+// in ~50 ms, which does not hold under a full parallel `vitest run`.
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -79,7 +77,7 @@ describe('UsersPanel', () => {
     )
     confirmButton?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await settle()
+    await waitFor(() => deactivateUserMock.mock.calls.length > 0, 'the deactivate call to fire')
 
     expect(deactivateUserMock).toHaveBeenCalledWith(1)
 

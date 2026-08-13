@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 const createUserMock = vi.fn()
@@ -41,10 +42,12 @@ describe('UserForm', () => {
     // Presence-gated pattern as Dialog's teleported content). reka-ui's
     // SelectTrigger opens on pointerdown, not click.
     roleSelect.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    for (let i = 0; i < 5; i += 1) {
-      await flushPromises()
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
+    // Condition, not a fixed timer budget — the popup is Presence-gated and
+    // mounts on its own schedule.
+    await waitFor(
+      () => (document.body.textContent ?? '').includes('users.role.admin'),
+      'the role select popup to render its options'
+    )
 
     const optionText = document.body.textContent ?? ''
     expect(optionText).toContain('users.role.admin')

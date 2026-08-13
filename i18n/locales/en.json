@@ -65,6 +65,11 @@
       "latency": "AI latency (p50 / p95)",
       "latencyValue": "{p50} / {p95} ms",
       "noData": "No data yet"
+    },
+    "activity": {
+      "title": "Recent activity",
+      "empty": "No candidates yet. They appear here as soon as the calling system creates one.",
+      "noProject": "Project unavailable"
     }
   },
   "participants": {

@@ -28,6 +28,25 @@ export interface DashboardMetricsResponse {
   data: DashboardMetrics
 }
 
+/**
+ * One row of the recent-activity feed.
+ *
+ * Hand-typed for the same reason as `DashboardMetrics` above: Scramble cannot
+ * trace a shape through a JsonResource's `toArray()`. Source of truth is
+ * `api/app/Http/Resources/Admin/DashboardActivityResource.php`.
+ */
+export interface DashboardActivityRow {
+  candidate_ref: string
+  display_name: string
+  status: string
+  project_name: string | null
+  updated_at: string
+}
+
+export interface DashboardActivityResponse {
+  data: DashboardActivityRow[]
+}
+
 export function useDashboardMetrics() {
   const { apiFetch } = useApi()
 
@@ -35,5 +54,9 @@ export function useDashboardMetrics() {
     return apiFetch<DashboardMetricsResponse>('/dashboard/metrics')
   }
 
-  return { fetchMetrics }
+  async function fetchActivity(): Promise<DashboardActivityResponse> {
+    return apiFetch<DashboardActivityResponse>('/dashboard/activity')
+  }
+
+  return { fetchMetrics, fetchActivity }
 }

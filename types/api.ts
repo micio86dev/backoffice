@@ -281,6 +281,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The most recently updated candidates, newest first
+         * @description GET /api/dashboard/activity
+         *     Auth: auth:api (same `viewAny` gate as the candidate list, via
+         *     AdminParticipantReader — this is that list's data, not a wider view)
+         *
+         *     Hard-capped: the dashboard answers "what just happened", and a feed that
+         *     can grow without bound is a second candidate list wearing a summary's
+         *     clothes. Anyone who needs more has /participants, which paginates.
+         *
+         *     `with('project:id,name')` is not an optimisation detail — without it
+         *     every row would fire its own query for a single string.
+         */
+        get: operations["dashboard.activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/evaluations/summary": {
         parameters: {
             query?: never;
@@ -1071,6 +1100,14 @@ export interface components {
             definition: unknown[];
             type: string;
             bars_available: boolean;
+        };
+        /** DashboardActivityResource */
+        DashboardActivityResource: {
+            candidate_ref: string;
+            display_name: string;
+            status: string;
+            project_name: string;
+            updated_at: string | null;
         };
         /** DashboardMetricsResource */
         DashboardMetricsResource: {
@@ -1899,6 +1936,29 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["DashboardMetricsResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+        };
+    };
+    "dashboard.activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of `DashboardActivityResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["DashboardActivityResource"][];
                     };
                 };
             };

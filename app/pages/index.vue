@@ -29,6 +29,8 @@
       />
       <MetricCard :label="$t('dashboard.kpi.latency')" :value="latencyLabel" />
     </div>
+
+    <RecentActivity v-if="!loadError" :rows="activity" :locale="locale" />
   </div>
 </template>
 
@@ -38,8 +40,13 @@
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import RecentActivity from '@/components/organisms/RecentActivity.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
-import { useDashboardMetrics, type DashboardMetrics } from '@/composables/useDashboardMetrics'
+import {
+  useDashboardMetrics,
+  type DashboardMetrics,
+  type DashboardActivityRow,
+} from '@/composables/useDashboardMetrics'
 import { formatNumber, formatPercent } from '@/utils/format'
 import {
   resolveResourceErrorState,
@@ -61,9 +68,10 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-const { fetchMetrics } = useDashboardMetrics()
+const { fetchMetrics, fetchActivity } = useDashboardMetrics()
 
 const metrics = ref<DashboardMetrics | null>(null)
+const activity = ref<DashboardActivityRow[]>([])
 
 // A failed metrics fetch must NEVER fall through to the "no data yet"
 // placeholder: that reports a 403 to the operator as an empty tenant (D4).
@@ -97,6 +105,15 @@ onMounted(async () => {
     const response = await fetchMetrics()
     metrics.value = response.data
     loadError.value = null
+
+    // Deliberately AFTER the metrics call and deliberately swallowed: the feed
+    // is context, and a dashboard that refuses to render its counters because a
+    // secondary panel failed reports the wrong problem to the operator.
+    try {
+      activity.value = (await fetchActivity()).data
+    } catch {
+      activity.value = []
+    }
   } catch (error) {
     loadError.value = resolveResourceErrorState(error)
   }

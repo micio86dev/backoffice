@@ -12,6 +12,7 @@ import {
   isPauseEveryNCompetenciesValid,
   isNudgeMinCharsValid,
   isUrlLengthValid,
+  isProjectUrlValid,
 } from '../../app/utils/project-field-specs'
 
 describe('project-field-specs', () => {
@@ -67,5 +68,43 @@ describe('project-field-specs', () => {
       expect(url.length).toBe(2049)
       expect(isUrlLengthValid(url)).toBe(false)
     })
+  })
+})
+
+describe('isProjectUrlValid', () => {
+  it.each([
+    ['https://example.com/hook'],
+    ['http://localhost:8000/hook'],
+    ['https://example.com:8443/a/b?c=d#e'],
+  ])('accepts the absolute http(s) URL %s', (value) => {
+    expect(isProjectUrlValid(value)).toBe(true)
+  })
+
+  it.each([[''], [null], [undefined]])(
+    'treats %s as valid — both columns are nullable, empty means "not configured"',
+    (value) => {
+      expect(isProjectUrlValid(value)).toBe(true)
+    }
+  )
+
+  it.each([['example.com'], ['/hooks/beai'], ['not a url'], ['http://']])(
+    'rejects %s, which is not an absolute address',
+    (value) => {
+      expect(isProjectUrlValid(value)).toBe(false)
+    }
+  )
+
+  // Stricter than Laravel's `url` rule on purpose: BEAI dereferences these.
+  it.each([['javascript:alert(1)'], ['file:///etc/passwd'], ['ftp://example.com']])(
+    'rejects the non-http scheme %s',
+    (value) => {
+      expect(isProjectUrlValid(value)).toBe(false)
+    }
+  )
+
+  it('rejects a URL longer than the 2048 cap the server enforces', () => {
+    const tooLong = `https://example.com/${'a'.repeat(PROJECT_FIELD_BOUNDS.urlMaxLength)}`
+
+    expect(isProjectUrlValid(tooLong)).toBe(false)
   })
 })

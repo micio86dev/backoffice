@@ -182,7 +182,7 @@
         </FieldError>
       </Field>
 
-      <Field>
+      <Field :data-invalid="Boolean(errors.exitRedirectUrl)">
         <FieldLabel for="project-form-exit-redirect-url">
           {{ $t('projects.form.exitRedirectUrl') }}
         </FieldLabel>
@@ -190,18 +190,40 @@
           id="project-form-exit-redirect-url"
           v-model="exitRedirectUrl"
           type="url"
+          :aria-invalid="Boolean(errors.exitRedirectUrl)"
+          :aria-describedby="
+            errors.exitRedirectUrl ? 'project-form-exit-redirect-url-error' : undefined
+          "
           data-testid="project-form-exit-redirect-url"
+          @blur="validateExitRedirectUrl"
         />
+        <FieldError
+          v-if="errors.exitRedirectUrl"
+          id="project-form-exit-redirect-url-error"
+          data-testid="project-form-exit-redirect-url-error"
+        >
+          {{ errors.exitRedirectUrl }}
+        </FieldError>
       </Field>
 
-      <Field>
+      <Field :data-invalid="Boolean(errors.webhookUrl)">
         <FieldLabel for="project-form-webhook-url">{{ $t('projects.form.webhookUrl') }}</FieldLabel>
         <Input
           id="project-form-webhook-url"
           v-model="webhookUrl"
           type="url"
+          :aria-invalid="Boolean(errors.webhookUrl)"
+          :aria-describedby="errors.webhookUrl ? 'project-form-webhook-url-error' : undefined"
           data-testid="project-form-webhook-url"
+          @blur="validateWebhookUrl"
         />
+        <FieldError
+          v-if="errors.webhookUrl"
+          id="project-form-webhook-url-error"
+          data-testid="project-form-webhook-url-error"
+        >
+          {{ errors.webhookUrl }}
+        </FieldError>
       </Field>
 
       <!--
@@ -291,6 +313,7 @@ import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import {
   isNudgeMinCharsValid,
+  isProjectUrlValid,
   isPauseEveryNCompetenciesValid,
   PROJECT_FIELD_BOUNDS,
 } from '@/utils/project-field-specs'
@@ -343,6 +366,8 @@ const errors = ref<{
   roleCode?: string
   pauseEveryNCompetencies?: string
   nudgeMinChars?: string
+  exitRedirectUrl?: string
+  webhookUrl?: string
 }>({})
 
 const competencyOptions = ref<CompetencyOption[]>([])
@@ -390,6 +415,20 @@ function validateNudgeMinChars(): boolean {
     ? undefined
     : rangeKey(PROJECT_FIELD_BOUNDS.nudgeMinChars)
   return !errors.value.nudgeMinChars
+}
+
+function validateExitRedirectUrl(): boolean {
+  errors.value.exitRedirectUrl = isProjectUrlValid(exitRedirectUrl.value)
+    ? undefined
+    : t('projects.form.invalidUrl')
+  return !errors.value.exitRedirectUrl
+}
+
+function validateWebhookUrl(): boolean {
+  errors.value.webhookUrl = isProjectUrlValid(webhookUrl.value)
+    ? undefined
+    : t('projects.form.invalidUrl')
+  return !errors.value.webhookUrl
 }
 
 function validateRoleCode(): boolean {
@@ -452,6 +491,26 @@ async function loadCompetencyOptions(): Promise<void> {
   }
 }
 
+/**
+ * Server field name -> local error key.
+ *
+ * Table-driven, and covering EVERY field this form submits, because the
+ * hand-written version covered three of them: a 422 on `webhook_url`,
+ * `exit_redirect_url`, `pause_every_n_competencies`, `nudge_min_chars`,
+ * `assessment_type`, `language`, `competency_ids` or `framework_version_id`
+ * was silently reduced to a generic "could not save" banner, leaving the
+ * operator to guess which field the server had refused.
+ */
+const SERVER_FIELD_TO_ERROR_KEY = {
+  name: 'name',
+  slug: 'slug',
+  role_code: 'roleCode',
+  pause_every_n_competencies: 'pauseEveryNCompetencies',
+  nudge_min_chars: 'nudgeMinChars',
+  exit_redirect_url: 'exitRedirectUrl',
+  webhook_url: 'webhookUrl',
+} as const satisfies Record<string, keyof typeof errors.value>
+
 function applyServerErrors(error: unknown): void {
   const fields = getErrorFields(error)
   if (fields === null) {
@@ -459,10 +518,28 @@ function applyServerErrors(error: unknown): void {
     return
   }
 
-  if (fields['name']) errors.value.name = fields['name'][0]
-  if (fields['slug']) errors.value.slug = fields['slug'][0]
-  if (fields['role_code']) errors.value.roleCode = fields['role_code'][0]
-  formMessage.value = { kind: 'error', text: t('projects.form.saveError') }
+  const unmapped: string[] = []
+
+  for (const [serverField, messages] of Object.entries(fields)) {
+    const message = messages?.[0]
+    if (message === undefined) continue
+
+    // `competency_ids.*` and friends: Laravel reports per-index keys, which
+    // belong to the same control as their parent.
+    const root = serverField.split('.')[0] ?? serverField
+    const localKey = SERVER_FIELD_TO_ERROR_KEY[root as keyof typeof SERVER_FIELD_TO_ERROR_KEY]
+
+    if (localKey) errors.value[localKey] = message
+    else if (!unmapped.includes(message)) unmapped.push(message)
+  }
+
+  // A field with no control of its own (framework_version_id, status,
+  // webhook_secret, competency_ids) still has to reach the operator — showing
+  // the server's own message beats a generic banner that hides it.
+  formMessage.value = {
+    kind: 'error',
+    text: unmapped.length > 0 ? unmapped.join(' ') : t('projects.form.saveError'),
+  }
 }
 
 async function onSubmit(): Promise<void> {
@@ -473,8 +550,10 @@ async function onSubmit(): Promise<void> {
   const roleOk = validateRoleCode()
   const pauseOk = validatePauseEveryNCompetencies()
   const nudgeOk = validateNudgeMinChars()
+  const exitUrlOk = validateExitRedirectUrl()
+  const webhookUrlOk = validateWebhookUrl()
 
-  if (!nameOk || !slugOk || !roleOk || !pauseOk || !nudgeOk) return
+  if (!nameOk || !slugOk || !roleOk || !pauseOk || !nudgeOk || !exitUrlOk || !webhookUrlOk) return
 
   saving.value = true
   try {

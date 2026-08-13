@@ -364,4 +364,94 @@ describe('ProjectForm', () => {
     expect(input.attributes('aria-invalid')).toBe('true')
     expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
   })
+
+  // The two URL fields shipped with no FieldError, no aria-invalid and no
+  // client-side check at all, while every other field in this form had all
+  // three: a malformed webhook URL produced a generic "could not save" banner
+  // and no indication of which field the server had refused.
+  it.each([
+    ['exit redirect url', 'project-form-exit-redirect-url'],
+    ['webhook url', 'project-form-webhook-url'],
+  ])('reports a malformed %s on the field itself', async (_label, testid) => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    const input = wrapper.get(`[data-testid="${testid}"]`)
+    await input.setValue('example.com')
+    await input.trigger('blur')
+
+    const error = wrapper.get(`[data-testid="${testid}-error"]`)
+    expect(error.attributes('id')).toBeTruthy()
+    expect(input.attributes('aria-invalid')).toBe('true')
+    expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
+  })
+
+  it('refuses to submit while a URL field is malformed', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-webhook-url"]').setValue('nope')
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateProjectMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="project-form-webhook-url-error"]').exists()).toBe(true)
+  })
+
+  // Previously only name/slug/role_code were mapped; every other 422 field was
+  // reduced to the generic banner.
+  it.each([
+    ['webhook_url', 'project-form-webhook-url-error'],
+    ['exit_redirect_url', 'project-form-exit-redirect-url-error'],
+    ['nudge_min_chars', 'project-form-nudge-min-chars-error'],
+    ['pause_every_n_competencies', 'project-form-pause-every-n-error'],
+  ])('surfaces a 422 on %s next to its own control', async (serverField, errorTestId) => {
+    updateProjectMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { [serverField]: ['Server says no.'] } },
+      })
+    )
+
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get(`[data-testid="${errorTestId}"]`).text()).toContain('Server says no.')
+  })
+
+  // A field with no control of its own must still reach the operator rather
+  // than being swallowed into a generic message.
+  it('shows the server message in the banner for a field this form has no control for', async () => {
+    updateProjectMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { framework_version_id: ['That framework version is retired.'] } },
+      })
+    )
+
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-form-banner"]').text()).toContain(
+      'That framework version is retired.'
+    )
+  })
 })

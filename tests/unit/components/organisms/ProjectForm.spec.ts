@@ -5,8 +5,9 @@
  * an unexplained 422, and follows the ratified two-level feedback contract
  * (login.vue/login.spec.ts).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { confirmDialog } from '../../support/confirm'
 
 const tMock = (key: string) => key
 
@@ -55,6 +56,13 @@ describe('ProjectForm', () => {
     createProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     updateProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     fetchRoleCompetenciesMock.mockReset().mockResolvedValue({ data: [] })
+  })
+
+  // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
+  // document.body — wrapper.find() never matches it. Every test mounting a
+  // dialog-driven interaction needs attachTo: document.body (task 4.5).
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 
   it('disables framework_version_id, assessment_type, and role_code on an active project', async () => {
@@ -465,6 +473,126 @@ describe('ProjectForm', () => {
     expect(wrapper.get('[data-testid="project-form-banner"]').text()).toContain(
       'That framework version is retired.'
     )
+  })
+})
+
+// dates-and-destructive-actions, design.md D7 — archive stops calling
+// onTransition directly; it sets archiveConfirm = true instead. onTransition
+// is reachable ONLY from confirm, so cancel structurally cannot strand
+// `saving` (the only place `saving = true` is assigned is inside
+// onTransition itself).
+describe('ProjectForm — archive requires confirmation (D7)', () => {
+  // A SIBLING describe, not nested — does NOT inherit the outer
+  // describe('ProjectForm')'s beforeEach, so updateProjectMock's call
+  // history from whichever test in that block ran last would otherwise leak
+  // into this block's first assertion. Reset explicitly here too.
+  beforeEach(() => {
+    updateProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
+  })
+
+  // ConfirmDialog teleports to document.body, and confirmDialog() queries it
+  // globally — without this, a previous test's dialog DOM can leak into the
+  // next one's query.
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('clicking Archive does not call updateProject or set saving, until confirmed', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'active' }) },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-transition-archive"]').trigger('click')
+    await flushPromises()
+
+    expect(updateProjectMock).not.toHaveBeenCalled()
+    expect(
+      wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
+    ).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('cancelling the archive confirmation leaves saving false and calls nothing', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'active' }) },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-transition-archive"]').trigger('click')
+    await flushPromises()
+    await confirmDialog('cancel')
+
+    expect(updateProjectMock).not.toHaveBeenCalled()
+    expect(
+      wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
+    ).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('confirming archives with { status: "archived" } and settles saving back to false', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'active', id: '7' }) },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-transition-archive"]').trigger('click')
+    await flushPromises()
+    await confirmDialog('confirm')
+
+    expect(updateProjectMock).toHaveBeenCalledWith('7', { status: 'archived' })
+    expect(
+      wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
+    ).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('the confirmation names the resulting archived status', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'active' }) },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-transition-archive"]').trigger('click')
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('projects.confirm.archiveTitle')
+    expect(document.body.textContent).toContain('projects.confirm.archiveDescription')
+    wrapper.unmount()
+  })
+
+  // The regression this requirement (ConfirmDialog exposes per-action verb)
+  // exists to prevent: someone silently drops the `confirm-label` prop at
+  // this call site and ships the generic "Confirm" — ConfirmDialog.spec.ts
+  // proves the MECHANISM works, but nothing at this call site pinned that
+  // it is actually USED here.
+  it('the archive confirmation button carries the "Archive" verb, not the generic label', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'active' }) },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-transition-archive"]').trigger('click')
+    await flushPromises()
+
+    const confirmButtonText = document.body.querySelector(
+      '[data-testid="confirm-dialog-confirm"]'
+    )?.textContent
+
+    expect(confirmButtonText).toContain('projects.action.archive')
+    expect(confirmButtonText).not.toContain('users.confirm.action')
+
+    wrapper.unmount()
   })
 })
 

@@ -28,7 +28,7 @@
           accept="application/json,.json"
           class="hidden"
           data-testid="template-import-input"
-          @change="onImport"
+          @change="onFileChosen"
         />
       </label>
     </div>
@@ -40,6 +40,23 @@
     >
       <AlertDescription>{{ message.text }}</AlertDescription>
     </Alert>
+
+    <!--
+      The file is already fully parsed at this point — the dialog names WHAT
+      is about to be imported (count + names), not a bare "are you sure?"
+      (design.md D8). A parse/shape failure never reaches here; it goes
+      straight to the banner above.
+    -->
+    <ConfirmDialog
+      :open="pendingImport !== null"
+      :title="
+        $t('avatar_templates.confirm.importTitle', { count: pendingImport?.names.length ?? 0 })
+      "
+      :description="importDescription"
+      :confirm-label="$t('avatar_templates.portability.import')"
+      @confirm="onImportConfirmed"
+      @cancel="onImportCancelled"
+    />
   </div>
 </template>
 
@@ -51,9 +68,10 @@
  * operator believing a configuration is present when it is not — and they find
  * out at interview time, on a candidate.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 
 defineProps<{ isAdmin: boolean }>()
@@ -64,6 +82,29 @@ const { exportTemplates, importTemplates } = useAvatarTemplates()
 
 const picker = ref<HTMLInputElement | null>(null)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
+// The count and names to preview — the content, not a generic warning, IS
+// the confirmation (design.md D8). Preview cutoff: every name when 10 or
+// fewer, otherwise the first 10 plus "+N more" — a preview that hides what
+// is about to be applied is not a preview.
+const PREVIEW_CUTOFF = 10
+
+interface PendingImport {
+  document: Record<string, unknown>
+  names: string[]
+}
+
+const pendingImport = ref<PendingImport | null>(null)
+
+const importDescription = computed(() => {
+  if (pendingImport.value === null) return ''
+  const { names } = pendingImport.value
+  const shown = names.slice(0, PREVIEW_CUTOFF)
+  const remaining = names.length - shown.length
+  const list = remaining > 0 ? `${shown.join(', ')}, +${remaining} more` : shown.join(', ')
+
+  return t('avatar_templates.confirm.importDescription', { count: names.length, names: list })
+})
 
 async function onExport(): Promise<void> {
   message.value = null
@@ -85,7 +126,15 @@ async function onExport(): Promise<void> {
   }
 }
 
-async function onImport(event: Event): Promise<void> {
+/**
+ * Reads and parses the chosen file, validating only the shape needed to
+ * preview it (`templates` is an array). A file that fails either step NEVER
+ * reaches the confirmation dialog — it reports through the existing
+ * `message` banner, so a parse error is not disguised as a scary
+ * confirmation (design.md D8). The network call happens only in
+ * `onImportConfirmed`, below.
+ */
+async function onFileChosen(event: Event): Promise<void> {
   message.value = null
 
   const file = (event.target as HTMLInputElement).files?.[0]
@@ -93,7 +142,35 @@ async function onImport(event: Event): Promise<void> {
 
   try {
     const parsed = JSON.parse(await file.text()) as Record<string, unknown>
-    const result = await importTemplates(parsed)
+    const templates = parsed.templates
+    if (!Array.isArray(templates)) {
+      throw new TypeError('Malformed import document: "templates" is not an array.')
+    }
+
+    const names = templates.map((entry, index) => {
+      const name = (entry as { name?: unknown })?.name
+      return typeof name === 'string' && name !== '' ? name : `#${index + 1}`
+    })
+
+    pendingImport.value = { document: parsed, names }
+  } catch {
+    message.value = {
+      kind: 'error',
+      text: t('avatar_templates.portability.importFailed', {
+        reason: t('avatar_templates.portability.parseError'),
+      }),
+    }
+    if (picker.value) picker.value.value = ''
+  }
+}
+
+async function onImportConfirmed(): Promise<void> {
+  if (pendingImport.value === null) return
+  const { document: document_ } = pendingImport.value
+  pendingImport.value = null
+
+  try {
+    const result = await importTemplates(document_)
 
     message.value = {
       kind: 'ok',
@@ -116,5 +193,10 @@ async function onImport(event: Event): Promise<void> {
   } finally {
     if (picker.value) picker.value.value = ''
   }
+}
+
+function onImportCancelled(): void {
+  pendingImport.value = null
+  if (picker.value) picker.value.value = ''
 }
 </script>

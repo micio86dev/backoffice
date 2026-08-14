@@ -34,10 +34,11 @@ const USER = {
 }
 
 const API_CLIENT = {
-  id: '1',
+  id: 1,
   name: 'CI key',
   abilities: ['read'],
-  is_active: 'true',
+  is_active: true,
+  state: 'active',
   expires_at: null,
   last_used_at: null,
   created_at: '2026-03-01T10:00:00Z',

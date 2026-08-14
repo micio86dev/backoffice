@@ -88,10 +88,11 @@ describe('ApiKeysPanel', () => {
     listClientsMock.mockReset().mockResolvedValue({
       data: [
         {
-          id: '1',
+          id: 1,
           name: 'CI key',
           abilities: ['read'],
-          is_active: 'true',
+          is_active: true,
+          state: 'active',
           expires_at: null,
           last_used_at: null,
           created_at: '2026-03-01T10:00:00Z',
@@ -105,6 +106,45 @@ describe('ApiKeysPanel', () => {
     revokeClientMock.mockReset().mockResolvedValue(undefined)
   })
 
+  // admin-backoffice spec, "i18n and Locale-Aware Formatting" — "Only
+  // expires_at carries a timezone indicator": unit-tested on FormattedDate
+  // in isolation (show-zone prop), but never at the call site that actually
+  // decides which of the three date columns gets it. Same instant on all
+  // three columns, so any difference in rendered text can only be the zone
+  // suffix.
+  it('shows a timezone indicator on expires_at only, never on created_at or last_used_at', async () => {
+    const SAME_INSTANT = '2026-03-01T10:00:00Z'
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'CI key',
+          abilities: ['read'],
+          is_active: true,
+          state: 'active',
+          expires_at: SAME_INSTANT,
+          last_used_at: SAME_INSTANT,
+          created_at: SAME_INSTANT,
+        },
+      ],
+    })
+
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    const cells = wrapper.findAll('td')
+    const [, createdAtCell, expiresAtCell, lastUsedAtCell] = cells
+
+    const zonePart = new Intl.DateTimeFormat('it', { timeZoneName: 'short' })
+      .formatToParts(new Date(SAME_INSTANT))
+      .find((part) => part.type === 'timeZoneName')?.value
+
+    expect(zonePart).toBeTruthy()
+    expect(expiresAtCell?.text()).toContain(zonePart as string)
+    expect(createdAtCell?.text()).not.toContain(zonePart as string)
+    expect(lastUsedAtCell?.text()).not.toContain(zonePart as string)
+  })
+
   it('lists existing keys without ever rendering a key_hash', async () => {
     const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
     await flushPromises()
@@ -116,10 +156,11 @@ describe('ApiKeysPanel', () => {
   it('shows the raw key exactly once, right after creation', async () => {
     createClientMock.mockResolvedValue({
       data: {
-        id: '2',
+        id: 2,
         name: 'New key',
         abilities: ['read'],
-        is_active: 'true',
+        is_active: true,
+        state: 'active',
         expires_at: null,
         last_used_at: null,
         created_at: '2026-03-01T10:00:00Z',
@@ -147,10 +188,11 @@ describe('ApiKeysPanel', () => {
   it('never re-displays the raw key once the reveal is dismissed, even after reloading the list', async () => {
     createClientMock.mockResolvedValue({
       data: {
-        id: '2',
+        id: 2,
         name: 'New key',
         abilities: ['read'],
-        is_active: 'true',
+        is_active: true,
+        state: 'active',
         expires_at: null,
         last_used_at: null,
         created_at: '2026-03-01T10:00:00Z',
@@ -205,7 +247,35 @@ describe('ApiKeysPanel', () => {
     confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await waitFor(() => revokeClientMock.mock.calls.length > 0, 'the revoke call to fire')
 
-    expect(revokeClientMock).toHaveBeenCalledWith('1')
+    expect(revokeClientMock).toHaveBeenCalledWith(1)
+
+    wrapper.unmount()
+  })
+
+  // The regression this requirement (ConfirmDialog exposes per-action verb)
+  // exists to prevent: someone silently drops the `confirm-label` prop at
+  // this call site and ships the generic "Confirm" — ConfirmDialog.spec.ts
+  // proves the MECHANISM works, but nothing at this call site pinned that
+  // it is actually USED here.
+  it('the revoke confirmation button carries the "Revoke" verb, not the generic label', async () => {
+    const wrapper = mount(ApiKeysPanel, {
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="api-key-revoke-1"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+      'the revoke confirmation dialog to mount'
+    )
+
+    const confirmButtonText = document.body.querySelector(
+      '[data-testid="confirm-dialog-confirm"]'
+    )?.textContent
+
+    expect(confirmButtonText).toContain('settings.apiKeys.revoke')
+    expect(confirmButtonText).not.toContain('users.confirm.action')
 
     wrapper.unmount()
   })
@@ -402,10 +472,11 @@ describe('ApiKeysPanel — the ability catalogue comes from the server', () => {
     listAbilitiesMock.mockResolvedValue({ data: ['invented:ability'] })
     createClientMock.mockResolvedValue({
       data: {
-        id: '9',
+        id: 9,
         name: 'Future key',
         abilities: ['invented:ability'],
-        is_active: 'true',
+        is_active: true,
+        state: 'active',
         expires_at: null,
         last_used_at: null,
         created_at: '2026-03-01T10:00:00Z',
@@ -443,5 +514,135 @@ describe('ApiKeysPanel — the ability catalogue comes from the server', () => {
     expect(document.body.querySelectorAll('[data-testid^="api-key-ability-"]')).toHaveLength(0)
 
     wrapper.unmount()
+  })
+})
+
+// dates-and-destructive-actions, design.md D3 — the table MUST render one of
+// three states, derived from `client.state` (server-derived, the SAME
+// predicate ApiClient::scopeActive uses), and MUST NOT offer Revoke on a key
+// that is not active.
+describe('ApiKeysPanel — state badge and Revoke guard (D3)', () => {
+  // A SIBLING describe, not nested inside describe('ApiKeysPanel') — does
+  // NOT inherit that block's beforeEach, so every mock needs its own reset
+  // here (lesson from ProjectForm.spec.ts's cross-describe mock leak).
+  beforeEach(() => {
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'CI key',
+          abilities: ['read'],
+          is_active: true,
+          state: 'active',
+          expires_at: null,
+          last_used_at: null,
+          created_at: '2026-03-01T10:00:00Z',
+        },
+      ],
+    })
+    listAbilitiesMock.mockReset().mockResolvedValue({
+      data: ['participants:create', 'participants:read', 'sso_link:generate'],
+    })
+    createClientMock.mockReset()
+    revokeClientMock.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('reads "Expired" for is_active true + past expires_at (never "Active")', async () => {
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'Expiring key',
+          abilities: ['read'],
+          is_active: true,
+          state: 'expired',
+          expires_at: '2020-01-01T00:00:00Z',
+          last_used_at: null,
+          created_at: '2026-03-01T10:00:00Z',
+        },
+      ],
+    })
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('settings.apiKeys.state.expired')
+    expect(wrapper.text()).not.toContain('settings.apiKeys.state.active')
+  })
+
+  it('reads "Revoked" for a revoked key', async () => {
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'Dead key',
+          abilities: ['read'],
+          is_active: false,
+          state: 'revoked',
+          expires_at: null,
+          last_used_at: null,
+          created_at: '2026-03-01T10:00:00Z',
+        },
+      ],
+    })
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('settings.apiKeys.state.revoked')
+  })
+
+  it('reads "Active" for an active key', async () => {
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('settings.apiKeys.state.active')
+  })
+
+  it('hides Revoke on a key whose state is not active (expired)', async () => {
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'Expiring key',
+          abilities: ['read'],
+          is_active: true,
+          state: 'expired',
+          expires_at: '2020-01-01T00:00:00Z',
+          last_used_at: null,
+          created_at: '2026-03-01T10:00:00Z',
+        },
+      ],
+    })
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="api-key-revoke-1"]').exists()).toBe(false)
+  })
+
+  it('hides Revoke on a revoked key', async () => {
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'Dead key',
+          abilities: ['read'],
+          is_active: false,
+          state: 'revoked',
+          expires_at: null,
+          last_used_at: null,
+          created_at: '2026-03-01T10:00:00Z',
+        },
+      ],
+    })
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="api-key-revoke-1"]').exists()).toBe(false)
+  })
+
+  it('offers Revoke on an active key', async () => {
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="api-key-revoke-1"]').exists()).toBe(true)
   })
 })

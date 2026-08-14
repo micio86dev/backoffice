@@ -329,12 +329,28 @@
           type="button"
           variant="secondary"
           data-testid="project-form-transition-archive"
-          @click="onTransition('archived')"
+          @click="archiveConfirm = true"
         >
           {{ $t('projects.action.archive') }}
         </Button>
       </div>
     </FieldGroup>
+
+    <!--
+      D7: the archive button no longer calls onTransition directly — it sets
+      archiveConfirm = true instead. `onTransition` is now reachable ONLY
+      from confirm, so cancel structurally cannot strand `saving` (the only
+      assignment of `saving = true` lives inside onTransition).
+    -->
+    <ConfirmDialog
+      :open="archiveConfirm"
+      :title="$t('projects.confirm.archiveTitle')"
+      :description="$t('projects.confirm.archiveDescription')"
+      :confirm-label="$t('projects.action.archive')"
+      variant="destructive"
+      @confirm="onArchiveConfirmed"
+      @cancel="archiveConfirm = false"
+    />
   </form>
 </template>
 
@@ -358,6 +374,7 @@ import {
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import WriteOnlySecretField from '@/components/molecules/WriteOnlySecretField.vue'
+import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import CompetencyPicker, {
   type CompetencyOption,
 } from '@/components/molecules/CompetencyPicker.vue'
@@ -411,6 +428,10 @@ const webhookUrl = ref(props.project?.webhook_url ?? '')
 const webhookSecret = ref<string | undefined>(undefined)
 
 const saving = ref(false)
+// D7: a single boolean is sufficient here (unlike the nullable-ref contract
+// for row-scoped targets elsewhere) — archive acts on `props.project`
+// itself, there is no "which row" to carry.
+const archiveConfirm = ref(false)
 const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
 const errors = ref<{
   name?: string
@@ -664,6 +685,15 @@ async function onTransition(status: 'active' | 'archived'): Promise<void> {
   } finally {
     saving.value = false
   }
+}
+
+// D7: clear the confirmation flag FIRST, then act — the call-site contract
+// (design.md D4) — so a late spurious 'cancel' from reka-ui's own
+// close-on-click is idempotent instead of a race. `onTransition` is
+// unchanged above; this is its only caller for 'archived'.
+async function onArchiveConfirmed(): Promise<void> {
+  archiveConfirm.value = false
+  await onTransition('archived')
 }
 
 onMounted(() => {

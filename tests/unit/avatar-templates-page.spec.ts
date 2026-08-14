@@ -8,9 +8,28 @@
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { confirmDialog } from './support/confirm'
 
-const tMock = vi.fn((key: string) => key)
+/**
+ * The rendered text of the currently-open ConfirmDialog ONLY — never
+ * `document.body.textContent` unscoped, which also picks up the template
+ * list's own rows (every template name is already printed there) and would
+ * let a naming assertion pass vacuously regardless of what the dialog
+ * itself renders.
+ */
+function openDialogText(): string {
+  return document.body.querySelector('[role="alertdialog"]')?.textContent ?? ''
+}
+
+// Echoes interpolation params so assertions can observe rendered content
+// (e.g. `activateDescription`'s `{name, current}`) instead of the bare key —
+// a plain `(key) => key` stub, used here previously, silently discards the
+// second argument and hides exactly the bug this file's activation-naming
+// tests exist to catch.
+const tMock = vi.fn((key: string, params?: Record<string, unknown>) =>
+  params ? `${key} ${JSON.stringify(params)}` : key
+)
 
 function template(overrides: Record<string, unknown> = {}) {
   return {
@@ -56,7 +75,7 @@ async function mountPage(handlers: Handlers = {}) {
   }))
 
   const Page = (await import('../../app/pages/avatar-templates/index.vue')).default
-  const wrapper = mount(Page, { global: { mocks: { $t: tMock } } })
+  const wrapper = mount(Page, { global: { mocks: { $t: tMock } }, attachTo: document.body })
   await flushPromises()
 
   return { wrapper, api }
@@ -72,6 +91,12 @@ describe('AvatarTemplatesPage', () => {
       'useI18n',
       vi.fn(() => ({ t: tMock, locale: ref('it') }))
     )
+  })
+
+  // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
+  // document.body — wrapper.find() never matches it (task 4.5).
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 
   it('loads the templates and the field specs together', async () => {
@@ -113,17 +138,76 @@ describe('AvatarTemplatesPage', () => {
     expect(wrapper.find('[data-testid="template-activate-1"]').exists()).toBe(false)
   })
 
-  it('reloads the list after activating', async () => {
+  it('reloads the list after activating, only once confirmed', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
     await flushPromises()
+
+    // The point of the change: nothing happens on the first click.
+    expect(api.activateTemplate).not.toHaveBeenCalled()
+
+    await confirmDialog('confirm')
 
     // Twice: once on mount, once after the swap. The server deactivates the
     // previous template in the same transaction, and a client-side guess about
     // which row that was is a guess about what candidates see next.
     expect(api.activateTemplate).toHaveBeenCalledWith(1)
     expect(api.listTemplates).toHaveBeenCalledTimes(2)
+  })
+
+  // The requirement the whole change was justified by (design.md D5,
+  // avatar-templates spec "Confirmation Before Activation..."): activation
+  // carries no destructive-sounding word, yet swaps the org's single active
+  // template atomically — the highest blast radius of any action this
+  // change covers. A single-template fixture can never observe a
+  // replacement (there is nothing to replace), so this needs at least two.
+  it('names BOTH the incoming and the outgoing template in the activation confirmation', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [
+          template({ id: 1, name: 'Interviewer EN', is_active: false }),
+          template({ id: 2, name: 'Interviewer IT', is_active: true }),
+        ],
+      }),
+    })
+
+    await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
+    await flushPromises()
+
+    const dialogText = openDialogText()
+    expect(dialogText).toContain('Interviewer EN')
+    expect(dialogText).toContain('Interviewer IT')
+  })
+
+  // The edge case activateDescription's other branch exists for: a fresh
+  // organization with no template active yet. Nothing to replace, so the
+  // description must not silently interpolate an empty "current" name.
+  it('names only the incoming template when no template is currently active yet', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [template({ id: 1, name: 'First Template', is_active: false })],
+      }),
+    })
+
+    await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
+    await flushPromises()
+
+    const dialogText = openDialogText()
+    expect(dialogText).toContain('First Template')
+    expect(dialogText).toContain('activateDescriptionNoPrevious')
+  })
+
+  it('cancelling the activate confirmation performs no request', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
+    await flushPromises()
+
+    await confirmDialog('cancel')
+
+    expect(api.activateTemplate).not.toHaveBeenCalled()
+    expect(api.listTemplates).toHaveBeenCalledTimes(1)
   })
 
   it('surfaces a persona-sync warning after a SUCCESSFUL activation', async () => {
@@ -136,20 +220,73 @@ describe('AvatarTemplatesPage', () => {
 
     await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
     await flushPromises()
+    await confirmDialog('confirm')
 
     // The activation WORKED. Without this the operator believes an advanced
     // setting is live when it never reached the provider.
     expect(wrapper.find('[data-testid="template-warning"]').exists()).toBe(true)
   })
 
-  it('reloads after deleting', async () => {
+  it('reloads after deleting, only once confirmed', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-delete-1"]').trigger('click')
     await flushPromises()
 
+    // The point of the change: nothing happens on the first click.
+    expect(api.deleteTemplate).not.toHaveBeenCalled()
+
+    await confirmDialog('confirm')
+
     expect(api.deleteTemplate).toHaveBeenCalledWith(1)
     expect(api.listTemplates).toHaveBeenCalledTimes(2)
+  })
+
+  // Content assertion: the delete dialog must render deleteTitle/
+  // deleteDescription (irreversibility, per the avatar-templates spec) — not
+  // just fire on the right id, which every prior test here already proved.
+  it('renders the delete confirmation title and irreversibility description', async () => {
+    const { wrapper } = await mountPage()
+
+    await wrapper.find('[data-testid="template-delete-1"]').trigger('click')
+    await flushPromises()
+
+    const dialogText = openDialogText()
+    expect(dialogText).toContain('avatar_templates.confirm.deleteTitle')
+    expect(dialogText).toContain('avatar_templates.confirm.deleteDescription')
+  })
+
+  // Targeting correctness with more than one candidate present — a
+  // single-item fixture cannot distinguish "deletes the clicked row" from
+  // "always deletes the first row".
+  it('deletes the SPECIFIC template clicked, not just the first in the list', async () => {
+    const { wrapper, api } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [
+          template({ id: 1, name: 'Keep me', is_active: false }),
+          template({ id: 2, name: 'Delete me', is_active: false }),
+        ],
+      }),
+    })
+
+    await wrapper.find('[data-testid="template-delete-2"]').trigger('click')
+    await flushPromises()
+    await confirmDialog('confirm')
+
+    expect(api.deleteTemplate).toHaveBeenCalledWith(2)
+    expect(api.deleteTemplate).not.toHaveBeenCalledWith(1)
+  })
+
+  it('cancelling the delete confirmation performs no request', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-delete-1"]').trigger('click')
+    await flushPromises()
+
+    await confirmDialog('cancel')
+
+    expect(api.deleteTemplate).not.toHaveBeenCalled()
+    expect(api.listTemplates).toHaveBeenCalledTimes(1)
   })
 
   it('reports a load failure instead of rendering an empty list', async () => {

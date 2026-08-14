@@ -15,22 +15,33 @@
           <TableHead>{{ $t('settings.apiKeys.table.createdAt') }}</TableHead>
           <TableHead>{{ $t('settings.apiKeys.table.expiresAt') }}</TableHead>
           <TableHead>{{ $t('settings.apiKeys.table.lastUsedAt') }}</TableHead>
+          <TableHead>{{ $t('settings.apiKeys.table.state') }}</TableHead>
           <TableHead>
             <span class="sr-only">{{ $t('settings.apiKeys.table.actions') }}</span>
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableEmpty v-if="clients.length === 0" :colspan="5">
+        <TableEmpty v-if="clients.length === 0" :colspan="6">
           {{ $t('settings.apiKeys.empty') }}
         </TableEmpty>
         <TableRow v-for="client in clients" :key="client.id">
           <TableCell>{{ client.name }}</TableCell>
-          <TableCell>{{ client.created_at }}</TableCell>
-          <TableCell>{{ client.expires_at ?? '—' }}</TableCell>
-          <TableCell>{{ client.last_used_at ?? '—' }}</TableCell>
+          <TableCell><FormattedDate :value="client.created_at" :locale="locale" /></TableCell>
+          <TableCell>
+            <FormattedDate :value="client.expires_at" :locale="locale" show-zone />
+          </TableCell>
+          <TableCell><FormattedDate :value="client.last_used_at" :locale="locale" /></TableCell>
+          <TableCell><ApiKeyStateBadge :state="client.state" /></TableCell>
           <TableCell class="text-right">
+            <!--
+              Do not offer a control whose only outcome is an error (same
+              ratified reasoning as avatar-templates/index.vue's delete
+              button) — the badge in the same row supplies the explanation
+              for the absence (design.md D3).
+            -->
             <Button
+              v-if="client.state === 'active'"
               variant="outline"
               size="sm"
               :data-testid="`api-key-revoke-${client.id}`"
@@ -190,6 +201,8 @@
       :open="revokeTarget !== null"
       :title="$t('settings.apiKeys.confirmRevokeTitle')"
       :description="$t('settings.apiKeys.confirmRevokeDescription')"
+      :confirm-label="$t('settings.apiKeys.revoke')"
+      variant="destructive"
       @confirm="onRevokeConfirmed"
       @cancel="revokeTarget = null"
     />
@@ -228,6 +241,8 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
+import FormattedDate from '@/components/atoms/FormattedDate.vue'
+import ApiKeyStateBadge from '@/components/atoms/ApiKeyStateBadge.vue'
 import { useApiClients, type ApiClient } from '@/composables/useApiClients'
 import { applyServerFieldErrors } from '@/utils/http-error'
 
@@ -255,7 +270,7 @@ function abilityLabelKey(value: string): string {
 }
 
 const { listClients, listAbilities, createClient, revokeClient } = useApiClients()
-const { t, te } = useI18n()
+const { t, te, locale } = useI18n()
 
 const clients = ref<ApiClient[]>([])
 const creating = ref(false)

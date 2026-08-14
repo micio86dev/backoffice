@@ -160,6 +160,53 @@ test.describe('Projects CRUD (Unit 2b)', () => {
     await expect(page.getByRole('button', { name: 'Standard' })).toBeDisabled()
   })
 
+  // dates-and-destructive-actions, design.md D7 — archive no longer fires on
+  // the first click; cancelling the confirmation leaves the project
+  // untouched (no PATCH sent, status stays active).
+  test('cancelling the archive confirmation leaves the project active', async ({ page }) => {
+    await mockAdminApi(page)
+
+    let patchCount = 0
+    // Registered AFTER mockAdminApi — Playwright tries the LAST-registered
+    // matching route first, so this override (which counts PATCH calls)
+    // wins over mockAdminApi's own /projects/:id route for this test.
+    await page.route(
+      (url) => /^\/projects\/\d+$/.test(url.pathname),
+      (route) => {
+        if (route.request().method() === 'PATCH') patchCount += 1
+        return jsonRoute(route, { data: { ...ACTIVE_PROJECT, status: 'archived' } })
+      }
+    )
+    await login(page)
+    await page.goto('/projects')
+
+    await page
+      .getByRole('row', { name: /Active Project/ })
+      .getByRole('button', { name: 'Modifica' })
+      .click()
+
+    await page.getByRole('button', { name: 'Archivia' }).click()
+
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Annulla' })).toBeVisible()
+
+    await dialog.getByRole('button', { name: 'Annulla' }).click()
+    await expect(dialog).toBeHidden()
+
+    expect(patchCount).toBe(0)
+
+    // The edit dialog is still open (cancelling the ARCHIVE confirmation
+    // only closes that nested dialog) — the archive trigger is still
+    // offered, which is only true if the project is still active.
+    await expect(page.getByRole('button', { name: 'Archivia' })).toBeVisible()
+
+    // Closing the edit dialog and returning to the list, the row still
+    // reads its ORIGINAL status — cancelling touched nothing.
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('row', { name: /Active Project/ })).toBeVisible()
+  })
+
   test('the projects list is WCAG 2.1 AA clean', async ({ page }) => {
     await mockAdminApi(page)
     await login(page)

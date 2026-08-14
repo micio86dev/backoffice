@@ -78,7 +78,7 @@
             type="button"
             :data-testid="`template-activate-${template.id}`"
             class="rounded-md border border-border px-3 py-1.5 text-sm"
-            @click="activate(template)"
+            @click="activateTarget = template"
           >
             {{ $t('avatar_templates.action.activate') }}
           </button>
@@ -93,7 +93,7 @@
             type="button"
             :data-testid="`template-delete-${template.id}`"
             class="rounded-md border border-border px-3 py-1.5 text-sm"
-            @click="remove(template)"
+            @click="deleteTarget = template"
           >
             {{ $t('avatar_templates.action.delete') }}
           </button>
@@ -111,6 +111,32 @@
       @cancel="editing = null"
       @submit="save"
     />
+
+    <!--
+      Activation's blast radius: the server atomically swaps the org's single
+      active template, so one unconfirmed click changes the face and voice
+      every candidate meets. The description names what gets replaced —
+      "activate X" is not the consequence; "X replaces Y" is (design.md D5,
+      admin-backoffice spec).
+    -->
+    <ConfirmDialog
+      :open="activateTarget !== null"
+      :title="$t('avatar_templates.confirm.activateTitle')"
+      :description="activateDescription"
+      :confirm-label="$t('avatar_templates.action.activate')"
+      @confirm="onActivateConfirmed"
+      @cancel="activateTarget = null"
+    />
+
+    <ConfirmDialog
+      :open="deleteTarget !== null"
+      :title="$t('avatar_templates.confirm.deleteTitle')"
+      :description="$t('avatar_templates.confirm.deleteDescription')"
+      :confirm-label="$t('avatar_templates.action.delete')"
+      variant="destructive"
+      @confirm="onDeleteConfirmed"
+      @cancel="deleteTarget = null"
+    />
   </div>
 </template>
 
@@ -127,9 +153,10 @@ import { useCurrentUser } from '@/composables/useCurrentUser'
  * patching its own copy, because a client-side guess about which row is now
  * active is a guess about what candidates are seeing.
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
+import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 
@@ -165,6 +192,28 @@ const submitError = ref<unknown | null>(null)
 
 /** null = closed; an object with no id = creating. */
 const editing = ref<Partial<AvatarTemplate> | null>(null)
+
+// Confirmation call-site contract (design.md D4): a single nullable ref per
+// dialog, `:open` derived from it, `@cancel` clears it and nothing else,
+// `@confirm` reads it into a local, clears the ref FIRST, then acts.
+const activateTarget = ref<AvatarTemplate | null>(null)
+const deleteTarget = ref<AvatarTemplate | null>(null)
+
+// Names the template being replaced — "activate X" is not the consequence,
+// "X replaces Y for every candidate in your organization" is (design.md D5).
+const activateDescription = computed(() => {
+  if (activateTarget.value === null) return ''
+  const current = templates.value.find((candidate) => candidate.is_active)
+
+  return current
+    ? t('avatar_templates.confirm.activateDescription', {
+        name: activateTarget.value.name,
+        current: current.name,
+      })
+    : t('avatar_templates.confirm.activateDescriptionNoPrevious', {
+        name: activateTarget.value.name,
+      })
+})
 
 async function load(): Promise<void> {
   try {
@@ -235,7 +284,11 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
   }
 }
 
-async function activate(template: AvatarTemplate): Promise<void> {
+async function onActivateConfirmed(): Promise<void> {
+  if (activateTarget.value === null) return
+  const template = activateTarget.value
+  activateTarget.value = null
+
   warning.value = null
 
   try {
@@ -251,7 +304,11 @@ async function activate(template: AvatarTemplate): Promise<void> {
   await load()
 }
 
-async function remove(template: AvatarTemplate): Promise<void> {
+async function onDeleteConfirmed(): Promise<void> {
+  if (deleteTarget.value === null) return
+  const template = deleteTarget.value
+  deleteTarget.value = null
+
   try {
     await deleteTemplate(template.id)
   } catch {

@@ -6,15 +6,25 @@
         <AlertDialogDescription>{{ description }}</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel data-testid="confirm-dialog-cancel" @click="onCancel">
-          {{ $t('projects.action.cancel') }}
+        <!--
+          type="button" on BOTH buttons — required because dates-and-
+          destructive-actions PR4 places this dialog inside ProjectForm's
+          form element (archive confirmation). A native button with no
+          explicit type defaults to "submit" inside a surrounding form, so
+          without this, the confirm click would ALSO fire that form's submit
+          handler — a second, unrelated network call racing the intended one.
+        -->
+        <AlertDialogCancel type="button" data-testid="confirm-dialog-cancel" @click="onCancel">
+          {{ cancelLabel ?? $t('projects.action.cancel') }}
         </AlertDialogCancel>
         <AlertDialogAction
+          type="button"
           data-testid="confirm-dialog-confirm"
+          :variant="variant"
           @pointerdown="suppressNextCancel = true"
           @click="onConfirm"
         >
-          {{ $t('users.confirm.action') }}
+          {{ confirmLabel ?? $t('users.confirm.action') }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -37,11 +47,23 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-defineProps<{
-  open: boolean
-  title: string
-  description: string
-}>()
+// confirmLabel/cancelLabel/variant (design.md D4): every new prop is
+// optional and defaults to today's exact string, so both existing call
+// sites compile unchanged. The fallback is resolved in the TEMPLATE via
+// `??`, never captured here as a string — `$t` is a template global, and a
+// string captured at prop-default time would not re-render on a locale
+// switch.
+withDefaults(
+  defineProps<{
+    open: boolean
+    title: string
+    description: string
+    confirmLabel?: string
+    cancelLabel?: string
+    variant?: 'default' | 'destructive'
+  }>(),
+  { confirmLabel: undefined, cancelLabel: undefined, variant: 'default' }
+)
 
 const emit = defineEmits<{
   (e: 'confirm' | 'cancel'): void

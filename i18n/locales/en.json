@@ -153,6 +153,10 @@
       "BUL": "Business Unit Leader",
       "SRX": "Senior Executive"
     },
+    "confirm": {
+      "archiveTitle": "Archive this project?",
+      "archiveDescription": "The project moves to Archived status and cannot be reactivated afterwards."
+    },
     "form": {
       "newTitle": "New project",
       "editTitle": "Edit project",
@@ -322,11 +326,17 @@
       "confirmRevokeTitle": "Revoke this API key?",
       "confirmRevokeDescription": "Any integration using this key will immediately stop working. This cannot be undone.",
       "empty": "No API keys yet.",
+      "state": {
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      },
       "table": {
         "name": "Name",
         "createdAt": "Created",
         "expiresAt": "Expires",
         "lastUsedAt": "Last used",
+        "state": "State",
         "actions": "Actions"
       }
     }
@@ -446,6 +456,15 @@
       "save": "Save",
       "cancel": "Cancel"
     },
+    "confirm": {
+      "activateTitle": "Activate this template?",
+      "activateDescription": "\"{name}\" will replace \"{current}\" for every candidate in your organization.",
+      "activateDescriptionNoPrevious": "\"{name}\" will become the template every candidate in your organization meets.",
+      "deleteTitle": "Delete this template?",
+      "deleteDescription": "This cannot be undone.",
+      "importTitle": "Import {count} templates?",
+      "importDescription": "This adds {count} templates to your organization's catalogue: {names}. Existing templates are never overwritten."
+    },
     "form": {
       "new_title": "New template",
       "edit_title": "Edit template",
@@ -521,6 +540,7 @@
       "import": "Import JSON",
       "importDone": "Imported {count} templates, inactive.",
       "importFailed": "Import refused: {reason}",
+      "parseError": "The file is not a valid template export.",
       "adminOnly": "Only admins can export and import."
     },
     "hint": {

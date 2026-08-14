@@ -26,7 +26,7 @@ describe('useApiClients', () => {
   })
 
   it('creates with POST and returns the raw key alongside the resource', async () => {
-    apiFetch.mockResolvedValue({ data: { id: '1' }, api_key: 'beai_live_abc' })
+    apiFetch.mockResolvedValue({ data: { id: 1 }, api_key: 'beai_live_abc' })
 
     const result = await useApiClients().createClient({ name: 'CI key', abilities: ['read'] })
 

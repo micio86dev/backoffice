@@ -153,6 +153,10 @@
       "BUL": "Responsabile di business unit",
       "SRX": "Dirigente senior"
     },
+    "confirm": {
+      "archiveTitle": "Archiviare questo progetto?",
+      "archiveDescription": "Il progetto passa allo stato Archiviato e non potrà più essere riattivato."
+    },
     "form": {
       "newTitle": "Nuovo progetto",
       "editTitle": "Modifica progetto",
@@ -322,11 +326,17 @@
       "confirmRevokeTitle": "Revocare questa chiave API?",
       "confirmRevokeDescription": "Qualsiasi integrazione che utilizza questa chiave smetterà immediatamente di funzionare. Questa azione non può essere annullata.",
       "empty": "Nessuna chiave API ancora presente.",
+      "state": {
+        "active": "Attiva",
+        "expired": "Scaduta",
+        "revoked": "Revocata"
+      },
       "table": {
         "name": "Nome",
         "createdAt": "Creata",
         "expiresAt": "Scadenza",
         "lastUsedAt": "Ultimo utilizzo",
+        "state": "Stato",
         "actions": "Azioni"
       }
     }
@@ -446,6 +456,15 @@
       "save": "Salva",
       "cancel": "Annulla"
     },
+    "confirm": {
+      "activateTitle": "Attivare questo template?",
+      "activateDescription": "\"{name}\" sostituirà \"{current}\" per ogni candidato della tua organizzazione.",
+      "activateDescriptionNoPrevious": "\"{name}\" diventerà il template che ogni candidato della tua organizzazione incontra.",
+      "deleteTitle": "Eliminare questo template?",
+      "deleteDescription": "Questa azione non può essere annullata.",
+      "importTitle": "Importare {count} template?",
+      "importDescription": "Verranno aggiunti {count} template al catalogo della tua organizzazione: {names}. I template esistenti non vengono mai sovrascritti."
+    },
     "form": {
       "new_title": "Nuovo template",
       "edit_title": "Modifica template",
@@ -521,6 +540,7 @@
       "import": "Importa JSON",
       "importDone": "Importati {count} template, disattivi.",
       "importFailed": "Import rifiutato: {reason}",
+      "parseError": "Il file non è un export valido di template.",
       "adminOnly": "Solo gli amministratori possono esportare e importare."
     },
     "hint": {

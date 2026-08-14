@@ -2,6 +2,15 @@
  * i18n-aware date/number formatting (admin-backoffice spec, "i18n and
  * Locale-Aware Formatting" requirement). `Intl.DateTimeFormat` /
  * `Intl.NumberFormat` only — never manual string concatenation.
+ *
+ * Timezone convention (design.md D9): the API emits UTC ISO 8601
+ * (`api/config/app.php` hardcodes UTC); display uses the VIEWER'S
+ * browser-local timezone via `Intl`'s implicit conversion — there is no
+ * user or organization timezone concept anywhere in this app. Only
+ * `expires_at` in the API-keys table renders a visible zone indicator
+ * (via `FormattedDate`'s `show-zone` prop); every other timestamp renders
+ * unsuffixed, because a deadline is the one date where "which zone?"
+ * changes what the reader does.
  */
 export function formatDate(iso: string | null, locale: string): string {
   if (!iso) return '–'

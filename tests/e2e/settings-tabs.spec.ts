@@ -34,10 +34,11 @@ const USER = {
 }
 
 const API_CLIENT = {
-  id: '1',
+  id: 1,
   name: 'CI key',
   abilities: ['read'],
-  is_active: 'true',
+  is_active: true,
+  state: 'active',
   expires_at: null,
   last_used_at: null,
   created_at: '2026-03-01T10:00:00Z',
@@ -117,6 +118,42 @@ test.describe('Settings tabs (Unit 6)', () => {
 
     await page.getByRole('tab', { name: 'Chiavi API' }).click()
     await expect(page.getByText('CI key')).toBeVisible()
+  })
+
+  // dates-and-destructive-actions, design.md D3 — the badge reflects the
+  // SAME predicate the auth guard uses, and Revoke is never offered on a
+  // key that is not active.
+  test('a revoked API key shows its state badge and offers no Revoke control', async ({ page }) => {
+    await mockAdminApi(page)
+    // Registered AFTER mockAdminApi — Playwright tries the LAST-registered
+    // matching route first, so this override wins over the default
+    // active-key fixture for this one test.
+    await page.route(
+      (url) => url.pathname === '/m2m/clients',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              data: [{ ...API_CLIENT, is_active: false, state: 'revoked' }],
+              links: { first: null, last: null, prev: null, next: null },
+              meta: {
+                current_page: 1,
+                from: 1,
+                last_page: 1,
+                links: [],
+                path: '',
+                per_page: 20,
+                to: 1,
+                total: 1,
+              },
+            })
+          : route.continue()
+    )
+    await login(page)
+    await page.goto('/settings')
+
+    await page.getByRole('tab', { name: 'Chiavi API' }).click()
+    await expect(page.getByText('Revocata')).toBeVisible()
+    await expect(page.getByTestId('api-key-revoke-1')).toHaveCount(0)
   })
 
   test('the settings page is WCAG 2.1 AA clean on every tab', async ({ page }) => {

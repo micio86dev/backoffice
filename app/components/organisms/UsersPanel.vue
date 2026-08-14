@@ -84,6 +84,11 @@
           ? $t('users.confirm.deactivateDescription')
           : $t('users.confirm.activateDescription')
       "
+      :confirm-label="
+        confirmTarget?.action === 'deactivate'
+          ? $t('users.action.deactivate')
+          : $t('users.action.activate')
+      "
       @confirm="onConfirmAction"
       @cancel="confirmTarget = null"
     />

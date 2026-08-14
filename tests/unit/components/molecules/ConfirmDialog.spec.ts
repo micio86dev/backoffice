@@ -61,4 +61,85 @@ describe('ConfirmDialog', () => {
     expect(wrapper.emitted('confirm')).toBeFalsy()
     wrapper.unmount()
   })
+
+  // design.md D4 — confirmLabel/cancelLabel/variant, widening the props
+  // without changing today's default strings.
+  it('falls back to the default confirm/cancel labels when none are given', async () => {
+    const wrapper = mount(ConfirmDialog, {
+      props: { open: true, title: 'Deactivate user?', description: 'They will lose access.' },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('users.confirm.action')
+    expect(document.body.textContent).toContain('projects.action.cancel')
+    wrapper.unmount()
+  })
+
+  it('renders overridden confirmLabel and cancelLabel verbatim', async () => {
+    const wrapper = mount(ConfirmDialog, {
+      props: {
+        open: true,
+        title: 'Revoke this key?',
+        description: 'It stops working immediately.',
+        confirmLabel: 'Revoke',
+        cancelLabel: 'Keep it',
+      },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Revoke')
+    expect(document.body.textContent).toContain('Keep it')
+    expect(document.body.textContent).not.toContain('users.confirm.action')
+    expect(document.body.textContent).not.toContain('projects.action.cancel')
+    wrapper.unmount()
+  })
+
+  it('applies the destructive variant to the confirm button only', async () => {
+    const wrapper = mount(ConfirmDialog, {
+      props: {
+        open: true,
+        title: 'Delete this template?',
+        description: 'This cannot be undone.',
+        variant: 'destructive',
+      },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const confirmButton = document.body.querySelector('[data-testid="confirm-dialog-confirm"]')
+    const cancelButton = document.body.querySelector('[data-testid="confirm-dialog-cancel"]')
+
+    expect(confirmButton?.className).toContain('text-destructive')
+    expect(cancelButton?.className).not.toContain('text-destructive')
+    wrapper.unmount()
+  })
+
+  // The missing regression test (design.md D4): a confirm click must emit
+  // `confirm` exactly once and `cancel` zero times — reka-ui's
+  // AlertDialogAction ALSO closes the dialog on click, which without
+  // `suppressNextCancel` would fire a spurious 'cancel' right after.
+  it('confirming emits confirm exactly once and cancel zero times', async () => {
+    const wrapper = mount(ConfirmDialog, {
+      props: { open: true, title: 'Deactivate user?', description: 'They will lose access.' },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const confirmButton = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="confirm-dialog-confirm"]'
+    )
+    confirmButton?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.emitted('confirm')).toHaveLength(1)
+    expect(wrapper.emitted('cancel')).toBeFalsy()
+    wrapper.unmount()
+  })
 })

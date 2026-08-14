@@ -55,6 +55,8 @@ export interface FieldSpec {
   key: string
   type: FieldType
   label_key: string
+  /** i18n key for the one-line explanation shown under the control. */
+  hint_key?: string
   required?: boolean
   options?: string[]
   min?: number

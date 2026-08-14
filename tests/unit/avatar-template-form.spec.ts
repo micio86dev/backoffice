@@ -19,7 +19,13 @@ import type { FieldSpec, ProviderName } from '../../app/types/avatar-template'
 
 const SPECS: Record<ProviderName, FieldSpec[]> = {
   heygen: [
-    { key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId', required: true },
+    {
+      key: 'avatarId',
+      type: 'text',
+      label_key: 'avatar_templates.field.avatarId',
+      hint_key: 'avatar_templates.hint.avatarId',
+      required: true,
+    },
     {
       key: 'voiceSpeed',
       type: 'number',
@@ -32,6 +38,7 @@ const SPECS: Record<ProviderName, FieldSpec[]> = {
       key: 'videoQuality',
       type: 'select',
       label_key: 'avatar_templates.field.videoQuality',
+      hint_key: 'avatar_templates.hint.videoQuality',
       options: ['high', 'low'],
     },
     {
@@ -199,5 +206,28 @@ describe('errors', () => {
     // One error per round trip turns a seventeen-field form into a guessing
     // game, so the API returns them all and the form shows them all.
     expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(2)
+  })
+})
+
+// A form of provider settings with labels alone is a form filled by copying the
+// previous value or by guessing: the names are the provider's vocabulary, not
+// the operator's.
+describe('field help', () => {
+  it('renders the hint for every field that declares one', () => {
+    const wrapper = mountForm({ provider: 'heygen', config: {} })
+
+    for (const field of SPECS.heygen.filter((f) => f.hint_key)) {
+      expect(wrapper.text()).toContain(field.hint_key)
+    }
+  })
+
+  it('still renders the control for a field carrying no hint', () => {
+    const wrapper = mountForm({ provider: 'heygen', config: {} })
+    const noHint = SPECS.heygen.find((f) => !f.hint_key)
+
+    // Explanation is an aid; losing it must never cost the ability to configure.
+    expect(noHint).toBeDefined()
+    expect(wrapper.find(`[data-testid="template-config-${noHint!.key}"]`).exists()).toBe(true)
+    expect(wrapper.text()).not.toContain(`avatar_templates.hint.${noHint!.key}`)
   })
 })

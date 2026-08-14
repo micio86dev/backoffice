@@ -132,6 +132,9 @@
           :class="formControlClass"
           @input="setValue(field, ($event.target as HTMLInputElement).value)"
         />
+        <span v-if="field.hint_key" class="text-xs leading-5 text-muted-foreground">
+          {{ $t(field.hint_key) }}
+        </span>
       </label>
     </fieldset>
 

@@ -8,7 +8,11 @@
  * and the participant detail page).
  */
 import { describe, it, expect } from 'vitest'
-import { getErrorStatus, getErrorFields } from '../../../app/utils/http-error'
+import {
+  getErrorStatus,
+  getErrorFields,
+  applyServerFieldErrors,
+} from '../../../app/utils/http-error'
 
 describe('getErrorStatus', () => {
   it('reads .status when present', () => {
@@ -55,5 +59,69 @@ describe('getErrorFields', () => {
 
   it('returns null for a non-object error', () => {
     expect(getErrorFields('boom')).toBeNull()
+  })
+})
+
+/**
+ * applyServerFieldErrors (form-clarity-and-console-warnings, D2) — the
+ * generic 422-to-field mapper every submitting form adopts. Generic over the
+ * caller's own error-key union `K`, so the `assign` callback's `key`
+ * parameter is checked against the caller's local `errors` type, not eroded
+ * to `string` at the boundary.
+ */
+describe('applyServerFieldErrors', () => {
+  it('assigns a mapped server field to the caller via the assign callback', () => {
+    const error = Object.assign(new Error('422'), {
+      status: 422,
+      data: { errors: { name: ['The name has already been taken.'] } },
+    })
+    const map = { name: 'name' } as const
+    const assigned: Record<string, string> = {}
+
+    const unmapped = applyServerFieldErrors(error, map, (key, message) => {
+      assigned[key] = message
+    })
+
+    expect(assigned).toEqual({ name: 'The name has already been taken.' })
+    expect(unmapped).toEqual([])
+  })
+
+  it('splits a server field at the first "." so an indexed field lands on its parent', () => {
+    const error = Object.assign(new Error('422'), {
+      status: 422,
+      data: { errors: { 'competency_ids.3': ['Invalid competency.'] } },
+    })
+    const map = { competency_ids: 'competencyIds' } as const
+    const assigned: Record<string, string> = {}
+
+    applyServerFieldErrors(error, map, (key, message) => {
+      assigned[key] = message
+    })
+
+    expect(assigned).toEqual({ competencyIds: 'Invalid competency.' })
+  })
+
+  it('returns a de-duplicated list of messages for fields the map does not cover', () => {
+    const error = Object.assign(new Error('422'), {
+      status: 422,
+      data: {
+        errors: {
+          status: ['Cannot transition from draft to archived.'],
+          webhook_secret: ['Cannot transition from draft to archived.'],
+        },
+      },
+    })
+
+    const unmapped = applyServerFieldErrors(error, {}, () => {})
+
+    expect(unmapped).toEqual(['Cannot transition from draft to archived.'])
+  })
+
+  it('returns null when the rejection carries no {data:{errors}} body', () => {
+    const error = Object.assign(new Error('boom'), { status: 500 })
+
+    const unmapped = applyServerFieldErrors(error, {}, () => {})
+
+    expect(unmapped).toBeNull()
   })
 })

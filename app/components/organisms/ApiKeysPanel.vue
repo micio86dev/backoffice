@@ -55,10 +55,14 @@
               <Input
                 id="api-key-form-name"
                 v-model="name"
+                autocomplete="off"
                 :aria-invalid="Boolean(errors.name)"
-                :aria-describedby="errors.name ? 'api-key-form-name-error' : undefined"
+                :aria-describedby="nameDescribedBy"
                 data-testid="api-key-form-name"
               />
+              <FieldDescription id="api-key-form-name-help">
+                {{ $t('settings.apiKeys.help.name') }}
+              </FieldDescription>
               <FieldError
                 v-if="errors.name"
                 id="api-key-form-name-error"
@@ -225,6 +229,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useApiClients, type ApiClient } from '@/composables/useApiClients'
+import { applyServerFieldErrors } from '@/utils/http-error'
 
 /**
  * DOM-safe id for an ability name (`participants:create` -> `participants-create`).
@@ -273,6 +278,11 @@ const abilities = computed(() =>
   })
 )
 const errors = ref<{ name?: string; abilities?: string }>({})
+const nameDescribedBy = computed(() =>
+  [errors.value.name ? 'api-key-form-name-error' : null, 'api-key-form-name-help']
+    .filter((id): id is string => id !== null)
+    .join(' ')
+)
 const formMessage = ref<string | null>(null)
 const rawKeyReveal = ref<string | null>(null)
 const copied = ref(false)
@@ -307,6 +317,11 @@ function toggleAbility(ability: string, checked: boolean | 'indeterminate'): voi
   if (next.length > 0) errors.value.abilities = undefined
 }
 
+const SERVER_FIELD_TO_ERROR_KEY = {
+  name: 'name',
+  abilities: 'abilities',
+} as const satisfies Record<string, keyof typeof errors.value>
+
 async function onCreate(): Promise<void> {
   formMessage.value = null
   errors.value.name = name.value.trim() === '' ? t('settings.apiKeys.nameRequired') : undefined
@@ -328,8 +343,15 @@ async function onCreate(): Promise<void> {
     name.value = ''
     selectedAbilities.value = []
     await load()
-  } catch {
-    formMessage.value = t('settings.apiKeys.createError')
+  } catch (error) {
+    const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
+      errors.value[key] = message
+    })
+    // A field with no control of its own (e.g. `organization_id` on a
+    // per-organization key limit) still has to reach the operator — the
+    // server's own message beats a generic banner that hides it.
+    formMessage.value =
+      unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('settings.apiKeys.createError')
   } finally {
     creatingKey.value = false
   }

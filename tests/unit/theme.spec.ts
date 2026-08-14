@@ -39,6 +39,8 @@ import { Window } from 'happy-dom'
 import { mount } from '@vue/test-utils'
 import Input from '@/components/ui/input/Input.vue'
 
+const SELECT_ITEM_PATH = resolve(__dirname, '../../app/components/ui/select/SelectItem.vue')
+
 const MAIN_CSS_PATH = resolve(__dirname, '../../app/assets/css/main.css')
 const MAIN_CSS_DIR = resolve(__dirname, '../../app/assets/css')
 
@@ -189,6 +191,66 @@ describe('form control border contrast token (D12, DESIGN.md §9)', () => {
     expect(classAttr).not.toBe('')
     const compiled = await compileForCandidates(classAttr.split(/\s+/).filter(Boolean))
     expect(computedStyleProperty(compiled, classAttr, 'borderColor')).toBe('#64748b')
+  })
+})
+
+/**
+ * Relative luminance / contrast ratio, per the WCAG 2.x formula — a small,
+ * self-contained implementation so the select-highlight contrast requirement
+ * (admin-backoffice spec, "Select Highlighted Option Meets AA Text Contrast")
+ * is asserted NUMERICALLY, not eyeballed. `#hex` input only, matching the
+ * theme tokens this file already works with.
+ */
+function relativeLuminance(hex: string): number {
+  const normalized = hex.replace('#', '')
+  const channel = (start: number): number => {
+    const value = Number.parseInt(normalized.slice(start, start + 2), 16) / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  }
+  const [r, g, b] = [channel(0), channel(2), channel(4)]
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+function contrastRatio(hexA: string, hexB: string): number {
+  const lA = relativeLuminance(hexA)
+  const lB = relativeLuminance(hexB)
+  const lighter = Math.max(lA, lB)
+  const darker = Math.min(lA, lB)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+// form-clarity-and-console-warnings — the select-highlighted-option contrast
+// requirement. White on `--color-accent` (#e45526) measures 3.7:1 and FAILS
+// WCAG AA's 4.5:1 minimum for normal text; white on `--color-accent-dark`
+// (#b8431e) measures 5.4:1 and passes. `main.css:53` already publishes
+// `--color-accent-dark`; this only asserts the CONSUMER (SelectItem.vue) uses
+// it for the highlight, not `--color-accent`.
+describe('select highlighted-option contrast (admin-backoffice spec)', () => {
+  it('--color-accent-dark resolves to #b8431e', async () => {
+    const compiled = await compileForCandidates(['bg-accent-dark'])
+    expect(computedBackgroundColor(compiled, 'bg-accent-dark')).toBe('#b8431e')
+  })
+
+  it('white on --color-accent-dark measures >= 4.5:1 (numerically, not eyeballed)', () => {
+    expect(contrastRatio('#ffffff', '#b8431e')).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('white on plain --color-accent measures BELOW 4.5:1 — the regression this requirement rejects', () => {
+    expect(contrastRatio('#ffffff', '#e45526')).toBeLessThan(4.5)
+  })
+
+  it("SelectItem's highlighted-state classes pair --color-accent-dark with white text, never plain --color-accent", () => {
+    // Reka-ui's SelectItem requires a live SelectRoot context to mount at all
+    // (`Injection Symbol(SelectRootContext) not found` otherwise) — the class
+    // LIST is static source, not conditionally computed, so reading it
+    // directly is both simpler and avoids building a full Select tree just to
+    // inspect a string.
+    const source = readFileSync(SELECT_ITEM_PATH, 'utf-8')
+
+    expect(source).toContain('focus:bg-accent-dark')
+    expect(source).toContain('focus:text-white')
+    expect(source).not.toMatch(/focus:bg-accent(?!-dark)\b/)
+    expect(source).not.toContain('focus:text-accent-foreground')
   })
 })
 

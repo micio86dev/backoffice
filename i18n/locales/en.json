@@ -161,7 +161,7 @@
       "language": "Language",
       "assessmentType": "Assessment type",
       "roleCode": "Role",
-      "roleCodeRequiredForStandard": "Required for a standard assessment.",
+      "roleCodeRequiredForStandard": "Required for a standard assessment. This choice becomes permanent once the project leaves draft.",
       "frameworkVersion": "Framework version",
       "frameworkVersionImmutable": "The framework version is fixed at creation and can never change afterwards, so every scored result stays comparable against the same catalogue.",
       "immutableWhenLive": "This field is locked once the project is active or archived, so a live assessment always stays comparable to itself.",
@@ -178,7 +178,18 @@
       "outOfRange": "Enter a value between {min} and {max}.",
       "saveError": "This project could not be saved. Please review the highlighted fields.",
       "saveSuccess": "Project saved.",
-      "onlyLegalTransition": "Only the next lifecycle step is offered here: {transition}."
+      "onlyLegalTransition": "Only the next lifecycle step is offered here: {transition}.",
+      "help": {
+        "name": "The name candidates see in the invitation email and at the start of the interview.",
+        "slug": "Used in the project's address. Lowercase letters, numbers and hyphens only.",
+        "language": "The language the interview is conducted in with the candidate. It does not change the language of this panel.",
+        "assessmentTypeFreezes": "Choose carefully: this can no longer be changed once the project goes live. Standard evaluates a candidate against a specific role; Potential evaluates general potential, with no target role.",
+        "pauseEveryN": "Gives the candidate a short break after this many competencies. Leave empty for no breaks.",
+        "nudgeMinChars": "If an answer is shorter than this many characters, the candidate is asked to expand on it.",
+        "exitRedirectUrl": "Where the candidate is sent after finishing the interview. Leave empty to show the standard closing page.",
+        "webhookUrl": "BEAI posts progress and evaluation events to this address. Leave empty to use the organization default.",
+        "competencies": "The competencies this interview covers. More competencies means a longer interview for the candidate."
+      }
     },
     "secret": {
       "notSet": "No secret configured.",
@@ -261,7 +272,10 @@
       "slug": "Slug",
       "slugReadOnly": "The slug is a tenancy identifier and cannot be changed.",
       "nameRequired": "Enter an organization name.",
-      "saveError": "The organization profile could not be saved. Please review the highlighted fields."
+      "saveError": "The organization profile could not be saved. Please review the highlighted fields.",
+      "help": {
+        "name": "The display name of your organization. The slug above is the identifier the system uses and does not change with it."
+      }
     },
     "webhooks": {
       "url": "Default webhook URL",
@@ -271,13 +285,19 @@
       "eventEvaluation": "Evaluation",
       "saveError": "The webhook defaults could not be saved. Please review the highlighted fields.",
       "invalidUrl": "Enter a full address starting with http:// or https://",
-      "note": "These defaults are copied onto a new project only at the moment it is created; changing them never retargets an existing project's live webhook."
+      "note": "These defaults are copied onto a new project only at the moment it is created; changing them never retargets an existing project's live webhook.",
+      "help": {
+        "url": "The address BEAI posts progress and evaluation events to. It must be reachable from the internet and start with http:// or https://."
+      }
     },
     "apiKeys": {
       "title": "API keys",
       "new": "New API key",
       "name": "Name",
       "nameRequired": "Enter a name for this key.",
+      "help": {
+        "name": "A label to recognise this key by later. The key itself is shown only once, right after it is created."
+      },
       "abilities": "Abilities",
       "abilitiesDescription": "Pick what this key is allowed to do. These are the only values the API accepts.",
       "abilitiesLoadError": "The list of abilities could not be loaded, so no key can be created right now. Reload the page to try again.",
@@ -346,7 +366,12 @@
       "passwordRequired": "Set an initial password.",
       "passwordTooShort": "The password must be at least 8 characters.",
       "roleRequired": "Select an access level.",
-      "saveError": "This user could not be saved. Please review the highlighted fields."
+      "saveError": "This user could not be saved. Please review the highlighted fields.",
+      "help": {
+        "email": "The address this person signs in with, and where their invitation is sent. It cannot already belong to another user.",
+        "password": "At least 8 characters. You are setting it on this person's behalf, so pass it to them directly.",
+        "role": "Admin can do everything, including managing users, API keys and avatar templates. Operator creates and manages projects and reads reports, but not users or credentials. Viewer can only read projects, candidates and reports."
+      }
     },
     "table": {
       "name": "Name",
@@ -431,11 +456,28 @@
       "settings": "Settings",
       "default": "Default",
       "required": "Required",
-      "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it."
+      "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it.",
+      "help": {
+        "name": "Must be different from every other template name in your organization."
+      },
+      "errors": {
+        "nameRequired": "Enter a template name.",
+        "nameTooLong": "The name must be at most 120 characters.",
+        "descriptionTooLong": "The description must be at most 500 characters.",
+        "fieldRequired": "This setting is required.",
+        "numberOutOfRange": "Enter a value within the allowed range."
+      }
     },
     "error": {
       "load_title": "Could not load templates",
-      "load_body": "Try again. If it keeps failing, check that you hold the administrator role."
+      "load_body": "Try again. If it keeps failing, check that you hold the administrator role.",
+      "config": {
+        "required": "This setting is required.",
+        "type": "This value has the wrong type.",
+        "range": "This value is out of the allowed range.",
+        "enum": "This value is not one of the allowed options.",
+        "unknown": "This setting does not exist for the selected service."
+      }
     },
     "warning": {
       "title": "Saved, with a warning",

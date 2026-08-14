@@ -40,3 +40,40 @@ test.describe('WCAG 3.1.1 — <html lang> follows the served locale', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
   })
 })
+
+/**
+ * form-clarity-and-console-warnings, D8 — "Console Is Free Of I18n baseUrl
+ * Warnings On Every Navigation" (admin-backoffice spec).
+ *
+ * @nuxtjs/i18n's `createHeadContext` (`runtime/routing/head.js:15`) fires an
+ * unconditional `console.warn` when `baseUrl` is falsy, and a client-side
+ * watcher (`:37-46`) re-invokes it on every route AND locale change — hence
+ * covering both, not just initial load. `nuxt.config.ts`'s `i18n.baseUrl`
+ * (the function form) is what silences it; `seo: false` alone does not.
+ */
+test.describe('console is free of the I18n baseUrl warning (admin-backoffice spec)', () => {
+  test('never fires on load, after a route change, or after a locale change', async ({ page }) => {
+    const consoleMessages: string[] = []
+    page.on('console', (message) => consoleMessages.push(message.text()))
+
+    await page.goto('/login')
+    await expect(page.getByTestId('login-form')).toBeVisible()
+
+    // Route change.
+    await page.goto('/en/login')
+    await expect(page.getByTestId('login-form')).toBeVisible()
+
+    // Locale change (re-fires the head.js watcher independently of navigation).
+    await page.goto('/login')
+    await expect(page.getByTestId('login-form')).toBeVisible()
+
+    // The real message is `I18n \`baseUrl\` is required to generate valid SEO
+    // tag links.` — backtick-quoted, so a naive /baseUrl is required/ regex
+    // never matches the contiguous substring. Matched on the two words
+    // independently instead, tolerant of the exact punctuation.
+    const baseUrlWarnings = consoleMessages.filter(
+      (text) => /baseurl/i.test(text) && /is required/i.test(text)
+    )
+    expect(baseUrlWarnings).toEqual([])
+  })
+})

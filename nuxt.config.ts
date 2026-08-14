@@ -25,6 +25,28 @@ export default defineNuxtConfig({
       { code: 'it', language: 'it', file: 'it.json' },
       { code: 'en', language: 'en', file: 'en.json' },
     ],
+    // form-clarity-and-console-warnings, D8: silences the unconditional
+    // `console.warn` inside @nuxtjs/i18n's `createHeadContext`
+    // (`runtime/routing/head.js:15`), which fires BEFORE `options.seo` is
+    // read at `:96` and re-fires on every route/locale change via its
+    // client-side watcher (`:37-46`). `seo: false` (app.vue) does NOT
+    // silence it — only `baseUrl` does; `seo: false` stays because this app's
+    // `noindex, nofollow` policy (D30) means a canonical URL has no product
+    // value here.
+    //
+    // Function form, kept here for documentation/typing and for the SSR path
+    // this option is designed for. It does NOT reach the browser by itself:
+    // @nuxtjs/i18n forwards it into `runtimeConfig.public.i18n.baseUrl`,
+    // which this `ssr: false` static build embeds client-side as a JSON
+    // literal (`window.__NUXT__.config`, verified in the generated
+    // `index.html`) — and a function cannot survive `JSON.stringify`, so it
+    // is silently dropped and the warning fires exactly as if this were never
+    // set. `app/plugins/i18n-base-url.client.ts` is what actually makes this
+    // work for this app's deployment shape: it re-injects the same function
+    // into the live `useRuntimeConfig()` object, in memory, before
+    // @nuxtjs/i18n's own plugin reads it — never touching serialization.
+    // Caught end-to-end by `tests/e2e/html-lang.spec.ts`'s console listener.
+    baseUrl: () => (typeof window === 'undefined' ? '' : window.location.origin),
   },
 
   // Tailwind CSS v4 via Vite plugin (D26)

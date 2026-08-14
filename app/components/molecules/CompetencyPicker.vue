@@ -1,6 +1,7 @@
 <template>
   <FieldSet>
     <FieldLegend>{{ $t('projects.competencyPicker.legend') }}</FieldLegend>
+    <FieldDescription>{{ $t('projects.form.help.competencies') }}</FieldDescription>
     <p v-if="options.length === 0" class="text-muted-foreground text-sm">
       {{ $t('projects.competencyPicker.empty') }}
     </p>
@@ -27,7 +28,7 @@
 // composes the right `options` list); this molecule only renders what it is
 // given and tracks selection.
 import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 
 export interface CompetencyOption {
   code: string

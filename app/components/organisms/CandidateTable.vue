@@ -6,6 +6,7 @@
         <Input
           id="candidate-search"
           v-model="searchInput"
+          autocomplete="off"
           :placeholder="$t('participants.filters.searchPlaceholder')"
           data-testid="candidate-search"
           @keyup.enter="onSearchSubmit"

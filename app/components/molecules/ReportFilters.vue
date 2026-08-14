@@ -120,6 +120,7 @@
               <Input
                 id="report-filter-from"
                 type="date"
+                autocomplete="off"
                 class="w-40"
                 data-testid="report-filter-from"
                 @change="onFromChange"
@@ -133,6 +134,7 @@
               <Input
                 id="report-filter-to"
                 type="date"
+                autocomplete="off"
                 class="w-40"
                 data-testid="report-filter-to"
                 @change="onToChange"

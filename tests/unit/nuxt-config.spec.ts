@@ -55,3 +55,32 @@ describe('nuxt.config i18n — <html lang> prerequisites (WCAG 3.1.1)', () => {
     expect(config.app.head.htmlAttrs.lang).toBe(config.i18n.defaultLocale)
   })
 })
+
+/**
+ * i18n.baseUrl (form-clarity-and-console-warnings, D8) — @nuxtjs/i18n's
+ * `createHeadContext` (`runtime/routing/head.js:15-16`) unconditionally
+ * `console.warn`s "I18n baseUrl is required..." BEFORE `options.seo` is even
+ * read, and `joinURL('', '/') === ''` trips the falsy check when `baseUrl` is
+ * unset. `seo: false` alone does NOT silence it — only `baseUrl` does. The
+ * function form (not a runtimeConfig value) is ratified: this app is
+ * `ssr: false`, so `window` always exists by the time `localeHead` runs.
+ */
+describe('nuxt.config i18n.baseUrl — silences the head.js:15 warning', () => {
+  it('is a function, not a static value', async () => {
+    const config = await loadNuxtConfig()
+
+    expect(typeof (config.i18n as unknown as { baseUrl: unknown }).baseUrl).toBe('function')
+  })
+
+  it('returns window.location.origin under a stubbed window', async () => {
+    const config = await loadNuxtConfig()
+    const baseUrl = (config.i18n as unknown as { baseUrl: () => string }).baseUrl
+
+    // happy-dom (this suite's test environment) always provides `window`, so
+    // this exercises the SPA branch — the one that matters, since
+    // `ssr: false` means `window` is defined by the time `baseUrl` is ever
+    // actually invoked by `localeHead`.
+    expect(baseUrl()).toBe(window.location.origin)
+    expect(baseUrl()).not.toBe('')
+  })
+})

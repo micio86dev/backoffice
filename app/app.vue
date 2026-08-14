@@ -28,13 +28,21 @@ import { computed } from 'vue'
 // nothing when it is absent. tests/unit/nuxt-config.spec.ts guards that.
 //
 // `seo: false` because the ONLY thing wanted here is `htmlAttrs.lang`. Left on,
-// @nuxtjs/i18n also emits canonical + hreflang link tags, which need an absolute
-// origin it cannot infer — hence the console warning "I18n `baseUrl` is required
-// to generate valid SEO tag links". Supplying a `baseUrl` would silence the
-// warning by producing those tags, which is the wrong resolution: this app sets
-// `noindex, nofollow` on every route in every environment (D30), so hreflang and
-// canonical describe an indexing decision that has already been refused. Turning
-// the SEO tags off removes both the warning and the dead markup.
+// @nuxtjs/i18n also emits canonical + hreflang link tags, which this app's
+// `noindex, nofollow` policy (D30) makes dead markup — hreflang and canonical
+// describe an indexing decision that has already been refused.
+//
+// This does NOT silence the console warning, despite an earlier version of
+// this comment claiming it does. The warning fires inside `createHeadContext`
+// (`@nuxtjs/i18n` `runtime/routing/head.js:15`), invoked UNCONDITIONALLY at
+// `:86`, BEFORE `options.seo` is even read at `:96` — so `seo: false` cannot
+// reach it either way. What actually silences it is `i18n.baseUrl`
+// (form-clarity-and-console-warnings, D8) — the warning's own trigger is
+// `joinURL('', '/') === ''`, a falsy `baseUrl`, unrelated to `seo`. Declared
+// in `nuxt.config.ts`, but that alone does not reach the browser: this is a
+// static (`ssr: false`) build, whose public runtime config is embedded
+// client-side as JSON, which cannot carry a function value. See
+// `app/plugins/i18n-base-url.client.ts` for what actually makes it work.
 const localeHead = useLocaleHead({ seo: false })
 const htmlLang = computed(() => localeHead.value.htmlAttrs?.lang ?? 'it')
 

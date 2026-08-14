@@ -161,7 +161,7 @@
       "language": "Lingua",
       "assessmentType": "Tipo di valutazione",
       "roleCode": "Ruolo",
-      "roleCodeRequiredForStandard": "Obbligatorio per una valutazione standard.",
+      "roleCodeRequiredForStandard": "Obbligatorio per una valutazione standard. Questa scelta non sarà più modificabile quando il progetto uscirà dallo stato bozza.",
       "frameworkVersion": "Versione del framework",
       "frameworkVersionImmutable": "La versione del framework è fissata alla creazione e non può più cambiare, così ogni risultato valutato resta confrontabile con lo stesso catalogo.",
       "immutableWhenLive": "Questo campo è bloccato quando il progetto è attivo o archiviato, così una valutazione live resta sempre confrontabile con se stessa.",
@@ -178,7 +178,18 @@
       "outOfRange": "Inserisci un valore tra {min} e {max}.",
       "saveError": "Non è stato possibile salvare questo progetto. Controlla i campi evidenziati.",
       "saveSuccess": "Progetto salvato.",
-      "onlyLegalTransition": "Qui è disponibile solo il prossimo passaggio del ciclo di vita: {transition}."
+      "onlyLegalTransition": "Qui è disponibile solo il prossimo passaggio del ciclo di vita: {transition}.",
+      "help": {
+        "name": "Il nome che i candidati vedono nell'email di invito e all'inizio del colloquio.",
+        "slug": "Compare nell'indirizzo del progetto. Solo lettere minuscole, numeri e trattini.",
+        "language": "La lingua in cui si svolge il colloquio con il candidato. Non cambia la lingua di questo pannello.",
+        "assessmentTypeFreezes": "Scegli con attenzione: non sarà più modificabile quando il progetto sarà attivo. Standard valuta il candidato rispetto a un ruolo specifico; Potenziale valuta il potenziale generale, senza un ruolo di riferimento.",
+        "pauseEveryN": "Concede al candidato una breve pausa ogni tot competenze. Lascia vuoto per non inserire pause.",
+        "nudgeMinChars": "Se una risposta è più breve di questo numero di caratteri, al candidato viene chiesto di approfondire.",
+        "exitRedirectUrl": "Dove viene indirizzato il candidato al termine del colloquio. Lascia vuoto per mostrare la pagina di chiusura standard.",
+        "webhookUrl": "BEAI invia a questo indirizzo gli eventi di avanzamento e di valutazione. Lascia vuoto per usare l'impostazione predefinita dell'organizzazione.",
+        "competencies": "Le competenze valutate in questo colloquio. Più competenze significano un colloquio più lungo per il candidato."
+      }
     },
     "secret": {
       "notSet": "Nessun segreto configurato.",
@@ -261,7 +272,10 @@
       "slug": "Slug",
       "slugReadOnly": "Lo slug è un identificatore del tenant e non può essere modificato.",
       "nameRequired": "Inserisci il nome dell'organizzazione.",
-      "saveError": "Non è stato possibile salvare il profilo dell'organizzazione. Controlla i campi evidenziati."
+      "saveError": "Non è stato possibile salvare il profilo dell'organizzazione. Controlla i campi evidenziati.",
+      "help": {
+        "name": "Il nome visualizzato della tua organizzazione. Lo slug qui sopra è l'identificativo usato dal sistema e non cambia insieme al nome."
+      }
     },
     "webhooks": {
       "url": "URL webhook predefinito",
@@ -271,13 +285,19 @@
       "eventEvaluation": "Valutazione",
       "saveError": "Non è stato possibile salvare i valori predefiniti del webhook. Controlla i campi evidenziati.",
       "invalidUrl": "Inserisci un indirizzo completo che inizi con http:// o https://",
-      "note": "Questi valori predefiniti vengono copiati su un nuovo progetto solo al momento della creazione; modificarli non ridirige mai il webhook live di un progetto esistente."
+      "note": "Questi valori predefiniti vengono copiati su un nuovo progetto solo al momento della creazione; modificarli non ridirige mai il webhook live di un progetto esistente.",
+      "help": {
+        "url": "L'indirizzo a cui BEAI invia gli eventi di avanzamento e di valutazione. Deve essere raggiungibile da internet e iniziare con http:// o https://."
+      }
     },
     "apiKeys": {
       "title": "Chiavi API",
       "new": "Nuova chiave API",
       "name": "Nome",
       "nameRequired": "Inserisci un nome per questa chiave.",
+      "help": {
+        "name": "Un'etichetta per riconoscere questa chiave in seguito. La chiave viene mostrata una sola volta, subito dopo la creazione."
+      },
       "abilities": "Permessi",
       "abilitiesDescription": "Scegli cosa può fare questa chiave. Sono gli unici valori accettati dall'API.",
       "abilitiesLoadError": "L'elenco dei permessi non è stato caricato, quindi al momento non è possibile creare una chiave. Ricarica la pagina per riprovare.",
@@ -346,7 +366,12 @@
       "passwordRequired": "Imposta una password iniziale.",
       "passwordTooShort": "La password deve contenere almeno 8 caratteri.",
       "roleRequired": "Seleziona un livello di accesso.",
-      "saveError": "Non è stato possibile salvare questo utente. Controlla i campi evidenziati."
+      "saveError": "Non è stato possibile salvare questo utente. Controlla i campi evidenziati.",
+      "help": {
+        "email": "L'indirizzo con cui questa persona accede e a cui viene inviato il suo invito. Non può appartenere già a un altro utente.",
+        "password": "Almeno 8 caratteri. La stai impostando per conto di questa persona: comunicagliela direttamente.",
+        "role": "Amministratore può fare tutto, inclusa la gestione di utenti, chiavi API e template avatar. Operatore crea e gestisce i progetti e consulta i report, ma non gli utenti né le credenziali. Visualizzatore può solo consultare progetti, candidati e report."
+      }
     },
     "table": {
       "name": "Nome",
@@ -431,11 +456,28 @@
       "settings": "Impostazioni",
       "default": "Predefinito",
       "required": "Obbligatorio",
-      "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai."
+      "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai.",
+      "help": {
+        "name": "Deve essere diverso dal nome di ogni altro template della tua organizzazione."
+      },
+      "errors": {
+        "nameRequired": "Inserisci il nome del template.",
+        "nameTooLong": "Il nome deve avere al massimo 120 caratteri.",
+        "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
+        "fieldRequired": "Questa impostazione è obbligatoria.",
+        "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
+      }
     },
     "error": {
       "load_title": "Impossibile caricare i template",
-      "load_body": "Riprova. Se il problema persiste, controlla di avere il ruolo di amministratore."
+      "load_body": "Riprova. Se il problema persiste, controlla di avere il ruolo di amministratore.",
+      "config": {
+        "required": "Questa impostazione è obbligatoria.",
+        "type": "Questo valore ha il tipo sbagliato.",
+        "range": "Questo valore è fuori dall'intervallo consentito.",
+        "enum": "Questo valore non è tra le opzioni consentite.",
+        "unknown": "Questa impostazione non esiste per il servizio selezionato."
+      }
     },
     "warning": {
       "title": "Salvato, con un avviso",

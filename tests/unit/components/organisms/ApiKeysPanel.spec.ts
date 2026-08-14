@@ -241,7 +241,132 @@ describe('ApiKeysPanel', () => {
 
     expect(error?.getAttribute('id')).toBeTruthy()
     expect(input?.getAttribute('aria-invalid')).toBe('true')
-    expect(input?.getAttribute('aria-describedby')).toBe(error?.getAttribute('id'))
+    // Split, not a strict string equality: `name` also carries a help-text id
+    // (D6) alongside the error id; `abilities` has none, so a single-id list
+    // still satisfies `toContain`.
+    expect((input?.getAttribute('aria-describedby') ?? '').split(/\s+/)).toContain(
+      error?.getAttribute('id')
+    )
+
+    wrapper.unmount()
+  })
+
+  // form-clarity-and-console-warnings, D2: this panel previously `catch {}`ed
+  // every create rejection, silently dropping a 422 on `name` or `abilities`.
+  it.each([
+    ['name', { name: ['That name is already in use.'] }, 'api-key-form-name-error'],
+    [
+      'abilities',
+      { abilities: ['One of the selected abilities is not recognised.'] },
+      'api-key-form-abilities-error',
+    ],
+  ])('surfaces a 422 on %s next to its own control', async (_field, errors, errorTestId) => {
+    createClientMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), { status: 422, data: { errors } })
+    )
+
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+    await waitForDialogOpen()
+
+    const nameInput = document.body.querySelector<HTMLInputElement>(
+      '[data-testid="api-key-form-name"]'
+    )
+    nameInput!.value = 'Broken key'
+    nameInput!.dispatchEvent(new Event('input'))
+    await flushPromises()
+
+    const checkbox = document.body.querySelector<HTMLElement>(
+      '[data-testid="api-key-ability-participants-read"]'
+    )
+    checkbox!.click()
+    await flushPromises()
+
+    document.body
+      .querySelector<HTMLFormElement>('[data-testid="api-key-form"]')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    const message = (errors as Record<string, string[]>)[Object.keys(errors)[0]!]![0]
+    expect(document.body.querySelector(`[data-testid="${errorTestId}"]`)?.textContent).toContain(
+      message
+    )
+
+    wrapper.unmount()
+  })
+
+  // form-clarity-and-console-warnings — CRITICAL 1 fix. `organization_id` has
+  // no entry in SERVER_FIELD_TO_ERROR_KEY, so a server 422 naming it (e.g. a
+  // per-organization API-key limit) must reach the form-level banner
+  // VERBATIM — not be silently discarded in favour of the generic
+  // createError string.
+  it('surfaces a 422 on a field outside the map (organization_id) in the banner, not the generic message', async () => {
+    createClientMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { organization_id: ['This organization has reached its API key limit.'] } },
+      })
+    )
+
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+    await waitForDialogOpen()
+
+    const nameInput = document.body.querySelector<HTMLInputElement>(
+      '[data-testid="api-key-form-name"]'
+    )
+    nameInput!.value = 'Broken key'
+    nameInput!.dispatchEvent(new Event('input'))
+    await flushPromises()
+
+    const checkbox = document.body.querySelector<HTMLElement>(
+      '[data-testid="api-key-ability-participants-read"]'
+    )
+    checkbox!.click()
+    await flushPromises()
+
+    document.body
+      .querySelector<HTMLFormElement>('[data-testid="api-key-form"]')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    expect(
+      document.body.querySelector('[data-testid="api-key-form-banner"]')?.textContent
+    ).toContain('This organization has reached its API key limit.')
+
+    wrapper.unmount()
+  })
+
+  // form-clarity-and-console-warnings, D6
+  it("renders the name help text and points the control's aria-describedby at it", async () => {
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+    await waitForDialogOpen()
+
+    expect(document.body.textContent).toContain('settings.apiKeys.help.name')
+
+    const control = document.body.querySelector('[data-testid="api-key-form-name"]')
+    const describedIds = (control?.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter(Boolean)
+    const matched = describedIds.some((id) => {
+      const el = document.body.querySelector(`#${id}`)
+      return el !== null && el.textContent === 'settings.apiKeys.help.name'
+    })
+    expect(matched).toBe(true)
 
     wrapper.unmount()
   })

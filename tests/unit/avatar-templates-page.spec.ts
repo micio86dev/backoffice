@@ -205,8 +205,17 @@ describe('AvatarTemplatesPage', () => {
     expect(api.createTemplate).not.toHaveBeenCalled()
   })
 
-  it('shows every config error the API returned, and keeps the form open', async () => {
+  // form-clarity-and-console-warnings, D3/D4: the page used to flatten every
+  // config error into one li-counted list (`extractConfigErrors`). It now
+  // passes the caught rejection down VERBATIM as `submitError`, and the form
+  // routes each message to its own field when the field exists, leaving only
+  // the genuinely unplaceable remainder in the summary. This is a DELIBERATE
+  // spec change from the previous li-counting assertion, not incidental
+  // breakage — `voiceSpeed` names no field this page's spec renders, so it is
+  // the one that proves the summary still catches what it must.
+  it('routes each config error to its own field, or to the summary when no field claims it', async () => {
     const failure = Object.assign(new Error('422'), {
+      status: 422,
       data: { errors: { config: ['avatarId: required', 'voiceSpeed: range'] } },
     })
 
@@ -222,7 +231,15 @@ describe('AvatarTemplatesPage', () => {
     // Closing the form on a validation failure would discard everything the
     // operator typed to tell them one of the fields was wrong.
     expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(2)
+    // `avatarId` IS a field this page's spec renders — claimed onto its own
+    // control rather than flattened into the summary.
+    expect(wrapper.find('[data-testid="template-config-avatarId-error"]').exists()).toBe(true)
+    // `voiceSpeed` names no field this page's spec renders — an unplaceable
+    // message still has to reach the operator, so it stays in the summary.
+    expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain(
+      'voiceSpeed: range'
+    )
   })
 
   it('closes the form and reloads after a successful save', async () => {

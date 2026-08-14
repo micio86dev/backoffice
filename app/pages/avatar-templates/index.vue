@@ -106,7 +106,7 @@
       :template="editing"
       :field-specs="fieldSpecs"
       :saving="saving"
-      :errors="formErrors"
+      :submit-error="submitError"
       data-testid="template-form"
       @cancel="editing = null"
       @submit="save"
@@ -156,7 +156,12 @@ const fieldSpecs = ref<Record<ProviderName, FieldSpec[]>>({ heygen: [], tavus: [
 const loadError = ref(false)
 const warning = ref<string | null>(null)
 const saving = ref(false)
-const formErrors = ref<string[]>([])
+// The raw rejection, passed down VERBATIM (form-clarity-and-console-warnings,
+// D3) — the form runs `applyServerFieldErrors` and its own "knob: code"
+// parser on it. This page previously hand-rolled `extractConfigErrors`,
+// duplicating what the form now owns and flattening away the field
+// association in the process.
+const submitError = ref<unknown | null>(null)
 
 /** null = closed; an object with no id = creating. */
 const editing = ref<Partial<AvatarTemplate> | null>(null)
@@ -187,13 +192,13 @@ onMounted(async () => {
 })
 
 function startCreate(): void {
-  formErrors.value = []
+  submitError.value = null
   warning.value = null
   editing.value = { name: '', description: '', provider: 'heygen', config: {} }
 }
 
 function startEdit(template: AvatarTemplate): void {
-  formErrors.value = []
+  submitError.value = null
   warning.value = null
   // A copy, so abandoning the form leaves the list untouched.
   editing.value = { ...template, config: { ...template.config } }
@@ -201,7 +206,7 @@ function startEdit(template: AvatarTemplate): void {
 
 async function save(payload: Partial<AvatarTemplate>): Promise<void> {
   saving.value = true
-  formErrors.value = []
+  submitError.value = null
 
   try {
     const response = payload.id
@@ -222,8 +227,9 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
     await load()
   } catch (error) {
     // The API returns every config problem at once, keyed by field. Surfacing
-    // one at a time would turn a seventeen-field form into a guessing game.
-    formErrors.value = extractConfigErrors(error)
+    // one at a time would turn a seventeen-field form into a guessing game —
+    // the form itself now owns turning this into per-field placement.
+    submitError.value = error
   } finally {
     saving.value = false
   }
@@ -253,11 +259,5 @@ async function remove(template: AvatarTemplate): Promise<void> {
   }
 
   await load()
-}
-
-function extractConfigErrors(error: unknown): string[] {
-  const data = (error as { data?: { errors?: Record<string, string[]> } })?.data
-
-  return Object.values(data?.errors ?? {}).flat()
 }
 </script>

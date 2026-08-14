@@ -6,11 +6,15 @@
         <Input
           id="project-form-name"
           v-model="name"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.name)"
-          :aria-describedby="errors.name ? 'project-form-name-error' : undefined"
+          :aria-describedby="describedBy('project-form-name', Boolean(errors.name))"
           data-testid="project-form-name"
           @blur="validateName"
         />
+        <FieldDescription id="project-form-name-help">
+          {{ $t('projects.form.help.name') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.name"
           id="project-form-name-error"
@@ -25,11 +29,15 @@
         <Input
           id="project-form-slug"
           v-model="slug"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.slug)"
-          :aria-describedby="errors.slug ? 'project-form-slug-error' : undefined"
+          :aria-describedby="describedBy('project-form-slug', Boolean(errors.slug))"
           data-testid="project-form-slug"
           @blur="validateSlug"
         />
+        <FieldDescription id="project-form-slug-help">
+          {{ $t('projects.form.help.slug') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.slug"
           id="project-form-slug-error"
@@ -48,7 +56,11 @@
         -->
         <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
         <Select v-model="language">
-          <SelectTrigger id="project-form-language" data-testid="project-form-language">
+          <SelectTrigger
+            id="project-form-language"
+            data-testid="project-form-language"
+            aria-describedby="project-form-language-help"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -58,6 +70,9 @@
             </SelectGroup>
           </SelectContent>
         </Select>
+        <FieldDescription id="project-form-language-help">
+          {{ $t('projects.form.help.language') }}
+        </FieldDescription>
       </Field>
 
       <Field>
@@ -79,6 +94,15 @@
             {{ $t('projects.assessmentType.potential') }}
           </ToggleGroupItem>
         </ToggleGroup>
+        <!--
+          Renders ALWAYS, not gated on `lockedWhenLive` — D6's inversion fix.
+          The previous version of this description only appeared AFTER the
+          project went live, i.e. after the choice was already frozen, which
+          is the opposite of "stated before commitment" (spec.md's Permanence
+          scenario). `immutableWhenLive` below keeps its own gate: it is a
+          DIFFERENT statement ("this is now locked"), not a duplicate.
+        -->
+        <FieldDescription>{{ $t('projects.form.help.assessmentTypeFreezes') }}</FieldDescription>
         <FieldDescription v-if="lockedWhenLive">
           {{ $t('projects.form.immutableWhenLive') }}
         </FieldDescription>
@@ -92,7 +116,7 @@
             id="project-form-role-code"
             data-testid="project-form-role-code"
             :aria-invalid="Boolean(errors.roleCode)"
-            :aria-describedby="errors.roleCode ? 'project-form-role-code-error' : undefined"
+            :aria-describedby="describedBy('project-form-role-code', Boolean(errors.roleCode))"
           >
             <SelectValue :placeholder="$t('projects.form.roleCode')" />
           </SelectTrigger>
@@ -104,7 +128,18 @@
             </SelectGroup>
           </SelectContent>
         </Select>
-        <FieldDescription>{{ $t('projects.form.roleCodeRequiredForStandard') }}</FieldDescription>
+        <!--
+          Extended (not a new key) to also state permanence — the flagged
+          spec.md/design.md gap: spec's Permanence scenario requires
+          role_code's FieldDescription to state it alongside assessment_type;
+          design's copy table only drafted new copy for assessment_type. This
+          key already existed and already rendered unconditionally, so
+          extending it is the smaller, non-duplicative fix. Recorded in
+          tasks.md 3.4.
+        -->
+        <FieldDescription id="project-form-role-code-help">
+          {{ $t('projects.form.roleCodeRequiredForStandard') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.roleCode"
           id="project-form-role-code-error"
@@ -126,6 +161,7 @@
           v-model="frameworkVersionId"
           type="number"
           min="1"
+          autocomplete="off"
           :disabled="isEditing"
           data-testid="project-form-framework-version"
         />
@@ -142,13 +178,17 @@
           id="project-form-pause-every-n"
           v-model="pauseEveryNCompetencies"
           type="number"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.pauseEveryNCompetencies)"
           :aria-describedby="
-            errors.pauseEveryNCompetencies ? 'project-form-pause-every-n-error' : undefined
+            describedBy('project-form-pause-every-n', Boolean(errors.pauseEveryNCompetencies))
           "
           data-testid="project-form-pause-every-n"
           @blur="validatePauseEveryNCompetencies"
         />
+        <FieldDescription id="project-form-pause-every-n-help">
+          {{ $t('projects.form.help.pauseEveryN') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.pauseEveryNCompetencies"
           id="project-form-pause-every-n-error"
@@ -166,13 +206,17 @@
           id="project-form-nudge-min-chars"
           v-model="nudgeMinChars"
           type="number"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.nudgeMinChars)"
           :aria-describedby="
-            errors.nudgeMinChars ? 'project-form-nudge-min-chars-error' : undefined
+            describedBy('project-form-nudge-min-chars', Boolean(errors.nudgeMinChars))
           "
           data-testid="project-form-nudge-min-chars"
           @blur="validateNudgeMinChars"
         />
+        <FieldDescription id="project-form-nudge-min-chars-help">
+          {{ $t('projects.form.help.nudgeMinChars') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.nudgeMinChars"
           id="project-form-nudge-min-chars-error"
@@ -190,13 +234,17 @@
           id="project-form-exit-redirect-url"
           v-model="exitRedirectUrl"
           type="url"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.exitRedirectUrl)"
           :aria-describedby="
-            errors.exitRedirectUrl ? 'project-form-exit-redirect-url-error' : undefined
+            describedBy('project-form-exit-redirect-url', Boolean(errors.exitRedirectUrl))
           "
           data-testid="project-form-exit-redirect-url"
           @blur="validateExitRedirectUrl"
         />
+        <FieldDescription id="project-form-exit-redirect-url-help">
+          {{ $t('projects.form.help.exitRedirectUrl') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.exitRedirectUrl"
           id="project-form-exit-redirect-url-error"
@@ -212,11 +260,15 @@
           id="project-form-webhook-url"
           v-model="webhookUrl"
           type="url"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.webhookUrl)"
-          :aria-describedby="errors.webhookUrl ? 'project-form-webhook-url-error' : undefined"
+          :aria-describedby="describedBy('project-form-webhook-url', Boolean(errors.webhookUrl))"
           data-testid="project-form-webhook-url"
           @blur="validateWebhookUrl"
         />
+        <FieldDescription id="project-form-webhook-url-help">
+          {{ $t('projects.form.help.webhookUrl') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.webhookUrl"
           id="project-form-webhook-url-error"
@@ -317,7 +369,7 @@ import {
   isPauseEveryNCompetenciesValid,
   PROJECT_FIELD_BOUNDS,
 } from '@/utils/project-field-specs'
-import { getErrorFields } from '@/utils/http-error'
+import { applyServerFieldErrors } from '@/utils/http-error'
 
 const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
 
@@ -371,6 +423,19 @@ const errors = ref<{
 }>({})
 
 const competencyOptions = ref<CompetencyOption[]>([])
+
+/**
+ * Joins a field's error id (when invalid) with its help-text id (form-clarity-
+ * and-console-warnings, D6) — a control is described by whichever of the two
+ * currently apply, never just one at the expense of the other.
+ */
+function describedBy(baseId: string, hasError: boolean): string {
+  const ids = [hasError ? `${baseId}-error` : null, `${baseId}-help`].filter(
+    (id): id is string => id !== null
+  )
+
+  return ids.join(' ')
+}
 
 // assessment_type and role_code freeze once the project is live (D9); this
 // is a DIFFERENT gate than framework_version_id, which is always disabled
@@ -512,25 +577,16 @@ const SERVER_FIELD_TO_ERROR_KEY = {
 } as const satisfies Record<string, keyof typeof errors.value>
 
 function applyServerErrors(error: unknown): void {
-  const fields = getErrorFields(error)
-  if (fields === null) {
+  // `competency_ids.*` and friends: Laravel reports per-index keys, which
+  // belong to the same control as their parent — `applyServerFieldErrors`
+  // splits at the first `.` so they still land here.
+  const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
+    errors.value[key] = message
+  })
+
+  if (unmapped === null) {
     formMessage.value = { kind: 'error', text: t('projects.form.saveError') }
     return
-  }
-
-  const unmapped: string[] = []
-
-  for (const [serverField, messages] of Object.entries(fields)) {
-    const message = messages?.[0]
-    if (message === undefined) continue
-
-    // `competency_ids.*` and friends: Laravel reports per-index keys, which
-    // belong to the same control as their parent.
-    const root = serverField.split('.')[0] ?? serverField
-    const localKey = SERVER_FIELD_TO_ERROR_KEY[root as keyof typeof SERVER_FIELD_TO_ERROR_KEY]
-
-    if (localKey) errors.value[localKey] = message
-    else if (!unmapped.includes(message)) unmapped.push(message)
   }
 
   // A field with no control of its own (framework_version_id, status,

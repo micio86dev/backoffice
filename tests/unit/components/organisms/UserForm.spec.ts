@@ -87,9 +87,13 @@ describe('UserForm', () => {
     await wrapper.get('[data-testid="user-form-email"]').trigger('blur')
 
     const error = wrapper.get('[data-testid="user-form-email-error"]')
-    expect(wrapper.get('[data-testid="user-form-email"]').attributes('aria-describedby')).toBe(
-      error.attributes('id')
-    )
+    // Split, not a strict string equality: aria-describedby now also carries
+    // the field's help-text id (D6) alongside the error id.
+    expect(
+      (wrapper.get('[data-testid="user-form-email"]').attributes('aria-describedby') ?? '').split(
+        /\s+/
+      )
+    ).toContain(error.attributes('id'))
   })
 
   // DESIGN.md §16 / the admin-backoffice form contract: `aria-invalid` alone
@@ -109,7 +113,12 @@ describe('UserForm', () => {
     const error = wrapper.get(`[data-testid="${testid}-error"]`)
     expect(error.attributes('id')).toBeTruthy()
     expect(input.attributes('aria-invalid')).toBe('true')
-    expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
+    // Split, not a strict string equality: `password` also carries a help-text
+    // id (D6) alongside the error id; `name` has none, so a single-id list
+    // still satisfies `toContain`.
+    expect((input.attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+      error.attributes('id')
+    )
   })
 
   it('creates via useUsers on submit and emits saved', async () => {
@@ -128,5 +137,91 @@ describe('UserForm', () => {
       role: 'operator',
     })
     expect(wrapper.emitted('saved')).toBeTruthy()
+  })
+
+  // form-clarity-and-console-warnings, D2: previously only `name`/`email` were
+  // mapped ad hoc, and `email`'s message was dropped when the payload also
+  // carried `password`.
+  it.each([
+    ['name', 'user-form-name-error'],
+    ['email', 'user-form-email-error'],
+    ['password', 'user-form-password-error'],
+  ])('surfaces a 422 on %s next to its own control', async (serverField, errorTestId) => {
+    createUserMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { [serverField]: ['Server says no.'] } },
+      })
+    )
+
+    const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
+
+    await wrapper.get('[data-testid="user-form-name"]').setValue('Ada')
+    await wrapper.get('[data-testid="user-form-email"]').setValue('ada@example.com')
+    await wrapper.get('[data-testid="user-form-password"]').setValue('password123')
+    await wrapper.get('[data-testid="user-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get(`[data-testid="${errorTestId}"]`).text()).toContain('Server says no.')
+  })
+
+  // form-clarity-and-console-warnings — CRITICAL 1 fix. `role` has no entry in
+  // SERVER_FIELD_TO_ERROR_KEY (Select is constrained client-side, D4/D8), so a
+  // server 422 on it must reach the form-level banner VERBATIM — not be
+  // silently discarded in favour of the generic saveError string.
+  it('surfaces a 422 on a field outside the map (role) in the banner, not the generic message', async () => {
+    createUserMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { role: ['That role assignment is not permitted.'] } },
+      })
+    )
+
+    const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
+
+    await wrapper.get('[data-testid="user-form-name"]').setValue('Ada')
+    await wrapper.get('[data-testid="user-form-email"]').setValue('ada@example.com')
+    await wrapper.get('[data-testid="user-form-password"]').setValue('password123')
+    await wrapper.get('[data-testid="user-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="user-form-banner"]').text()).toContain(
+      'That role assignment is not permitted.'
+    )
+  })
+})
+
+// form-clarity-and-console-warnings, D6: `name` is deliberately CUT (not
+// ambiguous, unconstrained, or foreign — fails D6's three-question rule).
+describe('UserForm — field help (D6)', () => {
+  it.each([
+    ['user-form-email', 'users.form.help.email'],
+    ['user-form-password', 'users.form.help.password'],
+  ])("%s renders and is pointed at by its control's aria-describedby", async (testId, helpKey) => {
+    const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
+
+    expect(wrapper.text()).toContain(helpKey)
+
+    const control = wrapper.get(`[data-testid="${testId}"]`)
+    const describedIds = (control.attributes('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+    const matched = describedIds.some((id) => {
+      const el = wrapper.find(`#${id}`)
+      return el.exists() && el.text() === helpKey
+    })
+    expect(matched, `expected an aria-describedby id on ${testId} to point at "${helpKey}"`).toBe(
+      true
+    )
+  })
+
+  it('renders the role help text', () => {
+    const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
+
+    expect(wrapper.text()).toContain('users.form.help.role')
+  })
+
+  it('does not render help text for name (D6 — self-evident field, deliberately cut)', () => {
+    const wrapper = mount(UserForm, { props: { user: null }, global: { mocks: { $t: tMock } } })
+
+    expect(wrapper.text()).not.toContain('users.form.help.name')
   })
 })

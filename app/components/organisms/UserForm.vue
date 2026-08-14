@@ -6,6 +6,7 @@
         <Input
           id="user-form-name"
           v-model="name"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.name)"
           :aria-describedby="errors.name ? 'user-form-name-error' : undefined"
           data-testid="user-form-name"
@@ -25,11 +26,15 @@
           id="user-form-email"
           v-model="email"
           type="email"
+          autocomplete="off"
           :aria-invalid="Boolean(errors.email)"
-          :aria-describedby="errors.email ? 'user-form-email-error' : undefined"
+          :aria-describedby="describedBy('user-form-email', Boolean(errors.email))"
           data-testid="user-form-email"
           @blur="validateEmail"
         />
+        <FieldDescription id="user-form-email-help">{{
+          $t('users.form.help.email')
+        }}</FieldDescription>
         <FieldError
           v-if="errors.email"
           id="user-form-email-error"
@@ -47,10 +52,13 @@
           type="password"
           autocomplete="new-password"
           :aria-invalid="Boolean(errors.password)"
-          :aria-describedby="errors.password ? 'user-form-password-error' : undefined"
+          :aria-describedby="describedBy('user-form-password', Boolean(errors.password))"
           data-testid="user-form-password"
           @blur="validatePassword"
         />
+        <FieldDescription id="user-form-password-help">
+          {{ $t('users.form.help.password') }}
+        </FieldDescription>
         <FieldError
           v-if="errors.password"
           id="user-form-password-error"
@@ -63,7 +71,11 @@
         <FieldLabel for="user-form-role">{{ $t('users.accessLevel') }}</FieldLabel>
         <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
         <Select v-model="role">
-          <SelectTrigger id="user-form-role" data-testid="user-form-role">
+          <SelectTrigger
+            id="user-form-role"
+            data-testid="user-form-role"
+            aria-describedby="user-form-role-help"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -74,6 +86,9 @@
             </SelectGroup>
           </SelectContent>
         </Select>
+        <FieldDescription id="user-form-role-help">{{
+          $t('users.form.help.role')
+        }}</FieldDescription>
       </Field>
 
       <Alert
@@ -99,7 +114,7 @@
 // never free text, never a BEAI role_code value). Password is admin-set
 // (D4 "New User Initial Password Set By Admin") and only offered at create.
 import { ref } from 'vue'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -112,7 +127,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useUsers, type UserResponse } from '@/composables/useUsers'
-import { getErrorFields } from '@/utils/http-error'
+import { applyServerFieldErrors } from '@/utils/http-error'
 
 const ACCESS_LEVELS = ['admin', 'operator', 'viewer'] as const
 
@@ -172,6 +187,18 @@ function validateEmail(): boolean {
   return !errors.value.email
 }
 
+/**
+ * Joins a field's error id (when invalid) with its help-text id
+ * (form-clarity-and-console-warnings, D6).
+ */
+function describedBy(baseId: string, hasError: boolean): string {
+  const ids = [hasError ? `${baseId}-error` : null, `${baseId}-help`].filter(
+    (id): id is string => id !== null
+  )
+
+  return ids.join(' ')
+}
+
 function validatePassword(): boolean {
   if (isEditing) {
     errors.value.password = undefined
@@ -180,6 +207,20 @@ function validatePassword(): boolean {
   errors.value.password = password.value.length < 8 ? t('users.form.passwordTooShort') : undefined
   return !errors.value.password
 }
+
+/**
+ * Server field name -> local error key.
+ *
+ * `role` deliberately has no entry: the Select is constrained client-side to
+ * exactly admin/operator/viewer, so a server 422 on it is unexpected rather
+ * than a normal validation failure — it reaches the form-level banner like
+ * any other field this form renders no control-specific handling for.
+ */
+const SERVER_FIELD_TO_ERROR_KEY = {
+  name: 'name',
+  email: 'email',
+  password: 'password',
+} as const satisfies Record<string, keyof typeof errors.value>
 
 async function onSubmit(): Promise<void> {
   formMessage.value = null
@@ -202,10 +243,14 @@ async function onSubmit(): Promise<void> {
     }
     emit('saved')
   } catch (error) {
-    const fields = getErrorFields(error)
-    if (fields?.['name']) errors.value.name = fields['name'][0]
-    if (fields?.['email']) errors.value.email = fields['email'][0]
-    formMessage.value = t('users.form.saveError')
+    const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
+      errors.value[key] = message
+    })
+    // A field with no control of its own (`role`, constrained client-side to
+    // admin/operator/viewer) still has to reach the operator — the server's
+    // own message beats a generic banner that hides it.
+    formMessage.value =
+      unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('users.form.saveError')
   } finally {
     saving.value = false
   }

@@ -46,6 +46,11 @@ const SPECS: Record<ProviderName, FieldSpec[]> = {
       type: 'checkbox',
       label_key: 'avatar_templates.field.voiceUseSpeakerBoost',
     },
+    // Non-required text field, appended deliberately: `avatarId` (the only
+    // other text field in this fixture) became REQUIRED-validated by D3, so
+    // it can no longer double as the "clearing drops the key, never blanks
+    // it" demonstration field without also tripping the new required check.
+    { key: 'voiceId', type: 'text', label_key: 'avatar_templates.field.voiceId' },
   ],
   tavus: [
     { key: 'faceId', type: 'text', label_key: 'avatar_templates.field.faceId', required: true },
@@ -54,7 +59,15 @@ const SPECS: Record<ProviderName, FieldSpec[]> = {
 
 function mountForm(template: Record<string, unknown> = {}) {
   return mount(AvatarTemplateForm, {
-    props: { template, fieldSpecs: SPECS, saving: false, errors: [] },
+    props: {
+      // A valid default name so tests that submit without caring about name
+      // validation aren't incidentally blocked by it (D3 adds novalidate +
+      // JS validation, including a required name).
+      template: { name: 'Test template', ...template },
+      fieldSpecs: SPECS,
+      saving: false,
+      submitError: null,
+    },
     global: { mocks: { $t: (key: string) => key } },
   })
 }
@@ -94,20 +107,30 @@ describe('the form is built from the spec', () => {
 
 describe('clearing a field removes it, never blanks it', () => {
   it('drops a text knob when emptied', async () => {
-    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+    // `voiceId`, not `avatarId`: `avatarId` is REQUIRED (D3), so clearing it
+    // now correctly BLOCKS submit instead of vanishing the key — that
+    // strengthened behaviour is covered separately in the "client-side
+    // validation" describe block below.
+    const wrapper = mountForm({
+      provider: 'heygen',
+      config: { avatarId: 'av_1', voiceId: 'vo_1' },
+    })
 
-    await wrapper.find('[data-testid="template-config-avatarId"]').setValue('')
+    await wrapper.find('[data-testid="template-config-voiceId"]').setValue('')
     await wrapper.find('form').trigger('submit')
 
     // The API reads absent as "use the provider's default". An empty string is
     // a value, and on a number field it is a type error — so clearing has to
     // remove the key.
     const payload = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
-    expect(payload.config).not.toHaveProperty('avatarId')
+    expect(payload.config).not.toHaveProperty('voiceId')
   })
 
   it('drops a select knob when set back to default', async () => {
-    const wrapper = mountForm({ provider: 'heygen', config: { videoQuality: 'high' } })
+    const wrapper = mountForm({
+      provider: 'heygen',
+      config: { avatarId: 'av_1', videoQuality: 'high' },
+    })
 
     await wrapper.find('[data-testid="template-config-videoQuality"]').setValue('')
     await wrapper.find('form').trigger('submit')
@@ -119,7 +142,10 @@ describe('clearing a field removes it, never blanks it', () => {
   })
 
   it('drops an unchecked checkbox rather than sending false', async () => {
-    const wrapper = mountForm({ provider: 'heygen', config: { voiceUseSpeakerBoost: true } })
+    const wrapper = mountForm({
+      provider: 'heygen',
+      config: { avatarId: 'av_1', voiceUseSpeakerBoost: true },
+    })
 
     await wrapper.find('[data-testid="template-config-voiceUseSpeakerBoost"]').setValue(false)
     await wrapper.find('form').trigger('submit')
@@ -134,7 +160,7 @@ describe('clearing a field removes it, never blanks it', () => {
 
 describe('numbers', () => {
   it('submits a number, not a string', async () => {
-    const wrapper = mountForm({ provider: 'heygen', config: {} })
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
 
     await wrapper.find('[data-testid="template-config-voiceSpeed"]').setValue('1.05')
     await wrapper.find('form').trigger('submit')
@@ -147,13 +173,26 @@ describe('numbers', () => {
   })
 
   it('drops an unparseable number rather than sending NaN', async () => {
-    const wrapper = mountForm({ provider: 'heygen', config: {} })
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
 
     await wrapper.find('[data-testid="template-config-voiceSpeed"]').setValue('abc')
     await wrapper.find('form').trigger('submit')
 
     const payload = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
     expect(payload.config).not.toHaveProperty('voiceSpeed')
+  })
+
+  it('does not validate step client-side (D3 — server is authoritative)', async () => {
+    // 1.005 is not a multiple of the 0.01 step, but it IS within min/max
+    // (0.8-1.2) — float step-checking would produce false negatives, so D3
+    // deliberately leaves `step` unvalidated client-side.
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    await wrapper.find('[data-testid="template-config-voiceSpeed"]').setValue('1.005')
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeTruthy()
+    expect(wrapper.find('[data-testid="template-config-voiceSpeed-error"]').exists()).toBe(false)
   })
 })
 
@@ -181,31 +220,207 @@ describe('the provider', () => {
     const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
 
     await wrapper.find('[data-testid="template-field-provider"]').setValue('tavus')
+    // tavus's `faceId` is required (D3): filling it is what proves the switch
+    // actually DROPPED heygen's `avatarId` rather than merely not sending it
+    // because the required check blocked the submit.
+    await wrapper.find('[data-testid="template-config-faceId"]').setValue('face_1')
     await wrapper.find('form').trigger('submit')
 
     // Carrying values over would post knobs belonging to the other provider,
     // which the API rejects as unknown keys — a validation wall for an action
     // that felt like changing one dropdown.
     const payload = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
-    expect(payload.config).toEqual({})
+    expect(payload.config).toEqual({ faceId: 'face_1' })
   })
 })
 
-describe('errors', () => {
-  it('shows every validation error at once', () => {
+// form-clarity-and-console-warnings, D3/D4: `errors: string[]` became
+// `submitError: unknown | null`. The top-of-form `<ul>` KEEPS existing —
+// D4 — but only as the form-level banner fed by whatever the "knob: code"
+// parser could not place on a control. This is a DELIBERATE spec change:
+// the two previous li-counting assertions (this file's old `:208` and
+// `avatar-templates-page.spec.ts`'s old `:225`) fed messages that now map
+// onto fields instead, leaving the summary empty — so they are rewritten
+// here to assert PER-FIELD placement, plus a case proving an unmappable
+// message still reaches the summary.
+describe('server 422s (D3/D4 — per-field placement, unmappable remainder in the banner)', () => {
+  function submitErrorFor(messages: string[]) {
+    return Object.assign(new Error('422'), {
+      status: 422,
+      data: { errors: { config: messages } },
+    })
+  }
+
+  it('places a recognised "{knob}: {code}" message on its own control', () => {
     const wrapper = mount(AvatarTemplateForm, {
       props: {
-        template: { provider: 'heygen', config: {} },
+        template: { name: 'Test template', provider: 'heygen', config: {} },
         fieldSpecs: SPECS,
         saving: false,
-        errors: ['avatarId: required', 'voiceSpeed: range'],
+        submitError: submitErrorFor(['avatarId: required', 'voiceSpeed: range']),
       },
       global: { mocks: { $t: (key: string) => key } },
     })
 
-    // One error per round trip turns a seventeen-field form into a guessing
-    // game, so the API returns them all and the form shows them all.
-    expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(2)
+    expect(wrapper.get('[data-testid="template-config-avatarId-error"]').text()).toContain(
+      'avatar_templates.error.config.required'
+    )
+    expect(wrapper.get('[data-testid="template-config-voiceSpeed-error"]').text()).toContain(
+      'avatar_templates.error.config.range'
+    )
+    // Mapped onto fields, so the summary carries nothing.
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
+  })
+
+  it('leaves a message naming a knob this provider does not expose in the summary', () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        template: { name: 'Test template', provider: 'heygen', config: {} },
+        fieldSpecs: SPECS,
+        saving: false,
+        // `removedKnob` parses fine as "{key}: {code}", but is not a key of
+        // ANY field in `activeFields` — exactly a knob a since-changed
+        // provider spec no longer exposes.
+        submitError: submitErrorFor(['removedKnob: unknown']),
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+
+    const banner = wrapper.get('[data-testid="template-form-errors"]')
+    expect(banner.attributes('role')).toBe('alert')
+    expect(banner.text()).toContain('removedKnob: unknown')
+  })
+
+  it('leaves a genuinely unparseable message in the summary', () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        template: { name: 'Test template', provider: 'heygen', config: {} },
+        fieldSpecs: SPECS,
+        saving: false,
+        submitError: submitErrorFor(['something went wrong']),
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+
+    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain(
+      'something went wrong'
+    )
+  })
+
+  it('maps a top-level name 422 onto the name field', () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        template: { name: 'Test template', provider: 'heygen', config: {} },
+        fieldSpecs: SPECS,
+        saving: false,
+        submitError: Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { name: ['That name is already in use.'] } },
+        }),
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+
+    expect(wrapper.get('[data-testid="template-name-error"]').text()).toContain(
+      'That name is already in use.'
+    )
+  })
+})
+
+describe('client-side validation (D3 — novalidate + JS, never native bubbles)', () => {
+  it('sets novalidate, so native constraint bubbles can never be the only thing blocking submit', () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    expect(wrapper.find('form').attributes('novalidate')).toBeDefined()
+  })
+
+  it('blocks an empty name from submitting', async () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    await wrapper.find('[data-testid="template-field-name"]').setValue('')
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeFalsy()
+    expect(wrapper.get('[data-testid="template-name-error"]').text()).toContain(
+      'avatar_templates.form.errors.nameRequired'
+    )
+  })
+
+  it('blocks a name over 120 characters', async () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    await wrapper.find('[data-testid="template-field-name"]').setValue('a'.repeat(121))
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeFalsy()
+    expect(wrapper.get('[data-testid="template-name-error"]').text()).toContain(
+      'avatar_templates.form.errors.nameTooLong'
+    )
+  })
+
+  it('blocks a description over 500 characters', async () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    await wrapper.find('[data-testid="template-field-description"]').setValue('a'.repeat(501))
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeFalsy()
+    expect(wrapper.get('[data-testid="template-description-error"]').text()).toContain(
+      'avatar_templates.form.errors.descriptionTooLong'
+    )
+  })
+
+  it('blocks submit when a required spec field is missing', async () => {
+    const wrapper = mountForm({ provider: 'heygen', config: {} })
+
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeFalsy()
+    expect(wrapper.get('[data-testid="template-config-avatarId-error"]').text()).toContain(
+      'avatar_templates.form.errors.fieldRequired'
+    )
+  })
+
+  it('blocks submit when a number field is out of range', async () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    await wrapper.find('[data-testid="template-config-voiceSpeed"]').setValue('5')
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeFalsy()
+    expect(wrapper.get('[data-testid="template-config-voiceSpeed-error"]').text()).toContain(
+      'avatar_templates.form.errors.numberOutOfRange'
+    )
+  })
+})
+
+// form-clarity-and-console-warnings, D6: `name` gains a new help text;
+// `provider_hint` (already-existing copy) merely CONVERTS from a raw <span>
+// to FieldDescription — no new string. `description` stays CUT (D6 —
+// optional, self-evident, its only constraint is enforced at the moment it
+// is exceeded).
+describe('AvatarTemplateForm — field help (D6)', () => {
+  it("renders the name help text and points the control's aria-describedby at it", () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    expect(wrapper.text()).toContain('avatar_templates.form.help.name')
+
+    const control = wrapper.get('[data-testid="template-field-name"]')
+    const describedIds = (control.attributes('aria-describedby') ?? '').split(/\s+/).filter(Boolean)
+    const matched = describedIds.some((id) => {
+      const el = wrapper.find(`#${id}`)
+      return el.exists() && el.text() === 'avatar_templates.form.help.name'
+    })
+    expect(matched).toBe(true)
+  })
+
+  it('renders the provider hint through FieldDescription, not a raw span (D5)', () => {
+    const wrapper = mountForm({ provider: 'heygen', config: { avatarId: 'av_1' } })
+
+    const description = wrapper
+      .findAll('[data-slot="field-description"]')
+      .find((el) => el.text() === 'avatar_templates.form.provider_hint')
+    expect(description).toBeDefined()
   })
 })
 

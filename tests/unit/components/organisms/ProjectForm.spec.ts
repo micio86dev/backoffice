@@ -243,7 +243,11 @@ describe('ProjectForm', () => {
     const error = wrapper.get('[data-testid="project-form-name-error"]')
     expect(error.text()).toBe('projects.form.nameRequired')
     expect(nameInput.attributes('aria-invalid')).toBe('true')
-    expect(nameInput.attributes('aria-describedby')).toBe(error.attributes('id'))
+    // Split, not a strict string equality: aria-describedby also carries the
+    // field's help-text id (D6) alongside the error id.
+    expect((nameInput.attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+      error.attributes('id')
+    )
   })
 
   it('renders a role="alert" banner adjacent to the submit CTA on a failed save, not at the top of the form', async () => {
@@ -362,7 +366,11 @@ describe('ProjectForm', () => {
     const error = wrapper.get(`[data-testid="${testid}-error"]`)
     expect(error.attributes('id')).toBeTruthy()
     expect(input.attributes('aria-invalid')).toBe('true')
-    expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
+    // Split, not a strict string equality: aria-describedby also carries the
+    // field's help-text id (D6) alongside the error id.
+    expect((input.attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+      error.attributes('id')
+    )
   })
 
   // The two URL fields shipped with no FieldError, no aria-invalid and no
@@ -386,7 +394,11 @@ describe('ProjectForm', () => {
     const error = wrapper.get(`[data-testid="${testid}-error"]`)
     expect(error.attributes('id')).toBeTruthy()
     expect(input.attributes('aria-invalid')).toBe('true')
-    expect(input.attributes('aria-describedby')).toBe(error.attributes('id'))
+    // Split, not a strict string equality: aria-describedby also carries the
+    // field's help-text id (D6) alongside the error id.
+    expect((input.attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+      error.attributes('id')
+    )
   })
 
   it('refuses to submit while a URL field is malformed', async () => {
@@ -453,5 +465,86 @@ describe('ProjectForm', () => {
     expect(wrapper.get('[data-testid="project-form-banner"]').text()).toContain(
       'That framework version is retired.'
     )
+  })
+})
+
+// form-clarity-and-console-warnings, D6: 9 new FieldDescriptions, each
+// nested inside the same Field as the control it describes and referenced
+// from that control's aria-describedby.
+describe('ProjectForm — field help (D6)', () => {
+  it.each([
+    ['project-form-name', 'projects.form.help.name'],
+    ['project-form-slug', 'projects.form.help.slug'],
+    ['project-form-language', 'projects.form.help.language'],
+    ['project-form-pause-every-n', 'projects.form.help.pauseEveryN'],
+    ['project-form-nudge-min-chars', 'projects.form.help.nudgeMinChars'],
+    ['project-form-exit-redirect-url', 'projects.form.help.exitRedirectUrl'],
+    ['project-form-webhook-url', 'projects.form.help.webhookUrl'],
+  ])("%s renders and is pointed at by its control's aria-describedby", async (testId, helpKey) => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(helpKey)
+
+    const control = wrapper.get(`[data-testid="${testId}"]`)
+    const describedBy = control.attributes('aria-describedby') ?? ''
+    const describedIds = describedBy.split(/\s+/).filter(Boolean)
+
+    const matched = describedIds.some((id) => {
+      const el = wrapper.find(`#${id}`)
+      return el.exists() && el.text() === helpKey
+    })
+    expect(matched, `expected an aria-describedby id on ${testId} to point at "${helpKey}"`).toBe(
+      true
+    )
+  })
+
+  // assessment_type's description previously only appeared AFTER the choice
+  // was already frozen (`v-if="lockedWhenLive"`) — the warning arrived too
+  // late to change anything. This asserts the fix: the new description
+  // renders on a DRAFT project, before commitment.
+  it('states assessment_type permanence on a draft project, before commitment', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('projects.form.help.assessmentTypeFreezes')
+  })
+
+  // The spec/design gap flagged in tasks.md 3.4: role_code's FieldDescription
+  // also states permanence, via the EXISTING `roleCodeRequiredForStandard`
+  // key extended to carry that clause — not a new key.
+  it('states role_code permanence via the existing roleCodeRequiredForStandard description', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('projects.form.roleCodeRequiredForStandard')
+
+    const control = wrapper.get('[data-testid="project-form-role-code"]')
+    const describedBy = control.attributes('aria-describedby') ?? ''
+    const describedIds = describedBy.split(/\s+/).filter(Boolean)
+    const matched = describedIds.some((id) => {
+      const el = wrapper.find(`#${id}`)
+      return el.exists() && el.text() === 'projects.form.roleCodeRequiredForStandard'
+    })
+    expect(matched).toBe(true)
+  })
+
+  it('renders the competencies help text inside the CompetencyPicker FieldSet', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('projects.form.help.competencies')
   })
 })

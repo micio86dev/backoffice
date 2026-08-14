@@ -278,6 +278,23 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Select highlighted-option contrast — DESIGN.md §9.1 / §16, admin-backoffice
+   spec "Select Highlighted Option Meets AA Text Contrast".
+
+   `ui/select/SelectItem.vue`'s focus (highlighted) state pairs white text
+   with `--color-accent-dark` (#b8431e), NOT plain `--color-accent` (#e45526):
+   white on `--color-accent` measures 3.7:1 and FAILS WCAG AA's 4.5:1 minimum
+   for normal text; white on `--color-accent-dark` measures 5.4:1 and passes.
+   `--color-accent-dark` already exists above (no new token) — this is a
+   CONSUMER change, asserted numerically (not eyeballed) by
+   `tests/unit/theme.spec.ts`'s `contrastRatio()` helper. Darkening the
+   background, rather than lightening the foreground on the existing accent,
+   is the only way to give the operator legible white text: `--color-accent`
+   itself cannot be lightened without breaking `--accent-foreground`'s own
+   4.78:1 contrast pairing declared in the `:root` block below.
+--------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
    Clickable affordance — PROJECT CONVENTION, see DESIGN.md.
 
    Tailwind v4's Preflight no longer sets `cursor: pointer` on <button>; it

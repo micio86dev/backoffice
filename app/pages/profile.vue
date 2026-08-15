@@ -16,7 +16,14 @@
       <!-- Read-only identity header: avatar, name, email — never editable
            here, only through the account form below. -->
       <div class="flex items-center gap-4">
-        <Avatar size="lg" aria-hidden="true">
+        <!--
+          :key forces a fresh AvatarRoot across a null <-> non-null
+          photo_url transition — see ProfilePhotoForm.vue's comment on the
+          same pattern (reka-ui's shared imageLoadingStatus is never reset
+          by AvatarImage's own v-if unmount).
+        -->
+        <Avatar :key="profile.photo_url ? 'photo' : 'no-photo'" size="lg" aria-hidden="true">
+          <AvatarImage v-if="profile.photo_url" :src="profile.photo_url" alt="" />
           <AvatarFallback>{{ initials(profile.name) }}</AvatarFallback>
         </Avatar>
         <div class="flex flex-col gap-1">
@@ -55,6 +62,12 @@
       </div>
 
       <div class="flex max-w-[65ch] flex-col gap-1">
+        <h2 class="text-lg font-semibold text-foreground">{{ $t('profile.photo.title') }}</h2>
+      </div>
+      <Separator />
+      <ProfilePhotoForm :photo-url="profile.photo_url" :name="profile.name" @saved="onSaved" />
+
+      <div class="flex max-w-[65ch] flex-col gap-1">
         <h2 class="text-lg font-semibold text-foreground">{{ $t('profile.details.title') }}</h2>
       </div>
       <Separator />
@@ -84,10 +97,11 @@ import { onMounted, ref, computed } from 'vue'
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AccessLevelBadge from '@/components/atoms/AccessLevelBadge.vue'
 import ProfileDetailsForm from '@/components/organisms/ProfileDetailsForm.vue'
 import ProfilePasswordForm from '@/components/organisms/ProfilePasswordForm.vue'
+import ProfilePhotoForm from '@/components/organisms/ProfilePhotoForm.vue'
 import { useProfile, type ProfileResponse } from '@/composables/useProfile'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { initials } from '@/utils/initials'

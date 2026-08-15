@@ -44,8 +44,27 @@
               data-testid="sidebar-footer-identity"
               :aria-label="$t('nav.profileLabel', { name: currentUserName })"
             >
-              <Avatar size="sm" aria-hidden="true" data-testid="sidebar-footer-avatar">
-                <AvatarFallback>{{ initials(currentUserName) }}</AvatarFallback>
+              <!--
+                :key forces a fresh AvatarRoot across a null <-> non-null
+                photoUrl transition — see ProfilePhotoForm.vue's comment on
+                the same pattern (reka-ui's shared imageLoadingStatus is
+                never reset by AvatarImage's own v-if unmount).
+              -->
+              <Avatar
+                :key="currentUserPhotoUrl ? 'photo' : 'no-photo'"
+                size="sm"
+                aria-hidden="true"
+                data-testid="sidebar-footer-avatar"
+              >
+                <AvatarImage
+                  v-if="currentUserPhotoUrl"
+                  data-testid="sidebar-footer-avatar-image"
+                  :src="currentUserPhotoUrl"
+                  alt=""
+                />
+                <AvatarFallback data-testid="sidebar-footer-avatar-fallback">{{
+                  initials(currentUserName)
+                }}</AvatarFallback>
               </Avatar>
               <span>{{ currentUserName }}</span>
             </NuxtLink>
@@ -75,7 +94,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { initials } from '@/utils/initials'
 
@@ -115,12 +134,19 @@ function isCurrent(to: string): boolean {
 // NavBar.vue's organization fetch — a transient error here must not break
 // navigation, and the footer simply omits identity rather than showing one.
 const currentUserName = ref<string | null>(null)
+// user-avatar-image (design D6): sourced from useCurrentUser().user.photo_url
+// — the /auth/me contract — never the /profile resource's own photo_url,
+// which pages/profile.vue reads independently (two contracts, never conflated).
+const currentUserPhotoUrl = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    currentUserName.value = (await useCurrentUser().ensureLoaded()).user.name
+    const { user } = await useCurrentUser().ensureLoaded()
+    currentUserName.value = user.name
+    currentUserPhotoUrl.value = user.photo_url
   } catch {
     currentUserName.value = null
+    currentUserPhotoUrl.value = null
   }
 })
 </script>

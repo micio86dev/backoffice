@@ -28,7 +28,15 @@ import { useApi } from './useApi'
 import { useAuth } from './useAuth'
 
 export interface CurrentUser {
-  user: { id: number; name: string; email: string; locale: string }
+  user: {
+    id: number
+    name: string
+    email: string
+    locale: string
+    // user-avatar-image (design D4): null when the user has no photo, or the
+    // presigned URL minted by the SAME signer ProfileResource uses.
+    photo_url: string | null
+  }
   organization: { id: number; name: string } | null
   roles: string[]
 }

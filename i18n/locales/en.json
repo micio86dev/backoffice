@@ -399,6 +399,17 @@
     "subtitle": "Your own account — visible to no one but you.",
     "role": "Role",
     "organization": "Organization",
+    "photo": {
+      "title": "Profile photo",
+      "inputLabel": "Upload a profile photo",
+      "change": "Change photo",
+      "remove": "Remove photo",
+      "confirmRemoveTitle": "Remove profile photo?",
+      "confirmRemoveDescription": "This deletes the stored photo. You can upload a new one at any time.",
+      "tooLarge": "The photo is too large. Choose a file up to 2 MB.",
+      "uploadError": "The photo could not be uploaded. Please review the highlighted field.",
+      "removeError": "The photo could not be removed. Please try again."
+    },
     "details": {
       "title": "Account details",
       "name": "Name",

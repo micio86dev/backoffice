@@ -78,8 +78,8 @@ const { listProjects } = useProjects()
 
 const projects = ref<Project[]>([])
 
-// null = closed, 'new' = create form, string id = edit form for that project.
-const editing = ref<'new' | string | null>(null)
+// null = closed, 'new' = create form, number id = edit form for that project.
+const editing = ref<'new' | number | null>(null)
 
 const editingProject = computed<Project | null>(() => {
   if (editing.value === null || editing.value === 'new') return null
@@ -103,7 +103,7 @@ async function load(): Promise<void> {
   }
 }
 
-function onEdit(id: string): void {
+function onEdit(id: number): void {
   editing.value = id
 }
 

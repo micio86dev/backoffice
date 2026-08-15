@@ -342,18 +342,18 @@ describe('AvatarTemplatesPage', () => {
     expect(api.createTemplate).not.toHaveBeenCalled()
   })
 
-  // form-clarity-and-console-warnings, D3/D4: the page used to flatten every
-  // config error into one li-counted list (`extractConfigErrors`). It now
-  // passes the caught rejection down VERBATIM as `submitError`, and the form
-  // routes each message to its own field when the field exists, leaving only
-  // the genuinely unplaceable remainder in the summary. This is a DELIBERATE
-  // spec change from the previous li-counting assertion, not incidental
-  // breakage — `voiceSpeed` names no field this page's spec renders, so it is
-  // the one that proves the summary still catches what it must.
-  it('routes each config error to its own field, or to the summary when no field claims it', async () => {
+  // generated-client-truth-and-session-safety D6: the server now keys each
+  // invalid knob under its own `config.{knob}` field instead of flattening
+  // every knob's error into one `config` array. The page passes the caught
+  // rejection down VERBATIM as `submitError`, and the form routes each
+  // `config.{knob}` entry to its own field when the field exists, leaving
+  // only the genuinely unplaceable remainder in the summary — `voiceSpeed`
+  // names no field this page's spec renders, so it is the one that proves
+  // the summary still catches what it must.
+  it('routes each config.{knob} error to its own field, or to the summary when no field claims it', async () => {
     const failure = Object.assign(new Error('422'), {
       status: 422,
-      data: { errors: { config: ['avatarId: required', 'voiceSpeed: range'] } },
+      data: { errors: { 'config.avatarId': ['required'], 'config.voiceSpeed': ['range'] } },
     })
 
     const { wrapper } = await mountPage({
@@ -374,9 +374,7 @@ describe('AvatarTemplatesPage', () => {
     // `voiceSpeed` names no field this page's spec renders — an unplaceable
     // message still has to reach the operator, so it stays in the summary.
     expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain(
-      'voiceSpeed: range'
-    )
+    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain('range')
   })
 
   it('closes the form and reloads after a successful save', async () => {

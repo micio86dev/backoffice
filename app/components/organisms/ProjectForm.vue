@@ -415,9 +415,7 @@ const isEditing = computed(() => props.project !== null)
 const name = ref(props.project?.name ?? '')
 const slug = ref(props.project?.slug ?? '')
 const language = ref(props.project?.language ?? 'en')
-const assessmentType = ref<'standard' | 'potential'>(
-  (props.project?.assessment_type as 'standard' | 'potential') ?? 'standard'
-)
+const assessmentType = ref<'standard' | 'potential'>(props.project?.assessment_type ?? 'standard')
 const roleCode = ref(props.project?.role_code ?? '')
 const frameworkVersionId = ref(props.project?.framework_version_id ?? '')
 const competencyIds = ref<number[]>([])
@@ -563,14 +561,12 @@ async function loadCompetencyOptions(): Promise<void> {
       // this file's notes about the missing id are resolved.
       id: competency.id,
       code: competency.code,
-      // Scramble types `CompetencyResource.name` as `unknown[]` (it cannot
-      // resolve the PHP model's locale-dependent accessor), but
-      // `FrameworkController` already resolves it to a single localized
-      // string server-side (`CompetencyResource.php`'s own docblock: "Uses
-      // the current app locale"). `String()` is a no-op against that real
-      // runtime value; it exists only to satisfy the (mistyped) generated
-      // client without hand-patching `types/api.ts`.
-      name: String(competency.name),
+      // `CompetencyResource.name` is now typed `string` in the generated
+      // client (generated-client-truth-and-session-safety D1) — the
+      // `@scramble-return` annotation on `CompetencyResource` documents the
+      // `HasTranslations` property-read interception directly, so the
+      // `String()` conversion this comment used to defend is gone with it.
+      name: competency.name,
     }))
   } catch {
     competencyOptions.value = []

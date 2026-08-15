@@ -15,13 +15,13 @@ const tMock = (key: string) => key
 function detailResponse(status: string) {
   return {
     data: {
-      id: '42',
+      id: 42,
       candidate_ref: 'ref-042',
       display_name: 'Jane Doe',
       role_code: 'FLL',
       language: 'it',
       status,
-      project_id: '1',
+      project_id: 1,
       timeline: { started_at: '2026-03-14T10:00:00Z', completed_at: null, session_count: 3 },
       files: {
         transcript: { type: 'text/plain', ref: 'transcript', url: '/x' },
@@ -163,7 +163,7 @@ describe('pages/participants/[id].vue', () => {
       await flushPromises()
 
       expect(downloadTranscriptMock).toHaveBeenCalledTimes(1)
-      expect(downloadTranscriptMock.mock.calls[0]?.[0]).toBe('42')
+      expect(downloadTranscriptMock.mock.calls[0]?.[0]).toBe(42)
     })
 
     it('clicking the evaluation download button calls downloadEvaluation with the participant id', async () => {
@@ -173,7 +173,7 @@ describe('pages/participants/[id].vue', () => {
       await flushPromises()
 
       expect(downloadEvaluationMock).toHaveBeenCalledTimes(1)
-      expect(downloadEvaluationMock.mock.calls[0]?.[0]).toBe('42')
+      expect(downloadEvaluationMock.mock.calls[0]?.[0]).toBe(42)
     })
 
     it('disables the evaluation download button when the participant is not yet completato', async () => {

@@ -234,30 +234,31 @@ describe('the provider', () => {
   })
 })
 
-// form-clarity-and-console-warnings, D3/D4: `errors: string[]` became
-// `submitError: unknown | null`. The top-of-form `<ul>` KEEPS existing —
-// D4 — but only as the form-level banner fed by whatever the "knob: code"
-// parser could not place on a control. This is a DELIBERATE spec change:
-// the two previous li-counting assertions (this file's old `:208` and
-// `avatar-templates-page.spec.ts`'s old `:225`) fed messages that now map
-// onto fields instead, leaving the summary empty — so they are rewritten
-// here to assert PER-FIELD placement, plus a case proving an unmappable
-// message still reaches the summary.
-describe('server 422s (D3/D4 — per-field placement, unmappable remainder in the banner)', () => {
-  function submitErrorFor(messages: string[]) {
+// generated-client-truth-and-session-safety D6: the server now keys each
+// invalid knob under its own `config.{knob}` field instead of flattening
+// every knob's error into one `config` array of "{knob}: {code}" strings.
+// The top-of-form `<ul>` KEEPS existing (form-clarity-and-console-warnings
+// D4) as the banner fed by whatever `config.{knob}` key names a field this
+// provider does not currently render, or by a genuinely unmappable
+// top-level message.
+describe('server 422s (D6 — per-field placement via config.{knob} keys, unmappable remainder in the banner)', () => {
+  function submitErrorFor(errors: Record<string, string[]>) {
     return Object.assign(new Error('422'), {
       status: 422,
-      data: { errors: { config: messages } },
+      data: { errors },
     })
   }
 
-  it('places a recognised "{knob}: {code}" message on its own control', () => {
+  it('places a config.{knob} error on its own control', () => {
     const wrapper = mount(AvatarTemplateForm, {
       props: {
         template: { name: 'Test template', provider: 'heygen', config: {} },
         fieldSpecs: SPECS,
         saving: false,
-        submitError: submitErrorFor(['avatarId: required', 'voiceSpeed: range']),
+        submitError: submitErrorFor({
+          'config.avatarId': ['required'],
+          'config.voiceSpeed': ['range'],
+        }),
       },
       global: { mocks: { $t: (key: string) => key } },
     })
@@ -272,38 +273,57 @@ describe('server 422s (D3/D4 — per-field placement, unmappable remainder in th
     expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
   })
 
-  it('leaves a message naming a knob this provider does not expose in the summary', () => {
+  it('a single invalid knob still routes correctly — placed under its own control, not the summary', () => {
+    // spec.md's "A single invalid knob still routes correctly" scenario:
+    // exactly one config.{knob} key in the error payload.
     const wrapper = mount(AvatarTemplateForm, {
       props: {
         template: { name: 'Test template', provider: 'heygen', config: {} },
         fieldSpecs: SPECS,
         saving: false,
-        // `removedKnob` parses fine as "{key}: {code}", but is not a key of
-        // ANY field in `activeFields` — exactly a knob a since-changed
-        // provider spec no longer exposes.
-        submitError: submitErrorFor(['removedKnob: unknown']),
+        submitError: submitErrorFor({ 'config.voiceSpeed': ['range'] }),
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+
+    expect(wrapper.get('[data-testid="template-config-voiceSpeed-error"]').text()).toContain(
+      'avatar_templates.error.config.range'
+    )
+    // Not a generic banner — the summary carries nothing.
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
+  })
+
+  it('leaves a config.{knob} error naming a knob this provider does not expose in the summary', () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        template: { name: 'Test template', provider: 'heygen', config: {} },
+        fieldSpecs: SPECS,
+        saving: false,
+        // `removedKnob` is not a key of ANY field in `activeFields` —
+        // exactly a knob a since-changed provider spec no longer exposes.
+        submitError: submitErrorFor({ 'config.removedKnob': ['unknown'] }),
       },
       global: { mocks: { $t: (key: string) => key } },
     })
 
     const banner = wrapper.get('[data-testid="template-form-errors"]')
     expect(banner.attributes('role')).toBe('alert')
-    expect(banner.text()).toContain('removedKnob: unknown')
+    expect(banner.text()).toContain('unknown')
   })
 
-  it('leaves a genuinely unparseable message in the summary', () => {
+  it('leaves a bare config error (non-array config) in the summary', () => {
     const wrapper = mount(AvatarTemplateForm, {
       props: {
         template: { name: 'Test template', provider: 'heygen', config: {} },
         fieldSpecs: SPECS,
         saving: false,
-        submitError: submitErrorFor(['something went wrong']),
+        submitError: submitErrorFor({ config: ['The config field must be an array.'] }),
       },
       global: { mocks: { $t: (key: string) => key } },
     })
 
     expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain(
-      'something went wrong'
+      'The config field must be an array.'
     )
   })
 

@@ -1,13 +1,25 @@
 /**
- * SidebarNav.vue (task 15.3, DESIGN.md §8.1 — RED)
+ * SidebarNav.vue (task 15.3, DESIGN.md §8.1 — RED; extended for
+ * user-profile-self-service, design D7, task 7.1 — RED)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { SidebarProvider } from '../../../../app/components/ui/sidebar'
 import SidebarNav from '../../../../app/components/organisms/SidebarNav.vue'
+import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
+
+// user-profile-self-service, design D7: SidebarFooter identity reads
+// `useCurrentUser().ensureLoaded()`. Mocked here so the pre-existing tests
+// above (which never configure it) still resolve cleanly instead of hitting
+// the real network-fetch path; each identity test below sets its own value.
+const ensureLoadedMock = vi.fn()
+
+vi.mock('../../../../app/composables/useCurrentUser', () => ({
+  useCurrentUser: () => ({ ensureLoaded: ensureLoadedMock }),
+}))
 
 const NuxtLinkStub = {
   props: ['to'],
@@ -37,6 +49,11 @@ function mountSidebarNav(currentPath: string) {
 describe('SidebarNav', () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.test', locale: 'en' },
+      organization: null,
+      roles: ['operator'],
+    })
   })
 
   it('renders a link for each nav item from DESIGN.md §8.1 (Dashboard, Projects, Candidates, Reports, Settings)', () => {
@@ -146,5 +163,61 @@ describe('SidebarNav — current page on a hard load', () => {
 
   it('marks nothing current on a route that is not in the nav', () => {
     expect(mountAt('/unknown/').findAll('[aria-current="page"]')).toHaveLength(0)
+  })
+})
+
+// user-profile-self-service, design D7: identity goes in SidebarFooter, not
+// NavBar — NavBar already carries a truncating ORGANIZATION string plus Help
+// plus Logout in one row; a second identity element there would make "who"
+// and "where" compete. SidebarFooter replaces the literal "BEAI" header as
+// the shell's only identity element.
+describe('SidebarNav — shell identity (design D7)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    vi.stubGlobal(
+      'useRoute',
+      vi.fn(() => ({ path: '/', fullPath: '/', params: {}, query: {} }))
+    )
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.test', locale: 'en' },
+      organization: null,
+      roles: ['operator'],
+    })
+  })
+
+  it('renders a SidebarFooter with an aria-hidden initials avatar and the user name', async () => {
+    const wrapper = mountSidebarNav('/')
+    await waitFor(
+      () => wrapper.find('[data-testid="sidebar-footer-identity"]').exists(),
+      'the SidebarFooter identity link to render'
+    )
+
+    const footer = wrapper.get('[data-testid="sidebar-footer-identity"]')
+    expect(footer.text()).toContain('Ada Lovelace')
+
+    const avatar = wrapper.get('[data-testid="sidebar-footer-avatar"]')
+    expect(avatar.attributes('aria-hidden')).toBe('true')
+    expect(avatar.text()).toBe('AL')
+  })
+
+  it('links the identity to /profile with an accessible name from nav.profileLabel', async () => {
+    const wrapper = mountSidebarNav('/')
+    await waitFor(
+      () => wrapper.find('[data-testid="sidebar-footer-identity"]').exists(),
+      'the SidebarFooter identity link to render'
+    )
+
+    const link = wrapper.get('[data-testid="sidebar-footer-identity"]')
+    expect(link.attributes('href')).toBe('/profile')
+    expect(link.attributes('aria-label')).toBe('nav.profileLabel')
+  })
+
+  it('renders no footer identity when the current user has not loaded (fails silently, like NavBar org fetch)', async () => {
+    ensureLoadedMock.mockReset().mockRejectedValue(new Error('network error'))
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="sidebar-footer-identity"]').exists()).toBe(false)
   })
 })

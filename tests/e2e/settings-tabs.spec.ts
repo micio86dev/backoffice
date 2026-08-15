@@ -72,23 +72,9 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
   )
   await page.route(
     (url) => url.pathname === '/m2m/clients',
-    (route) =>
-      isDataRequest(route)
-        ? jsonRoute(route, {
-            data: [API_CLIENT],
-            links: { first: null, last: null, prev: null, next: null },
-            meta: {
-              current_page: 1,
-              from: 1,
-              last_page: 1,
-              links: [],
-              path: '',
-              per_page: 20,
-              to: 1,
-              total: 1,
-            },
-          })
-        : route.continue()
+    // Unpaginated (generated-client-truth-and-session-safety D5) — the
+    // fixture mirrors the real envelope shape: `data` only, no `links`/`meta`.
+    (route) => (isDataRequest(route) ? jsonRoute(route, { data: [API_CLIENT] }) : route.continue())
   )
 }
 
@@ -132,20 +118,7 @@ test.describe('Settings tabs (Unit 6)', () => {
       (url) => url.pathname === '/m2m/clients',
       (route) =>
         isDataRequest(route)
-          ? jsonRoute(route, {
-              data: [{ ...API_CLIENT, is_active: false, state: 'revoked' }],
-              links: { first: null, last: null, prev: null, next: null },
-              meta: {
-                current_page: 1,
-                from: 1,
-                last_page: 1,
-                links: [],
-                path: '',
-                per_page: 20,
-                to: 1,
-                total: 1,
-              },
-            })
+          ? jsonRoute(route, { data: [{ ...API_CLIENT, is_active: false, state: 'revoked' }] })
           : route.continue()
     )
     await login(page)
@@ -154,6 +127,35 @@ test.describe('Settings tabs (Unit 6)', () => {
     await page.getByRole('tab', { name: 'Chiavi API' }).click()
     await expect(page.getByText('Revocata')).toBeVisible()
     await expect(page.getByTestId('api-key-revoke-1')).toHaveCount(0)
+  })
+
+  // generated-client-truth-and-session-safety D5 — the table must show every
+  // key the (now unpaginated) endpoint returns, not just a first page of 20.
+  test('all 25 API keys render — the list is unpaginated, not clipped at a page boundary', async ({
+    page,
+  }) => {
+    await mockAdminApi(page)
+    const clients = Array.from({ length: 25 }, (_, i) => ({
+      ...API_CLIENT,
+      id: i + 1,
+      name: `CI key ${i + 1}`,
+    }))
+    // Registered AFTER mockAdminApi — Playwright tries the LAST-registered
+    // matching route first, so this override wins over the default
+    // one-client fixture for this test (same convention as the revoked-key
+    // test above).
+    await page.route(
+      (url) => url.pathname === '/m2m/clients',
+      (route) => (isDataRequest(route) ? jsonRoute(route, { data: clients }) : route.continue())
+    )
+
+    await login(page)
+    await page.goto('/settings')
+    await page.getByRole('tab', { name: 'Chiavi API' }).click()
+
+    await expect(page.getByText('CI key 1', { exact: true })).toBeVisible()
+    await expect(page.getByText('CI key 25', { exact: true })).toBeVisible()
+    await expect(page.getByRole('row')).toHaveCount(26) // 25 data rows + header row
   })
 
   test('the settings page is WCAG 2.1 AA clean on every tab', async ({ page }) => {

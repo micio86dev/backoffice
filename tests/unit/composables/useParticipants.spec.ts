@@ -40,7 +40,7 @@ describe('useParticipants', () => {
   })
 
   it('fetchParticipant(id) calls GET /participants/{id}', async () => {
-    const apiFetchMock = vi.fn().mockResolvedValue({ data: { id: '42' } })
+    const apiFetchMock = vi.fn().mockResolvedValue({ data: { id: 42 } })
     vi.doMock('../../../app/composables/useApi', () => ({
       useApi: () => ({ apiFetch: apiFetchMock }),
     }))
@@ -51,6 +51,6 @@ describe('useParticipants', () => {
     const result = await fetchParticipant(42)
 
     expect(apiFetchMock).toHaveBeenCalledWith('/participants/42')
-    expect(result).toEqual({ data: { id: '42' } })
+    expect(result).toEqual({ data: { id: 42 } })
   })
 })

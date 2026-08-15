@@ -26,20 +26,21 @@ function listResponse() {
   return {
     data: [
       {
-        id: '1',
-        organization_id: '1',
-        framework_version_id: '1',
+        id: 1,
+        organization_id: 1,
+        framework_version_id: 1,
         slug: 'demo-project',
         name: 'Demo Project',
         assessment_type: 'standard',
         role_code: 'FLL',
         language: 'en',
         status: 'draft',
-        pause_every_n_competencies: '3',
-        nudge_min_chars: '40',
+        pause_every_n_competencies: 3,
+        nudge_min_chars: 40,
         exit_redirect_url: null,
         webhook_url: null,
-        webhook_events: '[]',
+        webhook_events: [],
+        has_webhook_secret: false,
         deadline_at: null,
         goes_live_at: null,
         created_at: '2026-03-01T10:00:00Z',
@@ -121,7 +122,7 @@ describe('pages/projects/index.vue', () => {
 
     await wrapper.get('[data-testid="project-row-edit-1"]').trigger('click')
 
-    expect((wrapper.vm as unknown as { editing: unknown }).editing).toBe('1')
+    expect((wrapper.vm as unknown as { editing: unknown }).editing).toBe(1)
   })
 
   describe('the create/edit dialog (task 21.5)', () => {

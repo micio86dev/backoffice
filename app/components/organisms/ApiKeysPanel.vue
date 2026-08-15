@@ -305,6 +305,10 @@ const revokeTarget = ref<ApiClient | null>(null)
 
 async function load(): Promise<void> {
   const response = await listClients()
+  // Correct rather than accidentally-correct-for-page-one:
+  // `ApiClientController::index` now returns every org-scoped client
+  // unpaginated (generated-client-truth-and-session-safety D5), so
+  // `response.data` is the whole set, not the first 20.
   clients.value = response.data
 }
 

@@ -57,6 +57,6 @@ defineProps<{
 }>()
 
 defineEmits<{
-  (e: 'edit', id: string): void
+  (e: 'edit', id: number): void
 }>()
 </script>

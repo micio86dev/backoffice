@@ -90,6 +90,16 @@ test.describe('SA-11 — every admin route redirects at a mobile viewport (task 
 
     await expect(page.getByTestId('unsupported-gate')).toBeVisible()
     await expect(page).toHaveURL(/\/unsupported$/)
+    // A positive settle signal BEFORE the count(0) check below — the
+    // container's data-testid can be present in the DOM before Vue/i18n has
+    // finished hydrating, which would let `toHaveCount(0)` pass on an EARLY
+    // poll simply because nothing has rendered yet, not because the gate
+    // correctly withheld the sidebar (generated-client-truth-and-session-
+    // safety D7: `toHaveCount(0)` is a false-pass risk independent of the
+    // webkit-specific failure this file's tasks.md entry investigates).
+    // The heading's translated text requires the FULL component tree
+    // (i18n resolved) to be in place, which the bare container div does not.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     // The full admin shell (sidebar nav) must never render at this viewport.
     // Role-based, not `[data-slot="sidebar"]`: AGENTS.md forbids CSS locators,
     // and the landmark is asserted to EXIST by SidebarNav.spec.ts, so this

@@ -26,13 +26,13 @@ const NuxtLinkStub = {
 
 function baseParticipant(overrides: Record<string, unknown> = {}) {
   return {
-    id: '1',
+    id: 1,
     candidate_ref: 'ref-001',
     display_name: 'Jane Doe',
     role_code: 'FLL',
     language: 'it',
     status: 'in_corso',
-    project_id: '1',
+    project_id: 1,
     started_at: null,
     completed_at: null,
     created_at: '2026-03-14T10:30:00Z',
@@ -73,7 +73,7 @@ describe('CandidateTable', () => {
 
   it('renders a DIFFERENT row set for a different participant list (proves real rendering, not a fixed fixture)', () => {
     const wrapper = mountTable({
-      participants: [baseParticipant({ id: '2', display_name: 'John Smith' })],
+      participants: [baseParticipant({ id: 2, display_name: 'John Smith' })],
     })
 
     expect(wrapper.find('a[href="/participants/2"]').text()).toContain('John Smith')

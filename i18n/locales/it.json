@@ -23,7 +23,8 @@
       "projects": "Progetti",
       "reports": "Report",
       "settings": "Impostazioni",
-      "review": "Resoconto sessione — BEAI"
+      "review": "Resoconto sessione — BEAI",
+      "profile": "Il mio profilo"
     }
   },
   "errors": {
@@ -54,7 +55,8 @@
     "reports": "Report",
     "settings": "Impostazioni",
     "logout": "Esci",
-    "avatarTemplates": "Template avatar"
+    "avatarTemplates": "Template avatar",
+    "profileLabel": "Profilo di {name}"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -390,6 +392,34 @@
       "state": "Stato",
       "actions": "Azioni",
       "empty": "Nessun utente ancora presente."
+    }
+  },
+  "profile": {
+    "title": "Il mio profilo",
+    "subtitle": "Il tuo account, visibile solo a te.",
+    "role": "Ruolo",
+    "organization": "Organizzazione",
+    "details": {
+      "title": "Dati account",
+      "name": "Nome",
+      "email": "Email",
+      "locale": "Lingua",
+      "nameRequired": "Inserisci il tuo nome.",
+      "emailRequired": "Inserisci il tuo indirizzo email.",
+      "emailInvalid": "Inserisci un indirizzo email valido.",
+      "saveError": "Non è stato possibile salvare il profilo. Controlla i campi evidenziati."
+    },
+    "password": {
+      "title": "Cambia password",
+      "current": "Password attuale",
+      "new": "Nuova password",
+      "confirm": "Conferma nuova password",
+      "usernameHint": "Email dell'account (per i gestori di password)",
+      "currentRequired": "Inserisci la tua password attuale.",
+      "newRequired": "Inserisci una nuova password.",
+      "newTooShort": "La nuova password deve contenere almeno 8 caratteri.",
+      "confirmMismatch": "Le password non coincidono.",
+      "saveError": "Non è stato possibile cambiare la password. Controlla i campi evidenziati."
     }
   },
   "reports": {

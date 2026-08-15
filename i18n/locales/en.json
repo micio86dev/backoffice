@@ -23,7 +23,8 @@
       "projects": "Projects",
       "reports": "Reports",
       "settings": "Settings",
-      "review": "Session review — BEAI"
+      "review": "Session review — BEAI",
+      "profile": "My profile"
     }
   },
   "errors": {
@@ -54,7 +55,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "logout": "Log out",
-    "avatarTemplates": "Avatar templates"
+    "avatarTemplates": "Avatar templates",
+    "profileLabel": "{name}'s profile"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -390,6 +392,34 @@
       "state": "State",
       "actions": "Actions",
       "empty": "No users yet."
+    }
+  },
+  "profile": {
+    "title": "My profile",
+    "subtitle": "Your own account — visible to no one but you.",
+    "role": "Role",
+    "organization": "Organization",
+    "details": {
+      "title": "Account details",
+      "name": "Name",
+      "email": "Email",
+      "locale": "Language",
+      "nameRequired": "Enter your name.",
+      "emailRequired": "Enter your email address.",
+      "emailInvalid": "Enter a valid email address.",
+      "saveError": "The profile could not be saved. Please review the highlighted fields."
+    },
+    "password": {
+      "title": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Confirm new password",
+      "usernameHint": "Account email (for password managers)",
+      "currentRequired": "Enter your current password.",
+      "newRequired": "Enter a new password.",
+      "newTooShort": "The new password must be at least 8 characters.",
+      "confirmMismatch": "The passwords do not match.",
+      "saveError": "The password could not be changed. Please review the highlighted fields."
     }
   },
   "reports": {

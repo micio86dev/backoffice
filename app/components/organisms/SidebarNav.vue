@@ -27,6 +27,32 @@
         </SidebarMenu>
       </SidebarGroup>
     </SidebarContent>
+
+    <!--
+      Shell identity (user-profile-self-service, design D7) — replaces the
+      literal "BEAI" header above as the shell's only identity element.
+      Deliberately NOT in NavBar: that row already carries a truncating
+      ORGANIZATION string plus Help plus Logout, and a second identity
+      element there would make "who" and "where" compete.
+    -->
+    <SidebarFooter v-if="currentUserName">
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton as-child>
+            <NuxtLink
+              to="/profile"
+              data-testid="sidebar-footer-identity"
+              :aria-label="$t('nav.profileLabel', { name: currentUserName })"
+            >
+              <Avatar size="sm" aria-hidden="true" data-testid="sidebar-footer-avatar">
+                <AvatarFallback>{{ initials(currentUserName) }}</AvatarFallback>
+              </Avatar>
+              <span>{{ currentUserName }}</span>
+            </NuxtLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarFooter>
   </Sidebar>
 </template>
 
@@ -38,15 +64,20 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
+import { onMounted, ref } from 'vue'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { useCurrentUser } from '@/composables/useCurrentUser'
+import { initials } from '@/utils/initials'
 
 // Nav items per DESIGN.md §8.1 (Dashboard / Projects / Candidates / Reports /
 // Settings). "Candidates" is the product-facing label for the Participant
@@ -79,4 +110,17 @@ function isCurrent(to: string): boolean {
 
   return normalize(route.path) === normalize(to)
 }
+
+// Shell identity (design D7). Silent on failure, same discipline as
+// NavBar.vue's organization fetch — a transient error here must not break
+// navigation, and the footer simply omits identity rather than showing one.
+const currentUserName = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    currentUserName.value = (await useCurrentUser().ensureLoaded()).user.name
+  } catch {
+    currentUserName.value = null
+  }
+})
 </script>

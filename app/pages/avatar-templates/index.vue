@@ -234,7 +234,7 @@ onMounted(async () => {
   try {
     // Affordance only — the server enforces. Failing closed keeps a transient
     // error from handing an operator controls they cannot use.
-    isAdmin.value = (await useCurrentUser().fetchMe()).roles.includes('admin')
+    isAdmin.value = (await useCurrentUser().ensureLoaded()).roles.includes('admin')
   } catch {
     isAdmin.value = false
   }

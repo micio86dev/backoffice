@@ -399,6 +399,17 @@
     "subtitle": "Il tuo account, visibile solo a te.",
     "role": "Ruolo",
     "organization": "Organizzazione",
+    "photo": {
+      "title": "Foto profilo",
+      "inputLabel": "Carica una foto profilo",
+      "change": "Cambia foto",
+      "remove": "Rimuovi foto",
+      "confirmRemoveTitle": "Rimuovere la foto profilo?",
+      "confirmRemoveDescription": "Questa operazione elimina la foto salvata. Potrai caricarne una nuova in qualsiasi momento.",
+      "tooLarge": "La foto è troppo grande. Scegli un file fino a 2 MB.",
+      "uploadError": "Non è stato possibile caricare la foto. Controlla il campo evidenziato.",
+      "removeError": "Non è stato possibile rimuovere la foto. Riprova."
+    },
     "details": {
       "title": "Dati account",
       "name": "Nome",

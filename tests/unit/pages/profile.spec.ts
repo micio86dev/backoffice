@@ -21,6 +21,7 @@ function profileResponse() {
       locale: 'en',
       role: 'operator',
       organization: { id: 1, name: 'Acme' },
+      photo_url: null,
     },
   }
 }

@@ -221,3 +221,46 @@ describe('SidebarNav — shell identity (design D7)', () => {
     expect(wrapper.find('[data-testid="sidebar-footer-identity"]').exists()).toBe(false)
   })
 })
+
+// user-avatar-image, design D6: AvatarImage (reka-ui) renders only after a
+// successful `load` event on the underlying Image; until then — and on any
+// error — AvatarFallback holds the slot. jsdom never fires that `load`
+// event for an <img>/Image() by default, so a photo_url that never
+// completes loading is functionally indistinguishable, from this unit
+// test's vantage point, from one that fails outright — exactly the "broken
+// or expired photo URL falls back to initials" claim. The POSITIVE case
+// (a real photo successfully rendering) is proved in Playwright (task 9.1),
+// where an actual browser can complete a real image load.
+describe('SidebarNav — broken photo URL falls back to initials (design D6)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    vi.stubGlobal(
+      'useRoute',
+      vi.fn(() => ({ path: '/', fullPath: '/', params: {}, query: {} }))
+    )
+  })
+
+  it('falls back to initials when the current user has a photo_url that never finishes loading', async () => {
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: {
+        id: 1,
+        name: 'Ada Lovelace',
+        email: 'ada@example.test',
+        locale: 'en',
+        photo_url: 'https://example.test/broken.jpg',
+      },
+      organization: null,
+      roles: ['operator'],
+    })
+
+    const wrapper = mountSidebarNav('/')
+    await waitFor(
+      () => wrapper.find('[data-testid="sidebar-footer-identity"]').exists(),
+      'the SidebarFooter identity link to render'
+    )
+    await flushPromises()
+
+    const avatar = wrapper.get('[data-testid="sidebar-footer-avatar"]')
+    expect(avatar.text()).toBe('AL')
+  })
+})

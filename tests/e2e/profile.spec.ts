@@ -21,7 +21,7 @@ const ORGANIZATION = {
 }
 
 const ME = {
-  user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.com', locale: 'en' },
+  user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.com', locale: 'en', photo_url: null },
   organization: { id: 1, name: 'Acme' },
   roles: ['operator'],
 }
@@ -38,8 +38,17 @@ const PROFILE = {
     locale: 'en',
     role: 'operator',
     organization: { id: 1, name: 'Acme' },
+    photo_url: null as string | null,
   },
 }
+
+// A real, decodable 1x1 PNG — the browser must actually load it for the
+// "image appears" assertion below to mean anything (user-avatar-image,
+// design D6/task 9.1).
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64'
+)
 
 async function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -49,7 +58,7 @@ function isDataRequest(route: Route): boolean {
   return route.request().resourceType() !== 'document'
 }
 
-async function mockAdminApi(page: Page): Promise<void> {
+async function mockAdminApi(page: Page, options: { photoUrl?: string | null } = {}): Promise<void> {
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -65,7 +74,13 @@ async function mockAdminApi(page: Page): Promise<void> {
   )
   await page.route(
     (url) => url.pathname === '/auth/me',
-    (route) => (isDataRequest(route) ? jsonRoute(route, ME) : route.continue())
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            ...ME,
+            user: { ...ME.user, photo_url: options.photoUrl ?? ME.user.photo_url },
+          })
+        : route.continue()
   )
 }
 
@@ -214,5 +229,164 @@ test.describe('Profile page (user-profile-self-service)', () => {
     await expect(page.getByLabel('Password attuale', { exact: true })).toHaveValue('')
     await page.waitForTimeout(200)
     expect(sawNewToken).toBe(true)
+  })
+
+  // user-avatar-image (design D6, task 9.1). This case doubles as the
+  // detector for the ofetch/FormData assumption in useProfile.ts's
+  // uploadPhoto: if apiFetch ever stopped forwarding a FormData body
+  // untouched, the mocked POST below would never see a real file and this
+  // test would fail loudly rather than the assumption silently rotting.
+  const PHOTO_URL = 'https://example.test/photos/current.png'
+
+  test('setting a photo uploads it and the avatar shows it', async ({ page }) => {
+    await mockAdminApi(page)
+    // Stateful across GET /profile and POST /profile/photo: profile.vue's
+    // onSaved reloads via GET /profile after the upload resolves (design
+    // D6), so the mock must reflect the upload — a GET that always returns
+    // the pre-upload snapshot would make this assertion pass or fail for
+    // the wrong reason.
+    let currentPhotoUrl: string | null = null
+    await page.route(
+      (url) => url.pathname === '/profile',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, { data: profileData({ photo_url: currentPhotoUrl }) })
+          : route.continue()
+    )
+    await page.route(
+      (url) => url.pathname === '/profile/photo',
+      (route) => {
+        if (route.request().method() !== 'POST') return route.continue()
+        currentPhotoUrl = PHOTO_URL
+        return jsonRoute(route, { data: profileData({ photo_url: currentPhotoUrl }) })
+      }
+    )
+    await page.route(
+      (url) => url.href === PHOTO_URL,
+      (route) => route.fulfill({ status: 200, contentType: 'image/png', body: ONE_PIXEL_PNG })
+    )
+    await login(page)
+    await page.goto('/profile')
+    await dismissConsent(page)
+
+    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
+
+    await page
+      .getByLabel('Carica una foto profilo')
+      .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: ONE_PIXEL_PNG })
+
+    await expect(page.getByTestId('profile-photo-avatar-image')).toBeVisible()
+  })
+
+  // Post-apply verification finding (CRITICAL 2): user-self-service spec.md
+  // "A broken or expired photo URL falls back to initials" and admin-
+  // backoffice spec.md "A failed photo load falls back to initials in the
+  // shell" both require a FAILED load to fall back — SidebarNav.spec.ts
+  // (jsdom) cannot distinguish "never finishes loading" from "failed to
+  // load", and until now no Playwright case injected a real failure either
+  // (both prior cases mocked the photo with status: 200). These two cases
+  // close that gap in a real browser, on both surfaces the photo_url reaches
+  // (the shell's SidebarFooter, via /auth/me, and /profile's own header +
+  // ProfilePhotoForm avatar).
+  test('a 404 photo URL falls back to initials, in the shell and on the page', async ({ page }) => {
+    await mockAdminApi(page, { photoUrl: PHOTO_URL })
+    await page.route(
+      (url) => url.pathname === '/profile',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, { data: profileData({ photo_url: PHOTO_URL }) })
+          : route.continue()
+    )
+    await page.route(
+      (url) => url.href === PHOTO_URL,
+      (route) => route.fulfill({ status: 404 })
+    )
+    await login(page)
+    await page.goto('/profile')
+    await dismissConsent(page)
+
+    // NOT toHaveCount(0): reka-ui's AvatarImage stays mounted in the DOM
+    // whenever photoUrl is truthy (v-if is bound to the URL's presence, not
+    // its load status) — the load-failure signal toggles VISIBILITY only,
+    // via an internal v-show keyed on imageLoadingStatus. Asserting count(0)
+    // here was this test's own first-draft bug, caught by its own RED: the
+    // element legitimately exists, hidden, and toHaveCount(0) never
+    // distinguishes "hidden" from "absent".
+    await expect(page.getByTestId('sidebar-footer-avatar-fallback')).toBeVisible()
+    await expect(page.getByTestId('sidebar-footer-avatar-image')).not.toBeVisible()
+    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-avatar-image')).not.toBeVisible()
+  })
+
+  test('an aborted photo request falls back to initials, in the shell and on the page', async ({
+    page,
+  }) => {
+    await mockAdminApi(page, { photoUrl: PHOTO_URL })
+    await page.route(
+      (url) => url.pathname === '/profile',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, { data: profileData({ photo_url: PHOTO_URL }) })
+          : route.continue()
+    )
+    await page.route(
+      (url) => url.href === PHOTO_URL,
+      (route) => route.abort('connectionrefused')
+    )
+    await login(page)
+    await page.goto('/profile')
+    await dismissConsent(page)
+
+    // NOT toHaveCount(0): reka-ui's AvatarImage stays mounted in the DOM
+    // whenever photoUrl is truthy (v-if is bound to the URL's presence, not
+    // its load status) — the load-failure signal toggles VISIBILITY only,
+    // via an internal v-show keyed on imageLoadingStatus. Asserting count(0)
+    // here was this test's own first-draft bug, caught by its own RED: the
+    // element legitimately exists, hidden, and toHaveCount(0) never
+    // distinguishes "hidden" from "absent".
+    await expect(page.getByTestId('sidebar-footer-avatar-fallback')).toBeVisible()
+    await expect(page.getByTestId('sidebar-footer-avatar-image')).not.toBeVisible()
+    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-avatar-image')).not.toBeVisible()
+  })
+
+  test('removing a photo goes through ConfirmDialog, then initials return', async ({ page }) => {
+    await mockAdminApi(page)
+    let currentPhotoUrl: string | null = PHOTO_URL
+    let deleteCalled = false
+    await page.route(
+      (url) => url.pathname === '/profile',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, { data: profileData({ photo_url: currentPhotoUrl }) })
+          : route.continue()
+    )
+    await page.route(
+      (url) => url.href === PHOTO_URL,
+      (route) => route.fulfill({ status: 200, contentType: 'image/png', body: ONE_PIXEL_PNG })
+    )
+    await page.route(
+      (url) => url.pathname === '/profile/photo',
+      (route) => {
+        if (route.request().method() !== 'DELETE') return route.continue()
+        deleteCalled = true
+        currentPhotoUrl = null
+        return jsonRoute(route, { data: profileData({ photo_url: null }) })
+      }
+    )
+    await login(page)
+    await page.goto('/profile')
+    await dismissConsent(page)
+
+    await expect(page.getByTestId('profile-photo-avatar-image')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Rimuovi foto' }).click()
+    await expect(page.getByRole('alertdialog')).toBeVisible()
+    expect(deleteCalled).toBe(false)
+
+    await page.getByTestId('confirm-dialog-confirm').click()
+
+    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
+    expect(deleteCalled).toBe(true)
   })
 })

@@ -170,4 +170,35 @@ test.describe('every bare input declares autocomplete (admin-backoffice spec, D7
     await expect(page.getByTestId('user-form')).toBeVisible()
     await expectEveryInputToDeclareAutocomplete(page)
   })
+
+  // user-profile-self-service, design D8: ProfileDetailsForm keeps
+  // autocomplete="off" (the ratified rule); ProfilePasswordForm is the
+  // second legitimate exception after login.vue — current-password, then
+  // new-password on both new fields, plus a hidden username field.
+  test('the /profile account and password forms', async ({ page }) => {
+    await mockAdminApi(page)
+    await page.route(
+      (url) => url.pathname === '/profile',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              data: {
+                id: 1,
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                locale: 'en',
+                role: 'admin',
+                organization: { id: 1, name: 'Acme' },
+              },
+            })
+          : route.continue()
+    )
+    await login(page)
+    await page.goto('/profile')
+
+    await expect(page.getByTestId('profile-details-form')).toBeVisible()
+    await expect(page.getByTestId('profile-password-form')).toBeVisible()
+
+    await expectEveryInputToDeclareAutocomplete(page)
+  })
 })

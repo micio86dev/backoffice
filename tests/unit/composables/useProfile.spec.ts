@@ -54,4 +54,31 @@ describe('useProfile', () => {
     })
     expect(result).toEqual({ access_token: 'new-token', token_type: 'bearer' })
   })
+
+  // user-avatar-image (design D6): apiFetch forwards options.body untouched
+  // and ofetch does not JSON-serialise a FormData body — so uploadPhoto
+  // builds and sends a real FormData, never a JSON object, with no useApi.ts
+  // change required. The E2E case in Phase 9 is what verifies ofetch itself
+  // never coerces it; this test only proves useProfile builds it correctly.
+  it('uploads a photo as multipart FormData under the "photo" field — POST, no id', async () => {
+    apiFetch.mockResolvedValue({ data: { photo_url: 'https://example.test/signed.jpg' } })
+    const file = new File(['bytes'], 'photo.jpg', { type: 'image/jpeg' })
+
+    await useProfile().uploadPhoto(file)
+
+    expect(apiFetch).toHaveBeenCalledTimes(1)
+    const [path, options] = apiFetch.mock.calls[0] as [string, { method: string; body: FormData }]
+    expect(path).toBe('/profile/photo')
+    expect(options.method).toBe('POST')
+    expect(options.body).toBeInstanceOf(FormData)
+    expect(options.body.get('photo')).toBe(file)
+  })
+
+  it('removes the photo with DELETE — no id in the path, ever', async () => {
+    apiFetch.mockResolvedValue({ data: { photo_url: null } })
+
+    await useProfile().deletePhoto()
+
+    expect(apiFetch).toHaveBeenCalledWith('/profile/photo', { method: 'DELETE' })
+  })
 })

@@ -20,20 +20,21 @@ import { checkA11y } from './fixtures/a11y'
  */
 
 const DRAFT_PROJECT = {
-  id: '1',
-  organization_id: '1',
-  framework_version_id: '3',
+  id: 1,
+  organization_id: 1,
+  framework_version_id: 3,
   slug: 'draft-project',
   name: 'Draft Project',
   assessment_type: 'standard',
   role_code: 'FLL',
   language: 'en',
   status: 'draft',
-  pause_every_n_competencies: '3',
-  nudge_min_chars: '40',
+  pause_every_n_competencies: 3,
+  nudge_min_chars: 40,
   exit_redirect_url: null,
   webhook_url: null,
-  webhook_events: '[]',
+  webhook_events: [],
+  has_webhook_secret: false,
   deadline_at: null,
   goes_live_at: null,
   created_at: '2026-03-01T10:00:00Z',
@@ -44,7 +45,7 @@ const DRAFT_PROJECT = {
 
 const ACTIVE_PROJECT = {
   ...DRAFT_PROJECT,
-  id: '2',
+  id: 2,
   slug: 'active-project',
   name: 'Active Project',
   status: 'active',
@@ -80,7 +81,7 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
     (route) => {
       if (!isDataRequest(route)) return route.continue()
       if (route.request().method() === 'POST') {
-        const project = { ...DRAFT_PROJECT, id: '9', name: 'New E2E Project' }
+        const project = { ...DRAFT_PROJECT, id: 9, name: 'New E2E Project' }
         created.push(project)
 
         return jsonRoute(route, { data: project }, 201)

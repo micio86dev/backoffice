@@ -26,7 +26,8 @@
           <TableCell>{{ user.name }}</TableCell>
           <TableCell>{{ user.email }}</TableCell>
           <TableCell>
-            <AccessLevelBadge :role="String(user.role)" />
+            <AccessLevelBadge v-if="user.role !== null" :role="user.role" />
+            <span v-else>—</span>
           </TableCell>
           <TableCell>
             <UserStateBadge :deactivated="user.is_deactivated" />

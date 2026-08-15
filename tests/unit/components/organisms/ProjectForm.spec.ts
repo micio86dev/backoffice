@@ -27,20 +27,21 @@ const ProjectForm = (await import('../../../../app/components/organisms/ProjectF
 
 function activeProject(overrides: Record<string, unknown> = {}) {
   return {
-    id: '1',
-    organization_id: '1',
-    framework_version_id: '3',
+    id: 1,
+    organization_id: 1,
+    framework_version_id: 3,
     slug: 'demo-project',
     name: 'Demo Project',
     assessment_type: 'standard',
     role_code: 'FLL',
     language: 'en',
     status: 'active',
-    pause_every_n_competencies: '3',
-    nudge_min_chars: '40',
+    pause_every_n_competencies: 3,
+    nudge_min_chars: 40,
     exit_redirect_url: null,
     webhook_url: null,
-    webhook_events: '[]',
+    webhook_events: [],
+    has_webhook_secret: false,
     deadline_at: null,
     goes_live_at: null,
     created_at: '2026-03-01T10:00:00Z',
@@ -536,7 +537,7 @@ describe('ProjectForm — archive requires confirmation (D7)', () => {
 
   it('confirming archives with { status: "archived" } and settles saving back to false', async () => {
     const wrapper = mount(ProjectForm, {
-      props: { project: activeProject({ status: 'active', id: '7' }) },
+      props: { project: activeProject({ status: 'active', id: 7 }) },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -546,7 +547,7 @@ describe('ProjectForm — archive requires confirmation (D7)', () => {
     await flushPromises()
     await confirmDialog('confirm')
 
-    expect(updateProjectMock).toHaveBeenCalledWith('7', { status: 'archived' })
+    expect(updateProjectMock).toHaveBeenCalledWith(7, { status: 'archived' })
     expect(
       wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
     ).toBeUndefined()

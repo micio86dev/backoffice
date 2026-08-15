@@ -231,7 +231,6 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass } from '@/components/ui/form-control'
 import { getErrorFields } from '@/utils/http-error'
-import { parseConfigError } from '@/utils/avatar-template-config-error'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 
 const props = defineProps<{
@@ -423,24 +422,25 @@ function validateAllConfigFields(): boolean {
 }
 
 /**
- * Per-field 422s, and the string contract nobody documented (D3). Verified in
- * the API: `AvatarTemplateController.php:234-239` throws
- * `ValidationException::withMessages(['config' => ["{$key}: {$code}", …]])` —
- * a SINGLE `config` key holding N flattened strings, not per-knob keys. This
- * is why the watcher below reads `getErrorFields` directly rather than going
- * through `applyServerFieldErrors`: that shared mapper takes only the FIRST
- * message per server field (the normal Laravel shape, one message per key),
- * which would silently drop every knob but the first under `config`. `name`
- * and `description` — ordinary single-message top-level fields — still go
+ * Per-field 422s, keyed per knob (generated-client-truth-and-session-safety
+ * D6). `AvatarTemplateController::assertConfigValid` now throws
+ * `ValidationException::withMessages(['config.{key}' => $code, ...])` — one
+ * `config.{knob}` server key per invalid knob, never a single flattened
+ * `config` array. This is why the watcher below reads `getErrorFields`
+ * directly rather than going through `applyServerFieldErrors`: that shared
+ * mapper assigns by an EXACT key match, and there is no one static key to
+ * assign `config.avatarId`/`config.voiceSpeed`/… onto. `name` and
+ * `description` — ordinary single-message top-level fields — still go
  * through the same first-message convention as every other form.
  *
- * `parseConfigError` (this file's counterpart the API's own comment names)
- * splits each `config` message at the first `': '`; a parsed message is
- * claimed onto its control only when its key names a field THIS provider
- * currently renders — otherwise it stays in the summary, exactly like a
- * message this parser could not split at all. That total, safe fallback is
- * what makes a knob a since-changed provider spec no longer exposes still
- * reach the operator.
+ * The key IS the knob now — no `parseConfigError` message-text parsing. A
+ * `config.{key}` entry is claimed onto its control only when the key names a
+ * field THIS provider currently renders — otherwise it stays in the summary,
+ * same total fallback as before. That is what makes a knob a since-changed
+ * provider spec no longer exposes still reach the operator. The bare
+ * `config` key (non-array `config`) is handled by the generic top-level
+ * branch below and lands in the summary — it can never co-occur with a
+ * `config.*` key (disjoint by construction, per the API).
  */
 watch(
   () => props.submitError,
@@ -454,32 +454,30 @@ watch(
     if (fields === null) return
 
     const activeKeys = new Set(activeFields.value.map((field) => field.key))
+    const CONFIG_PREFIX = 'config.'
 
     for (const [serverField, messages] of Object.entries(fields)) {
-      if (serverField === 'config') {
-        for (const message of messages) {
-          const parsed = parseConfigError(message)
+      const message = messages?.[0]
+      if (message === undefined) continue
 
-          if (parsed !== null && activeKeys.has(parsed.key)) {
-            const translationKey = `avatar_templates.error.config.${parsed.code}`
-            // Falls back to the RAW server message when the code has no
-            // translation — an untranslated code the operator can at least
-            // read beats an i18n key echoed back as if it were prose. `te`
-            // is optional here defensively: every REAL i18n instance
-            // provides it, but a test double that only stubs `t` should not
-            // crash the whole watcher.
-            const hasTranslation = typeof te === 'function' ? te(translationKey) : true
-            configErrors.value[parsed.key] = hasTranslation ? t(translationKey) : message
-          } else {
-            unmappedErrors.value.push(message)
-          }
+      if (serverField.startsWith(CONFIG_PREFIX)) {
+        const key = serverField.slice(CONFIG_PREFIX.length)
+
+        if (activeKeys.has(key)) {
+          const translationKey = `avatar_templates.error.config.${message}`
+          // Falls back to the RAW server code when it has no translation —
+          // an untranslated code the operator can at least read beats an
+          // i18n key echoed back as if it were prose. `te` is optional here
+          // defensively: every REAL i18n instance provides it, but a test
+          // double that only stubs `t` should not crash the whole watcher.
+          const hasTranslation = typeof te === 'function' ? te(translationKey) : true
+          configErrors.value[key] = hasTranslation ? t(translationKey) : message
+        } else {
+          unmappedErrors.value.push(message)
         }
 
         continue
       }
-
-      const message = messages?.[0]
-      if (message === undefined) continue
 
       if (serverField === 'name') nameError.value = message
       else if (serverField === 'description') descriptionError.value = message

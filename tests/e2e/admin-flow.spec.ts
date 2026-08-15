@@ -17,13 +17,13 @@ import { checkA11y } from './fixtures/a11y'
  */
 
 const PARTICIPANT = {
-  id: '1',
+  id: 1,
   candidate_ref: 'ref-001',
   display_name: 'Mario Rossi',
   role_code: 'FLL',
   language: 'it',
   status: 'completato',
-  project_id: '1',
+  project_id: 1,
   started_at: '2026-03-14T09:00:00Z',
   completed_at: '2026-03-14T10:00:00Z',
   created_at: '2026-03-14T08:30:00Z',

@@ -72,23 +72,11 @@ async function mockAdminApi(page: Page): Promise<void> {
   )
   await page.route(
     (url) => url.pathname === '/m2m/clients',
-    (route) =>
-      isDataRequest(route)
-        ? jsonRoute(route, {
-            data: [API_CLIENT],
-            links: { first: null, last: null, prev: null, next: null },
-            meta: {
-              current_page: 1,
-              from: 1,
-              last_page: 1,
-              links: [],
-              path: '',
-              per_page: 20,
-              to: 1,
-              total: 1,
-            },
-          })
-        : route.continue()
+    // Unpaginated (generated-client-truth-and-session-safety D5) — the mock
+    // carries only `data`, matching the real envelope; a `links`/`meta`
+    // pagination wrapper would be a fixture asserting a contract the
+    // endpoint no longer has.
+    (route) => (isDataRequest(route) ? jsonRoute(route, { data: [API_CLIENT] }) : route.continue())
   )
   await page.route(
     (url) => url.pathname === '/m2m/abilities',
@@ -101,6 +89,31 @@ async function mockAdminApi(page: Page): Promise<void> {
     (url) => url.pathname === '/projects',
     (route) => (isDataRequest(route) ? jsonRoute(route, { data: [] }) : route.continue())
   )
+  // ProjectForm's `onMounted` calls `loadCompetencyOptions()`, which fetches
+  // this endpoint whenever a role is selected. Left unmocked (generated-
+  // client-truth-and-session-safety D7 diagnosis), a request here goes to
+  // the real dev server with non-deterministic latency and a `catch` that
+  // silently empties the options — closing that variance is what the
+  // retrying assertions below need to be meaningful, not a substitute for
+  // them.
+  await page.route(
+    (url) => /^\/framework\/roles\/[^/]+\/competencies$/.test(url.pathname),
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            data: [
+              {
+                id: 1,
+                code: 'PRS',
+                name: 'Problem solving',
+                definition: 'x',
+                type: 'standard',
+                bars_available: true,
+              },
+            ],
+          })
+        : route.continue()
+  )
 }
 
 async function login(page: Page): Promise<void> {
@@ -111,20 +124,32 @@ async function login(page: Page): Promise<void> {
   await expect(page).toHaveURL('/')
 }
 
-/** Every real (non-file, non-checkbox) input on the page must self-declare autocomplete. */
+/**
+ * Every real (non-file, non-checkbox) input on the page must self-declare
+ * autocomplete.
+ *
+ * Retrying assertions throughout (generated-client-truth-and-session-safety
+ * D7) — a one-shot `count()` followed by one-shot `getAttribute()` calls
+ * (neither auto-retries) can observe the control set mid-render: the async
+ * `ProjectForm` chunk and its own async competency fetch can still be
+ * settling after `getByTestId('project-form')` becomes visible. `toHaveCount`
+ * polls until the expected count holds, and `toHaveAttribute` polls until the
+ * attribute is present — closing the class of bug the mock above only
+ * removes the VARIANCE for.
+ */
 async function expectEveryInputToDeclareAutocomplete(page: Page): Promise<void> {
   const inputs = page.locator('form input:not([type="file"]):not([type="checkbox"])')
   const count = await inputs.count()
+  await expect(inputs).toHaveCount(count)
   expect(count).toBeGreaterThan(0)
 
   for (let i = 0; i < count; i++) {
     const input = inputs.nth(i)
-    const autocomplete = await input.getAttribute('autocomplete')
     const testId = await input.getAttribute('data-testid')
-    expect(
-      autocomplete,
+    await expect(
+      input,
       `input [data-testid="${testId}"] has no autocomplete attribute`
-    ).toBeTruthy()
+    ).toHaveAttribute('autocomplete', /.+/)
   }
 }
 

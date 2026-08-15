@@ -147,9 +147,10 @@ const isEditing = props.user !== null
 const name = ref(props.user?.name ?? '')
 const email = ref(props.user?.email ?? '')
 const password = ref('')
-const role = ref<(typeof ACCESS_LEVELS)[number]>(
-  (props.user?.role as (typeof ACCESS_LEVELS)[number]) ?? 'operator'
-)
+// ACCESS_LEVELS equals App\Enums\OrgRole::values() (admin/operator/viewer) —
+// the generated client's `role` type is that exact union plus null, so no
+// cast is needed to narrow it (design.md D3, task 4.5).
+const role = ref<(typeof ACCESS_LEVELS)[number]>(props.user?.role ?? 'operator')
 
 const saving = ref(false)
 const formMessage = ref<string | null>(null)

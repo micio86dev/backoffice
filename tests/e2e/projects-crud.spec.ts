@@ -51,6 +51,28 @@ const ACTIVE_PROJECT = {
   status: 'active',
 }
 
+// bars-coverage-visibility Phase 4 D7 — a project that already holds a
+// competency with no BARS anchors for its role. Draft, so the edit form is
+// not locked and the remediation path (uncheck, save) is reachable.
+const UNCOVERED_PROJECT = {
+  ...DRAFT_PROJECT,
+  id: 3,
+  slug: 'uncovered-project',
+  name: 'Uncovered Project',
+  status: 'draft',
+  competencies: [{ id: 3, code: 'JDG', type: 'standard', position: 0 }],
+}
+
+// Mixed bars_available (bars-coverage-visibility) — reused by mockAdminApi's
+// default `/framework/roles/*/competencies` route below AND by the
+// uncovered-competency test, which re-registers the same route (last
+// registered wins) purely to document why JDG is the fixture's uncovered one.
+const MIXED_COVERAGE_COMPETENCIES = [
+  { id: 1, code: 'PRS', name: 'Problem Solving', type: 'standard', bars_available: true },
+  { id: 2, code: 'COM', name: 'Communication', type: 'standard', bars_available: true },
+  { id: 3, code: 'JDG', name: 'Judgement', type: 'standard', bars_available: false },
+]
+
 async function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
@@ -87,7 +109,9 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
         return jsonRoute(route, { data: project }, 201)
       }
 
-      return jsonRoute(route, { data: [DRAFT_PROJECT, ACTIVE_PROJECT, ...created] })
+      return jsonRoute(route, {
+        data: [DRAFT_PROJECT, ACTIVE_PROJECT, UNCOVERED_PROJECT, ...created],
+      })
     }
   )
   await page.route(
@@ -100,17 +124,16 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
   // the form. Without this mock the competency picker renders "no competencies
   // available", so the form can never be completed and the create test can only
   // ever fail on validation rather than on the behaviour it means to cover.
+  //
+  // MIXED coverage (bars-coverage-visibility): JDG carries bars_available:
+  // false so the picker's disable-for-selection rule has something real to
+  // exercise across every test that shares this default mock.
   await page.route(
     (url) => /^\/framework\/roles\/[A-Z]+\/competencies$/.test(url.pathname),
     (route) => {
       if (!isDataRequest(route)) return route.continue()
 
-      return jsonRoute(route, {
-        data: [
-          { id: 1, code: 'PRS', name: 'Problem Solving', type: 'standard', bars_available: true },
-          { id: 2, code: 'COM', name: 'Communication', type: 'standard', bars_available: true },
-        ],
-      })
+      return jsonRoute(route, { data: MIXED_COVERAGE_COMPETENCIES })
     }
   )
 }
@@ -206,6 +229,82 @@ test.describe('Projects CRUD (Unit 2b)', () => {
     // reads its ORIGINAL status — cancelling touched nothing.
     await page.keyboard.press('Escape')
     await expect(page.getByRole('row', { name: /Active Project/ })).toBeVisible()
+  })
+
+  // bars-coverage-visibility Phase 4 D7 — disable-for-selection, never for
+  // deselection, end to end: create refuses an uncovered competency; the
+  // edit form for a project that already holds one lets the operator see it
+  // and remove it; reopening confirms it is gone.
+  test('an uncovered competency is disabled on create, and can be removed from an existing project via the edit form', async ({
+    page,
+  }) => {
+    await mockAdminApi(page)
+
+    // Stateful PATCH/GET so "reopen -> gone" is provable — mirrors the
+    // create test's stateful POST above, applied to the edit path instead.
+    let patchedCompetencies: Array<{
+      id: number
+      code: string
+      type: string
+      position: number
+    }> | null = null
+    await page.route(
+      (url) => /^\/projects\/\d+$/.test(url.pathname),
+      (route) => {
+        if (route.request().method() !== 'PATCH') return route.continue()
+        const body = route.request().postDataJSON() as { competency_ids?: number[] }
+        const ids = body.competency_ids ?? []
+        patchedCompetencies = MIXED_COVERAGE_COMPETENCIES.filter((c) => ids.includes(c.id)).map(
+          (c, position) => ({ id: c.id, code: c.code, type: c.type, position })
+        )
+        return jsonRoute(route, {
+          data: { ...UNCOVERED_PROJECT, competencies: patchedCompetencies },
+        })
+      }
+    )
+    await page.route(
+      (url) => url.pathname === '/projects',
+      (route) => {
+        if (!isDataRequest(route)) return route.continue()
+        if (route.request().method() === 'POST') return route.continue()
+        const current = patchedCompetencies
+          ? { ...UNCOVERED_PROJECT, competencies: patchedCompetencies }
+          : UNCOVERED_PROJECT
+        return jsonRoute(route, { data: [DRAFT_PROJECT, ACTIVE_PROJECT, current] })
+      }
+    )
+
+    await login(page)
+    await page.getByRole('link', { name: 'Progetti' }).click()
+    await expect(page).toHaveURL('/projects')
+
+    // CREATE: an uncovered competency (Judgement, bars_available: false)
+    // cannot be newly selected.
+    await page.getByRole('button', { name: 'Nuovo progetto' }).click()
+    await page.getByRole('combobox', { name: 'Ruolo' }).click()
+    await page.getByRole('option', { name: 'Contributore individuale' }).click()
+    await expect(page.getByLabel('Judgement')).toBeDisabled()
+    await page.keyboard.press('Escape')
+
+    // EDIT: the already-attached uncovered competency renders checked AND
+    // enabled — the edit form is the remediation path, not a second trap.
+    await page
+      .getByRole('row', { name: /Uncovered Project/ })
+      .getByRole('button', { name: 'Modifica' })
+      .click()
+    const judgementCheckbox = page.getByLabel('Judgement')
+    await expect(judgementCheckbox).toBeChecked()
+    await expect(judgementCheckbox).toBeEnabled()
+
+    await judgementCheckbox.uncheck()
+    await page.getByRole('button', { name: 'Salva' }).click()
+
+    // REOPEN: it is gone.
+    await page
+      .getByRole('row', { name: /Uncovered Project/ })
+      .getByRole('button', { name: 'Modifica' })
+      .click()
+    await expect(page.getByLabel('Judgement')).not.toBeChecked()
   })
 
   test('the projects list is WCAG 2.1 AA clean', async ({ page }) => {

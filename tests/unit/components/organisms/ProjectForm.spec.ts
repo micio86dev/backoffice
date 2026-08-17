@@ -8,6 +8,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { confirmDialog } from '../../support/confirm'
+import { waitFor } from '../../support/wait-for'
+import CompetencyPicker from '../../../../app/components/molecules/CompetencyPicker.vue'
 
 const tMock = (key: string) => key
 
@@ -675,5 +677,152 @@ describe('ProjectForm — field help (D6)', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('projects.form.help.competencies')
+  })
+})
+
+// bars-coverage-visibility Phase 1 (design D2 "scope finding"): competencyIds
+// never hydrated from props.project.competencies and never appeared in
+// either submit payload. Hydration and submission MUST land together —
+// submission alone would make the next save of an untouched project call
+// sync([]) and wipe its competency set.
+describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-loss guard)', () => {
+  it('hydrates the picker modelValue from props.project.competencies on mount', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue({
+      data: [{ id: 7, code: 'COL', name: 'Collaboration', bars_available: true }],
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          competencies: [{ id: 7, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    const picker = wrapper.findComponent(CompetencyPicker)
+    expect(picker.props('modelValue')).toEqual([7])
+  })
+
+  it('submits competency_ids in the update payload on an unmodified save (not omitted, not emptied)', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue({
+      data: [{ id: 7, code: 'COL', name: 'Collaboration', bars_available: true }],
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          competencies: [{ id: 7, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateProjectMock).toHaveBeenCalled()
+    const [, payload] = updateProjectMock.mock.calls[0] as [string, Record<string, unknown>]
+    expect(payload.competency_ids).toEqual([7])
+  })
+
+  it('includes competency_ids as an array in the create payload (potential assessment, no role)', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+    await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    await wrapper
+      .get('[data-testid="project-form-assessment-type"] button:last-child')
+      .trigger('click')
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(createProjectMock).toHaveBeenCalled()
+    const [payload] = createProjectMock.mock.calls[0] as [Record<string, unknown>]
+    expect(payload.competency_ids).toEqual([])
+  })
+})
+
+// bars-coverage-visibility Phase 3 (design D2): coverage is a property of the
+// role×competency PAIR, not of the competency alone, so it MUST re-evaluate
+// when role_code changes. The archived regression note this guards against:
+// a previous fix here survived because unit tests mocked the composable and
+// never actually drove the Select — this test drives the REAL control.
+describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () => {
+  it("flips the picker's coverage flags and collapses persistedIds to [] when the role Select changes", async () => {
+    fetchRoleCompetenciesMock.mockImplementation((roleCode: string) => {
+      if (roleCode === 'ICO') {
+        return Promise.resolve({
+          data: [{ id: 1, code: 'COL', name: 'Collaboration', bars_available: true }],
+        })
+      }
+      if (roleCode === 'FLL') {
+        return Promise.resolve({
+          data: [{ id: 2, code: 'STG', name: 'Strategy', bars_available: false }],
+        })
+      }
+      return Promise.resolve({ data: [] })
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          role_code: 'ICO',
+          competencies: [{ id: 1, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    // Before the role change: options reflect ICO's coverage, and
+    // persistedIds carries the project's ORIGINAL role's attached ids.
+    let picker = wrapper.findComponent(CompetencyPicker)
+    expect(picker.props('options')).toEqual([
+      { id: 1, code: 'COL', name: 'Collaboration', barsAvailable: true },
+    ])
+    expect(picker.props('persistedIds')).toEqual([1])
+
+    // Drive the REAL role Select — reka-ui's SelectTrigger opens on
+    // pointerdown, and SelectItem selects on pointerup.
+    const roleSelect = wrapper.get('[data-testid="project-form-role-code"]')
+    roleSelect.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await waitFor(
+      () => (document.body.textContent ?? '').includes('projects.roleCode.FLL'),
+      'the role select popup to render its options'
+    )
+
+    const flOption = Array.from(document.body.querySelectorAll('[role="option"]')).find((el) =>
+      (el.textContent ?? '').includes('projects.roleCode.FLL')
+    )
+    if (!flOption) throw new Error('FLL role option not found in the open Select popup')
+    flOption.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+    await flushPromises()
+
+    await waitFor(() => {
+      picker = wrapper.findComponent(CompetencyPicker)
+      const options = picker.props('options') as unknown[]
+      return options.length > 0 && (options[0] as { code: string }).code === 'STG'
+    }, 'the picker options to reload for the new role')
+
+    // After the role change: options reflect FLL's coverage (uncovered STG),
+    // and persistedIds has collapsed to [] — the ids were attached under the
+    // project's ORIGINAL role (ICO), not under FLL.
+    expect(picker.props('options')).toEqual([
+      { id: 2, code: 'STG', name: 'Strategy', barsAvailable: false },
+    ])
+    expect(picker.props('persistedIds')).toEqual([])
+
+    wrapper.unmount()
   })
 })

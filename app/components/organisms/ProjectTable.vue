@@ -31,21 +31,67 @@
           <ProjectStatusBadge :status="project.status" />
         </TableCell>
         <TableCell class="text-right">
-          <Button
-            variant="outline"
-            size="sm"
-            :data-testid="`project-row-edit-${project.id}`"
-            @click="$emit('edit', project.id)"
+          <div class="flex justify-end gap-2">
+            <Button
+              v-if="canInvite"
+              variant="outline"
+              size="sm"
+              :disabled="!projectAccessibility(project).eligible"
+              :data-testid="`project-row-invite-${project.id}`"
+              @click="openInvite(project)"
+            >
+              {{ $t('entryLink.invite') }}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              :data-testid="`project-row-edit-${project.id}`"
+              @click="$emit('edit', project.id)"
+            >
+              {{ $t('projects.action.edit') }}
+            </Button>
+          </div>
+          <p
+            v-if="canInvite && !projectAccessibility(project).eligible"
+            class="text-muted-foreground mt-1 text-xs"
+            :data-testid="`project-row-invite-disabled-reason-${project.id}`"
           >
-            {{ $t('projects.action.edit') }}
-          </Button>
+            {{ $t(`entryLink.disabledReason.${projectAccessibility(project).reason}`) }}
+          </p>
         </TableCell>
       </TableRow>
     </TableBody>
   </Table>
+
+  <!--
+    "Invite candidate" (design D4, surface B): opens a form for a candidate
+    not yet in the system. On success the dialog body swaps to
+    EntryLinkPanel — the SAME shared organism the participant-detail
+    re-issue card renders, so the single-use/expiry disclosure never drifts
+    between the two surfaces.
+  -->
+  <Dialog :open="inviteTarget !== null" @update:open="(open) => !open && closeInvite()">
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>{{ $t('entryLink.invite') }}</DialogTitle>
+      </DialogHeader>
+      <EntryLinkPanel
+        v-if="mintedLink"
+        :link="mintedLink"
+        :locale="locale"
+        @generate="onRequestAnotherLink"
+      />
+      <EntryLinkForm
+        v-else-if="inviteTarget"
+        :project-id="inviteTarget.id"
+        @success="onInviteSuccess"
+      />
+    </DialogContent>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import {
   Table,
   TableBody,
@@ -56,7 +102,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ProjectStatusBadge from '@/components/atoms/ProjectStatusBadge.vue'
+import EntryLinkForm from '@/components/organisms/EntryLinkForm.vue'
+import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
+import { projectAccessibility } from '@/utils/project-accessibility'
 import type { Project } from '@/composables/useProjects'
 
 // bars-coverage-visibility Phase 4 (design D1): `coverage` maps role_code ->
@@ -75,8 +125,16 @@ const props = withDefaults(
   defineProps<{
     projects: Project[]
     coverage?: Record<string, number[]>
+    // "Invite candidate" (operator-interview-link, design D4): the PARENT
+    // resolves the operator's role once (useProfile) and passes the result
+    // down — minting starts an assessment, it is not a read, and a viewer
+    // must see neither this row action nor the participant-detail
+    // "Generate new link" card (admin-backoffice spec, "Viewer sees neither
+    // action"). Defaults to false: fail-closed until the parent confirms.
+    canInvite?: boolean
+    locale?: string
   }>(),
-  { coverage: () => ({}) }
+  { coverage: () => ({}), canInvite: false, locale: 'it' }
 )
 
 defineEmits<{
@@ -89,5 +147,34 @@ function uncoveredCount(project: Project): number {
   if (!uncoveredIds || uncoveredIds.length === 0) return 0
   const uncoveredIdSet = new Set(uncoveredIds)
   return project.competencies.filter((competency) => uncoveredIdSet.has(competency.id)).length
+}
+
+const inviteTarget = ref<Project | null>(null)
+const mintedLink = ref<EntryLink | null>(null)
+
+function openInvite(project: Project): void {
+  inviteTarget.value = project
+  mintedLink.value = null
+}
+
+function closeInvite(): void {
+  inviteTarget.value = null
+  mintedLink.value = null
+}
+
+function onInviteSuccess(link: EntryLink): void {
+  mintedLink.value = link
+}
+
+// "Generate new link" from inside the invite dialog: EntryLinkForm's
+// submitted candidate_ref/display_name are its own local state, not lifted
+// to this parent, so a silent re-mint with "the same values" isn't
+// available here without duplicating that state. Returning to the (still
+// project-scoped) form lets the operator explicitly re-confirm who they are
+// inviting — an honest behaviour, not a shortcut, since no revocation
+// semantics exist that would make a silent re-mint meaningfully different
+// from a fresh submission anyway.
+function onRequestAnotherLink(): void {
+  mintedLink.value = null
 }
 </script>

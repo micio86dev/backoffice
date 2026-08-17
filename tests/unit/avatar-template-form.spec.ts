@@ -466,3 +466,28 @@ describe('field help', () => {
     expect(wrapper.text()).not.toContain(`avatar_templates.hint.${noHint!.key}`)
   })
 })
+
+/**
+ * A checkbox must not stretch to the container.
+ *
+ * `fieldVariants`' vertical orientation carries `*:w-full`, a child combinator
+ * that outranks the `size-4` class on the input itself — so a checkbox wrapped
+ * in a default Field rendered as a box the full width of the page. This asserts
+ * the orientation, not the computed width, because jsdom does not apply
+ * Tailwind: the orientation IS the mechanism, and it is what a regression would
+ * change.
+ */
+it('lays a checkbox field out horizontally so it cannot stretch to the container', () => {
+  const wrapper = mountForm()
+
+  const checkbox = wrapper.find('input[type="checkbox"]')
+  expect(checkbox.exists()).toBe(true)
+
+  const field = checkbox.element.closest('[data-slot="field"]')
+  expect(field?.getAttribute('data-orientation')).toBe('horizontal')
+
+  // A non-checkbox control keeps the vertical stacking it needs.
+  const text = wrapper.find('input[type="text"], input[type="number"], select')
+  const textField = text.element.closest('[data-slot="field"]')
+  expect(textField?.getAttribute('data-orientation')).toBe('vertical')
+})

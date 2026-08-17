@@ -121,6 +121,33 @@
       }
     }
   },
+  "entryLink": {
+    "reissue": {
+      "title": "Link di accesso al colloquio"
+    },
+    "invite": "Invita candidato",
+    "generate": "Genera nuovo link",
+    "disclosure": "Questo link è monouso e scade tra 30 minuti. Aprirlo tu stesso — anche solo per verificarlo — lo consuma; consegnalo direttamente al candidato.",
+    "expiresAt": "Scade:",
+    "copy": "Copia",
+    "copied": "Copiato",
+    "copyBlocked": "Copia bloccata — seleziona il link sopra e copialo manualmente.",
+    "mintError": "Non è stato possibile generare questo link di accesso. Riprova.",
+    "disabledReason": {
+      "notActive": "Questo progetto non è ancora attivo.",
+      "notYetLive": "Questo progetto non è ancora entrato in vigore.",
+      "expired": "La scadenza di questo progetto è passata."
+    },
+    "form": {
+      "candidateRef": "Riferimento candidato",
+      "displayName": "Nome visualizzato",
+      "candidateRefRequired": "Inserisci un riferimento candidato.",
+      "displayNameRequired": "Inserisci un nome visualizzato.",
+      "tooLong": "Inserisci al massimo {max} caratteri.",
+      "submit": "Genera link",
+      "saveError": "Non è stato possibile generare questo link di accesso. Controlla i campi evidenziati."
+    }
+  },
   "projects": {
     "title": "Progetti",
     "subtitle": "Ogni progetto definisce cosa misura una valutazione e dove finiscono i risultati.",

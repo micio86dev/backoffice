@@ -17,7 +17,14 @@
       <AlertTitle>{{ $t(loadErrorTitleKey) }}</AlertTitle>
       <AlertDescription>{{ $t(loadErrorMessageKey) }}</AlertDescription>
     </Alert>
-    <ProjectTable v-else :projects="projects" :coverage="uncoveredIdsByRole" @edit="onEdit" />
+    <ProjectTable
+      v-else
+      :projects="projects"
+      :coverage="uncoveredIdsByRole"
+      :can-invite="canInvite"
+      :locale="locale"
+      @edit="onEdit"
+    />
 
     <Dialog :open="editing !== null" @update:open="(open) => !open && (editing = null)">
       <!--
@@ -54,6 +61,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useBarsCoverage } from '@/composables/useBarsCoverage'
+import { useProfile } from '@/composables/useProfile'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -68,7 +76,7 @@ definePageMeta({
   name: 'projects',
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 useHead({
   title: () => t('head.title.projects'),
@@ -77,6 +85,23 @@ useHead({
 
 const { listProjects } = useProjects()
 const { uncoveredIdsByRole, loadRoles } = useBarsCoverage()
+const { fetchProfile } = useProfile()
+
+// "Invite candidate" (operator-interview-link, design D4): minting starts an
+// assessment, it is not a read — a viewer must see neither this row action
+// nor the participant-detail "Generate new link" card. Fail-closed default
+// (false) until the profile fetch confirms a non-viewer role, mirroring
+// profile.vue:52's own coercion of a missing/unrecognized role to 'viewer'.
+const canInvite = ref(false)
+
+async function loadViewerGate(): Promise<void> {
+  try {
+    const profile = await fetchProfile()
+    canInvite.value = (profile.data.role ? String(profile.data.role) : 'viewer') !== 'viewer'
+  } catch {
+    canInvite.value = false
+  }
+}
 
 const projects = ref<Project[]>([])
 
@@ -121,5 +146,6 @@ async function onFormSaved(): Promise<void> {
 
 onMounted(() => {
   void load()
+  void loadViewerGate()
 })
 </script>

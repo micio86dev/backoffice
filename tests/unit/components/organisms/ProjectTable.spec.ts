@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ProjectTable from '../../../../app/components/organisms/ProjectTable.vue'
+import EntryLinkForm from '../../../../app/components/organisms/EntryLinkForm.vue'
 
 const tMock = (key: string) => key
 
@@ -72,5 +73,72 @@ describe('ProjectTable', () => {
 
     editButton.trigger('click')
     expect(wrapper.emitted('edit')?.[0]).toEqual([9])
+  })
+})
+
+// operator-interview-link, design D4/D5 — "Invite candidate" row action.
+describe('ProjectTable — Invite candidate (operator-interview-link)', () => {
+  it('does not render the invite action when canInvite is false (default)', () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1 })] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-invite-1"]').exists()).toBe(false)
+  })
+
+  it('renders the invite action, enabled, for an eligible (active) project when canInvite is true', () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1, status: 'active' })], canInvite: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const button = wrapper.get('[data-testid="project-row-invite-1"]')
+    expect(button.attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="project-row-invite-disabled-reason-1"]').exists()).toBe(
+      false
+    )
+  })
+
+  it('disables the invite action with a stated reason for a draft project', () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1, status: 'draft' })], canInvite: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.get('[data-testid="project-row-invite-1"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="project-row-invite-disabled-reason-1"]').text()).toContain(
+      'entryLink.disabledReason.notActive'
+    )
+  })
+
+  it('opens the invite dialog with EntryLinkForm, then swaps to EntryLinkPanel on success', async () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1, status: 'active' })], canInvite: true, locale: 'en' },
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+
+    expect(document.body.querySelector('[data-testid="entry-link-form"]')).not.toBeNull()
+    expect(document.body.querySelector('[data-testid="entry-link-url"]')).toBeNull()
+
+    // The form's OWN submit/validation contract is covered by
+    // EntryLinkForm.spec.ts — here only the parent's success-swap wiring is
+    // under test, so the emit is triggered directly.
+    const form = wrapper.findComponent(EntryLinkForm)
+    form.vm.$emit('success', {
+      entry_url: 'https://interview.example.com/interview/tok',
+      expires_at: '2026-08-17T15:32:00.000000Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(document.body.querySelector('[data-testid="entry-link-form"]')).toBeNull()
+    expect(document.body.querySelector('[data-testid="entry-link-url"]')?.textContent).toBe(
+      'https://interview.example.com/interview/tok'
+    )
+
+    wrapper.unmount()
   })
 })

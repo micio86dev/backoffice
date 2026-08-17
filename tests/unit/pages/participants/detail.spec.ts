@@ -12,7 +12,7 @@ import { ref } from 'vue'
 
 const tMock = (key: string) => key
 
-function detailResponse(status: string) {
+function detailResponse(status: string, project?: Record<string, unknown>) {
   return {
     data: {
       id: 42,
@@ -22,12 +22,37 @@ function detailResponse(status: string) {
       language: 'it',
       status,
       project_id: 1,
+      // operator-interview-link, design D5: nested gate fields, defaulted to
+      // an eligible project so the pre-existing tests above (which know
+      // nothing about the entry-link card) are unaffected.
+      project: project ?? {
+        id: 1,
+        name: 'Demo Project',
+        status: 'active',
+        goes_live_at: null,
+        deadline_at: null,
+      },
       timeline: { started_at: '2026-03-14T10:00:00Z', completed_at: null, session_count: 3 },
       files: {
         transcript: { type: 'text/plain', ref: 'transcript', url: '/x' },
         evaluation_raw: { type: 'application/json', ref: 'evaluation', url: '/y' },
       },
       created_at: '2026-03-14T09:00:00Z',
+    },
+  }
+}
+
+/** ProfileResponse fixture — operator-interview-link's viewer-gate source. */
+function profileResponse(role: string) {
+  return {
+    data: {
+      id: 1,
+      name: 'Test User',
+      email: 'user@example.com',
+      locale: 'en',
+      role,
+      organization: { id: 1, name: 'Acme' },
+      photo_url: null,
     },
   }
 }
@@ -368,6 +393,201 @@ describe('pages/participants/[id].vue', () => {
 
       expect(wrapper.find('[data-testid="participant-error"]').exists()).toBe(false)
       expect(wrapper.text()).toContain('Jane Doe')
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // "Generate new link" re-issue card (operator-interview-link, design
+  // D4/D5) — the participant-detail half of the entry-link mint surface.
+  // entry-link.spec.ts (e2e) and EntryLinkPanel.spec.ts/EntryLinkForm.spec.ts
+  // cover the shared organisms in isolation; this describe block is what
+  // proves THIS page wires them correctly: viewer gating, disabled-with-
+  // reason rendering off the nested `project` gate fields, and the
+  // success/error mint flow.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('"Generate new link" card (operator-interview-link)', () => {
+    async function mountEntryLinkCard(options: {
+      role?: string
+      project?: Record<string, unknown>
+      generateEntryLinkMock?: ReturnType<typeof vi.fn>
+    }) {
+      const { role = 'operator', project, generateEntryLinkMock = vi.fn() } = options
+
+      vi.doMock('../../../../app/composables/useParticipants', () => ({
+        useParticipants: () => ({
+          fetchParticipant: vi.fn().mockResolvedValue(detailResponse('in_attesa', project)),
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useProfile', () => ({
+        useProfile: () => ({ fetchProfile: vi.fn().mockResolvedValue(profileResponse(role)) }),
+      }))
+      vi.doMock('../../../../app/composables/useEntryLinks', () => ({
+        useEntryLinks: () => ({ generateEntryLink: generateEntryLinkMock }),
+      }))
+      // Secondary content on this page — mocked to resolved/rejected
+      // no-ops so it never interferes with the entry-link assertions below.
+      vi.doMock('../../../../app/composables/useEvaluationReport', () => ({
+        useEvaluationReport: () => ({ fetchEvaluation: vi.fn().mockResolvedValue({}) }),
+      }))
+      vi.doMock('../../../../app/composables/useDownloads', () => ({
+        useDownloads: () => ({ downloadTranscript: vi.fn(), downloadEvaluation: vi.fn() }),
+      }))
+      vi.doMock('../../../../app/composables/useSessionReview', () => ({
+        useSessionReview: () => ({ listSessions: vi.fn().mockResolvedValue({ data: [] }) }),
+      }))
+
+      const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
+      const wrapper = mount(DetailPage, {
+        global: {
+          mocks: { $t: tMock },
+          stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+        },
+      })
+      await flushPromises()
+      // The viewer-gate profile fetch (`loadViewerGate`) is a SEPARATE,
+      // un-awaited (`void`) call in onMounted — a second flush lets its own
+      // microtask queue drain after the first one already resolved the
+      // primary participant fetch.
+      await flushPromises()
+
+      return wrapper
+    }
+
+    it('renders the card, enabled, for an operator viewing an eligible (active) project', async () => {
+      const wrapper = await mountEntryLinkCard({ role: 'operator' })
+
+      const button = wrapper.get('[data-testid="participant-generate-entry-link"]')
+      expect(button.attributes('disabled')).toBeUndefined()
+      expect(wrapper.find('[data-testid="participant-entry-link-disabled-reason"]').exists()).toBe(
+        false
+      )
+    })
+
+    it('renders the card, enabled, for an admin (both admin and operator may mint)', async () => {
+      const wrapper = await mountEntryLinkCard({ role: 'admin' })
+
+      expect(
+        wrapper.get('[data-testid="participant-generate-entry-link"]').attributes('disabled')
+      ).toBeUndefined()
+    })
+
+    it('hides the card entirely for a viewer — server-side 403 backed, but the control must not even render', async () => {
+      const wrapper = await mountEntryLinkCard({ role: 'viewer' })
+
+      expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(false)
+    })
+
+    it.each([
+      ['draft', { status: 'draft', goes_live_at: null, deadline_at: null }, 'notActive'],
+      [
+        'not-yet-live',
+        { status: 'active', goes_live_at: '2099-01-01T00:00:00Z', deadline_at: null },
+        'notYetLive',
+      ],
+      [
+        'expired',
+        { status: 'active', goes_live_at: null, deadline_at: '2020-01-01T00:00:00Z' },
+        'expired',
+      ],
+    ])(
+      'disables the action with a stated reason for a %s project',
+      async (_label, projectOverrides, expectedReasonKey) => {
+        const project = {
+          id: 1,
+          name: 'Demo Project',
+          ...projectOverrides,
+        }
+        const wrapper = await mountEntryLinkCard({ role: 'operator', project })
+
+        expect(
+          wrapper.get('[data-testid="participant-generate-entry-link"]').attributes('disabled')
+        ).toBeDefined()
+        expect(
+          wrapper.get('[data-testid="participant-entry-link-disabled-reason"]').text()
+        ).toContain(`entryLink.disabledReason.${expectedReasonKey}`)
+      }
+    )
+
+    it('leaves the action enabled for an eligible project (active, past goes_live_at, before deadline_at)', async () => {
+      const project = {
+        id: 1,
+        name: 'Demo Project',
+        status: 'active',
+        goes_live_at: '2020-01-01T00:00:00Z',
+        deadline_at: '2099-01-01T00:00:00Z',
+      }
+      const wrapper = await mountEntryLinkCard({ role: 'operator', project })
+
+      expect(
+        wrapper.get('[data-testid="participant-generate-entry-link"]').attributes('disabled')
+      ).toBeUndefined()
+    })
+
+    it("mints with the participant's own project_id/candidate_ref/display_name/role_code/language, and swaps to EntryLinkPanel on success", async () => {
+      const generateEntryLinkMock = vi.fn().mockResolvedValue({
+        entry_url: 'https://interview.example.com/interview/reissue-tok',
+        expires_at: '2026-08-17T15:32:00.000000Z',
+      })
+      const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+
+      expect(generateEntryLinkMock).toHaveBeenCalledWith({
+        project_id: 1,
+        candidate_ref: 'ref-042',
+        display_name: 'Jane Doe',
+        role_code: 'FLL',
+        lang: 'it',
+      })
+      expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(
+        'https://interview.example.com/interview/reissue-tok'
+      )
+    })
+
+    it('shows an inline error and keeps the button available to retry when the mint rejects', async () => {
+      const generateEntryLinkMock = vi.fn().mockRejectedValue(new Error('boom'))
+      const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="participant-entry-link-error"]').text()).toContain(
+        'entryLink.mintError'
+      )
+      // The button is still there — a failed mint must not strand the
+      // operator on a page with no way to retry.
+      expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="entry-link-url"]').exists()).toBe(false)
+    })
+
+    it('re-mints (via EntryLinkPanel\'s "generate" event) with the SAME participant payload', async () => {
+      const generateEntryLinkMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          entry_url: 'https://interview.example.com/interview/first-tok',
+          expires_at: '2026-08-17T15:32:00.000000Z',
+        })
+        .mockResolvedValueOnce({
+          entry_url: 'https://interview.example.com/interview/second-tok',
+          expires_at: '2026-08-17T16:02:00.000000Z',
+        })
+      const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(
+        'https://interview.example.com/interview/first-tok'
+      )
+
+      await wrapper.get('[data-testid="entry-link-generate"]').trigger('click')
+      await flushPromises()
+
+      expect(generateEntryLinkMock).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(
+        'https://interview.example.com/interview/second-tok'
+      )
     })
   })
 })

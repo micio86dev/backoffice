@@ -322,4 +322,154 @@ describe('pages/projects/index.vue', () => {
       expect(wrapper.text()).not.toContain('projects.table.empty')
     })
   })
+
+  // bars-coverage-visibility Phase 4 (design D1) — the list surface asks
+  // useBarsCoverage() (a thin cache over the same catalog endpoint the
+  // picker reads) for each distinct role_code among the loaded projects,
+  // and ProjectTable renders a per-row count. Never zero, never on failure.
+  //
+  // PROJECT-scoped, not role-scoped (fixed a real bug, caught by verify):
+  // the count must be THIS project's own `competencies` intersected with
+  // the role's uncovered-id set — not the role's raw uncovered count.
+  // Two projects can share a role and hold different competency subsets, so
+  // every fixture below builds `competencies` deliberately rather than
+  // leaving it `[]` (a `[]` fixture cannot tell a per-project implementation
+  // apart from a per-role one — both would happen to pass).
+  describe('list-surface uncovered-competency count (Phase 4)', () => {
+    // The role's coverage: STG covered, PRS and JDG uncovered. Reused by
+    // every test below so the ROLE side of the computation is identical
+    // across rows — only each PROJECT's own `competencies` differs.
+    const MIXED_ROLE_COMPETENCIES = {
+      data: [
+        { id: 1, code: 'STG', name: 'Strategy', bars_available: true },
+        { id: 2, code: 'PRS', name: 'Presence', bars_available: false },
+        { id: 3, code: 'JDG', name: 'Judgement', bars_available: false },
+      ],
+    }
+
+    function projectHolding(
+      overrides: Record<string, unknown>,
+      competencies: Array<{ id: number; code: string; type: string; position: number }>
+    ) {
+      return { ...listResponse().data[0], ...overrides, competencies }
+    }
+
+    it('shows the uncovered count on a row whose PROJECT holds an uncovered competency', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue({
+            data: [
+              projectHolding({ id: 1 }, [{ id: 2, code: 'PRS', type: 'standard', position: 0 }]),
+            ],
+          }),
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useFrameworkRoles', () => ({
+        useFrameworkRoles: () => ({
+          fetchRoleCompetencies: vi.fn().mockResolvedValue(MIXED_ROLE_COMPETENCIES),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+      await flushPromises()
+      await waitFor(
+        () => wrapper.text().includes('projects.table.uncoveredCompetencies'),
+        'the uncovered-competency count to render on the row'
+      )
+
+      expect(wrapper.text()).toContain('projects.table.uncoveredCompetencies')
+    })
+
+    // THE regression test: two projects share the SAME role (mixed
+    // coverage), but hold DIFFERENT competency subsets. A role-scoped
+    // implementation renders the identical count on both rows; only a
+    // project-scoped one tells them apart.
+    it('scopes the count to each PROJECT, not to the shared role — two projects, same role, different holdings', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue({
+            data: [
+              // Holds only the COVERED competency (STG) — must show nothing,
+              // even though its role (FLL) has two uncovered competencies.
+              projectHolding({ id: 1, slug: 'covered-project', name: 'Covered Project' }, [
+                { id: 1, code: 'STG', type: 'standard', position: 0 },
+              ]),
+              // Holds BOTH uncovered competencies (PRS, JDG) — must show 2.
+              projectHolding({ id: 2, slug: 'uncovered-project', name: 'Uncovered Project' }, [
+                { id: 2, code: 'PRS', type: 'standard', position: 0 },
+                { id: 3, code: 'JDG', type: 'standard', position: 1 },
+              ]),
+            ],
+          }),
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useFrameworkRoles', () => ({
+        useFrameworkRoles: () => ({
+          fetchRoleCompetencies: vi.fn().mockResolvedValue(MIXED_ROLE_COMPETENCIES),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+      await flushPromises()
+      await waitFor(
+        () => wrapper.find('[data-testid="project-row-uncovered-2"]').exists(),
+        'the uncovered row (project 2) to render its count'
+      )
+
+      expect(wrapper.find('[data-testid="project-row-uncovered-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="project-row-uncovered-2"]').exists()).toBe(true)
+    })
+
+    it('shows nothing on a row whose role is fully covered', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue({
+            data: [
+              projectHolding({ id: 1 }, [{ id: 1, code: 'STG', type: 'standard', position: 0 }]),
+            ],
+          }),
+        }),
+      }))
+      const fetchRoleCompetenciesMock = vi.fn().mockResolvedValue({
+        data: [{ id: 1, code: 'STG', name: 'Strategy', bars_available: true }],
+      })
+      vi.doMock('../../../../app/composables/useFrameworkRoles', () => ({
+        useFrameworkRoles: () => ({ fetchRoleCompetencies: fetchRoleCompetenciesMock }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+      await flushPromises()
+      await waitFor(
+        () => fetchRoleCompetenciesMock.mock.calls.length > 0,
+        'the coverage fetch to have been issued'
+      )
+      await flushPromises()
+
+      expect(wrapper.text()).not.toContain('projects.table.uncoveredCompetencies')
+    })
+
+    it('shows nothing, never zero, when the coverage fetch fails', async () => {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({ listProjects: vi.fn().mockResolvedValue(listResponse()) }),
+      }))
+      const fetchRoleCompetenciesMock = vi.fn().mockRejectedValue(new Error('network error'))
+      vi.doMock('../../../../app/composables/useFrameworkRoles', () => ({
+        useFrameworkRoles: () => ({ fetchRoleCompetencies: fetchRoleCompetenciesMock }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+      await flushPromises()
+      await waitFor(
+        () => fetchRoleCompetenciesMock.mock.calls.length > 0,
+        'the coverage fetch to have been issued'
+      )
+      await flushPromises()
+
+      expect(wrapper.text()).not.toContain('projects.table.uncoveredCompetencies')
+    })
+  })
 })

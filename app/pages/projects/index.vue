@@ -17,7 +17,7 @@
       <AlertTitle>{{ $t(loadErrorTitleKey) }}</AlertTitle>
       <AlertDescription>{{ $t(loadErrorMessageKey) }}</AlertDescription>
     </Alert>
-    <ProjectTable v-else :projects="projects" @edit="onEdit" />
+    <ProjectTable v-else :projects="projects" :coverage="uncoveredIdsByRole" @edit="onEdit" />
 
     <Dialog :open="editing !== null" @update:open="(open) => !open && (editing = null)">
       <!--
@@ -53,6 +53,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
+import { useBarsCoverage } from '@/composables/useBarsCoverage'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -75,6 +76,7 @@ useHead({
 })
 
 const { listProjects } = useProjects()
+const { uncoveredIdsByRole, loadRoles } = useBarsCoverage()
 
 const projects = ref<Project[]>([])
 
@@ -98,6 +100,11 @@ async function load(): Promise<void> {
     const response = await listProjects()
     projects.value = response.data
     loadError.value = null
+    // bars-coverage-visibility Phase 4 (D1): resolved for every distinct
+    // non-null role_code among the loaded projects, not awaited — the list
+    // itself must render immediately; the coverage line fills in once its
+    // own request(s) settle.
+    void loadRoles(projects.value.map((project) => project.role_code))
   } catch (error) {
     loadError.value = resolveResourceErrorState(error)
   }

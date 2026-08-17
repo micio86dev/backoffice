@@ -129,7 +129,8 @@
       "assessmentType": "Tipo di valutazione",
       "status": "Stato",
       "actions": "Azioni",
-      "empty": "Nessun progetto ancora presente."
+      "empty": "Nessun progetto ancora presente.",
+      "uncoveredCompetencies": "{count} senza ancore"
     },
     "action": {
       "new": "Nuovo progetto",
@@ -205,7 +206,10 @@
     },
     "competencyPicker": {
       "legend": "Competenze",
-      "empty": "Nessuna competenza disponibile per questa selezione."
+      "empty": "Nessuna competenza disponibile per questa selezione.",
+      "noBars": "Nessuna ancora comportamentale per questo ruolo — non è valutabile, quindi non è selezionabile.",
+      "attachedNoBars": "Già presente in questo progetto ma senza ancore comportamentali per questo ruolo — non verrà valutata. Rimuovila per correggere il report.",
+      "coverageSummary": "{missing} competenze su {total} non hanno ancora ancore comportamentali per questo ruolo."
     }
   },
   "report": {

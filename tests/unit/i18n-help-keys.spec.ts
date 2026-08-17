@@ -32,6 +32,15 @@ const HELP_KEY_PATHS = [
   'avatar_templates.form.help.name',
 ] as const
 
+// bars-coverage-visibility Phase 3 (design D6) — the 4 new coverage-copy
+// keys, asserted the same way: no bare literal, both locales carry it.
+const COVERAGE_KEY_PATHS = [
+  'projects.competencyPicker.noBars',
+  'projects.competencyPicker.attachedNoBars',
+  'projects.competencyPicker.coverageSummary',
+  'projects.table.uncoveredCompetencies',
+] as const
+
 function get(obj: unknown, path: string): unknown {
   return path
     .split('.')
@@ -70,5 +79,12 @@ describe('form help text — locale key parity', () => {
   it("projects.form.roleCodeRequiredForStandard states permanence (spec's Permanence scenario)", () => {
     expect(String(get(EN, 'projects.form.roleCodeRequiredForStandard'))).toMatch(/permanent/i)
     expect(String(get(IT, 'projects.form.roleCodeRequiredForStandard'))).toMatch(/modificabile/i)
+  })
+
+  it.each(COVERAGE_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
   })
 })

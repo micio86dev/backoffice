@@ -168,7 +168,11 @@
         <FieldDescription>{{ $t('projects.form.frameworkVersionImmutable') }}</FieldDescription>
       </Field>
 
-      <CompetencyPicker v-model="competencyIds" :options="competencyOptions" />
+      <CompetencyPicker
+        v-model="competencyIds"
+        :options="competencyOptions"
+        :persisted-ids="persistedIds"
+      />
 
       <Field :data-invalid="Boolean(errors.pauseEveryNCompetencies)">
         <FieldLabel for="project-form-pause-every-n">
@@ -394,9 +398,15 @@ const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
 // now serves the competency `id` alongside `code`/`name`, which is what
 // `StoreProjectRequest.competency_ids` validates against. It did not when D9
 // was written, and the gap made every competency selection a no-op.
+// `barsAvailable: null` explicitly, not omitted — D2's tri-state: the
+// coverage question does not APPLY to potential-assessment competencies
+// (they are not role-anchored), which is a different fact than "not yet
+// covered" (`false`). CompetencyOption.barsAvailable is required, so this
+// site has to state that reason rather than being allowed to skip it.
 const POTENTIAL_COMPETENCIES: CompetencyOption[] = [{ code: 'MTG' }, { code: 'LAT' }].map((c) => ({
   ...c,
   name: c.code,
+  barsAvailable: null,
 }))
 
 const props = defineProps<{
@@ -418,7 +428,11 @@ const language = ref(props.project?.language ?? 'en')
 const assessmentType = ref<'standard' | 'potential'>(props.project?.assessment_type ?? 'standard')
 const roleCode = ref(props.project?.role_code ?? '')
 const frameworkVersionId = ref(props.project?.framework_version_id ?? '')
-const competencyIds = ref<number[]>([])
+// Hydrated from the project's CURRENT competencies (D2's scope finding).
+// Submission below MUST land together with this hydration: submitting
+// competency_ids while this still initialised to [] would make the next
+// save of any untouched project call sync([]) and wipe its competency set.
+const competencyIds = ref<number[]>((props.project?.competencies ?? []).map((c) => c.id))
 const pauseEveryNCompetencies = ref(props.project?.pause_every_n_competencies ?? '')
 const nudgeMinChars = ref(props.project?.nudge_min_chars ?? '')
 const exitRedirectUrl = ref(props.project?.exit_redirect_url ?? '')
@@ -462,6 +476,18 @@ function describedBy(baseId: string, hasError: boolean): string {
 const lockedWhenLive = computed(
   () =>
     isEditing.value && (props.project?.status === 'active' || props.project?.status === 'archived')
+)
+
+// D2: scoped to the project's ORIGINAL role_code, not the currently-selected
+// one. Without this comparison the escape hatch leaks — the role-change
+// watcher below already clears `competencyIds` on a role change, so a stale
+// `persistedIds` would re-enable competencies that were never attached under
+// the newly-selected role. Empty on create (nothing persisted yet), so every
+// uncovered option is disabled — there is no existing commitment to honour.
+const persistedIds = computed<number[]>(() =>
+  roleCode.value === props.project?.role_code
+    ? (props.project?.competencies ?? []).map((c) => c.id)
+    : []
 )
 
 const nextTransition = computed<'active' | 'archived' | null>(() => {
@@ -567,6 +593,11 @@ async function loadCompetencyOptions(): Promise<void> {
       // `HasTranslations` property-read interception directly, so the
       // `String()` conversion this comment used to defend is gone with it.
       name: competency.name,
+      // bars-coverage-visibility D1/D2: the catalog endpoint's own
+      // `bars_available` flag, threaded through unchanged — previously
+      // dropped here entirely. `FrameworkController::roleCompetencies`
+      // already scopes this to the CURRENT role×competency pair.
+      barsAvailable: competency.bars_available,
     }))
   } catch {
     competencyOptions.value = []
@@ -643,6 +674,7 @@ async function onSubmit(): Promise<void> {
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
         webhook_url: webhookUrl.value || null,
+        competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
       })
     } else {
@@ -659,6 +691,7 @@ async function onSubmit(): Promise<void> {
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
         webhook_url: webhookUrl.value || null,
+        competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
       })
     }

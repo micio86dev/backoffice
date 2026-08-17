@@ -129,7 +129,8 @@
       "assessmentType": "Assessment type",
       "status": "Status",
       "actions": "Actions",
-      "empty": "No projects yet."
+      "empty": "No projects yet.",
+      "uncoveredCompetencies": "{count} without anchors"
     },
     "action": {
       "new": "New project",
@@ -205,7 +206,10 @@
     },
     "competencyPicker": {
       "legend": "Competencies",
-      "empty": "No competencies available for this selection."
+      "empty": "No competencies available for this selection.",
+      "noBars": "No behavioural anchors for this role yet — it cannot be assessed, so it cannot be selected.",
+      "attachedNoBars": "Already in this project but has no behavioural anchors for this role — it will not be scored. Remove it to fix the report.",
+      "coverageSummary": "{missing} of {total} competencies have no behavioural anchors for this role yet."
     }
   },
   "report": {

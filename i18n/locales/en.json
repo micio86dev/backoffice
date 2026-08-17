@@ -121,6 +121,33 @@
       }
     }
   },
+  "entryLink": {
+    "reissue": {
+      "title": "Interview entry link"
+    },
+    "invite": "Invite candidate",
+    "generate": "Generate new link",
+    "disclosure": "This link is single-use and expires in 30 minutes. Opening it yourself — even just to check it works — spends it; hand it to the candidate directly.",
+    "expiresAt": "Expires:",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyBlocked": "Copy was blocked — select the link above and copy it manually.",
+    "mintError": "This entry link could not be generated. Please try again.",
+    "disabledReason": {
+      "notActive": "This project is not yet active.",
+      "notYetLive": "This project has not gone live yet.",
+      "expired": "This project's deadline has passed."
+    },
+    "form": {
+      "candidateRef": "Candidate reference",
+      "displayName": "Display name",
+      "candidateRefRequired": "Enter a candidate reference.",
+      "displayNameRequired": "Enter a display name.",
+      "tooLong": "Enter no more than {max} characters.",
+      "submit": "Generate link",
+      "saveError": "This entry link could not be generated. Please review the highlighted fields."
+    }
+  },
   "projects": {
     "title": "Projects",
     "subtitle": "Each project defines what an assessment measures and where its results are delivered.",

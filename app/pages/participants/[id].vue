@@ -56,6 +56,43 @@
         </CardContent>
       </Card>
 
+      <Card v-if="!isViewer">
+        <CardHeader>
+          <CardTitle>{{ $t('entryLink.reissue.title') }}</CardTitle>
+        </CardHeader>
+        <CardContent class="flex flex-col gap-4">
+          <EntryLinkPanel
+            v-if="entryLink"
+            :link="entryLink"
+            :locale="locale"
+            @generate="onGenerateEntryLink"
+          />
+          <template v-else>
+            <Button
+              :disabled="!entryLinkAccessibility.eligible || generatingEntryLink"
+              data-testid="participant-generate-entry-link"
+              @click="onGenerateEntryLink"
+            >
+              {{ $t('entryLink.generate') }}
+            </Button>
+            <p
+              v-if="!entryLinkAccessibility.eligible"
+              class="text-muted-foreground text-sm"
+              data-testid="participant-entry-link-disabled-reason"
+            >
+              {{ $t(`entryLink.disabledReason.${entryLinkAccessibility.reason}`) }}
+            </p>
+            <Alert
+              v-if="entryLinkError"
+              variant="destructive"
+              data-testid="participant-entry-link-error"
+            >
+              <AlertDescription>{{ entryLinkError }}</AlertDescription>
+            </Alert>
+          </template>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{{ $t('participants.detail.resources.title') }}</CardTitle>
@@ -190,12 +227,16 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
+import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
 import { useEvaluationReport, type EvaluationReportData } from '@/composables/useEvaluationReport'
 import { useDownloads } from '@/composables/useDownloads'
 import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
+import { useEntryLinks } from '@/composables/useEntryLinks'
+import { useProfile } from '@/composables/useProfile'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
 import { formatDate } from '@/utils/format'
+import { projectAccessibility, type ProjectAccessibility } from '@/utils/project-accessibility'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -304,6 +345,48 @@ async function onDownloadEvaluation(): Promise<void> {
 const sessions = ref<SessionSummary[]>([])
 const { listSessions } = useSessionReview()
 
+// "Generate new link" (operator-interview-link, design D4/D5): re-issue an
+// entry link for this already-known participant, pre-filled from their own
+// project/candidate_ref/display_name/role_code/language. Neither this Card
+// NOR the "Invite candidate" row action (ProjectTable.vue) may render for a
+// viewer — minting starts an assessment, it is not a read, and
+// ParticipantPolicy::create already denies viewer server-side (a control
+// that renders and then 403s teaches the operator the product is broken).
+const { generateEntryLink } = useEntryLinks()
+const { fetchProfile } = useProfile()
+const isViewer = ref(true)
+const entryLink = ref<EntryLink | null>(null)
+const entryLinkError = ref<string | null>(null)
+const generatingEntryLink = ref(false)
+
+// Fail-safe default (project not accessible) until the participant row —
+// carrying the nested `project` gate fields — has actually loaded.
+const entryLinkAccessibility = computed<ProjectAccessibility>(() =>
+  participant.value
+    ? projectAccessibility(participant.value.project)
+    : { eligible: false, reason: 'notActive' }
+)
+
+async function onGenerateEntryLink(): Promise<void> {
+  if (!participant.value) return
+  entryLinkError.value = null
+  generatingEntryLink.value = true
+  try {
+    const response = await generateEntryLink({
+      project_id: participant.value.project.id,
+      candidate_ref: participant.value.candidate_ref,
+      display_name: participant.value.display_name,
+      role_code: participant.value.role_code,
+      lang: participant.value.language,
+    })
+    entryLink.value = response
+  } catch {
+    entryLinkError.value = t('entryLink.mintError')
+  } finally {
+    generatingEntryLink.value = false
+  }
+}
+
 async function loadSessions(id: string): Promise<void> {
   try {
     sessions.value = (await listSessions(id)).data
@@ -314,8 +397,25 @@ async function loadSessions(id: string): Promise<void> {
   }
 }
 
+async function loadViewerGate(): Promise<void> {
+  try {
+    const profile = await fetchProfile()
+    // Fail-closed default, mirroring profile.vue:52's own coercion: an
+    // unrecognized/missing role is treated as 'viewer' (the least
+    // privileged), not as an accidental grant.
+    isViewer.value = (profile.data.role ? String(profile.data.role) : 'viewer') === 'viewer'
+  } catch {
+    // The mint action is a bonus surface on this page, not its primary
+    // purpose — a failed profile fetch hides it (fail-closed) rather than
+    // blanking the whole participant detail view.
+    isViewer.value = true
+  }
+}
+
 onMounted(async () => {
   const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
+
+  void loadViewerGate()
 
   try {
     const response = await fetchParticipant(id as string)

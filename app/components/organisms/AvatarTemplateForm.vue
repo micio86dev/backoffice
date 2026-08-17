@@ -115,9 +115,22 @@
     <fieldset class="flex flex-col gap-3 border-t border-border pt-4">
       <legend class="sr-only">{{ $t('avatar_templates.form.settings') }}</legend>
 
+      <!--
+        A checkbox lays out horizontally, everything else vertically, and that
+        is a layout fact rather than taste. `fieldVariants`' vertical
+        orientation carries `*:w-full`, which stretches EVERY direct child to
+        the container width. A select or a text input wants exactly that. A
+        16px checkbox does not — and `size-4` on the input cannot win, because
+        `*:w-full` compiles to a child combinator and outranks a class on the
+        element itself. So it rendered as a box the full width of the page.
+        The horizontal variant drops `*:w-full` and gives `flex-row
+        items-center`, which is also what a checkbox beside its label should
+        look like.
+      -->
       <Field
         v-for="field in activeFields"
         :key="field.key"
+        :orientation="field.type === 'checkbox' ? 'horizontal' : 'vertical'"
         :data-invalid="Boolean(configErrors[field.key])"
       >
         <FieldLabel :for="`template-config-${field.key}`">

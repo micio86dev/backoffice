@@ -46,6 +46,31 @@ RUN test -n "$NUXT_PUBLIC_API_BASE" || { \
     }
 ENV NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE}
 
+# The observability and analytics IDs are baked in for exactly the same reason
+# as the API base above: this is a static bundle, so a runtime environment entry
+# reaches nginx and never reaches the JavaScript. A Docker build sees only what
+# is declared as ARG, so anything omitted here compiles to the empty string no
+# matter what the deployment platform has configured.
+#
+# That is precisely what happened: only NUXT_PUBLIC_API_BASE was ever declared,
+# so Sentry, GA4 and Clarity shipped inert while their values sat correctly set
+# on the platform — a silent no-op with no failing build and no error to read.
+#
+# UNLIKE the API base, these carry NO guard and NO default. Empty is a
+# legitimate, documented state for all four: nuxt.config.ts's runtimeConfig
+# comments define an unset ID as "the tool does not load at all", which is the
+# correct posture for a developer build and for any environment that has not
+# opted in. Requiring them would break every build that legitimately runs
+# without analytics.
+ARG NUXT_PUBLIC_SENTRY_DSN
+ARG NUXT_PUBLIC_SENTRY_ENVIRONMENT
+ARG NUXT_PUBLIC_GA_MEASUREMENT_ID
+ARG NUXT_PUBLIC_CLARITY_PROJECT_ID
+ENV NUXT_PUBLIC_SENTRY_DSN=${NUXT_PUBLIC_SENTRY_DSN}
+ENV NUXT_PUBLIC_SENTRY_ENVIRONMENT=${NUXT_PUBLIC_SENTRY_ENVIRONMENT}
+ENV NUXT_PUBLIC_GA_MEASUREMENT_ID=${NUXT_PUBLIC_GA_MEASUREMENT_ID}
+ENV NUXT_PUBLIC_CLARITY_PROJECT_ID=${NUXT_PUBLIC_CLARITY_PROJECT_ID}
+
 # Generate the static SPA output (Nuxt SPA mode: ssr: false → nuxt generate)
 RUN bun run generate
 
@@ -57,6 +82,22 @@ RUN grep -q "apiBase:\"${NUXT_PUBLIC_API_BASE}\"" .output/public/index.html || {
       echo "  Found instead: $(grep -o 'apiBase:\"[^\"]*\"' .output/public/index.html || echo '<nothing>')"; \
       exit 1; \
     }
+
+# Same assertion for the Sentry DSN, but CONDITIONAL — it only runs when a DSN
+# was actually supplied, because empty is a legitimate build (see above).
+#
+# This is the check whose absence let the defect live: the DSN was set on the
+# platform, the build succeeded, the container served, the healthcheck passed,
+# and Sentry reported nothing at all. Nothing anywhere failed. A value that is
+# silently dropped between the platform and the bundle is invisible from the
+# outside, which is exactly why it has to be asserted from the inside.
+RUN if [ -n "$NUXT_PUBLIC_SENTRY_DSN" ]; then \
+      grep -q "sentryDsn:\"${NUXT_PUBLIC_SENTRY_DSN}\"" .output/public/index.html || { \
+        echo "ERROR: NUXT_PUBLIC_SENTRY_DSN was supplied but is not in the generated bundle."; \
+        echo "  Found instead: $(grep -o 'sentryDsn:\"[^\"]*\"' .output/public/index.html || echo '<nothing>')"; \
+        exit 1; \
+      }; \
+    fi
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
 FROM nginx:1.27.5-alpine AS runtime

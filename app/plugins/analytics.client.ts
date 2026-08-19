@@ -1,4 +1,4 @@
-import { analyticsPlan, gaConfigPayload } from '~/utils/analytics'
+import { analyticsPlan, createGtagStub, gaConfigPayload } from '~/utils/analytics'
 import { ANALYTICS_CONSENT_EVENT, readAnalyticsConsent } from '~/utils/analytics-consent'
 import { redactAnalyticsPath } from '~/utils/analytics-path'
 
@@ -39,9 +39,7 @@ function startGa(measurementId: string, pagePath: string): void {
   injectScript(`https://www.googletagmanager.com/gtag/js?id=${measurementId}`, 'beai-ga4')
 
   window.dataLayer = window.dataLayer ?? []
-  window.gtag = function gtag(...args: unknown[]): void {
-    window.dataLayer?.push(args)
-  }
+  window.gtag = createGtagStub(window)
 
   window.gtag('js', new Date())
 

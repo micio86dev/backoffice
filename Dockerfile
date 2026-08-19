@@ -71,6 +71,34 @@ ENV NUXT_PUBLIC_SENTRY_ENVIRONMENT=${NUXT_PUBLIC_SENTRY_ENVIRONMENT}
 ENV NUXT_PUBLIC_GA_MEASUREMENT_ID=${NUXT_PUBLIC_GA_MEASUREMENT_ID}
 ENV NUXT_PUBLIC_CLARITY_PROJECT_ID=${NUXT_PUBLIC_CLARITY_PROJECT_ID}
 
+# Sentry source-map upload credentials — BUILD-time only, and a different class
+# from everything above: these never reach the browser, they authenticate the
+# upload. nuxt.config.ts gates it on `Boolean(process.env['SENTRY_AUTH_TOKEN'])`,
+# so with no ARG declared the gate read false on every build and the upload
+# never ran, silently — a disabled upload is not an error.
+#
+# All three are required together; any one missing disables the upload. No
+# defaults and no guard: a build without them is legitimate and simply ships
+# without source maps.
+#
+# SENTRY_AUTH_TOKEN is a real secret, unlike the NUXT_PUBLIC_* values above. It
+# is declared HERE, in the builder stage, and deliberately never in the runtime
+# stage: this is a multi-stage build and only /app/.output/public is copied
+# forward, so the token cannot reach the published image or its history.
+ARG SENTRY_AUTH_TOKEN
+ARG SENTRY_ORG
+ARG SENTRY_PROJECT
+ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
+ENV SENTRY_ORG=${SENTRY_ORG}
+ENV SENTRY_PROJECT=${SENTRY_PROJECT}
+RUN if [ -n "$SENTRY_AUTH_TOKEN" ]; then \
+      test -n "$SENTRY_ORG" && test -n "$SENTRY_PROJECT" || { \
+        echo "ERROR: SENTRY_AUTH_TOKEN was supplied but SENTRY_ORG and/or SENTRY_PROJECT are empty."; \
+        echo "  All three are required together; the upload silently no-ops otherwise."; \
+        exit 1; \
+      }; \
+    fi
+
 # Generate the static SPA output (Nuxt SPA mode: ssr: false → nuxt generate)
 RUN bun run generate
 

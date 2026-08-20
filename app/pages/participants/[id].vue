@@ -93,6 +93,34 @@
         </CardContent>
       </Card>
 
+      <!--
+        Participant recovery (participant-error-recovery, design D9): the
+        operator's ONLY path back out of `errore`. `!isViewer` is UI
+        convenience only — ParticipantPolicy::recover is the real server-side
+        gate (a control that renders and then 403s teaches the operator the
+        product is broken, same reasoning as the entry-link card above).
+        Visible while status === 'errore' OR immediately after a successful
+        recovery (`justRecovered`) — status flips to 'in_attesa' the instant
+        `onParticipantRecovered` runs, so gating on status ALONE would
+        unmount this card (and its own success confirmation) before the
+        operator ever saw it.
+      -->
+      <Card
+        v-if="!isViewer && (participant.status === 'errore' || justRecovered)"
+        data-testid="participant-recovery-card"
+      >
+        <CardHeader>
+          <CardTitle>{{ $t('participantRecovery.action') }}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ParticipantRecoveryPanel
+            :participant-id="participant.id"
+            :sessions="sessions"
+            @recovered="onParticipantRecovered"
+          />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{{ $t('participants.detail.resources.title') }}</CardTitle>
@@ -228,7 +256,9 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
+import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
+import type { RecoverParticipantResponse } from '@/composables/useParticipantRecovery'
 import { useEvaluationReport, type EvaluationReportData } from '@/composables/useEvaluationReport'
 import { useDownloads } from '@/composables/useDownloads'
 import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
@@ -385,6 +415,22 @@ async function onGenerateEntryLink(): Promise<void> {
   } finally {
     generatingEntryLink.value = false
   }
+}
+
+// (participant-error-recovery, design D9) `justRecovered` keeps the
+// recovery card mounted (see the Card's v-if above) after the status flips
+// away from 'errore', so the panel's own success confirmation stays visible
+// instead of unmounting the instant the badge updates.
+const justRecovered = ref(false)
+
+// Reflect the recovery immediately: the status badge above re-renders from
+// `participant.value.status`, and sessions are re-fetched so the (now
+// `pending`) reset session no longer shows as `error` in the session list
+// below.
+async function onParticipantRecovered(response: RecoverParticipantResponse): Promise<void> {
+  if (participant.value) participant.value.status = response.status
+  justRecovered.value = true
+  await loadSessions(String(route.params['id']))
 }
 
 async function loadSessions(id: string): Promise<void> {

@@ -148,6 +148,29 @@
       "saveError": "This entry link could not be generated. Please review the highlighted fields."
     }
   },
+  "participantRecovery": {
+    "description": "This candidate's assessment failed during the interview. An admin or operator can re-open it so the candidate can resume.",
+    "action": "Re-open assessment",
+    "confirm": {
+      "title": "Re-open this assessment?",
+      "dataLossWarning": "The candidate will resume from the competency below — it will be re-asked from the start and any partial answer already recorded for it will be permanently discarded. Every other already-answered competency is untouched.",
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "e.g. candidate reported a connection drop",
+      "submit": "Re-open assessment",
+      "submitting": "Re-opening…",
+      "cancel": "Cancel"
+    },
+    "success": {
+      "title": "Assessment re-opened",
+      "body": "The candidate can resume now. Competencies to re-ask: {count}."
+    },
+    "refusalReason": {
+      "evaluation_already_delivered": "This assessment already finished scoring and cannot be re-opened.",
+      "nothing_to_recover": "There is nothing to recover for this participant.",
+      "not_failed": "This participant is not in a failed state.",
+      "unknown": "This assessment could not be re-opened. Please try again."
+    }
+  },
   "projects": {
     "title": "Projects",
     "subtitle": "Each project defines what an assessment measures and where its results are delivered.",

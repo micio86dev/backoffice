@@ -603,7 +603,6 @@
     "field": {
       "avatarId": "ID avatar",
       "voiceId": "ID voce",
-      "language": "Lingua",
       "interactivityType": "Modalità di interazione",
       "maxSessionDurationSec": "Durata massima sessione (s)",
       "videoQuality": "Qualità video",
@@ -647,7 +646,6 @@
       "idleEngagement": "Cosa fa l'avatar quando c'è silenzio: «off» aspetta; «patient» ogni tanto sprona; «eager» interviene spesso.",
       "interactivityType": "Come si conversa: «CONVERSATIONAL» = si parla liberamente; «PUSH_TO_TALK» = si tiene premuto per parlare.",
       "interruptibility": "Quanto è facile interrompere l'avatar mentre parla. Alta = si ferma subito appena parli.",
-      "language": "Lingua in cui parla l'avatar.",
       "llmModel": "Il modello di intelligenza artificiale che «ragiona» e risponde. In dubbio, lascia il predefinito.",
       "llmSpeculativeInference": "Accelera la generazione delle risposte per ridurre l'attesa. In genere conviene tenerlo attivo.",
       "llmTemperature": "Quanto sono libere/creative le risposte (0–2). Bassa = più precisa e ripetibile; alta = più varia e creativa.",

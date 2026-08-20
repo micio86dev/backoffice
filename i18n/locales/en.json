@@ -603,7 +603,6 @@
     "field": {
       "avatarId": "Avatar ID",
       "voiceId": "Voice ID",
-      "language": "Language",
       "interactivityType": "Interaction mode",
       "maxSessionDurationSec": "Maximum session duration (s)",
       "videoQuality": "Video quality",
@@ -647,7 +646,6 @@
       "idleEngagement": "What the avatar does during silence: “off” waits; “patient” nudges occasionally; “eager” chimes in often.",
       "interactivityType": "How you talk: “CONVERSATIONAL” = speak freely; “PUSH_TO_TALK” = hold to talk.",
       "interruptibility": "How easy it is to interrupt the avatar while it speaks. High = it stops as soon as you talk.",
-      "language": "The language the avatar speaks in.",
       "llmModel": "The AI model that “thinks” and replies. When in doubt, leave the default.",
       "llmSpeculativeInference": "Speeds up answer generation to reduce waiting. Usually worth keeping on.",
       "llmTemperature": "How free/creative the answers are (0–2). Low = more precise and repeatable; high = more varied and creative.",

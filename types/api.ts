@@ -2670,6 +2670,19 @@ export interface operations {
                     };
                 };
             };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "down";
+                        /** @constant */
+                        reason: "cors_allowed_origins_empty";
+                    };
+                };
+            };
         };
     };
     "integrity.store": {

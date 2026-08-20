@@ -15,6 +15,21 @@ export function getErrorStatus(error: unknown): number | null {
 }
 
 /**
+ * Extracts a machine-facing `{data:{reason: string}}` refusal code from an
+ * ofetch/$fetch rejection (participant-error-recovery D9 and D3's split
+ * refusal reasons on the entry-link mints). Callers map this string onto an
+ * i18n key — it is NEVER rendered raw, since it is a stable machine value,
+ * not user-facing copy.
+ */
+export function getErrorReason(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+  const data = (error as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return null
+  const reason = (data as { reason?: unknown }).reason
+  return typeof reason === 'string' ? reason : null
+}
+
+/**
  * Extracts a Laravel `ValidationException` body's per-field message arrays
  * (`{errors: {field: [message, ...]}}`) from an ofetch/$fetch rejection.
  *

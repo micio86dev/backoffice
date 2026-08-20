@@ -1,54 +1,35 @@
 import { ref, computed } from 'vue'
 
 /**
- * useAuth — Bearer JWT session composable (D11).
+ * useAuth — memory-only Bearer JWT session composable
+ * (backoffice-session-refresh-hardening design D2/D4/D9).
  *
- * Storage: sessionStorage + an in-memory mirror. The API issues no cookie
- * (`AuthController.php:181-186` returns JSON only), so an httpOnly refresh
- * cookie is out of scope; sessionStorage survives a page reload without
- * persisting across tab close/browser restart. The real XSS mitigation is the
- * existing CSP/security headers (`nuxt.config.ts` route rules) and never using
- * `v-html`, not the storage mechanism itself — an accepted risk (D11).
+ * Storage: a MODULE-SCOPED ref, and NOTHING else — never sessionStorage,
+ * never localStorage. The API's login response no longer carries a
+ * `refresh_token` field (D8): the real refresh credential is an httpOnly
+ * cookie (`beai_refresh`, Path=/api/auth/refresh) the client can never read
+ * and must never try to persist. The access token itself is memory-only by
+ * the same reasoning that killed the old design: a 14-day JS-readable
+ * credential in any Web Storage turns any XSS into a long-lived takeover.
+ * A reload therefore always starts unauthenticated in memory —
+ * `00.auth-bootstrap.client.ts` (D9) is what rehydrates it, awaited, from
+ * the cookie before the router's auth guard ever evaluates.
  *
- * Single-flight refresh: `AuthController.php:86-98` uses jwt-auth token
- * ROTATION with the denylist enabled (`config/jwt.php:227`). Two concurrent
- * refresh calls would mean the second presents a jti the first already
- * denylisted, causing a spurious logout. `refreshInFlight` is a MODULE-scoped
- * (not per-call) in-flight promise, so every `useAuth()` call site anywhere in
- * the app shares the same refresh — a poor-man's store, since this stack has no
- * Pinia.
+ * Single-flight refresh, preserved UNCHANGED from the pre-hardening design:
+ * `refreshInFlight` is a MODULE-scoped (not per-call) in-flight promise, so
+ * every `useAuth()` call site anywhere in the app shares the same refresh.
+ * This is PER TAB (per JS context) and does not help across tabs — the
+ * cross-tab race is handled server-side by the concurrency grace (D6), not
+ * here.
  */
 
-const ACCESS_TOKEN_KEY = 'beai_access_token'
+const REFRESH_CSRF_HEADER = { 'X-BEAI-Refresh': '1' } as const
 
-// Module-scoped state — intentionally NOT inside the useAuth() function body,
-// so every call site shares the same reactive session and the same in-flight
-// refresh promise.
+// Module-scoped state — intentionally NOT inside the useAuth() function
+// body, so every call site shares the same reactive session and the same
+// in-flight refresh promise.
 const accessToken = ref<string | null>(null)
-let hydrated = false
 let refreshInFlight: Promise<string> | null = null
-
-function readStoredToken(): string | null {
-  if (typeof sessionStorage === 'undefined') return null
-  return sessionStorage.getItem(ACCESS_TOKEN_KEY)
-}
-
-function persistToken(token: string | null): void {
-  accessToken.value = token
-  if (typeof sessionStorage === 'undefined') return
-  if (token) {
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, token)
-  } else {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY)
-  }
-}
-
-function ensureHydrated(): void {
-  if (hydrated) return
-  hydrated = true
-  const stored = readStoredToken()
-  if (stored) accessToken.value = stored
-}
 
 interface TokenResponse {
   access_token: string
@@ -56,41 +37,57 @@ interface TokenResponse {
 }
 
 export function useAuth() {
-  ensureHydrated()
-
   const isAuthenticated = computed(() => accessToken.value !== null)
 
   function setSession(token: string): void {
-    persistToken(token)
+    accessToken.value = token
   }
 
   function clearSession(): void {
-    persistToken(null)
+    accessToken.value = null
   }
 
   /**
-   * Refresh the access token. Single-flight: concurrent callers await the
-   * SAME promise and exactly one request reaches /api/auth/refresh.
+   * Refresh the access token via the httpOnly refresh cookie.
+   *
+   * `credentials: 'include'` sends the cookie cross-origin (backoffice and
+   * api are different origins even on localhost); `X-BEAI-Refresh` is the
+   * CSRF header the API requires on this endpoint (D5). NEVER sends an
+   * Authorization header here — the refresh credential is the cookie, not
+   * the access token, and D8's whole point is that this must keep working
+   * after the access token has already expired.
+   *
+   * Single-flight: concurrent callers await the SAME promise and exactly
+   * one request reaches /api/auth/refresh.
    *
    * On failure the session is cleared and the rejection propagates — callers
-   * (useApi) are responsible for redirecting to /login.
+   * (useApi) are responsible for redirecting to /login. The clear is
+   * CONDITIONAL: only if nothing else changed the session while this
+   * attempt was in flight. Without this guard, the awaited boot-time
+   * refresh (00.auth-bootstrap.client.ts, D9) racing a direct
+   * `login()` → `setSession()` call would clobber a freshly-established
+   * session the instant the slower boot attempt finally rejects — a real
+   * bug this composable's own test suite caught, not a hypothetical.
    */
   function refresh(): Promise<string> {
     if (refreshInFlight) return refreshInFlight
 
     const apiBase = useRuntimeConfig().public.apiBase
-    const currentToken = accessToken.value
+    const tokenBeforeAttempt = accessToken.value
 
     refreshInFlight = (async () => {
       try {
         const response = await $fetch<TokenResponse>(`${apiBase}/auth/refresh`, {
           method: 'POST',
-          headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : undefined,
+          credentials: 'include',
+          headers: REFRESH_CSRF_HEADER,
         })
-        persistToken(response.access_token)
+        setSession(response.access_token)
         return response.access_token
       } catch (error) {
-        clearSession()
+        if (accessToken.value === tokenBeforeAttempt) {
+          clearSession()
+        }
         throw error
       } finally {
         refreshInFlight = null
@@ -101,10 +98,11 @@ export function useAuth() {
   }
 
   /**
-   * POST /api/auth/logout — denylists the jti server-side, then clears local
-   * storage and navigates to /login regardless of the response (D11: never
-   * leave a stale local session, or the user stranded on a protected page,
-   * because the network call failed).
+   * POST /api/auth/logout — denylists the jti and revokes the refresh
+   * family server-side, then clears the in-memory session and navigates to
+   * /login regardless of the response (never leave a stale local session,
+   * or the user stranded on a protected page, because the network call
+   * failed).
    */
   async function logout(): Promise<void> {
     const apiBase = useRuntimeConfig().public.apiBase
@@ -112,11 +110,12 @@ export function useAuth() {
     try {
       await $fetch(`${apiBase}/auth/logout`, {
         method: 'POST',
+        credentials: 'include',
         headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : undefined,
       })
     } catch {
       // Intentionally swallowed — logout must succeed locally even if the
-      // network call fails (D11).
+      // network call fails.
     } finally {
       clearSession()
       await navigateTo('/login')

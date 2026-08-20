@@ -1,15 +1,22 @@
 /**
- * login.spec.ts (D11, task 14.4)
+ * login.spec.ts (corrected first — backoffice-session-refresh-hardening
+ * slice 5, design D2/D8)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import LoginPage from '../../app/pages/login.vue'
+import { useAuth } from '../../app/composables/useAuth'
 
 const tMock = (key: string) => key
 
 describe('LoginPage', () => {
   beforeEach(() => {
-    sessionStorage.clear()
+    // useAuth's session is a MODULE-scoped ref (D2) — this file statically
+    // imports LoginPage (required for @vue/test-utils' mount()), so
+    // vi.resetModules() cannot be used to isolate it between tests here
+    // without desynchronising LoginPage's own dynamically-resolved useAuth
+    // instance. Explicit clearSession() is the isolation mechanism instead.
+    useAuth().clearSession()
     // NOTE: intentionally no `afterEach(() => vi.unstubAllGlobals())` here.
     // tests/unit/setup.ts stubs definePageMeta/useHead/useRuntimeConfig/useNuxtApp
     // ONCE per test FILE (not per test), via Vitest's setupFiles. Calling
@@ -31,11 +38,10 @@ describe('LoginPage', () => {
     expect(wrapper.find('[data-testid="login-submit"]').exists()).toBe(true)
   })
 
-  it('on successful login, stores the session and navigates to /', async () => {
+  it('on successful login, stores the session IN MEMORY (never sessionStorage/localStorage) and navigates to /', async () => {
     const navigateToMock = vi.fn()
     const fetchMock = vi.fn(async () => ({
       access_token: 'issued-token',
-      refresh_token: 'issued-token',
       token_type: 'bearer',
     }))
     vi.stubGlobal('$fetch', fetchMock)
@@ -55,10 +61,19 @@ describe('LoginPage', () => {
       'https://api.test/api/auth/login',
       expect.objectContaining({
         method: 'POST',
+        credentials: 'include',
         body: { email: 'admin@example.com', password: 'secret' },
       })
     )
-    expect(sessionStorage.getItem('beai_access_token')).toBe('issued-token')
+
+    const { useAuth } = await import('../../app/composables/useAuth')
+    expect(useAuth().isAuthenticated.value).toBe(true)
+    expect(useAuth().accessToken.value).toBe('issued-token')
+    // No storage write anywhere — the login response no longer carries a
+    // refresh_token field to persist, and the access token itself is
+    // memory-only by design (D2/D4).
+    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
     expect(navigateToMock).toHaveBeenCalledWith('/')
   })
 
@@ -82,7 +97,9 @@ describe('LoginPage', () => {
 
     expect(navigateToMock).not.toHaveBeenCalled()
     expect(wrapper.find('[data-testid="login-error"]').exists()).toBe(true)
-    expect(sessionStorage.getItem('beai_access_token')).toBeNull()
+
+    const { useAuth } = await import('../../app/composables/useAuth')
+    expect(useAuth().isAuthenticated.value).toBe(false)
   })
 
   it('routes the <title> through i18n instead of a hardcoded English literal', () => {

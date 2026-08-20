@@ -1,10 +1,12 @@
 /**
- * useApi.spec.ts (D11, task 14.1 — RED)
+ * useApi.spec.ts (corrected first — backoffice-session-refresh-hardening
+ * slice 5, design D2/D4/D8)
  *
  * Scenarios per the admin-backoffice spec "Authenticated Session" requirement:
  *   - Unauthenticated user is redirected to login.
- *   - Expired token triggers refresh, not logout (silent refresh + retry, the
- *     user is never redirected to login for a recoverable 401).
+ *   - Expired token triggers refresh (via the httpOnly cookie, NOT an
+ *     Authorization header), not logout — silent refresh + retry, the user
+ *     is never redirected to login for a recoverable 401.
  *   - Every request is prefixed with the CONFIGURED apiBase, `/api` suffix
  *     included (AGENTS.md — "apiBase includes the /api suffix").
  *
@@ -22,9 +24,8 @@ function unauthorizedError(): Error & { status: number } {
   return Object.assign(new Error('Unauthorized'), { status: 401 })
 }
 
-describe('useApi — session-aware $fetch wrapper (D11)', () => {
+describe('useApi — session-aware $fetch wrapper (D2/D4/D8)', () => {
   beforeEach(() => {
-    sessionStorage.clear()
     vi.resetModules()
     // NOTE: no `afterEach(() => vi.unstubAllGlobals())` — see login.spec.ts for
     // why that wipes tests/unit/setup.ts's once-per-file baseline stubs. Each
@@ -50,7 +51,7 @@ describe('useApi — session-aware $fetch wrapper (D11)', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('silently refreshes and retries on a 401, without redirecting to /login', async () => {
+  it('silently refreshes (via cookie, credentials:"include", no Bearer) and retries on a 401, without redirecting to /login', async () => {
     const navigateToMock = vi.fn()
     const fetchMock = vi.fn()
     // First call (the protected request) → 401. Second call (/auth/refresh) → new
@@ -83,6 +84,16 @@ describe('useApi — session-aware $fetch wrapper (D11)', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.test/api/participants')
     expect(fetchMock.mock.calls[1][0]).toBe('https://api.test/api/auth/refresh')
     expect(fetchMock.mock.calls[2][0]).toBe('https://api.test/api/participants')
+
+    // The refresh call carries the cookie + CSRF header, NEVER a Bearer.
+    const refreshOptions = fetchMock.mock.calls[1][1] as {
+      credentials?: string
+      headers?: Record<string, string>
+    }
+    expect(refreshOptions.credentials).toBe('include')
+    expect(refreshOptions.headers?.['X-BEAI-Refresh']).toBe('1')
+    expect(refreshOptions.headers?.Authorization).toBeUndefined()
+
     // Retried request carries the NEW token, not the stale one.
     expect(fetchMock.mock.calls[2][1]).toEqual(
       expect.objectContaining({
@@ -91,7 +102,7 @@ describe('useApi — session-aware $fetch wrapper (D11)', () => {
     )
   })
 
-  it('redirects to /login when refresh itself fails (refresh token also invalid/denylisted)', async () => {
+  it('redirects to /login when refresh itself fails (refresh cookie also invalid/revoked)', async () => {
     const navigateToMock = vi.fn()
     const fetchMock = vi.fn()
     fetchMock.mockRejectedValueOnce(unauthorizedError()).mockRejectedValueOnce(unauthorizedError())

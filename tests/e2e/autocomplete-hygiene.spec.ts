@@ -117,6 +117,21 @@ async function mockAdminApi(page: Page): Promise<void> {
 }
 
 async function login(page: Page): Promise<void> {
+  // The access token is memory-only (backoffice-session-refresh-hardening D2)
+  // — 00.auth-bootstrap.client.ts (D9) fires POST /auth/refresh on EVERY full
+  // page load, including any later page.goto() in this test to a DIFFERENT
+  // route (a real browser navigation, not a client-side SPA transition). Without
+  // this mock the boot refresh fails against the unmocked real apiBase, the
+  // session never rehydrates, and the auth guard bounces back to /login.
+  await page.route(
+    (url) => url.pathname === '/auth/refresh',
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: 'e2e-access-token', token_type: 'bearer' }),
+      })
+  )
   await page.goto('/login')
   await page.getByLabel('Email').fill('admin@example.com')
   await page.getByLabel('Password').fill('secret-password')

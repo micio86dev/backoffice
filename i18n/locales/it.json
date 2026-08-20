@@ -148,6 +148,29 @@
       "saveError": "Non è stato possibile generare questo link di accesso. Controlla i campi evidenziati."
     }
   },
+  "participantRecovery": {
+    "description": "La valutazione di questo candidato è fallita durante il colloquio. Un admin o un operatore può riaprirla per permettere al candidato di riprendere.",
+    "action": "Riapri valutazione",
+    "confirm": {
+      "title": "Riaprire questa valutazione?",
+      "dataLossWarning": "Il candidato riprenderà dalla competenza indicata di seguito — verrà riproposta dall'inizio e l'eventuale risposta parziale già registrata per essa sarà eliminata definitivamente. Ogni altra competenza già completata resta invariata.",
+      "reasonLabel": "Motivo (facoltativo)",
+      "reasonPlaceholder": "es. il candidato ha segnalato una caduta di connessione",
+      "submit": "Riapri valutazione",
+      "submitting": "Riapertura in corso…",
+      "cancel": "Annulla"
+    },
+    "success": {
+      "title": "Valutazione riaperta",
+      "body": "Il candidato può riprendere ora. Competenze da riproporre: {count}."
+    },
+    "refusalReason": {
+      "evaluation_already_delivered": "Questa valutazione ha già completato lo scoring e non può essere riaperta.",
+      "nothing_to_recover": "Non c'è nulla da recuperare per questo partecipante.",
+      "not_failed": "Questo partecipante non è in uno stato di errore.",
+      "unknown": "Non è stato possibile riaprire questa valutazione. Riprova."
+    }
+  },
   "projects": {
     "title": "Progetti",
     "subtitle": "Ogni progetto definisce cosa misura una valutazione e dove finiscono i risultati.",

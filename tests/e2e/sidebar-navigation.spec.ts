@@ -7,37 +7,20 @@ import { test, expect, type Route } from '@playwright/test'
  * change, three had no page file), made executable.
  *
  * Bypasses the broken `login()` helper (pre-existing, documented in
- * tasks.md task 4.3 and the three other new specs in this batch) by
- * injecting a session token directly into `sessionStorage` before the app
- * boots — `useAuth().ensureHydrated()` reads it on first `useAuth()` call,
- * so `02.auth.global.ts`'s route guard sees an authenticated visitor without
- * ever needing the login FORM to render.
+ * tasks.md task 4.3 and the three other new specs in this batch) by mocking
+ * the boot plugin's own `POST /auth/refresh`
+ * (`00.auth-bootstrap.client.ts`, backoffice-session-refresh-hardening D9)
+ * to succeed before the app boots — the access token is memory-only now
+ * (D2), so `sessionStorage` injection (the pre-hardening technique) no
+ * longer establishes a session at all; the awaited boot refresh is the only
+ * path left that populates `useAuth`'s in-memory session on a fresh load.
  *
- * DEEPER FINDING on the pre-existing `login()` blocker (tasks.md task 4.3,
- * `projects-crud.spec.ts`, `settings-tabs.spec.ts`, `reports-index.spec.ts`):
- * it is NOT specific to the login page. In THIS session's environment,
- * `page.goto()` to `/login` — a completely unmodified, pre-existing route —
- * reproduces the identical symptom this spec hit for `/`, `/participants`,
- * `/projects`, `/reports`, and `/settings`: the browser's console reports
- * `Failed to load resource: the server responded with a status of 404
- * (Page not found: /login)` against `playwright.config.ts`'s `webServer`
- * (`bunx serve .output/public -s` on `127.0.0.1:3000`). Only `/health` and
- * `/unsupported` are confirmed reachable via direct `goto()` there.
- *
- * Isolated further: an independently-started `bunx serve .output/public -s`
- * instance on a DIFFERENT port served every one of these same paths
- * correctly (200, byte-identical shell to `/health`, verified via `curl`).
- * The regression is therefore specific to how the webServer at
- * `127.0.0.1:3000` behaves in this session — a `serve`-vs-port-3000
- * interaction (a Docker proxy was independently observed also present near
- * that port in this sandbox) is the leading hypothesis, not a confirmed
- * root cause. Either way: this is shared E2E serving infrastructure
- * (`playwright.config.ts`), reproduces identically against unmodified
- * pre-existing routes, and is out of this batch's scope to fix.
- *
- * This spec is written correctly and is ready to run once that
- * infrastructure issue is resolved — it could NOT be run to completion in
- * this environment, same as every other new Playwright spec in this batch.
+ * UPDATE (backoffice-session-refresh-hardening apply session): the
+ * `127.0.0.1:3000` port-collision blocker described in the original version
+ * of this comment no longer reproduces — `playwright.config.ts`'s
+ * `webServer` now binds `127.0.0.1:4173` explicitly (see its own comment on
+ * the `FRONTEND_PORT`/`BACKOFFICE_PORT` collision this was changed to
+ * avoid). This spec runs to completion and passes in this environment.
  */
 
 const SIDEBAR_ROUTES: { path: string; heading: string }[] = [
@@ -152,9 +135,15 @@ async function mockBaselineApi(page: import('@playwright/test').Page): Promise<v
 }
 
 async function injectSession(page: import('@playwright/test').Page): Promise<void> {
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('beai_access_token', 'e2e-injected-token')
-  })
+  await page.route(
+    (url) => url.pathname === '/auth/refresh',
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: 'e2e-injected-token', token_type: 'bearer' }),
+      })
+  )
 }
 
 test.describe('Sidebar navigation — no dead links (Phase 30, task 30.1)', () => {

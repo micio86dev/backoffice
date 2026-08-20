@@ -98,7 +98,6 @@ useHead({
 
 interface LoginResponse {
   access_token: string
-  refresh_token: string
   token_type: string
 }
 
@@ -153,8 +152,14 @@ async function onSubmit(): Promise<void> {
   submitting.value = true
   try {
     const apiBase = useRuntimeConfig().public.apiBase
+    // credentials:'include' (backoffice-session-refresh-hardening D2/D4): api
+    // and backoffice are different origins even on localhost, and a
+    // cross-origin response's Set-Cookie header is silently DROPPED by the
+    // browser unless the request itself opted into credentialed mode — this
+    // is what makes the returned beai_refresh cookie actually get stored.
     const response = await $fetch<LoginResponse>(`${apiBase}/auth/login`, {
       method: 'POST',
+      credentials: 'include',
       body: { email: email.value, password: password.value },
     })
     useAuth().setSession(response.access_token)

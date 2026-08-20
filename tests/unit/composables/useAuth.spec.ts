@@ -1,22 +1,22 @@
 /**
- * useAuth.spec.ts (D11, task 14.2 — RED)
+ * useAuth.spec.ts (corrected first — backoffice-session-refresh-hardening
+ * slice 4, design D2/D4/D9)
  *
- * Regression guard for the concurrent-refresh hazard flagged in design D11:
- * `AuthController.php:86-98` rotates the JWT on every /api/auth/refresh call
- * with the denylist enabled (`config/jwt.php:227`). If two concurrent 401s each
- * triggered their own refresh call, the second would present a jti the first
- * already denylisted, causing a spurious logout — and the dashboard fires
- * several parallel requests on mount, so this is not hypothetical.
+ * The access token is now MEMORY-ONLY: no sessionStorage, no localStorage
+ * anywhere. The real refresh credential is an httpOnly cookie the client can
+ * never read (D2/D4) — `refresh()` sends `credentials: 'include'` +
+ * `X-BEAI-Refresh` and NEVER an Authorization header (the cookie IS the
+ * credential, and the whole point of D8 is that this must still work after
+ * the access token has expired).
  *
- * `useAuth().refresh()` MUST be single-flight: every concurrent caller awaits
- * the SAME in-flight promise, and exactly one network call reaches
- * `/api/auth/refresh` no matter how many callers ask concurrently.
+ * Single-flight refresh is preserved UNCHANGED from the pre-hardening
+ * design: `AuthController::refresh()` still mints a fresh access token per
+ * call, so two concurrent 401s must still share one in-flight promise.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-describe('useAuth — single-flight refresh (D11)', () => {
+describe('useAuth — memory-only session, single-flight refresh (D2/D4/D9)', () => {
   beforeEach(() => {
-    sessionStorage.clear()
     vi.resetModules()
     // NOTE: no `afterEach(() => vi.unstubAllGlobals())` — see login.spec.ts for
     // why that wipes tests/unit/setup.ts's once-per-file baseline stubs. Each
@@ -51,6 +51,35 @@ describe('useAuth — single-flight refresh (D11)', () => {
     expect(resultB).toBe('new-token-after-rotation')
     expect(resultC).toBe('new-token-after-rotation')
     expect(auth.accessToken.value).toBe('new-token-after-rotation')
+  })
+
+  it('refresh() sends credentials:"include" and X-BEAI-Refresh, and NEVER an Authorization header', async () => {
+    const fetchMock = vi.fn(async () => ({
+      access_token: 'new-token',
+      token_type: 'bearer',
+    }))
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+
+    const { useAuth } = await import('../../../app/composables/useAuth')
+    const auth = useAuth()
+    auth.setSession('stale-token')
+
+    await auth.refresh()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.test/api/auth/refresh',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: expect.objectContaining({ 'X-BEAI-Refresh': '1' }),
+      })
+    )
+    const [, options] = fetchMock.mock.calls[0] as [string, { headers?: Record<string, string> }]
+    expect(options.headers?.Authorization).toBeUndefined()
   })
 
   it('allows a NEW refresh call after the in-flight one settles (not single-flight forever)', async () => {
@@ -96,7 +125,7 @@ describe('useAuth — single-flight refresh (D11)', () => {
     expect(auth.isAuthenticated.value).toBe(false)
   })
 
-  it('logout() calls POST /api/auth/logout, clears the session, and navigates to /login regardless of the response (task 14.4)', async () => {
+  it('logout() calls POST /api/auth/logout, clears the session, and navigates to /login regardless of the response', async () => {
     const navigateToMock = vi.fn()
     const fetchMock = vi.fn(async (url: string) => {
       expect(url).toBe('https://api.test/api/auth/logout')
@@ -142,21 +171,26 @@ describe('useAuth — single-flight refresh (D11)', () => {
     expect(navigateToMock).toHaveBeenCalledWith('/login')
   })
 
-  it('setSession persists to sessionStorage and clearSession removes it', () => {
+  it('setSession/clearSession keep the token in memory only — NEVER sessionStorage or localStorage', () => {
     vi.stubGlobal(
       'useRuntimeConfig',
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
-    const KEY = 'beai_access_token'
 
     return import('../../../app/composables/useAuth').then(({ useAuth }) => {
       const auth = useAuth()
       auth.setSession('my-token')
-      expect(sessionStorage.getItem(KEY)).toBe('my-token')
+
+      expect(auth.accessToken.value).toBe('my-token')
       expect(auth.isAuthenticated.value).toBe(true)
+      // The whole point of D2: a reload (which wipes memory but NOT web
+      // storage) must not leave a readable access token behind for an XSS
+      // payload to exfiltrate.
+      expect(sessionStorage.length).toBe(0)
+      expect(localStorage.length).toBe(0)
 
       auth.clearSession()
-      expect(sessionStorage.getItem(KEY)).toBeNull()
+      expect(auth.accessToken.value).toBeNull()
       expect(auth.isAuthenticated.value).toBe(false)
     })
   })

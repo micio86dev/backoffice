@@ -106,6 +106,42 @@ describe('useAuth — memory-only session, single-flight refresh (D2/D4/D9)', ()
     expect(second).toBe('token-2')
   })
 
+  it('a slow/failed refresh() must NOT clobber a session established by something else while it was in flight (the boot-plugin-vs-login race)', async () => {
+    let resolveRefresh: (() => void) | null = null
+    const fetchMock = vi.fn(async () => {
+      await new Promise<void>((resolve) => {
+        resolveRefresh = resolve
+      })
+      throw new Error('401 — no valid refresh cookie')
+    })
+    vi.stubGlobal('$fetch', fetchMock)
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+
+    const { useAuth } = await import('../../../app/composables/useAuth')
+    const auth = useAuth()
+
+    // Boot-time refresh starts (accessToken is null at this point) but does
+    // not resolve yet.
+    const bootRefresh = auth.refresh()
+
+    // A direct login (bypassing refresh() entirely) establishes a session
+    // WHILE the boot refresh is still in flight — realistic: the login POST
+    // is a separate, faster network call.
+    auth.setSession('freshly-logged-in-token')
+
+    // NOW the slow boot refresh rejects.
+    resolveRefresh!()
+    await expect(bootRefresh).rejects.toThrow()
+
+    // The login's session must survive — a stale boot-time attempt must
+    // never win a race against a newer, successful login.
+    expect(auth.accessToken.value).toBe('freshly-logged-in-token')
+    expect(auth.isAuthenticated.value).toBe(true)
+  })
+
   it('clears the session and rejects when refresh fails', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('401')

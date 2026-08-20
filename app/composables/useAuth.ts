@@ -61,12 +61,19 @@ export function useAuth() {
    * one request reaches /api/auth/refresh.
    *
    * On failure the session is cleared and the rejection propagates — callers
-   * (useApi) are responsible for redirecting to /login.
+   * (useApi) are responsible for redirecting to /login. The clear is
+   * CONDITIONAL: only if nothing else changed the session while this
+   * attempt was in flight. Without this guard, the awaited boot-time
+   * refresh (00.auth-bootstrap.client.ts, D9) racing a direct
+   * `login()` → `setSession()` call would clobber a freshly-established
+   * session the instant the slower boot attempt finally rejects — a real
+   * bug this composable's own test suite caught, not a hypothetical.
    */
   function refresh(): Promise<string> {
     if (refreshInFlight) return refreshInFlight
 
     const apiBase = useRuntimeConfig().public.apiBase
+    const tokenBeforeAttempt = accessToken.value
 
     refreshInFlight = (async () => {
       try {
@@ -78,7 +85,9 @@ export function useAuth() {
         setSession(response.access_token)
         return response.access_token
       } catch (error) {
-        clearSession()
+        if (accessToken.value === tokenBeforeAttempt) {
+          clearSession()
+        }
         throw error
       } finally {
         refreshInFlight = null

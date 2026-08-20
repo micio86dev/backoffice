@@ -2007,10 +2007,10 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @constant */
-                        error: "refresh_token_revoked";
+                        error: "refresh_token_invalid";
                     } | {
                         /** @constant */
-                        error: "refresh_token_invalid";
+                        error: "refresh_token_revoked";
                     } | {
                         /** @constant */
                         error: "refresh_token_expired";

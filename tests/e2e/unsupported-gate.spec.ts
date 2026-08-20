@@ -78,13 +78,22 @@ test.describe('SA-11 — every admin route redirects at a mobile viewport (task 
   test('an authenticated visitor is STILL sent to /unsupported at a mobile viewport (the browser gate runs before the auth gate)', async ({
     page,
   }) => {
-    // No live API in this environment — a session token is injected directly
-    // into sessionStorage (exactly what useAuth().setSession() writes) to
-    // prove the SA-11 gate fires regardless of auth state, without depending
-    // on a running backend for a UI-only assertion.
-    await page.addInitScript(() => {
-      window.sessionStorage.setItem('beai_access_token', 'e2e-fake-session-token')
-    })
+    // No live API in this environment, and the access token is memory-only
+    // (backoffice-session-refresh-hardening D2) — sessionStorage injection no
+    // longer establishes a session. Instead, mock the boot plugin's own
+    // POST /auth/refresh (00.auth-bootstrap.client.ts, D9) to succeed, which
+    // is the ONLY way a fresh page load becomes authenticated now. Proves the
+    // SA-11 gate fires regardless of auth state, without depending on a
+    // running backend for a UI-only assertion.
+    await page.route(
+      (url) => url.pathname === '/auth/refresh',
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ access_token: 'e2e-fake-session-token', token_type: 'bearer' }),
+        })
+    )
 
     await page.goto('/')
 

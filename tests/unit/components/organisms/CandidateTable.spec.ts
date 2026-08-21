@@ -33,6 +33,7 @@ function baseParticipant(overrides: Record<string, unknown> = {}) {
     language: 'it',
     status: 'in_corso',
     project_id: 1,
+    project_name: 'Demo Project',
     started_at: null,
     completed_at: null,
     created_at: '2026-03-14T10:30:00Z',
@@ -85,6 +86,32 @@ describe('CandidateTable', () => {
 
     expect(wrapper.text()).toContain('participants.table.empty')
     expect(wrapper.findAll('tbody tr td a').length).toBe(0)
+    // 5 columns since the project column was added — a stale colspan of 4
+    // would leave the empty-state cell visually misaligned with the header.
+    expect(wrapper.get('tbody td').attributes('colspan')).toBe('5')
+  })
+
+  it("renders each row's own project name in a dedicated column", () => {
+    const wrapper = mountTable({
+      participants: [
+        baseParticipant({ id: 1, project_name: 'Onboarding Q3' }),
+        baseParticipant({ id: 2, project_name: 'Leadership Track' }),
+      ],
+    })
+
+    const rows = wrapper.findAll('tbody tr')
+    expect(rows[0]?.text()).toContain('Onboarding Q3')
+    expect(rows[1]?.text()).toContain('Leadership Track')
+    expect(rows[0]?.text()).not.toContain('Leadership Track')
+  })
+
+  it('renders a dash rather than throwing when a row has no project (orphaned FK, D6)', () => {
+    const wrapper = mountTable({
+      participants: [baseParticipant({ project_name: null })],
+    })
+
+    const row = wrapper.get('tbody tr')
+    expect(row.text()).toContain('–')
   })
 
   it('renders the pagination summary and enables Next when not on the last page', () => {

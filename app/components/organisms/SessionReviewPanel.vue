@@ -101,7 +101,7 @@
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import MetricCard from '@/components/molecules/MetricCard.vue'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatDuration } from '@/utils/format'
 import type { IntegrityEventRow, SessionReview } from '@/composables/useSessionReview'
 
 const props = defineProps<{
@@ -117,13 +117,7 @@ const BAND_CLASS: Record<string, string> = {
   high: 'bg-error-light text-destructive',
 }
 
-const durationLabel = computed(() => {
-  const seconds = props.review.duration_seconds
-  if (seconds === null) return '–'
-
-  const minutes = Math.floor(seconds / 60)
-  return t('review.durationValue', { minutes, seconds: seconds % 60 })
-})
+const durationLabel = computed(() => formatDuration(props.review.duration_seconds, t))
 
 // Always the word "estimate": no provider exposes a per-session billed amount,
 // and an operator who reads this as an invoice line will reconcile it against a

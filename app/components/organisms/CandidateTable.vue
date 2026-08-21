@@ -33,13 +33,14 @@
       <TableHeader>
         <TableRow>
           <TableHead>{{ $t('participants.table.candidate') }}</TableHead>
+          <TableHead>{{ $t('participants.table.project') }}</TableHead>
           <TableHead>{{ $t('participants.table.role') }}</TableHead>
           <TableHead>{{ $t('participants.table.status') }}</TableHead>
           <TableHead>{{ $t('participants.table.createdAt') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableEmpty v-if="participants.length === 0" :colspan="4">
+        <TableEmpty v-if="participants.length === 0" :colspan="5">
           {{ $t('participants.table.empty') }}
         </TableEmpty>
         <TableRow v-for="participant in participants" :key="participant.id">
@@ -52,6 +53,7 @@
             </NuxtLink>
             <div class="text-muted-foreground text-xs">{{ participant.candidate_ref }}</div>
           </TableCell>
+          <TableCell>{{ participant.project_name ?? '–' }}</TableCell>
           <TableCell>{{ participant.role_code }}</TableCell>
           <TableCell>
             <StatusBadge :status="participant.status" />

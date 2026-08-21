@@ -65,7 +65,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatDuration } from '@/utils/format'
 import type { SessionSummary } from '@/composables/useSessionReview'
 
 defineProps<{
@@ -76,8 +76,6 @@ defineProps<{
 const { t } = useI18n()
 
 function durationLabel(seconds: number | null): string {
-  if (seconds === null) return '–'
-
-  return t('review.durationValue', { minutes: Math.floor(seconds / 60), seconds: seconds % 60 })
+  return formatDuration(seconds, t)
 }
 </script>

@@ -29,7 +29,7 @@
           <CardTitle>{{ $t('participants.detail.timeline.title') }}</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl class="grid grid-cols-3 gap-4 text-sm">
+          <dl class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt class="text-muted-foreground">
                 {{ $t('participants.detail.timeline.startedAt') }}
@@ -46,13 +46,53 @@
                 {{ formatDate(participant.timeline.completed_at, locale) }}
               </dd>
             </div>
-            <div>
-              <dt class="text-muted-foreground">
-                {{ $t('participants.detail.timeline.sessionCount') }}
-              </dt>
-              <dd class="text-foreground">{{ participant.timeline.session_count }}</dd>
-            </div>
           </dl>
+        </CardContent>
+      </Card>
+
+      <!--
+        Interview summary (operator-participant-visibility, design D3–D6):
+        the five facts the operator's original report said were missing.
+        `timeline.session_count` (above) stays in the payload but no longer
+        renders — it counts session ROWS, not ended competencies, and
+        showing both would put two different numbers on "how far" this
+        interview got (D5). Every figure here carries its own coverage
+        count, adjacent to the number, because progress/elapsed/cost
+        genuinely differ in which sessions they exclude.
+      -->
+      <Card>
+        <CardHeader>
+          <CardTitle>{{ $t('participants.detail.interview.title') }}</CardTitle>
+        </CardHeader>
+        <CardContent class="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            :label="$t('participants.detail.interview.progress')"
+            :value="progressLabel"
+            data-testid="interview-progress"
+          />
+          <div class="flex flex-col gap-1" data-testid="interview-elapsed">
+            <MetricCard
+              :label="$t('participants.detail.interview.elapsed')"
+              :value="elapsedLabel"
+            />
+            <p
+              v-if="elapsedCoverageLabel"
+              class="text-muted-foreground text-xs"
+              data-testid="elapsed-coverage"
+            >
+              {{ elapsedCoverageLabel }}
+            </p>
+          </div>
+          <div class="flex flex-col gap-1" data-testid="interview-cost">
+            <MetricCard :label="$t('review.costEstimate')" :value="costLabel" />
+            <p
+              v-if="costCoverageLabel"
+              class="text-muted-foreground text-xs"
+              data-testid="cost-coverage"
+            >
+              {{ costCoverageLabel }}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -254,6 +294,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
+import MetricCard from '@/components/molecules/MetricCard.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
@@ -265,7 +306,7 @@ import { useSessionReview, type SessionSummary } from '@/composables/useSessionR
 import { useEntryLinks } from '@/composables/useEntryLinks'
 import { useProfile } from '@/composables/useProfile'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatDuration } from '@/utils/format'
 import { projectAccessibility, type ProjectAccessibility } from '@/utils/project-accessibility'
 import {
   resolveResourceErrorState,
@@ -320,6 +361,49 @@ const transcriptReady = computed(() =>
 const evaluationReady = computed(() =>
   participant.value ? isParticipantResourceReady(participant.value.status, 'evaluation') : false
 )
+
+// Interview summary (D3–D6): progress/elapsed/cost, each with its own
+// coverage disclosure. A coverage line renders only while partial — full
+// coverage (counted/estimated === total) says nothing extra, matching the
+// "state it only when it's incomplete" doctrine from the top-level spec.
+const progressLabel = computed(() => {
+  if (!participant.value) return '–'
+  const { done, total } = participant.value.progress
+  return `${done} / ${total}`
+})
+
+const elapsedLabel = computed(() =>
+  participant.value ? formatDuration(participant.value.elapsed.seconds, t) : '–'
+)
+
+const elapsedCoverageLabel = computed(() => {
+  if (!participant.value) return null
+  const { sessions_counted, sessions_total } = participant.value.elapsed
+  if (sessions_counted >= sessions_total) return null
+  return t('participants.detail.interview.elapsedCoverage', {
+    counted: sessions_counted,
+    total: sessions_total,
+  })
+})
+
+// Always the word "estimate" (review.costEstimate label, reused verbatim):
+// no provider exposes a per-session billed amount, and an operator who
+// reads this as an invoice line will reconcile it against a real bill and
+// find a discrepancy that was never a defect.
+const costLabel = computed(() => {
+  if (!participant.value || participant.value.cost.amount === null) return '–'
+  return t('review.costValue', { usd: participant.value.cost.amount.toFixed(2) })
+})
+
+const costCoverageLabel = computed(() => {
+  if (!participant.value) return null
+  const { sessions_estimated, sessions_total } = participant.value.cost
+  if (sessions_estimated >= sessions_total) return null
+  return t('participants.detail.interview.costCoverage', {
+    estimated: sessions_estimated,
+    total: sessions_total,
+  })
+})
 
 const evaluationState = ref<ResourceState>('loading')
 const evaluationData = ref<EvaluationReportData | null>(null)

@@ -6,7 +6,12 @@
  * Intl.NumberFormat only, never manual string formatting.
  */
 import { describe, it, expect } from 'vitest'
-import { formatDate, formatPercent, formatCompetencyMean } from '../../../app/utils/format'
+import {
+  formatDate,
+  formatPercent,
+  formatCompetencyMean,
+  formatDuration,
+} from '../../../app/utils/format'
 
 describe('formatDate', () => {
   it('formats an ISO date string using Intl.DateTimeFormat for the given locale', () => {
@@ -57,5 +62,24 @@ describe('formatCompetencyMean', () => {
 
   it('returns an en dash for a null mean (all indicators unassessable — never 0)', () => {
     expect(formatCompetencyMean(null, 'en')).toBe('–')
+  })
+})
+
+describe('formatDuration', () => {
+  // formerly duplicated in SessionList.vue and SessionReviewPanel.vue
+  // (design.md D7 utils/format.ts entry) — extracted here so a third copy
+  // is never written.
+  const t = (key: string, params?: Record<string, unknown>) => `${key}:${JSON.stringify(params)}`
+
+  it('delegates to the translated review.durationValue key with minutes/seconds split from the total', () => {
+    expect(formatDuration(605, t)).toBe('review.durationValue:{"minutes":10,"seconds":5}')
+  })
+
+  it('splits a DIFFERENT total into a DIFFERENT minutes/seconds pair (proves real division, not a fixed fixture)', () => {
+    expect(formatDuration(42, t)).toBe('review.durationValue:{"minutes":0,"seconds":42}')
+  })
+
+  it('returns an em dash for null seconds, never 0 (an unfinished interview is not a zero-length one)', () => {
+    expect(formatDuration(null, t)).toBe('–')
   })
 })

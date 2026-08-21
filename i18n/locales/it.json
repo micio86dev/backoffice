@@ -86,6 +86,7 @@
     },
     "table": {
       "candidate": "Candidato",
+      "project": "Progetto",
       "role": "Ruolo",
       "status": "Stato",
       "createdAt": "Iniziato",
@@ -118,6 +119,13 @@
         "evaluation": "Report di valutazione",
         "ready": "Disponibile",
         "notReady": "Non ancora disponibile"
+      },
+      "interview": {
+        "title": "Colloquio",
+        "progress": "Avanzamento",
+        "elapsed": "Tempo trascorso",
+        "elapsedCoverage": "{counted} di {total} sessioni conteggiate",
+        "costCoverage": "{estimated} di {total} sessioni stimate"
       }
     }
   },

@@ -86,6 +86,7 @@
     },
     "table": {
       "candidate": "Candidate",
+      "project": "Project",
       "role": "Role",
       "status": "Status",
       "createdAt": "Started",
@@ -118,6 +119,13 @@
         "evaluation": "Evaluation report",
         "ready": "Ready",
         "notReady": "Not ready yet"
+      },
+      "interview": {
+        "title": "Interview",
+        "progress": "Progress",
+        "elapsed": "Elapsed time",
+        "elapsedCoverage": "{counted} of {total} sessions counted",
+        "costCoverage": "{estimated} of {total} sessions estimated"
       }
     }
   },

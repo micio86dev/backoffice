@@ -12,7 +12,15 @@ import { ref } from 'vue'
 
 const tMock = (key: string) => key
 
-function detailResponse(status: string, project?: Record<string, unknown>) {
+function detailResponse(
+  status: string,
+  project?: Record<string, unknown>,
+  interview?: {
+    progress?: Record<string, unknown>
+    elapsed?: Record<string, unknown>
+    cost?: Record<string, unknown>
+  }
+) {
   return {
     data: {
       id: 42,
@@ -33,6 +41,18 @@ function detailResponse(status: string, project?: Record<string, unknown>) {
         deadline_at: null,
       },
       timeline: { started_at: '2026-03-14T10:00:00Z', completed_at: null, session_count: 3 },
+      // operator-participant-visibility, design D3/D4/D6: the five facts the
+      // aggregator derives, always present on a real response (never
+      // optional in ParticipantDetailResource — see types/api.ts).
+      progress: interview?.progress ?? { done: 6, total: 15 },
+      elapsed: interview?.elapsed ?? { seconds: 780, sessions_counted: 2, sessions_total: 3 },
+      cost: interview?.cost ?? {
+        amount: 4.5,
+        currency: 'USD',
+        is_estimate: true,
+        sessions_estimated: 2,
+        sessions_total: 3,
+      },
       files: {
         transcript: { type: 'text/plain', ref: 'transcript', url: '/x' },
         evaluation_raw: { type: 'application/json', ref: 'evaluation', url: '/y' },
@@ -88,18 +108,22 @@ describe('pages/participants/[id].vue', () => {
 
   async function mountDetailPage(options: {
     status?: string
+    interview?: Parameters<typeof detailResponse>[2]
     fetchEvaluationImpl?: () => Promise<typeof EVALUATION_FIXTURE>
     downloadTranscriptMock?: ReturnType<typeof vi.fn>
     downloadEvaluationMock?: ReturnType<typeof vi.fn>
   }) {
     const {
       status = 'completato',
+      interview,
       fetchEvaluationImpl = () => Promise.resolve(EVALUATION_FIXTURE),
       downloadTranscriptMock = vi.fn().mockResolvedValue(undefined),
       downloadEvaluationMock = vi.fn().mockResolvedValue(undefined),
     } = options
 
-    const fetchParticipantMock = vi.fn().mockResolvedValue(detailResponse(status))
+    const fetchParticipantMock = vi
+      .fn()
+      .mockResolvedValue(detailResponse(status, undefined, interview))
     vi.doMock('../../../../app/composables/useParticipants', () => ({
       useParticipants: () => ({ fetchParticipant: fetchParticipantMock }),
     }))
@@ -243,7 +267,10 @@ describe('pages/participants/[id].vue', () => {
 
     expect(fetchParticipantMock).toHaveBeenCalledWith('42')
     expect(wrapper.text()).toContain('Jane Doe')
-    expect(wrapper.text()).toContain('3')
+    // The raw session_count row is gone (D5: "stops being rendered" — it
+    // counts session ROWS, not ended competencies, and the aggregator's
+    // done/total below is the number an operator actually needs).
+    expect(wrapper.text()).not.toContain('participants.detail.timeline.sessionCount')
   })
 
   it('shows the transcript as ready and the evaluation as not-ready at in_valutazione (mirrors the server gate, D2)', async () => {
@@ -588,6 +615,162 @@ describe('pages/participants/[id].vue', () => {
       expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(
         'https://interview.example.com/interview/second-tok'
       )
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Interview summary: status/progress/elapsed/cost (operator-participant-
+  // visibility, design D3–D6). The operator's original complaint was that a
+  // five-state lifecycle, and everything derived from it, rendered as one
+  // flat "3" — these tests pin each of the five missing facts individually.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('Interview summary (status/progress/elapsed/cost)', () => {
+    it('renders the real lifecycle status value, never a boolean/reduction (errore case)', async () => {
+      const { wrapper } = await mountDetailPage({ status: 'errore' })
+
+      // StatusBadge already renders the literal value through
+      // participants.status.<status> (participant-lifecycle.ts); this test
+      // pins that the detail page still surfaces it — not "not completed",
+      // not a boolean.
+      expect(wrapper.text()).toContain('participants.status.errore')
+      expect(wrapper.text()).not.toContain('participants.status.completato')
+    })
+
+    it('renders progress as done / total, not the bare session_count', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: { progress: { done: 6, total: 15 } },
+      })
+
+      expect(wrapper.text()).toContain('6 / 15')
+    })
+
+    it('renders a DIFFERENT done/total for a different fixture (proves real data, not a fixed string)', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: { progress: { done: 2, total: 18 } },
+      })
+
+      expect(wrapper.text()).toContain('2 / 18')
+      expect(wrapper.text()).not.toContain('6 / 15')
+    })
+
+    it('labels the cost figure through the estimate copy key unconditionally', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: {
+          cost: {
+            amount: 4.5,
+            currency: 'USD',
+            is_estimate: true,
+            sessions_estimated: 3,
+            sessions_total: 3,
+          },
+        },
+      })
+
+      expect(wrapper.text()).toContain('review.costEstimate')
+    })
+
+    it('states how many sessions contributed when the cost total is partial', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: {
+          cost: {
+            amount: 4.5,
+            currency: 'USD',
+            is_estimate: true,
+            sessions_estimated: 2,
+            sessions_total: 3,
+          },
+        },
+      })
+
+      expect(wrapper.get('[data-testid="cost-coverage"]').text()).toBe(
+        'participants.detail.interview.costCoverage'
+      )
+    })
+
+    it('states nothing about coverage when the cost total is complete (full coverage)', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: {
+          cost: {
+            amount: 6,
+            currency: 'USD',
+            is_estimate: true,
+            sessions_estimated: 3,
+            sessions_total: 3,
+          },
+        },
+      })
+
+      expect(wrapper.find('[data-testid="cost-coverage"]').exists()).toBe(false)
+    })
+
+    it('renders a dash rather than 0 when no session yields a cost estimate', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: {
+          cost: {
+            amount: null,
+            currency: 'USD',
+            is_estimate: true,
+            sessions_estimated: 0,
+            sessions_total: 3,
+          },
+        },
+      })
+
+      expect(wrapper.get('[data-testid="interview-cost"]').text()).toContain('–')
+      expect(wrapper.get('[data-testid="interview-cost"]').text()).not.toContain('0')
+    })
+
+    it('renders a dash rather than 0 elapsed time when no session has finished', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: { elapsed: { seconds: null, sessions_counted: 0, sessions_total: 3 } },
+      })
+
+      expect(wrapper.get('[data-testid="interview-elapsed"]').text()).toContain('–')
+    })
+
+    it('states how many sessions contributed when elapsed time is partial', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: { elapsed: { seconds: 780, sessions_counted: 2, sessions_total: 3 } },
+      })
+
+      expect(wrapper.get('[data-testid="elapsed-coverage"]').text()).toBe(
+        'participants.detail.interview.elapsedCoverage'
+      )
+    })
+
+    it('a viewer sees every interview-summary field — no restriction beyond RBAC', async () => {
+      vi.doMock('../../../../app/composables/useProfile', () => ({
+        useProfile: () => ({
+          fetchProfile: vi.fn().mockResolvedValue(profileResponse('viewer')),
+        }),
+      }))
+
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: {
+          progress: { done: 6, total: 15 },
+          elapsed: { seconds: 780, sessions_counted: 2, sessions_total: 3 },
+          cost: {
+            amount: 4.5,
+            currency: 'USD',
+            is_estimate: true,
+            sessions_estimated: 2,
+            sessions_total: 3,
+          },
+        },
+      })
+
+      expect(wrapper.text()).toContain('6 / 15')
+      expect(wrapper.get('[data-testid="interview-elapsed"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('review.costEstimate')
     })
   })
 })

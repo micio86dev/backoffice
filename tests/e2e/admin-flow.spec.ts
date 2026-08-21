@@ -36,6 +36,19 @@ const PARTICIPANT_DETAIL = {
     completed_at: PARTICIPANT.completed_at,
     session_count: 5,
   },
+  // The participant detail contract gained progress/elapsed/cost. These mocks
+  // are typed the same as the real payload on purpose: leaving them short and
+  // making the page defensive instead would hide a genuine API regression
+  // behind an optional-chain.
+  progress: { done: 5, total: 5 },
+  elapsed: { seconds: 1860, sessions_counted: 5, sessions_total: 5 },
+  cost: {
+    amount: 3.72,
+    currency: 'USD',
+    is_estimate: true,
+    sessions_estimated: 5,
+    sessions_total: 5,
+  },
   files: {
     transcript: {
       type: 'text/plain',
@@ -228,13 +241,13 @@ test.describe('Admin flow — login → participant list → participant detail'
     await page.getByRole('link', { name: 'Mario Rossi' }).click()
     await expect(page).toHaveURL('/participants/1')
     await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
-    // Session count from the timeline fixture (5) proves the detail payload
-    // was actually rendered, not a stale/empty state. Scoped to the <dd>'s
-    // implicit "definition" role: PR B3's report grid also renders indicator
-    // chips with the literal text "5" (aria-hidden, so excluded from a
-    // role-based query), which would otherwise make a bare getByText('5')
-    // ambiguous (strict-mode violation).
-    await expect(page.getByRole('definition').filter({ hasText: '5' })).toBeVisible()
+    // Progress from the detail fixture proves the payload was actually
+    // rendered, not a stale/empty state. This used to pin a bare "5" — the raw
+    // session count — which is precisely the unreadable figure this change
+    // replaced: five-of-five and five-of-fifteen rendered identically. Pinning
+    // the denominator too makes the assertion strictly stronger, and it can no
+    // longer pass against a page that has lost the total.
+    await expect(page.getByTestId('interview-progress')).toContainText('5 / 5')
   })
 
   test('the candidate list view is WCAG 2.1 AA clean', async ({ page }) => {

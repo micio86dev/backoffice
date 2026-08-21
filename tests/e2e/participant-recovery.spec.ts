@@ -65,6 +65,19 @@ const FAILED_PARTICIPANT_DETAIL = {
     deadline_at: ACTIVE_PROJECT.deadline_at,
   },
   timeline: { started_at: FAILED_PARTICIPANT.started_at, completed_at: null, session_count: 1 },
+  // The participant detail contract gained progress/elapsed/cost. These mocks
+  // are typed the same as the real payload on purpose: leaving them short and
+  // making the page defensive instead would hide a genuine API regression
+  // behind an optional-chain.
+  progress: { done: 1, total: 3 },
+  elapsed: { seconds: 420, sessions_counted: 1, sessions_total: 1 },
+  cost: {
+    amount: 0.84,
+    currency: 'USD',
+    is_estimate: true,
+    sessions_estimated: 1,
+    sessions_total: 1,
+  },
   files: {
     transcript: null,
     evaluation_raw: null,

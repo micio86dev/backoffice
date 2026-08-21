@@ -29,7 +29,7 @@
           <CardTitle>{{ $t('participants.detail.timeline.title') }}</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl class="grid grid-cols-3 gap-4 text-sm">
+          <dl class="grid grid-cols-2 gap-4 text-sm">
             <div>
               <dt class="text-muted-foreground">
                 {{ $t('participants.detail.timeline.startedAt') }}
@@ -46,13 +46,53 @@
                 {{ formatDate(participant.timeline.completed_at, locale) }}
               </dd>
             </div>
-            <div>
-              <dt class="text-muted-foreground">
-                {{ $t('participants.detail.timeline.sessionCount') }}
-              </dt>
-              <dd class="text-foreground">{{ participant.timeline.session_count }}</dd>
-            </div>
           </dl>
+        </CardContent>
+      </Card>
+
+      <!--
+        Interview summary (operator-participant-visibility, design D3–D6):
+        the five facts the operator's original report said were missing.
+        `timeline.session_count` (above) stays in the payload but no longer
+        renders — it counts session ROWS, not ended competencies, and
+        showing both would put two different numbers on "how far" this
+        interview got (D5). Every figure here carries its own coverage
+        count, adjacent to the number, because progress/elapsed/cost
+        genuinely differ in which sessions they exclude.
+      -->
+      <Card>
+        <CardHeader>
+          <CardTitle>{{ $t('participants.detail.interview.title') }}</CardTitle>
+        </CardHeader>
+        <CardContent class="grid gap-4 md:grid-cols-3">
+          <MetricCard
+            :label="$t('participants.detail.interview.progress')"
+            :value="progressLabel"
+            data-testid="interview-progress"
+          />
+          <div class="flex flex-col gap-1" data-testid="interview-elapsed">
+            <MetricCard
+              :label="$t('participants.detail.interview.elapsed')"
+              :value="elapsedLabel"
+            />
+            <p
+              v-if="elapsedCoverageLabel"
+              class="text-muted-foreground text-xs"
+              data-testid="elapsed-coverage"
+            >
+              {{ elapsedCoverageLabel }}
+            </p>
+          </div>
+          <div class="flex flex-col gap-1" data-testid="interview-cost">
+            <MetricCard :label="$t('review.costEstimate')" :value="costLabel" />
+            <p
+              v-if="costCoverageLabel"
+              class="text-muted-foreground text-xs"
+              data-testid="cost-coverage"
+            >
+              {{ costCoverageLabel }}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -191,6 +231,40 @@
         </CardContent>
       </Card>
 
+      <!--
+        Turn-by-turn transcript (operator-participant-visibility, design
+        D2/D7): what turned the operator's original report into an incident
+        — the data existed and was never shown. Gated by the SAME
+        `transcriptReady` mirror the download button above already uses, so
+        the panel and the button can never disagree about `in_attesa` (D7).
+        Hidden entirely rather than shown as a "not ready" state (unlike the
+        Evaluation card below) — the spec is explicit that no panel is
+        offered before the gate opens, not that it opens showing a stub.
+      -->
+      <Card v-if="transcriptReady">
+        <CardHeader>
+          <CardTitle>{{ $t('participants.detail.transcript.title') }}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p v-if="transcriptState === 'loading'" class="text-muted-foreground text-sm">
+            {{ $t('report.states.loading') }}
+          </p>
+          <Alert
+            v-else-if="transcriptState !== 'ready'"
+            variant="destructive"
+            data-testid="transcript-load-error"
+          >
+            <AlertTitle>{{ $t(transcriptErrorTitleKey) }}</AlertTitle>
+            <AlertDescription>{{ $t(transcriptErrorMessageKey) }}</AlertDescription>
+          </Alert>
+          <TranscriptPanel
+            v-else-if="transcriptData"
+            :sessions="transcriptData.sessions"
+            :is-partial="transcriptData.is_partial"
+          />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{{ $t('report.title') }}</CardTitle>
@@ -254,18 +328,21 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
+import MetricCard from '@/components/molecules/MetricCard.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
+import TranscriptPanel from '@/components/organisms/TranscriptPanel.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
 import type { RecoverParticipantResponse } from '@/composables/useParticipantRecovery'
 import { useEvaluationReport, type EvaluationReportData } from '@/composables/useEvaluationReport'
+import { useTranscript, type TranscriptData } from '@/composables/useTranscript'
 import { useDownloads } from '@/composables/useDownloads'
 import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
 import { useEntryLinks } from '@/composables/useEntryLinks'
 import { useProfile } from '@/composables/useProfile'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatDuration } from '@/utils/format'
 import { projectAccessibility, type ProjectAccessibility } from '@/utils/project-accessibility'
 import {
   resolveResourceErrorState,
@@ -291,6 +368,7 @@ useHead({
 
 const { fetchParticipant } = useParticipants()
 const { fetchEvaluation } = useEvaluationReport()
+const { fetchTranscript } = useTranscript()
 const { downloadTranscript, downloadEvaluation } = useDownloads()
 
 const participant = ref<ParticipantDetailResponse['data'] | null>(null)
@@ -321,8 +399,71 @@ const evaluationReady = computed(() =>
   participant.value ? isParticipantResourceReady(participant.value.status, 'evaluation') : false
 )
 
+// Interview summary (D3–D6): progress/elapsed/cost, each with its own
+// coverage disclosure. A coverage line renders only while partial — full
+// coverage (counted/estimated === total) says nothing extra, matching the
+// "state it only when it's incomplete" doctrine from the top-level spec.
+const progressLabel = computed(() => {
+  if (!participant.value) return '–'
+  const { done, total } = participant.value.progress
+  return `${done} / ${total}`
+})
+
+const elapsedLabel = computed(() =>
+  participant.value ? formatDuration(participant.value.elapsed.seconds, t) : '–'
+)
+
+const elapsedCoverageLabel = computed(() => {
+  if (!participant.value) return null
+  const { sessions_counted, sessions_total } = participant.value.elapsed
+  if (sessions_counted >= sessions_total) return null
+  return t('participants.detail.interview.elapsedCoverage', {
+    counted: sessions_counted,
+    total: sessions_total,
+  })
+})
+
+// Always the word "estimate" (review.costEstimate label, reused verbatim):
+// no provider exposes a per-session billed amount, and an operator who
+// reads this as an invoice line will reconcile it against a real bill and
+// find a discrepancy that was never a defect.
+const costLabel = computed(() => {
+  if (!participant.value || participant.value.cost.amount === null) return '–'
+  return t('review.costValue', { usd: participant.value.cost.amount.toFixed(2) })
+})
+
+const costCoverageLabel = computed(() => {
+  if (!participant.value) return null
+  const { sessions_estimated, sessions_total } = participant.value.cost
+  if (sessions_estimated >= sessions_total) return null
+  return t('participants.detail.interview.costCoverage', {
+    estimated: sessions_estimated,
+    total: sessions_total,
+  })
+})
+
 const evaluationState = ref<ResourceState>('loading')
 const evaluationData = ref<EvaluationReportData | null>(null)
+
+// Transcript (D2/D7): fetched ONLY when the client-side mirror already says
+// the resource should be reachable — D7's whole point is knowing this
+// BEFORE the request, so a not-yet-ready participant never even attempts
+// it (unlike the evaluation fetch above, which always attempts and lets a
+// real 409 resolve the state).
+const transcriptState = ref<ResourceState>('loading')
+const transcriptData = ref<TranscriptData | null>(null)
+
+const transcriptErrorState = computed<ResourceErrorState>(() =>
+  transcriptState.value === 'loading' || transcriptState.value === 'ready'
+    ? 'error'
+    : transcriptState.value
+)
+const transcriptErrorTitleKey = computed(() =>
+  resourceErrorKey(transcriptErrorState.value, 'title')
+)
+const transcriptErrorMessageKey = computed(() =>
+  resourceErrorKey(transcriptErrorState.value, 'message')
+)
 
 const transcriptDownloading = ref(false)
 const evaluationDownloading = ref(false)
@@ -480,6 +621,15 @@ onMounted(async () => {
     evaluationState.value = 'ready'
   } catch (error) {
     evaluationState.value = resolveResourceErrorState(error)
+  }
+
+  if (transcriptReady.value) {
+    try {
+      transcriptData.value = await fetchTranscript(id as string)
+      transcriptState.value = 'ready'
+    } catch (error) {
+      transcriptState.value = resolveResourceErrorState(error)
+    }
   }
 
   await loadSessions(id as string)

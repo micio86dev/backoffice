@@ -41,6 +41,19 @@ const PARTICIPANT_DETAIL = {
     completed_at: '2026-03-14T10:00:00Z',
     session_count: 5,
   },
+  // The participant detail contract gained progress/elapsed/cost. These mocks
+  // are typed the same as the real payload on purpose: leaving them short and
+  // making the page defensive instead would hide a genuine API regression
+  // behind an optional-chain.
+  progress: { done: 5, total: 5 },
+  elapsed: { seconds: 1860, sessions_counted: 5, sessions_total: 5 },
+  cost: {
+    amount: 3.72,
+    currency: 'USD',
+    is_estimate: true,
+    sessions_estimated: 5,
+    sessions_total: 5,
+  },
   files: {
     transcript: {
       type: 'text/plain',

@@ -86,6 +86,7 @@
     },
     "table": {
       "candidate": "Candidate",
+      "project": "Project",
       "role": "Role",
       "status": "Status",
       "createdAt": "Started",
@@ -118,6 +119,26 @@
         "evaluation": "Evaluation report",
         "ready": "Ready",
         "notReady": "Not ready yet"
+      },
+      "interview": {
+        "title": "Interview",
+        "progress": "Progress",
+        "elapsed": "Elapsed time",
+        "elapsedCoverage": "{counted} of {total} sessions counted",
+        "costCoverage": "{estimated} of {total} sessions estimated"
+      },
+      "transcript": {
+        "title": "Transcript",
+        "empty": "No turns recorded yet.",
+        "question": "Question {index}",
+        "speaker": {
+          "avatar": "Avatar",
+          "candidate": "Candidate"
+        },
+        "partial": {
+          "title": "Partial transcript",
+          "message": "The interview has not finished — this transcript only covers what happened so far. Use it to see what occurred, not as a substitute for the evaluation."
+        }
       }
     }
   },

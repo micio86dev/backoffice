@@ -231,6 +231,40 @@
         </CardContent>
       </Card>
 
+      <!--
+        Turn-by-turn transcript (operator-participant-visibility, design
+        D2/D7): what turned the operator's original report into an incident
+        — the data existed and was never shown. Gated by the SAME
+        `transcriptReady` mirror the download button above already uses, so
+        the panel and the button can never disagree about `in_attesa` (D7).
+        Hidden entirely rather than shown as a "not ready" state (unlike the
+        Evaluation card below) — the spec is explicit that no panel is
+        offered before the gate opens, not that it opens showing a stub.
+      -->
+      <Card v-if="transcriptReady">
+        <CardHeader>
+          <CardTitle>{{ $t('participants.detail.transcript.title') }}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p v-if="transcriptState === 'loading'" class="text-muted-foreground text-sm">
+            {{ $t('report.states.loading') }}
+          </p>
+          <Alert
+            v-else-if="transcriptState !== 'ready'"
+            variant="destructive"
+            data-testid="transcript-load-error"
+          >
+            <AlertTitle>{{ $t(transcriptErrorTitleKey) }}</AlertTitle>
+            <AlertDescription>{{ $t(transcriptErrorMessageKey) }}</AlertDescription>
+          </Alert>
+          <TranscriptPanel
+            v-else-if="transcriptData"
+            :sessions="transcriptData.sessions"
+            :is-partial="transcriptData.is_partial"
+          />
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>{{ $t('report.title') }}</CardTitle>
@@ -296,11 +330,13 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
+import TranscriptPanel from '@/components/organisms/TranscriptPanel.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
 import type { RecoverParticipantResponse } from '@/composables/useParticipantRecovery'
 import { useEvaluationReport, type EvaluationReportData } from '@/composables/useEvaluationReport'
+import { useTranscript, type TranscriptData } from '@/composables/useTranscript'
 import { useDownloads } from '@/composables/useDownloads'
 import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
 import { useEntryLinks } from '@/composables/useEntryLinks'
@@ -332,6 +368,7 @@ useHead({
 
 const { fetchParticipant } = useParticipants()
 const { fetchEvaluation } = useEvaluationReport()
+const { fetchTranscript } = useTranscript()
 const { downloadTranscript, downloadEvaluation } = useDownloads()
 
 const participant = ref<ParticipantDetailResponse['data'] | null>(null)
@@ -407,6 +444,26 @@ const costCoverageLabel = computed(() => {
 
 const evaluationState = ref<ResourceState>('loading')
 const evaluationData = ref<EvaluationReportData | null>(null)
+
+// Transcript (D2/D7): fetched ONLY when the client-side mirror already says
+// the resource should be reachable — D7's whole point is knowing this
+// BEFORE the request, so a not-yet-ready participant never even attempts
+// it (unlike the evaluation fetch above, which always attempts and lets a
+// real 409 resolve the state).
+const transcriptState = ref<ResourceState>('loading')
+const transcriptData = ref<TranscriptData | null>(null)
+
+const transcriptErrorState = computed<ResourceErrorState>(() =>
+  transcriptState.value === 'loading' || transcriptState.value === 'ready'
+    ? 'error'
+    : transcriptState.value
+)
+const transcriptErrorTitleKey = computed(() =>
+  resourceErrorKey(transcriptErrorState.value, 'title')
+)
+const transcriptErrorMessageKey = computed(() =>
+  resourceErrorKey(transcriptErrorState.value, 'message')
+)
 
 const transcriptDownloading = ref(false)
 const evaluationDownloading = ref(false)
@@ -564,6 +621,15 @@ onMounted(async () => {
     evaluationState.value = 'ready'
   } catch (error) {
     evaluationState.value = resolveResourceErrorState(error)
+  }
+
+  if (transcriptReady.value) {
+    try {
+      transcriptData.value = await fetchTranscript(id as string)
+      transcriptState.value = 'ready'
+    } catch (error) {
+      transcriptState.value = resolveResourceErrorState(error)
+    }
   }
 
   await loadSessions(id as string)

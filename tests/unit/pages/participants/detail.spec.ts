@@ -106,10 +106,31 @@ describe('pages/participants/[id].vue', () => {
     },
   }
 
+  // operator-participant-visibility PR4, D2/D7: fetched ONLY when the
+  // client-side mirror (isParticipantResourceReady(status, 'transcript'))
+  // already says the resource is reachable — this default fixture is what
+  // every status >= in_corso (plus errore) receives unless a test overrides
+  // it via `fetchTranscriptImpl`.
+  const TRANSCRIPT_FIXTURE = {
+    is_partial: false,
+    sessions: [
+      {
+        session_id: 1,
+        competency_code: 'COL',
+        question_index: 0,
+        utterances: [
+          { speaker: 'avatar', text: 'Tell me about a time...', ts: '2026-03-14T10:00:00Z' },
+          { speaker: 'candidate', text: 'Sure, once I...', ts: '2026-03-14T10:00:05Z' },
+        ],
+      },
+    ],
+  }
+
   async function mountDetailPage(options: {
     status?: string
     interview?: Parameters<typeof detailResponse>[2]
     fetchEvaluationImpl?: () => Promise<typeof EVALUATION_FIXTURE>
+    fetchTranscriptImpl?: () => Promise<typeof TRANSCRIPT_FIXTURE>
     downloadTranscriptMock?: ReturnType<typeof vi.fn>
     downloadEvaluationMock?: ReturnType<typeof vi.fn>
   }) {
@@ -117,6 +138,7 @@ describe('pages/participants/[id].vue', () => {
       status = 'completato',
       interview,
       fetchEvaluationImpl = () => Promise.resolve(EVALUATION_FIXTURE),
+      fetchTranscriptImpl = () => Promise.resolve(TRANSCRIPT_FIXTURE),
       downloadTranscriptMock = vi.fn().mockResolvedValue(undefined),
       downloadEvaluationMock = vi.fn().mockResolvedValue(undefined),
     } = options
@@ -130,6 +152,10 @@ describe('pages/participants/[id].vue', () => {
     const fetchEvaluationMock = vi.fn().mockImplementation(fetchEvaluationImpl)
     vi.doMock('../../../../app/composables/useEvaluationReport', () => ({
       useEvaluationReport: () => ({ fetchEvaluation: fetchEvaluationMock }),
+    }))
+    const fetchTranscriptMock = vi.fn().mockImplementation(fetchTranscriptImpl)
+    vi.doMock('../../../../app/composables/useTranscript', () => ({
+      useTranscript: () => ({ fetchTranscript: fetchTranscriptMock }),
     }))
     vi.doMock('../../../../app/composables/useDownloads', () => ({
       useDownloads: () => ({
@@ -147,7 +173,13 @@ describe('pages/participants/[id].vue', () => {
     })
     await flushPromises()
 
-    return { wrapper, fetchEvaluationMock, downloadTranscriptMock, downloadEvaluationMock }
+    return {
+      wrapper,
+      fetchEvaluationMock,
+      fetchTranscriptMock,
+      downloadTranscriptMock,
+      downloadEvaluationMock,
+    }
   }
 
   describe('BARS report section (D4 — three distinct, meaningful states, never a generic error toast)', () => {
@@ -771,6 +803,81 @@ describe('pages/participants/[id].vue', () => {
       expect(wrapper.text()).toContain('6 / 15')
       expect(wrapper.get('[data-testid="interview-elapsed"]').exists()).toBe(true)
       expect(wrapper.text()).toContain('review.costEstimate')
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Transcript panel (operator-participant-visibility PR4, D2/D7): what
+  // finally puts INN's 27 stored turns on screen. Task 4.13's own contract —
+  // panel visibility uses the SAME isParticipantResourceReady(status,
+  // 'transcript') gate as the download button, so the two can never
+  // disagree about in_attesa.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('Transcript panel (D2/D7)', () => {
+    it('is unreachable at in_attesa — the SAME gate the download button uses', async () => {
+      const { wrapper, fetchTranscriptMock } = await mountDetailPage({ status: 'in_attesa' })
+
+      // The mirror must be known BEFORE the request (D7): no fetch attempt
+      // at all when the gate is closed.
+      expect(fetchTranscriptMock).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="transcript-panel"]').exists()).toBe(false)
+      expect(
+        wrapper.get('[data-testid="download-transcript"]').attributes('disabled')
+      ).toBeDefined()
+    })
+
+    it.each(['in_corso', 'in_valutazione', 'completato', 'errore'])(
+      'is reachable at %s — the D1 minimum plus the errore off-progression allowance',
+      async (status) => {
+        const { wrapper, fetchTranscriptMock } = await mountDetailPage({ status })
+
+        expect(fetchTranscriptMock).toHaveBeenCalledWith('42')
+        expect(wrapper.find('[data-testid="transcript-panel"]').exists()).toBe(true)
+        expect(
+          wrapper.get('[data-testid="download-transcript"]').attributes('disabled')
+        ).toBeUndefined()
+      }
+    )
+
+    it('renders turns from the fetched payload, grouped by question', async () => {
+      const { wrapper } = await mountDetailPage({ status: 'in_corso' })
+
+      expect(wrapper.text()).toContain('COL')
+      expect(wrapper.text()).toContain('Tell me about a time...')
+      expect(wrapper.text()).toContain('Sure, once I...')
+    })
+
+    it('shows the partial label transported from the payload, NOT recomputed from status', async () => {
+      // completato is the status a client-recomputed rule would call
+      // "complete" — the payload disagrees, and the payload must win.
+      const { wrapper } = await mountDetailPage({
+        status: 'completato',
+        fetchTranscriptImpl: () =>
+          Promise.resolve({ is_partial: true, sessions: TRANSCRIPT_FIXTURE.sessions }),
+      })
+
+      expect(wrapper.find('[data-testid="transcript-partial"]').exists()).toBe(true)
+    })
+
+    it('shows no partial label when the payload says complete, even at errore (varying only the payload)', async () => {
+      const { wrapper } = await mountDetailPage({
+        status: 'errore',
+        fetchTranscriptImpl: () =>
+          Promise.resolve({ is_partial: false, sessions: TRANSCRIPT_FIXTURE.sessions }),
+      })
+
+      expect(wrapper.find('[data-testid="transcript-partial"]').exists()).toBe(false)
+    })
+
+    it('surfaces a distinct error state if the transcript fetch fails despite the gate being open', async () => {
+      const serverError = Object.assign(new Error('boom'), { status: 500 })
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        fetchTranscriptImpl: () => Promise.reject(serverError),
+      })
+
+      expect(wrapper.find('[data-testid="transcript-load-error"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="transcript-panel"]').exists()).toBe(false)
     })
   })
 })

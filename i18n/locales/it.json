@@ -126,6 +126,19 @@
         "elapsed": "Tempo trascorso",
         "elapsedCoverage": "{counted} di {total} sessioni conteggiate",
         "costCoverage": "{estimated} di {total} sessioni stimate"
+      },
+      "transcript": {
+        "title": "Trascrizione",
+        "empty": "Nessuno scambio registrato finora.",
+        "question": "Domanda {index}",
+        "speaker": {
+          "avatar": "Avatar",
+          "candidate": "Candidato"
+        },
+        "partial": {
+          "title": "Trascrizione parziale",
+          "message": "Il colloquio non è ancora terminato: questa trascrizione copre solo quanto avvenuto finora. Usala per capire cosa è successo, non come sostituto della valutazione."
+        }
       }
     }
   },

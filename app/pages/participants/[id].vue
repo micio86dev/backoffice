@@ -302,8 +302,9 @@
             <AlertDescription>{{ $t('report.states.error.message') }}</AlertDescription>
           </Alert>
           <EvaluationReport
-            v-else-if="evaluationData"
+            v-else-if="evaluationData && evaluationMeta"
             :evaluation="evaluationData"
+            :meta="evaluationMeta"
             :locale="locale"
           />
         </CardContent>
@@ -335,7 +336,11 @@ import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLink
 import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
 import type { RecoverParticipantResponse } from '@/composables/useParticipantRecovery'
-import { useEvaluationReport, type EvaluationReportData } from '@/composables/useEvaluationReport'
+import {
+  useEvaluationReport,
+  type EvaluationReportData,
+  type EvaluationScoringMeta,
+} from '@/composables/useEvaluationReport'
 import { useTranscript, type TranscriptData } from '@/composables/useTranscript'
 import { useDownloads } from '@/composables/useDownloads'
 import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
@@ -448,6 +453,7 @@ const costCoverageLabel = computed(() => {
 
 const evaluationState = ref<ResourceState>('loading')
 const evaluationData = ref<EvaluationReportData | null>(null)
+const evaluationMeta = ref<EvaluationScoringMeta | null>(null)
 
 // Transcript (D2/D7): fetched ONLY when the client-side mirror already says
 // the resource should be reachable — D7's whole point is knowing this
@@ -638,7 +644,9 @@ onMounted(async () => {
   }
 
   try {
-    evaluationData.value = await fetchEvaluation(id as string)
+    const evaluation = await fetchEvaluation(id as string)
+    evaluationData.value = evaluation.data
+    evaluationMeta.value = evaluation.meta
     evaluationState.value = 'ready'
   } catch (error) {
     evaluationState.value = resolveResourceErrorState(error)

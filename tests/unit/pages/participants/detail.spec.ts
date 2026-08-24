@@ -94,7 +94,7 @@ describe('pages/participants/[id].vue', () => {
 
   // --- BARS report section + downloads (PR B3, task 21.2 support) --------
 
-  const EVALUATION_FIXTURE = {
+  const EVALUATION_DATA_FIXTURE = {
     SLF: {
       score: 4,
       reliability: '67%',
@@ -105,6 +105,15 @@ describe('pages/participants/[id].vue', () => {
       ],
     },
   }
+
+  // D7 (bars-full-scale-1-5): fetchEvaluation() now resolves { data, meta }.
+  const EVALUATION_META_FIXTURE = {
+    prompt_version: '2.0.0',
+    model_version: 'claude-haiku-4-5-20251001',
+    framework_version: '1.4.0',
+  }
+
+  const EVALUATION_FIXTURE = { data: EVALUATION_DATA_FIXTURE, meta: EVALUATION_META_FIXTURE }
 
   // operator-participant-visibility PR4, D2/D7: fetched ONLY when the
   // client-side mirror (isParticipantResourceReady(status, 'transcript'))

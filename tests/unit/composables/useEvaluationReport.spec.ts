@@ -1,5 +1,6 @@
 /**
- * useEvaluationReport.ts (PR B3, task 20.1 support — RED)
+ * useEvaluationReport.ts (PR B3, task 20.1 support; widened return shape for
+ * scoring provenance — bars-full-scale-1-5 D7, task 2.8)
  *
  * Typed read over GET /api/participants/{id}/evaluation. The generated
  * `types/api.ts` schema for `EvaluationResource` is a generic
@@ -8,6 +9,10 @@
  * prior B2 batches) — this composable hand-types the response to match
  * `AdminEvaluationSerializer::serializeCompetencyResult()` exactly
  * (api/app/Services/Admin/AdminEvaluationSerializer.php:96-119).
+ *
+ * `fetchEvaluation()` returns `{ data, meta }` — `meta.scoring` carries the
+ * Evaluation's `prompt_version`/`model_version`/`framework_version` (D7), a
+ * response SIBLING of `data`, never merged into the competency map.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -16,7 +21,7 @@ describe('useEvaluationReport', () => {
     vi.resetModules()
   })
 
-  it('fetchEvaluation(id) calls GET /participants/{id}/evaluation and returns the competency map', async () => {
+  it('fetchEvaluation(id) calls GET /participants/{id}/evaluation and returns { data, meta }', async () => {
     const evaluationData = {
       SLF: {
         score: 4,
@@ -28,7 +33,14 @@ describe('useEvaluationReport', () => {
         ],
       },
     }
-    const apiFetchMock = vi.fn().mockResolvedValue({ data: evaluationData })
+    const scoringMeta = {
+      prompt_version: '2.0.0',
+      model_version: 'claude-haiku-4-5-20251001',
+      framework_version: '1.4.0',
+    }
+    const apiFetchMock = vi
+      .fn()
+      .mockResolvedValue({ data: evaluationData, meta: { scoring: scoringMeta } })
     vi.doMock('../../../app/composables/useApi', () => ({
       useApi: () => ({ apiFetch: apiFetchMock }),
     }))
@@ -39,7 +51,8 @@ describe('useEvaluationReport', () => {
     const result = await fetchEvaluation(42)
 
     expect(apiFetchMock).toHaveBeenCalledWith('/participants/42/evaluation')
-    expect(result).toEqual(evaluationData)
+    expect(result.data).toEqual(evaluationData)
+    expect(result.meta).toEqual(scoringMeta)
   })
 
   it('propagates a rejection (e.g. 409 lifecycle_not_ready) to the caller unchanged', async () => {

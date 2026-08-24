@@ -288,11 +288,17 @@
   "report": {
     "title": "Report di valutazione",
     "reliability": "Affidabilità",
+    "provenance": {
+      "label": "Valutato con"
+    },
     "chip": {
       "low": "Punteggio 1 su 5 (da migliorare)",
+      "belowMid": "Punteggio 2 su 5 (sotto le aspettative)",
       "mid": "Punteggio 3 su 5 (in sviluppo)",
+      "aboveMid": "Punteggio 4 su 5 (oltre le aspettative)",
       "high": "Punteggio 5 su 5 (evidenza solida)",
-      "unassessable": "Non valutabile — nessuna evidenza nella trascrizione"
+      "unassessable": "Non valutabile — nessuna evidenza nella trascrizione",
+      "invalid": "Punteggio non valido {score} — fuori dalla scala 1–5"
     },
     "table": {
       "caption": "Valutazione delle competenze BARS — punteggi degli indicatori, media della competenza e affidabilità",

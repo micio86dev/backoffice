@@ -157,7 +157,9 @@
     "disabledReason": {
       "notActive": "This project is not yet active.",
       "notYetLive": "This project has not gone live yet.",
-      "expired": "This project's deadline has passed."
+      "expired": "This project's deadline has passed.",
+      "completed": "This candidate has already completed the interview.",
+      "failed": "This candidate's interview failed: recover it with the action below before generating a new link."
     },
     "form": {
       "candidateRef": "Candidate reference",
@@ -813,6 +815,7 @@
   "review": {
     "title": "Session review",
     "subtitle": "What happened during this interview: timing, integrity checks and snapshots.",
+    "backToParticipant": "Back to participant",
     "duration": "Duration",
     "durationValue": "{minutes} min {seconds} s",
     "provider": "Service",
@@ -856,7 +859,9 @@
       "competency": "Competency",
       "startedAt": "Started",
       "events": "Events",
-      "open": "Open review"
+      "open": "Open review",
+      "nav": "Navigate between sessions",
+      "current": "Current session ({competency})"
     }
   }
 }

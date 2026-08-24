@@ -567,6 +567,54 @@ describe('pages/participants/[id].vue', () => {
       }
     )
 
+    it.each([
+      ['completato', 'completed'],
+      ['errore', 'failed'],
+    ])(
+      'disables the action with a stated reason for a %s participant, even on an eligible project',
+      async (participantStatus, expectedReasonKey) => {
+        vi.doMock('../../../../app/composables/useParticipants', () => ({
+          useParticipants: () => ({
+            fetchParticipant: vi.fn().mockResolvedValue(detailResponse(participantStatus)),
+          }),
+        }))
+        vi.doMock('../../../../app/composables/useProfile', () => ({
+          useProfile: () => ({
+            fetchProfile: vi.fn().mockResolvedValue(profileResponse('operator')),
+          }),
+        }))
+        vi.doMock('../../../../app/composables/useEntryLinks', () => ({
+          useEntryLinks: () => ({ generateEntryLink: vi.fn() }),
+        }))
+        vi.doMock('../../../../app/composables/useEvaluationReport', () => ({
+          useEvaluationReport: () => ({ fetchEvaluation: vi.fn().mockResolvedValue({}) }),
+        }))
+        vi.doMock('../../../../app/composables/useDownloads', () => ({
+          useDownloads: () => ({ downloadTranscript: vi.fn(), downloadEvaluation: vi.fn() }),
+        }))
+        vi.doMock('../../../../app/composables/useSessionReview', () => ({
+          useSessionReview: () => ({ listSessions: vi.fn().mockResolvedValue({ data: [] }) }),
+        }))
+
+        const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
+        const wrapper = mount(DetailPage, {
+          global: {
+            mocks: { $t: tMock },
+            stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+          },
+        })
+        await flushPromises()
+        await flushPromises()
+
+        expect(
+          wrapper.get('[data-testid="participant-generate-entry-link"]').attributes('disabled')
+        ).toBeDefined()
+        expect(
+          wrapper.get('[data-testid="participant-entry-link-disabled-reason"]').text()
+        ).toContain(`entryLink.disabledReason.${expectedReasonKey}`)
+      }
+    )
+
     it('leaves the action enabled for an eligible project (active, past goes_live_at, before deadline_at)', async () => {
       const project = {
         id: 1,

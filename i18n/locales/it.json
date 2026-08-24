@@ -157,7 +157,9 @@
     "disabledReason": {
       "notActive": "Questo progetto non è ancora attivo.",
       "notYetLive": "Questo progetto non è ancora entrato in vigore.",
-      "expired": "La scadenza di questo progetto è passata."
+      "expired": "La scadenza di questo progetto è passata.",
+      "completed": "Questo candidato ha già completato il colloquio.",
+      "failed": "Il colloquio di questo candidato è fallito: ripristinalo con l'azione di recupero qui sotto prima di generare un nuovo link."
     },
     "form": {
       "candidateRef": "Riferimento candidato",
@@ -813,6 +815,7 @@
   "review": {
     "title": "Resoconto sessione",
     "subtitle": "Cosa è successo durante questo colloquio: tempi, controlli di integrità e fotogrammi.",
+    "backToParticipant": "Torna al partecipante",
     "duration": "Durata",
     "durationValue": "{minutes} min {seconds} s",
     "provider": "Servizio",
@@ -856,7 +859,9 @@
       "competency": "Competenza",
       "startedAt": "Inizio",
       "events": "Eventi",
-      "open": "Apri resoconto"
+      "open": "Apri resoconto",
+      "nav": "Naviga tra le sessioni",
+      "current": "Sessione corrente ({competency})"
     }
   }
 }

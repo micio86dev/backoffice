@@ -163,7 +163,37 @@ RUN printf 'server {\n\
         try_files $uri $uri/ /health/index.html;\n\
     }\n\
 \n\
-    # SPA fallback: all routes return index.html for client-side routing\n\
+    # Build assets: a miss here is a 404, NEVER the SPA shell.\n\
+    #\n\
+    # A browser still holding a previous deploy'"'"'s bundle asks for its own\n\
+    # manifest at /_nuxt/builds/meta/{buildId}.json. After a redeploy that file\n\
+    # is gone, and the `location /` fallback below answered it with index.html\n\
+    # under a 200 — so Nuxt parsed HTML as JSON and reported "Received malformed\n\
+    # app manifest". A real 404 is what it needs: that is the signal that drives\n\
+    # reload-on-chunk-error.\n\
+    #\n\
+    # Only .json was affected: the static-asset regex block covers js|css|png|…,\n\
+    # and a regex location without try_files serves from root and 404s correctly.\n\
+    #\n\
+    # `^~` is load-bearing. nginx prefers a REGEX location over a plain prefix\n\
+    # one, so without it the js|css regex below would still win for /_nuxt/*.js\n\
+    # and this guard would cover only the manifest it was written for.\n\
+    #\n\
+    # `expires` rather than `add_header Cache-Control`: a single add_header in a\n\
+    # location REPLACES the whole inherited set, which would silently drop the\n\
+    # four security headers above for every asset. `expires` does not.\n\
+    location ^~ /_nuxt/builds/ {\n\
+        expires -1;\n\
+        try_files $uri =404;\n\
+    }\n\
+\n\
+    location ^~ /_nuxt/ {\n\
+        expires 1y;\n\
+        try_files $uri =404;\n\
+    }\n\
+\n\
+    # SPA fallback: all routes return index.html for client-side routing.\n\
+    # Reached only by paths that are NOT build assets — i.e. Vue Router routes.\n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\
     }\n\

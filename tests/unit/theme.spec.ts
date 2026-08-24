@@ -254,6 +254,22 @@ describe('select highlighted-option contrast (admin-backoffice spec)', () => {
   })
 })
 
+// bars-full-scale-1-5 D2/D6 — the invalid `ScoreChip` pairing: `--destructive`
+// text on `--color-error-light` fill. DESIGN.md §9.1 states this computes to
+// "≈5.30:1, AA pass" — per that same section's own rule ("verify with a real
+// contrast calculation, never by eye"), assert it NUMERICALLY here. If this
+// disagrees with the doc, the test wins and the doc row is corrected (D2).
+describe('invalid ScoreChip contrast (D2, DESIGN.md §9.1)', () => {
+  it('--color-error-light resolves to #fee2e2', async () => {
+    const compiled = await compileForCandidates(['bg-error-light'])
+    expect(computedBackgroundColor(compiled, 'bg-error-light')).toBe('#fee2e2')
+  })
+
+  it('--destructive (#b91c1c) on --color-error-light (#fee2e2) measures >= 4.5:1 AA (numerically, not eyeballed)', () => {
+    expect(contrastRatio('#b91c1c', '#fee2e2')).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
 // task 13.3 — snapshot over the full token block, as a regression guard for
 // future edits. Snapshots the AUTHORED source (not Tailwind's compiled output,
 // which would also include unrelated framework defaults), so a diff here means

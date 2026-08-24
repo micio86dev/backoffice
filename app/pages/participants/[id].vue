@@ -343,7 +343,11 @@ import { useEntryLinks } from '@/composables/useEntryLinks'
 import { useProfile } from '@/composables/useProfile'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
 import { formatDate, formatDuration } from '@/utils/format'
-import { projectAccessibility, type ProjectAccessibility } from '@/utils/project-accessibility'
+import {
+  projectAccessibility,
+  type ProjectAccessibilityReason,
+} from '@/utils/project-accessibility'
+import { entryLinkParticipantReason } from '@/utils/entry-link-participant-gate'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -530,13 +534,30 @@ const entryLink = ref<EntryLink | null>(null)
 const entryLinkError = ref<string | null>(null)
 const generatingEntryLink = ref(false)
 
-// Fail-safe default (project not accessible) until the participant row —
-// carrying the nested `project` gate fields — has actually loaded.
-const entryLinkAccessibility = computed<ProjectAccessibility>(() =>
-  participant.value
-    ? projectAccessibility(participant.value.project)
-    : { eligible: false, reason: 'notActive' }
-)
+/**
+ * Fail-safe default (project not accessible) until the participant row —
+ * carrying the nested `project` gate fields — has actually loaded.
+ *
+ * Checked in the SAME order as `EntryLinkMinter::mint()` (design D5/D3): the
+ * project gate first, THEN the participant's own terminal status — so a
+ * participant failing both always reports the same reason the server would
+ * encounter first. A `completato`/`errore` participant would otherwise show
+ * an enabled "Generate new link" button that is guaranteed to 409.
+ */
+const entryLinkAccessibility = computed<{
+  eligible: boolean
+  reason: ProjectAccessibilityReason | 'completed' | 'failed' | null
+}>(() => {
+  if (!participant.value) return { eligible: false, reason: 'notActive' }
+
+  const projectGate = projectAccessibility(participant.value.project)
+  if (!projectGate.eligible) return projectGate
+
+  const participantReason = entryLinkParticipantReason(participant.value.status)
+  if (participantReason !== null) return { eligible: false, reason: participantReason }
+
+  return { eligible: true, reason: null }
+})
 
 async function onGenerateEntryLink(): Promise<void> {
   if (!participant.value) return

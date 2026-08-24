@@ -1,6 +1,24 @@
 <template>
   <div class="flex flex-col gap-8">
-    <PageHeader :title="$t('review.title')" :subtitle="$t('review.subtitle')" />
+    <div class="flex flex-col gap-4">
+      <Button
+        v-if="review"
+        as-child
+        variant="ghost"
+        size="sm"
+        class="w-fit"
+        data-testid="back-to-participant"
+      >
+        <NuxtLink :to="`/participants/${review.participant_id}`">
+          <ArrowLeftIcon aria-hidden="true" />
+          <span>{{ $t('review.backToParticipant') }}</span>
+        </NuxtLink>
+      </Button>
+
+      <PageHeader :title="$t('review.title')" :subtitle="$t('review.subtitle')" />
+
+      <SessionNav v-if="review" :sessions="siblingSessions" :current-session-id="review.id" />
+    </div>
 
     <Alert
       v-if="loadError"
@@ -26,10 +44,17 @@
  * transcript and a BARS report makes all four harder to read (design D11).
  */
 import { ref, computed, onMounted } from 'vue'
+import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import SessionReviewPanel from '@/components/organisms/SessionReviewPanel.vue'
-import { useSessionReview, type SessionReview } from '@/composables/useSessionReview'
+import SessionNav from '@/components/organisms/SessionNav.vue'
+import {
+  useSessionReview,
+  type SessionReview,
+  type SessionSummary,
+} from '@/composables/useSessionReview'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -46,10 +71,11 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-const { fetchReview } = useSessionReview()
+const { fetchReview, listSessions } = useSessionReview()
 
 const review = ref<SessionReview | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
+const siblingSessions = ref<SessionSummary[]>([])
 
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))
@@ -63,6 +89,16 @@ onMounted(async () => {
     // report a 403 as "this session had no events", which is a different and
     // much worse claim.
     loadError.value = resolveResourceErrorState(error)
+    return
+  }
+
+  try {
+    // Best-effort: the nav is a convenience for jumping between this
+    // interview's OTHER competencies. Its own failure must never blank the
+    // review the operator actually opened this page for.
+    siblingSessions.value = (await listSessions(review.value.participant_id)).data
+  } catch {
+    siblingSessions.value = []
   }
 })
 </script>

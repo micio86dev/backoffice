@@ -288,11 +288,17 @@
   "report": {
     "title": "Evaluation report",
     "reliability": "Reliability",
+    "provenance": {
+      "label": "Scored with"
+    },
     "chip": {
       "low": "Score 1 out of 5 (needs improvement)",
+      "belowMid": "Score 2 out of 5 (below expectations)",
       "mid": "Score 3 out of 5 (developing)",
+      "aboveMid": "Score 4 out of 5 (exceeds expectations)",
       "high": "Score 5 out of 5 (strong evidence)",
-      "unassessable": "Not assessable — no evidence in the transcript"
+      "unassessable": "Not assessable — no evidence in the transcript",
+      "invalid": "Invalid score {score} — outside the 1–5 scale"
     },
     "table": {
       "caption": "BARS competency evaluation — indicator scores, competency mean, and reliability",

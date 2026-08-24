@@ -17,6 +17,13 @@
  * here — the caller (the participant detail page) is responsible for
  * distinguishing those states (D4's whole reason for choosing 409 over a
  * generic error).
+ *
+ * `fetchEvaluation()` returns `{ data, meta }` (D7, bars-full-scale-1-5):
+ * `meta` is the Evaluation's scoring provenance (`prompt_version`,
+ * `model_version`, `framework_version` — the resolved string, never the FK
+ * id), unwrapped from the API response's `meta.scoring` sibling of `data`.
+ * Nothing is computed here; this is a pure read-through of what the API
+ * already exposes.
  */
 import { useApi } from './useApi'
 
@@ -35,16 +42,25 @@ export interface EvaluationCompetencyResult {
 
 export type EvaluationReportData = Record<string, EvaluationCompetencyResult>
 
+export interface EvaluationScoringMeta {
+  prompt_version: string
+  model_version: string
+  framework_version: string
+}
+
 interface EvaluationResponse {
   data: EvaluationReportData
+  meta: { scoring: EvaluationScoringMeta }
 }
 
 export function useEvaluationReport() {
   const { apiFetch } = useApi()
 
-  async function fetchEvaluation(id: number | string): Promise<EvaluationReportData> {
+  async function fetchEvaluation(
+    id: number | string
+  ): Promise<{ data: EvaluationReportData; meta: EvaluationScoringMeta }> {
     const response = await apiFetch<EvaluationResponse>(`/participants/${id}/evaluation`)
-    return response.data
+    return { data: response.data, meta: response.meta.scoring }
   }
 
   return { fetchEvaluation }

@@ -67,3 +67,35 @@ export function competencyMeanState(mean: number | null): BarsChipState {
   if (mean <= 3.5) return 'warning'
   return 'success'
 }
+
+/**
+ * The four `unscorable_reason` values shipped by the API today
+ * (scoring-failure-containment D11/D12). Extending this list is additive and
+ * safe by construction — `unscorableReasonKey` never throws on an
+ * unrecognized value, it falls back loudly instead (below).
+ */
+const KNOWN_UNSCORABLE = [
+  'role_no_bars',
+  'anchor_translation_missing',
+  'llm_parse_error',
+  'llm_truncated',
+] as const
+
+/**
+ * Maps `CompetencyResult.unscorable_reason` to an i18n key for the operator
+ * report (D11/D12). A TOTAL function over `string | null`:
+ *   - `null` → `null` — the competency scored normally, nothing to render.
+ *   - a KNOWN reason → its own i18n key.
+ *   - an UNRECOGNIZED reason (e.g. a future API addition not yet shipped in
+ *     the backoffice) → the neutral fallback key, `report.unscorable.unknown`
+ *     — NEVER blank and NEVER the raw machine key printed bare. This is D6
+ *     of bars-full-scale-1-5 applied to a second field: an unrecognized key
+ *     that renders nothing tells the operator "there is no explanation",
+ *     which is a lie about the data.
+ */
+export function unscorableReasonKey(reason: string | null): string | null {
+  if (reason === null) return null
+  return (KNOWN_UNSCORABLE as readonly string[]).includes(reason)
+    ? `report.unscorable.${reason}`
+    : 'report.unscorable.unknown'
+}

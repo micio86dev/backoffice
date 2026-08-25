@@ -300,6 +300,13 @@
       "unassessable": "Not assessable — no evidence in the transcript",
       "invalid": "Invalid score {score} — outside the 1–5 scale"
     },
+    "unscorable": {
+      "role_no_bars": "Not scored — no BARS indicators are defined for this competency in the pinned framework version.",
+      "anchor_translation_missing": "Not scored — the BARS anchors are not available in this project's language.",
+      "llm_parse_error": "Not scored — the evaluator's response could not be read.",
+      "llm_truncated": "Not scored — the evaluator's response was cut off before it was complete.",
+      "unknown": "Not scored — unrecognised reason ({reason})."
+    },
     "table": {
       "caption": "BARS competency evaluation — indicator scores, competency mean, and reliability",
       "competency": "Competency",

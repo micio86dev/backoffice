@@ -93,8 +93,13 @@ const KNOWN_UNSCORABLE = [
  *     that renders nothing tells the operator "there is no explanation",
  *     which is a lie about the data.
  */
-export function unscorableReasonKey(reason: string | null): string | null {
-  if (reason === null) return null
+export function unscorableReasonKey(reason: string | null | undefined): string | null {
+  // `== null` on purpose, matching undefined as well as null. An ABSENT field
+  // means "no reason", which means SCORABLE — the same thing an explicit null
+  // means. Under `=== null` an omitted field fell through to the "unrecognised"
+  // branch, and the operator saw a row carrying a real score AND the words "not
+  // assessed", with an empty parenthesis where the reason belongs.
+  if (reason == null) return null
   return (KNOWN_UNSCORABLE as readonly string[]).includes(reason)
     ? `report.unscorable.${reason}`
     : 'report.unscorable.unknown'
@@ -121,8 +126,10 @@ const KNOWN_INDICATOR_UNASSESSABLE_REASONS = [
  *   - an UNRECOGNIZED reason → the neutral fallback key, never blank and
  *     never the raw machine key printed bare (D6/D12 applied a third time).
  */
-export function indicatorUnassessableReasonKey(reason: string | null): string | null {
-  if (reason === null) return null
+export function indicatorUnassessableReasonKey(reason: string | null | undefined): string | null {
+  // `== null` for the same reason as its competency-grain sibling above: an
+  // absent field means "no reason", not "a reason I do not recognise".
+  if (reason == null) return null
   return (KNOWN_INDICATOR_UNASSESSABLE_REASONS as readonly string[]).includes(reason)
     ? `report.indicatorUnassessableReason.${reason}`
     : 'report.indicatorUnassessableReason.unknown'

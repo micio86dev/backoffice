@@ -95,7 +95,8 @@ jobs:
       - name: Docker build
         run: |
           docker build -t beai-backoffice:ci \
-            --build-arg NUXT_PUBLIC_API_BASE=https://ci.example.test/api .
+            --build-arg NUXT_PUBLIC_API_BASE=/api \
+            --build-arg BEAI_API_ORIGIN=https://ci.example.test .
 
       # The Dockerfile guard is the only thing standing between a missing build
       # arg and an image that passes its healthcheck, serves the login page, and
@@ -116,10 +117,61 @@ jobs:
 
           echo "Guard fired as expected."
 
+      # Same reasoning as the guard above, for the two gates that keep Safari
+      # working: `up.railway.app` is a public suffix, so an ABSOLUTE api base
+      # makes the api a different SITE, the refresh cookie third-party, and
+      # WebKit drops it — logging every Safari operator out on each reload with
+      # nothing failing anywhere. A guard nobody has watched fail is not a guard.
+      - name: Guard — an ABSOLUTE API base must fail the build
+        run: |
+          if docker build -t beai-backoffice:should-not-exist \
+              --build-arg NUXT_PUBLIC_API_BASE=https://ci.example.test/api \
+              --build-arg BEAI_API_ORIGIN=https://ci.example.test . > /tmp/abs.log 2>&1; then
+            echo "::error::Build succeeded with an absolute NUXT_PUBLIC_API_BASE — the guard is not working."
+            exit 1
+          fi
+
+          if ! grep -q "NUXT_PUBLIC_API_BASE must be RELATIVE" /tmp/abs.log; then
+            echo "::error::Build failed, but not for the expected reason:"
+            tail -40 /tmp/abs.log
+            exit 1
+          fi
+
+          echo "Guard fired as expected."
+
+      - name: Guard — a build with no proxy target must fail
+        run: |
+          if docker build -t beai-backoffice:should-not-exist \
+              --build-arg NUXT_PUBLIC_API_BASE=/api . > /tmp/noorigin.log 2>&1; then
+            echo "::error::Build succeeded without BEAI_API_ORIGIN — the backoffice would have no API at all."
+            exit 1
+          fi
+
+          if ! grep -q "build arg BEAI_API_ORIGIN is required" /tmp/noorigin.log; then
+            echo "::error::Build failed, but not for the expected reason:"
+            tail -40 /tmp/noorigin.log
+            exit 1
+          fi
+
+          echo "Guard fired as expected."
+
       - name: Assert the API base reached the served bundle
         run: |
           BAKED=$(docker run --rm --entrypoint sh beai-backoffice:ci -c \
             "grep -o 'apiBase:\"[^\"]*\"' /usr/share/nginx/html/index.html")
           echo "Baked: $BAKED"
-          [ "$BAKED" = 'apiBase:"https://ci.example.test/api"' ] || {
+          [ "$BAKED" = 'apiBase:"/api"' ] || {
             echo "::error::Wrong API base baked into the image."; exit 1; }
+
+      # Proving the arg was passed is a different check from proving nginx will
+      # act on it — the same distinction the bundle assertion above draws.
+      - name: Assert nginx will proxy /api/ to the API service
+        run: |
+          CONF=$(docker run --rm --entrypoint sh beai-backoffice:ci -c \
+            "cat /etc/nginx/conf.d/default.conf")
+          echo "$CONF" | grep -q 'location \^~ /api/' || {
+            echo "::error::No /api/ proxy location in the served nginx config."; exit 1; }
+          echo "$CONF" | grep -q 'proxy_pass https://ci.example.test;' || {
+            echo "::error::proxy_pass is missing, or carries a URI part that would rewrite the request path."
+            echo "$CONF" | grep proxy_pass
+            exit 1; }

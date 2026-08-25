@@ -105,6 +105,24 @@ RUN bun run generate
 # Assert the value REACHED the bundle. The check above only proves the arg was
 # passed; this proves Nuxt inlined it. They are different failures, and the
 # second one is just as invisible from the outside as the first was.
+# The API base MUST be RELATIVE (backoffice-same-origin-api AD-3).
+#
+# nginx serves /api/ from this same origin, so the browser talks to exactly one
+# host and the refresh cookie is first-party. An ABSOLUTE url here silently
+# undoes that: `up.railway.app` is a public suffix, so the api is a different
+# SITE, `beai_refresh` becomes a third-party cookie, WebKit blocks it, and
+# Safari operators are logged out on every reload — with nothing anywhere
+# failing. That is exactly the class of silent breakage the two assertions
+# below already exist to prevent, applied to the value that causes it.
+RUN case "$NUXT_PUBLIC_API_BASE" in \
+      /*) : ;; \
+      *) echo "ERROR: NUXT_PUBLIC_API_BASE must be RELATIVE, got '${NUXT_PUBLIC_API_BASE}'."; \
+         echo "  nginx proxies /api/ from this origin, so the value should be '/api'."; \
+         echo "  An absolute URL makes the api a different SITE (up.railway.app is a"; \
+         echo "  public suffix), the refresh cookie third-party, and Safari unusable."; \
+         exit 1 ;; \
+    esac
+
 RUN grep -q "apiBase:\"${NUXT_PUBLIC_API_BASE}\"" .output/public/index.html || { \
       echo "ERROR: NUXT_PUBLIC_API_BASE was set to '${NUXT_PUBLIC_API_BASE}' but is not in the generated bundle."; \
       echo "  Found instead: $(grep -o 'apiBase:\"[^\"]*\"' .output/public/index.html || echo '<nothing>')"; \
@@ -129,6 +147,28 @@ RUN if [ -n "$NUXT_PUBLIC_SENTRY_DSN" ]; then \
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
 FROM nginx:1.27.5-alpine AS runtime
+
+# Where /api/* is forwarded. The browser never sees this host.
+#
+# A BUILD ARG rather than runtime templating, matching the decision this image
+# already made for NUXT_PUBLIC_API_BASE. The runtime stage runs as USER nginx
+# (non-root), so the official envsubst entrypoint would be writing into
+# /etc/nginx/conf.d unprivileged, and envsubst would also eat nginx's own $uri
+# and $host unless fenced with NGINX_ENVSUBST_FILTER. Both are solvable; both
+# are new failure modes introduced to configure a value that does not change
+# between restarts.
+#
+# A literal target also sidesteps nginx's rule that a proxy_pass containing a
+# variable requires a `resolver` — one more moving part removed rather than
+# configured.
+ARG BEAI_API_ORIGIN
+RUN test -n "$BEAI_API_ORIGIN" || { \
+      echo "ERROR: build arg BEAI_API_ORIGIN is required."; \
+      echo "  It is the origin nginx forwards /api/ to, e.g."; \
+      echo "  --build-arg BEAI_API_ORIGIN=https://api-production-640e.up.railway.app"; \
+      echo "  Without it the backoffice has no API and every request 404s."; \
+      exit 1; \
+    }
 
 # Remove default nginx config; replace with SPA-friendly config
 RUN rm /etc/nginx/conf.d/default.conf
@@ -190,6 +230,41 @@ RUN printf 'server {\n\
     location ^~ /_nuxt/ {\n\
         expires 1y;\n\
         try_files $uri =404;\n\
+    }\n\
+\n\
+    # ── Same-origin API (backoffice-same-origin-api AD-1) ─────────────────\n\
+    #\n\
+    # The browser talks to ONE origin, so the refresh cookie is first-party.\n\
+    # Before this, the backoffice and the api were different SITES — not merely\n\
+    # different hosts — because `up.railway.app` is on the Public Suffix List,\n\
+    # which made `beai_refresh` a third-party cookie. WebKit blocks those, and\n\
+    # `Secure`/`SameSite=None` do not override that, so Safari operators were\n\
+    # returned to the login screen on every reload.\n\
+    #\n\
+    # `^~` is load-bearing, for the same reason it is on /_nuxt/ above: without\n\
+    # it the js|css|… regex location would win for a path like /api/x.css, and\n\
+    # the SPA fallback would answer /api/* with index.html under a 200 — an API\n\
+    # client parsing HTML as JSON, which is the failure this file already\n\
+    # records once for build manifests.\n\
+    #\n\
+    # proxy_pass carries NO URI part on purpose: nginx then forwards the\n\
+    # original request URI unchanged, so /api/auth/refresh stays /api/auth/refresh\n\
+    # and the cookie'"'"'s `Path=/api/auth/refresh` keeps matching. Appending a\n\
+    # path here would silently rewrite it and break the cookie scope.\n\
+    #\n\
+    # No add_header block: a single add_header in a location REPLACES the whole\n\
+    # inherited set, and these are API responses, whose security headers the api\n\
+    # sets itself (App\\Http\\Middleware\\SecurityHeaders).\n\
+    location ^~ /api/ {\n\
+        proxy_pass '"$BEAI_API_ORIGIN"';\n\
+        proxy_http_version 1.1;\n\
+        proxy_ssl_server_name on;\n\
+        proxy_set_header X-Forwarded-Proto https;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        # Downloads (transcript, evaluation) stream through here.\n\
+        proxy_buffering off;\n\
+        proxy_read_timeout 120s;\n\
     }\n\
 \n\
     # SPA fallback: all routes return index.html for client-side routing.\n\

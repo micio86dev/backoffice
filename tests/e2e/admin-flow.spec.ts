@@ -83,6 +83,10 @@ const EVALUATION_REPORT = {
   SLF: {
     score: 4.0,
     reliability: '67%',
+    // The API always sends this, null when the competency scored normally.
+    // Its absence is what made the report claim "not assessed" beside a real
+    // score — the code now tolerates it, and the fixture stops pretending.
+    unscorable_reason: null,
     behaviors: [
       {
         indicator: 'Describe products and services accurately',
@@ -107,6 +111,7 @@ const EVALUATION_REPORT = {
   COM: {
     score: 3.67,
     reliability: '100%',
+    unscorable_reason: null,
     behaviors: [
       {
         indicator: 'Get the point across clearly and concisely',

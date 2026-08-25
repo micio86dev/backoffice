@@ -169,3 +169,33 @@ describe('indicatorUnassessableReasonKey', () => {
     )
   })
 })
+
+/**
+ * An ABSENT reason must mean "scorable", exactly as an explicit null does.
+ *
+ * Both functions compared with `=== null`, so a payload that simply omits the
+ * field — an older API, a serializer that drops nulls, a partial fixture — fell
+ * through to the "unrecognised reason" branch. The operator was then shown a row
+ * carrying a real score AND the words "not assessed", with an empty parenthesis
+ * where the reason should be. Self-contradictory output, stated confidently.
+ *
+ * Caught on 2026-08-25 by an E2E screenshot, once repaired mocks finally let the
+ * report render.
+ */
+describe('a missing reason is not an unrecognised reason', () => {
+  it('unscorableReasonKey treats undefined like null', () => {
+    expect(unscorableReasonKey(undefined as unknown as null)).toBeNull()
+  })
+
+  it('indicatorUnassessableReasonKey treats undefined like null', () => {
+    expect(indicatorUnassessableReasonKey(undefined as unknown as null)).toBeNull()
+  })
+
+  it('still flags a genuinely unrecognised reason', () => {
+    // The tolerance above must not swallow the case these functions exist for.
+    expect(unscorableReasonKey('something_new')).toBe('report.unscorable.unknown')
+    expect(indicatorUnassessableReasonKey('something_new')).toBe(
+      'report.indicatorUnassessableReason.unknown'
+    )
+  })
+})

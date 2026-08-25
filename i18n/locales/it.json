@@ -307,6 +307,12 @@
       "llm_truncated": "Non valutato — la risposta del valutatore è stata interrotta prima del completamento.",
       "unknown": "Non valutato — motivo non riconosciuto ({reason})."
     },
+    "indicatorUnassessableReason": {
+      "model_declared": "Nessuna evidenza disponibile nella trascrizione",
+      "excerpt_unverifiable": "L'evidenza non è verificabile rispetto alla trascrizione",
+      "score_illegal": "Il valutatore ha restituito un punteggio non valido",
+      "unknown": "Non valutato — motivo non riconosciuto ({reason})"
+    },
     "table": {
       "caption": "Valutazione delle competenze BARS — punteggi degli indicatori, media della competenza e affidabilità",
       "competency": "Competenza",

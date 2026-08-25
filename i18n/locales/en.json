@@ -307,6 +307,12 @@
       "llm_truncated": "Not scored — the evaluator's response was cut off before it was complete.",
       "unknown": "Not scored — unrecognised reason ({reason})."
     },
+    "indicatorUnassessableReason": {
+      "model_declared": "No assessable evidence in the transcript",
+      "excerpt_unverifiable": "Evidence could not be verified against the transcript",
+      "score_illegal": "The evaluator returned an invalid score",
+      "unknown": "Not assessed — unrecognised reason ({reason})"
+    },
     "table": {
       "caption": "BARS competency evaluation — indicator scores, competency mean, and reliability",
       "competency": "Competency",

@@ -99,3 +99,31 @@ export function unscorableReasonKey(reason: string | null): string | null {
     ? `report.unscorable.${reason}`
     : 'report.unscorable.unknown'
 }
+
+/**
+ * The three `unassessable_reason` values shipped by the API for a single
+ * BARS indicator (scoring-failure-containment D1/D7/D11) — the INDICATOR-grain
+ * sibling of `KNOWN_UNSCORABLE` (competency grain). Extending this list is
+ * additive and safe by construction, same as `KNOWN_UNSCORABLE` above.
+ */
+const KNOWN_INDICATOR_UNASSESSABLE_REASONS = [
+  'model_declared',
+  'excerpt_unverifiable',
+  'score_illegal',
+] as const
+
+/**
+ * Maps `IndicatorScore.unassessable_reason` to an i18n key for the operator
+ * report (D11). A TOTAL function over `string | null`, same shape as
+ * `unscorableReasonKey`:
+ *   - `null` → `null` — the indicator scored legally, nothing to render.
+ *   - a KNOWN reason → its own i18n key under `report.indicatorUnassessableReason`.
+ *   - an UNRECOGNIZED reason → the neutral fallback key, never blank and
+ *     never the raw machine key printed bare (D6/D12 applied a third time).
+ */
+export function indicatorUnassessableReasonKey(reason: string | null): string | null {
+  if (reason === null) return null
+  return (KNOWN_INDICATOR_UNASSESSABLE_REASONS as readonly string[]).includes(reason)
+    ? `report.indicatorUnassessableReason.${reason}`
+    : 'report.indicatorUnassessableReason.unknown'
+}

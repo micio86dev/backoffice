@@ -19,6 +19,7 @@ import {
   indicatorChipState,
   competencyMeanState,
   unscorableReasonKey,
+  indicatorUnassessableReasonKey,
 } from '../../../app/utils/bars'
 
 describe('indicatorChipState', () => {
@@ -130,6 +131,41 @@ describe('unscorableReasonKey', () => {
   it('maps an unrecognized reason to the neutral fallback key, never blank', () => {
     expect(unscorableReasonKey('some_future_reason_not_yet_shipped')).toBe(
       'report.unscorable.unknown'
+    )
+  })
+})
+
+// ─── indicatorUnassessableReasonKey (B3, design.md D11) ──────────────────────
+//
+// The indicator-grain sibling of unscorableReasonKey — same total-function
+// shape, different key base and different (3-value) known set.
+
+describe('indicatorUnassessableReasonKey', () => {
+  it('maps null to null (legally-scored indicator, nothing to render)', () => {
+    expect(indicatorUnassessableReasonKey(null)).toBeNull()
+  })
+
+  it('maps model_declared to its own i18n key', () => {
+    expect(indicatorUnassessableReasonKey('model_declared')).toBe(
+      'report.indicatorUnassessableReason.model_declared'
+    )
+  })
+
+  it('maps excerpt_unverifiable to its own i18n key', () => {
+    expect(indicatorUnassessableReasonKey('excerpt_unverifiable')).toBe(
+      'report.indicatorUnassessableReason.excerpt_unverifiable'
+    )
+  })
+
+  it('maps score_illegal to its own i18n key', () => {
+    expect(indicatorUnassessableReasonKey('score_illegal')).toBe(
+      'report.indicatorUnassessableReason.score_illegal'
+    )
+  })
+
+  it('maps an unrecognized reason to the neutral fallback key, never blank', () => {
+    expect(indicatorUnassessableReasonKey('some_future_reason_not_yet_shipped')).toBe(
+      'report.indicatorUnassessableReason.unknown'
     )
   })
 })

@@ -18,7 +18,7 @@
         class="flex flex-wrap gap-1"
       >
         <li v-for="(behavior, index) in result.behaviors" :key="index">
-          <ScoreChip :score="behavior.score" />
+          <ScoreChip :score="behavior.score" :unassessable-reason="behavior.unassessable_reason" />
         </li>
       </ul>
     </TableCell>

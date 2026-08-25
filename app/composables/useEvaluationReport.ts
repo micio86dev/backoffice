@@ -32,6 +32,14 @@ export interface EvaluationBehavior {
   score: number | null
   explanation: string
   excerpts: string[]
+  /**
+   * Machine-facing value, unlocalized (scoring-failure-containment D1/D7/D11)
+   * — `null` for a legally-scored indicator. Hand-typed by necessity, same
+   * reasoning as `EvaluationCompetencyResult.unscorable_reason` below: a
+   * field added here without a matching `api` change is caught by
+   * `EvaluationKeySetTest` on the `api` side.
+   */
+  unassessable_reason: string | null
 }
 
 export interface EvaluationCompetencyResult {

@@ -58,6 +58,7 @@ const SLF_FIXTURE: EvaluationReportData = {
         excerpts: [],
       },
     ],
+    unscorable_reason: null,
   },
 }
 
@@ -69,6 +70,7 @@ const ALL_UNASSESSABLE_FIXTURE: EvaluationReportData = {
       { indicator: 'a', score: null, explanation: 'x', excerpts: [] },
       { indicator: 'b', score: null, explanation: 'y', excerpts: [] },
     ],
+    unscorable_reason: null,
   },
 }
 

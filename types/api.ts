@@ -1516,8 +1516,10 @@ export interface components {
             duration_seconds: number | null;
             integrity: {
                 score: number;
-                /** @enum {string} */
-                band: "medium" | "low" | "high";
+                /** @enum {string|null} */
+                band: "low" | "medium" | "high" | null;
+                coverage_complete: boolean;
+                unavailable_layers: unknown[];
                 counts: string;
                 total: number;
                 tab_hidden_sec: number;

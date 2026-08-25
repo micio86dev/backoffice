@@ -67,3 +67,63 @@ export function competencyMeanState(mean: number | null): BarsChipState {
   if (mean <= 3.5) return 'warning'
   return 'success'
 }
+
+/**
+ * The four `unscorable_reason` values shipped by the API today
+ * (scoring-failure-containment D11/D12). Extending this list is additive and
+ * safe by construction — `unscorableReasonKey` never throws on an
+ * unrecognized value, it falls back loudly instead (below).
+ */
+const KNOWN_UNSCORABLE = [
+  'role_no_bars',
+  'anchor_translation_missing',
+  'llm_parse_error',
+  'llm_truncated',
+] as const
+
+/**
+ * Maps `CompetencyResult.unscorable_reason` to an i18n key for the operator
+ * report (D11/D12). A TOTAL function over `string | null`:
+ *   - `null` → `null` — the competency scored normally, nothing to render.
+ *   - a KNOWN reason → its own i18n key.
+ *   - an UNRECOGNIZED reason (e.g. a future API addition not yet shipped in
+ *     the backoffice) → the neutral fallback key, `report.unscorable.unknown`
+ *     — NEVER blank and NEVER the raw machine key printed bare. This is D6
+ *     of bars-full-scale-1-5 applied to a second field: an unrecognized key
+ *     that renders nothing tells the operator "there is no explanation",
+ *     which is a lie about the data.
+ */
+export function unscorableReasonKey(reason: string | null): string | null {
+  if (reason === null) return null
+  return (KNOWN_UNSCORABLE as readonly string[]).includes(reason)
+    ? `report.unscorable.${reason}`
+    : 'report.unscorable.unknown'
+}
+
+/**
+ * The three `unassessable_reason` values shipped by the API for a single
+ * BARS indicator (scoring-failure-containment D1/D7/D11) — the INDICATOR-grain
+ * sibling of `KNOWN_UNSCORABLE` (competency grain). Extending this list is
+ * additive and safe by construction, same as `KNOWN_UNSCORABLE` above.
+ */
+const KNOWN_INDICATOR_UNASSESSABLE_REASONS = [
+  'model_declared',
+  'excerpt_unverifiable',
+  'score_illegal',
+] as const
+
+/**
+ * Maps `IndicatorScore.unassessable_reason` to an i18n key for the operator
+ * report (D11). A TOTAL function over `string | null`, same shape as
+ * `unscorableReasonKey`:
+ *   - `null` → `null` — the indicator scored legally, nothing to render.
+ *   - a KNOWN reason → its own i18n key under `report.indicatorUnassessableReason`.
+ *   - an UNRECOGNIZED reason → the neutral fallback key, never blank and
+ *     never the raw machine key printed bare (D6/D12 applied a third time).
+ */
+export function indicatorUnassessableReasonKey(reason: string | null): string | null {
+  if (reason === null) return null
+  return (KNOWN_INDICATOR_UNASSESSABLE_REASONS as readonly string[]).includes(reason)
+    ? `report.indicatorUnassessableReason.${reason}`
+    : 'report.indicatorUnassessableReason.unknown'
+}

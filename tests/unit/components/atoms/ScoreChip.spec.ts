@@ -94,6 +94,54 @@ describe('ScoreChip', () => {
   })
 })
 
+// ─── unassessableReason (B3, design.md D11) ──────────────────────────────────
+//
+// When the -1/null "unassessable" chip carries an `unassessableReason`, its
+// screen-reader label REPLACES the generic `report.chip.unassessable` with
+// the reason-specific `report.indicatorUnassessableReason.*` key — the chip's
+// visual density is unchanged (still the neutral "–" glyph), only the label
+// gains detail.
+
+describe('ScoreChip unassessableReason (indicator-grain reason)', () => {
+  it('without a reason, the unassessable chip keeps the generic label', () => {
+    const wrapper = mount(ScoreChip, {
+      props: { score: -1, unassessableReason: null },
+      global: { mocks: { $t: tMock } },
+    })
+    expect(wrapper.text()).toContain('–')
+    expect(wrapper.text()).toContain('report.chip.unassessable')
+  })
+
+  it('with a reason, the unassessable chip label uses the reason-specific key instead of the generic one', () => {
+    const wrapper = mount(ScoreChip, {
+      props: { score: -1, unassessableReason: 'excerpt_unverifiable' },
+      global: { mocks: { $t: tMock } },
+    })
+    expect(wrapper.text()).toContain('–')
+    expect(wrapper.text()).toContain('report.indicatorUnassessableReason.excerpt_unverifiable')
+    expect(wrapper.text()).not.toContain('report.chip.unassessable')
+  })
+
+  it('an unrecognized reason falls back loudly, never blank', () => {
+    const wrapper = mount(ScoreChip, {
+      props: { score: -1, unassessableReason: 'some_future_reason' },
+      global: { mocks: { $t: tMock } },
+    })
+    expect(wrapper.text()).toContain('report.indicatorUnassessableReason.unknown')
+  })
+
+  it('a reason on a LEGALLY-scored chip is ignored — the score label wins', () => {
+    // A defensive case: unassessableReason should only ever be non-null when
+    // score is -1/null, but the chip must not misrender if the API sent both.
+    const wrapper = mount(ScoreChip, {
+      props: { score: 5, unassessableReason: 'model_declared' },
+      global: { mocks: { $t: tMock } },
+    })
+    expect(wrapper.text()).toContain('report.chip.high')
+    expect(wrapper.text()).not.toContain('report.indicatorUnassessableReason')
+  })
+})
+
 describe('report.chip.belowMid / aboveMid / invalid i18n keys', () => {
   it('are defined with non-empty strings in both en and it locales', async () => {
     const en = (await import('../../../../i18n/locales/en.json')).default as {

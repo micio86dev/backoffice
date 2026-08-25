@@ -15,7 +15,12 @@
  *     `null` (all-unassessable) renders neutral, never as if it were 0.
  */
 import { describe, it, expect } from 'vitest'
-import { indicatorChipState, competencyMeanState } from '../../../app/utils/bars'
+import {
+  indicatorChipState,
+  competencyMeanState,
+  unscorableReasonKey,
+  indicatorUnassessableReasonKey,
+} from '../../../app/utils/bars'
 
 describe('indicatorChipState', () => {
   it('maps 1 to error', () => {
@@ -88,5 +93,79 @@ describe('competencyMeanState', () => {
 
   it('is unassessable when mean is null (all indicators unassessable — never 0)', () => {
     expect(competencyMeanState(null)).toBe('unassessable')
+  })
+})
+
+// ─── unscorableReasonKey (A5.1/A5.2, design.md D12) ──────────────────────────
+//
+// A total function: `null` maps to `null` (no explanation to render — the
+// competency scored normally), each of the four known reasons maps to its
+// own i18n key, and an UNRECOGNIZED reason renders loudly via the neutral
+// fallback key — NEVER a blank cell and NEVER the raw machine key printed
+// bare. This is D6 of bars-full-scale-1-5 applied to a second field: the
+// failure mode that made ship-ordering load-bearing was silent masking.
+
+describe('unscorableReasonKey', () => {
+  it('maps null to null (competency scored normally, no explanation to render)', () => {
+    expect(unscorableReasonKey(null)).toBeNull()
+  })
+
+  it('maps role_no_bars to its own i18n key', () => {
+    expect(unscorableReasonKey('role_no_bars')).toBe('report.unscorable.role_no_bars')
+  })
+
+  it('maps anchor_translation_missing to its own i18n key', () => {
+    expect(unscorableReasonKey('anchor_translation_missing')).toBe(
+      'report.unscorable.anchor_translation_missing'
+    )
+  })
+
+  it('maps llm_parse_error to its own i18n key', () => {
+    expect(unscorableReasonKey('llm_parse_error')).toBe('report.unscorable.llm_parse_error')
+  })
+
+  it('maps llm_truncated to its own i18n key', () => {
+    expect(unscorableReasonKey('llm_truncated')).toBe('report.unscorable.llm_truncated')
+  })
+
+  it('maps an unrecognized reason to the neutral fallback key, never blank', () => {
+    expect(unscorableReasonKey('some_future_reason_not_yet_shipped')).toBe(
+      'report.unscorable.unknown'
+    )
+  })
+})
+
+// ─── indicatorUnassessableReasonKey (B3, design.md D11) ──────────────────────
+//
+// The indicator-grain sibling of unscorableReasonKey — same total-function
+// shape, different key base and different (3-value) known set.
+
+describe('indicatorUnassessableReasonKey', () => {
+  it('maps null to null (legally-scored indicator, nothing to render)', () => {
+    expect(indicatorUnassessableReasonKey(null)).toBeNull()
+  })
+
+  it('maps model_declared to its own i18n key', () => {
+    expect(indicatorUnassessableReasonKey('model_declared')).toBe(
+      'report.indicatorUnassessableReason.model_declared'
+    )
+  })
+
+  it('maps excerpt_unverifiable to its own i18n key', () => {
+    expect(indicatorUnassessableReasonKey('excerpt_unverifiable')).toBe(
+      'report.indicatorUnassessableReason.excerpt_unverifiable'
+    )
+  })
+
+  it('maps score_illegal to its own i18n key', () => {
+    expect(indicatorUnassessableReasonKey('score_illegal')).toBe(
+      'report.indicatorUnassessableReason.score_illegal'
+    )
+  })
+
+  it('maps an unrecognized reason to the neutral fallback key, never blank', () => {
+    expect(indicatorUnassessableReasonKey('some_future_reason_not_yet_shipped')).toBe(
+      'report.indicatorUnassessableReason.unknown'
+    )
   })
 })

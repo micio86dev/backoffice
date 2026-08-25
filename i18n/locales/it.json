@@ -300,6 +300,19 @@
       "unassessable": "Non valutabile — nessuna evidenza nella trascrizione",
       "invalid": "Punteggio non valido {score} — fuori dalla scala 1–5"
     },
+    "unscorable": {
+      "role_no_bars": "Non valutato — nessun indicatore BARS definito per questa competenza nella versione del framework in uso.",
+      "anchor_translation_missing": "Non valutato — le ancore BARS non sono disponibili nella lingua di questo progetto.",
+      "llm_parse_error": "Non valutato — non è stato possibile leggere la risposta del valutatore.",
+      "llm_truncated": "Non valutato — la risposta del valutatore è stata interrotta prima del completamento.",
+      "unknown": "Non valutato — motivo non riconosciuto ({reason})."
+    },
+    "indicatorUnassessableReason": {
+      "model_declared": "Nessuna evidenza disponibile nella trascrizione",
+      "excerpt_unverifiable": "L'evidenza non è verificabile rispetto alla trascrizione",
+      "score_illegal": "Il valutatore ha restituito un punteggio non valido",
+      "unknown": "Non valutato — motivo non riconosciuto ({reason})"
+    },
     "table": {
       "caption": "Valutazione delle competenze BARS — punteggi degli indicatori, media della competenza e affidabilità",
       "competency": "Competenza",

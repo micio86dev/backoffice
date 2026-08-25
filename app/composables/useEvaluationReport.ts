@@ -32,12 +32,28 @@ export interface EvaluationBehavior {
   score: number | null
   explanation: string
   excerpts: string[]
+  /**
+   * Machine-facing value, unlocalized (scoring-failure-containment D1/D7/D11)
+   * — `null` for a legally-scored indicator. Hand-typed by necessity, same
+   * reasoning as `EvaluationCompetencyResult.unscorable_reason` below: a
+   * field added here without a matching `api` change is caught by
+   * `EvaluationKeySetTest` on the `api` side.
+   */
+  unassessable_reason: string | null
 }
 
 export interface EvaluationCompetencyResult {
   score: number | null
   reliability: string
   behaviors: EvaluationBehavior[]
+  /**
+   * Machine-facing value, unlocalized (scoring-failure-containment D11) —
+   * `null` for a scored competency. Hand-typed by necessity: nothing
+   * generates this interface (see the class docblock above), so a field
+   * added here without a matching `api` change is caught by
+   * `EvaluationKeySetTest` on the `api` side, not by anything on this side.
+   */
+  unscorable_reason: string | null
 }
 
 export type EvaluationReportData = Record<string, EvaluationCompetencyResult>

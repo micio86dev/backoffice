@@ -42,10 +42,15 @@ import {
   MinusCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { computed } from 'vue'
-import { indicatorChipState } from '@/utils/bars'
+import { indicatorChipState, indicatorUnassessableReasonKey } from '@/utils/bars'
 
 const props = defineProps<{
   score: number | null
+  // Indicator-grain reason (scoring-failure-containment D1/D7/D11) — present
+  // only when score is the -1/null unassessable sentinel. Replaces the
+  // generic report.chip.unassessable label with a reason-specific one;
+  // visual density (the neutral "–" glyph) is unchanged.
+  unassessableReason?: string | null
 }>()
 
 const state = computed(() => indicatorChipState(props.score))
@@ -67,13 +72,17 @@ const labelKey = computed(() => {
     case 'invalid':
       return 'report.chip.invalid'
     default:
-      return 'report.chip.unassessable'
+      return (
+        indicatorUnassessableReasonKey(props.unassessableReason ?? null) ??
+        'report.chip.unassessable'
+      )
   }
 })
 
-// `invalid` interpolates the raw out-of-domain value into its label; every
-// other state ignores this (harmless extra param).
-const labelParams = computed(() => ({ score: props.score }))
+// `invalid` interpolates the raw out-of-domain score; the unassessable
+// unknown-reason fallback interpolates the raw unassessableReason instead —
+// every other key ignores whichever param it doesn't use (harmless extra).
+const labelParams = computed(() => ({ score: props.score, reason: props.unassessableReason }))
 
 const colorClass = computed(() => {
   switch (state.value) {

@@ -21,6 +21,13 @@ test.describe('Health page', () => {
 
   test('passes WCAG 2.1 AA accessibility check', async ({ page }) => {
     await page.goto('/health')
+    // Wait for the page to actually be rendered before running axe, exactly as
+    // the sibling tests do. Nuxt sets <title> through useHead AFTER navigation
+    // resolves, so an immediate axe run raced it and intermittently reported a
+    // `document-title` violation on a page that does have one. The flake was
+    // real but the finding was not: the assertion has to observe the settled
+    // page, not the instant `goto` returns.
+    await expect(page.getByTestId('health-status')).toBeVisible()
     await checkA11y(page)
   })
 

@@ -67,10 +67,26 @@ const PARTICIPANT_DETAIL = {
 // "SLF fixture renders per esempio-report-valutazione.json" scenario: [5,3,-1]
 // (API-mapped to null) -> mean 4.0, reliability "67%". COM added as a second,
 // fully-assessed competency for a more representative report screenshot.
+/**
+ * Scoring provenance, the `meta.scoring` sibling of `data` (D7).
+ *
+ * Values mirror what production stamps; the report renders them as a
+ * traceability footnote, so they must be present and well-formed.
+ */
+const SCORING_META = {
+  prompt_version: '3.0.0',
+  model_version: 'claude-haiku-4-5-20251001',
+  framework_version: '1.4.0',
+}
+
 const EVALUATION_REPORT = {
   SLF: {
     score: 4.0,
     reliability: '67%',
+    // The API always sends this, null when the competency scored normally.
+    // Its absence is what made the report claim "not assessed" beside a real
+    // score — the code now tolerates it, and the fixture stops pretending.
+    unscorable_reason: null,
     behaviors: [
       {
         indicator: 'Describe products and services accurately',
@@ -95,6 +111,7 @@ const EVALUATION_REPORT = {
   COM: {
     score: 3.67,
     reliability: '100%',
+    unscorable_reason: null,
     behaviors: [
       {
         indicator: 'Get the point across clearly and concisely',
@@ -138,6 +155,24 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
         token_type: 'bearer',
       })
   )
+  // The access token is memory-only by design, so EVERY hard navigation starts
+  // unauthenticated and `plugins/00.auth-bootstrap.client.ts` re-mints it from
+  // the refresh cookie before the page renders.
+  //
+  // Unmocked, that call failed and the app did exactly what it should — sent
+  // the operator to the login screen. Every test reaching a page through
+  // `page.goto()` then failed on a missing heading or table, which reads as a
+  // broken report rather than a missing mock. Tests that navigate by CLICKING
+  // passed throughout, because the token was still in memory: that asymmetry is
+  // the tell.
+  await page.route(
+    (url) => url.pathname === '/auth/refresh',
+    (route) =>
+      jsonRoute(route, {
+        access_token: 'e2e-access-token',
+        token_type: 'bearer',
+      })
+  )
   await page.route(
     (url) => url.pathname === '/dashboard/metrics',
     (route) =>
@@ -173,7 +208,13 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
   )
   await page.route(
     (url) => url.pathname === '/participants/1/evaluation',
-    (route) => jsonRoute(route, { data: EVALUATION_REPORT })
+    // `meta.scoring` is REQUIRED, not decorative: useEvaluationReport reads
+    // `response.meta.scoring` unconditionally (D7, bars-full-scale-1-5). A mock
+    // carrying only `data` throws on the property access, the page renders no
+    // report at all, and every assertion below fails with "table not found" —
+    // which reads as a UI regression rather than a stale fixture. That is what
+    // it did from 2026-08-24 until this was fixed.
+    (route) => jsonRoute(route, { data: EVALUATION_REPORT, meta: { scoring: SCORING_META } })
   )
   await page.route(
     (url) => url.pathname === '/participants/1/transcript/download',

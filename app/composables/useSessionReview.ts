@@ -15,7 +15,21 @@ export interface IntegrityEventRow {
 
 export interface IntegritySummary {
   score: number
-  band: 'low' | 'medium' | 'high'
+  /**
+   * NULL means the system has NO OPINION, not that the risk is low.
+   *
+   * A detector that never started produces zero events, and zero events used to
+   * render as "Rischio basso" — the product asserting a candidate's integrity
+   * from observations nobody made. `null` arrives when a layer reported itself
+   * unavailable and the measured score is below the medium threshold.
+   *
+   * `medium` and `high` still arrive under partial coverage: a measurement never
+   * taken can only RAISE the true score, so they remain valid lower bounds and
+   * withholding them would hide a real finding.
+   */
+  band: 'low' | 'medium' | 'high' | null
+  coverage_complete: boolean
+  unavailable_layers: string[]
   total: number
   counts: Record<string, number>
   events: IntegrityEventRow[]

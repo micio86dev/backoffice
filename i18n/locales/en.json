@@ -864,7 +864,17 @@
         "clipboard_copy": "Copied text",
         "clipboard_paste": "Pasted text",
         "second_voice": "Second voice detected",
-        "phone_detected": "Phone detected"
+        "phone_detected": "Phone detected",
+        "proctor_unavailable": "Detector unavailable"
+      },
+      "notMeasured": "Not measured",
+      "coverageIncomplete": "Some detectors did not start, so this session was not fully observed. This is not a judgement about the candidate.",
+      "unavailableLayers": "Detectors unavailable: {layers}",
+      "layer": {
+        "face": "face",
+        "phone": "phone",
+        "audio": "audio",
+        "unknown": "unknown"
       }
     },
     "snapshots": {

@@ -864,7 +864,17 @@
         "clipboard_copy": "Copia testo",
         "clipboard_paste": "Incolla testo",
         "second_voice": "Seconda voce rilevata",
-        "phone_detected": "Telefono rilevato"
+        "phone_detected": "Telefono rilevato",
+        "proctor_unavailable": "Rilevatore non disponibile"
+      },
+      "notMeasured": "Non misurato",
+      "coverageIncomplete": "Alcuni rilevatori non sono partiti, quindi questa sessione non è stata osservata per intero. Non è un giudizio sul candidato.",
+      "unavailableLayers": "Rilevatori non disponibili: {layers}",
+      "layer": {
+        "face": "volto",
+        "phone": "telefono",
+        "audio": "audio",
+        "unknown": "sconosciuto"
       }
     },
     "snapshots": {

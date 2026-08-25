@@ -16,13 +16,48 @@
         <h2 id="review-integrity-heading" class="text-lg font-semibold text-foreground">
           {{ $t('review.integrity.title') }}
         </h2>
-        <Badge :class="BAND_CLASS[review.integrity.band]" data-testid="integrity-band">
+        <!--
+          A null band means the system has NO OPINION, and it must LOOK like
+          one. Falling back to "Rischio basso" here is the defect this whole
+          change exists to remove: it asserted a candidate had behaved well from
+          observations nobody made.
+        -->
+        <Badge
+          v-if="review.integrity.band === null"
+          :class="BAND_CLASS.unmeasured"
+          data-testid="integrity-band"
+        >
+          {{ $t('review.integrity.notMeasured') }}
+        </Badge>
+        <Badge v-else :class="BAND_CLASS[review.integrity.band]" data-testid="integrity-band">
           {{ $t(`review.integrity.band.${review.integrity.band}`) }}
         </Badge>
         <span class="text-sm text-muted-foreground" data-testid="integrity-score">
           {{ $t('review.integrity.score', { score: review.integrity.score }) }}
         </span>
       </div>
+
+      <!--
+        Named explicitly, and beside the badge rather than buried below the
+        timeline: an operator scanning a list reads the badge, so the reason it
+        is missing has to travel with it.
+
+        Tested for `=== false`, not falsiness. An API that predates these fields
+        sends neither, and `undefined` there means "this server has no opinion
+        about coverage" — not "coverage was incomplete". Warning on every session
+        during a version skew would be noise, and noise is how a real warning
+        stops being read.
+      -->
+      <p
+        v-if="review.integrity.coverage_complete === false"
+        class="text-sm text-warning-dark"
+        data-testid="integrity-coverage-warning"
+      >
+        {{ $t('review.integrity.coverageIncomplete') }}
+        <span v-if="review.integrity.unavailable_layers.length > 0">
+          {{ $t('review.integrity.unavailableLayers', { layers: unavailableLayerLabels }) }}
+        </span>
+      </p>
 
       <!--
         The score is an input to the operator's judgement, never a verdict on
@@ -109,13 +144,32 @@ const props = defineProps<{
   locale: string
 }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const BAND_CLASS: Record<string, string> = {
+  // Deliberately NOT the success palette. "Not measured" must never be able to
+  // read, at a glance down a list, as a clean result.
+  unmeasured: 'bg-muted text-muted-foreground',
   low: 'bg-success-light text-success-dark',
   medium: 'bg-warning-light text-warning-dark',
   high: 'bg-error-light text-destructive',
 }
+
+/**
+ * The dead layers, translated and joined for display.
+ *
+ * An unrecognised layer name falls back to its raw value rather than being
+ * dropped: a detector we cannot name still did not run, and silently omitting
+ * it would understate the gap — the exact failure mode this change removes.
+ */
+const unavailableLayerLabels = computed(() =>
+  (props.review.integrity.unavailable_layers ?? [])
+    .map((layer) => {
+      const key = `review.integrity.layer.${layer}`
+      return te(key) ? t(key) : layer
+    })
+    .join(', ')
+)
 
 const durationLabel = computed(() => formatDuration(props.review.duration_seconds, t))
 

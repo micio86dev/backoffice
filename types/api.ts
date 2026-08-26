@@ -2458,6 +2458,15 @@ export interface operations {
                             config: unknown[];
                             /** @description Persona is optional: a template may be pure provider config. */
                             persona: unknown[] | null;
+                            /**
+                             * @description The binding travels by NAME, never by id or key material
+                             *     (design D13) — an id is meaningless in another org, and a
+                             *     fingerprint is key-derived material with no import use.
+                             */
+                            llm: {
+                                model_key: string;
+                                credential_name: string;
+                            } | null;
                         }[];
                     };
                 };

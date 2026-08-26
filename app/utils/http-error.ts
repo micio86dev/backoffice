@@ -30,6 +30,24 @@ export function getErrorReason(error: unknown): string | null {
 }
 
 /**
+ * Extracts a `{data:{error, templates}}` conflict body's template NAME list
+ * from an ofetch/$fetch rejection, gated on a specific machine `error` code
+ * (e.g. `credential_in_use` — `LlmCredentialController::destroy()`,
+ * pluggable-conversation-llm design D2). Scoped to one named error rather
+ * than any `{templates}` shape, so a caller cannot accidentally match a
+ * differently-shaped 409 that happens to carry the same field name.
+ */
+export function getConflictTemplates(error: unknown, expectedErrorCode: string): string[] | null {
+  if (typeof error !== 'object' || error === null) return null
+  const data = (error as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return null
+  const { error: code, templates } = data as { error?: unknown; templates?: unknown }
+  if (code !== expectedErrorCode) return null
+  if (!Array.isArray(templates) || !templates.every((t) => typeof t === 'string')) return null
+  return templates
+}
+
+/**
  * Extracts a Laravel `ValidationException` body's per-field message arrays
  * (`{errors: {field: [message, ...]}}`) from an ofetch/$fetch rejection.
  *

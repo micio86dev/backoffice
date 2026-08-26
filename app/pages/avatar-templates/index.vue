@@ -263,12 +263,16 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
           name: payload.name,
           description: payload.description ?? null,
           config: payload.config ?? {},
+          llm_model_id: payload.llm_model_id ?? null,
+          llm_credential_id: payload.llm_credential_id ?? null,
         })
       : await createTemplate({
           name: payload.name ?? '',
           description: payload.description ?? null,
           provider: (payload.provider ?? 'heygen') as ProviderName,
           config: payload.config ?? {},
+          llm_model_id: payload.llm_model_id ?? null,
+          llm_credential_id: payload.llm_credential_id ?? null,
         })
 
     warning.value = response.warning ?? null

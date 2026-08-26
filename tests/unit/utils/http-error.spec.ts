@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import {
   getErrorStatus,
   getErrorFields,
+  getConflictTemplates,
   applyServerFieldErrors,
 } from '../../../app/utils/http-error'
 
@@ -59,6 +60,47 @@ describe('getErrorFields', () => {
 
   it('returns null for a non-object error', () => {
     expect(getErrorFields('boom')).toBeNull()
+  })
+})
+
+/**
+ * getConflictTemplates (pluggable-conversation-llm PR P7, task P7.5 support
+ * — RED) — extracts the bound template NAMES from a
+ * `{data:{error, templates}}` 409, gated on a specific machine `error` code
+ * so it never matches a differently-shaped conflict that happens to carry
+ * the same field name.
+ */
+describe('getConflictTemplates', () => {
+  it('reads .data.templates from a matching 409 rejection', () => {
+    const error = Object.assign(new Error('Conflict'), {
+      status: 409,
+      data: {
+        error: 'credential_in_use',
+        message: 'in use',
+        templates: ['Sales bot', 'Support bot'],
+      },
+    })
+    expect(getConflictTemplates(error, 'credential_in_use')).toEqual(['Sales bot', 'Support bot'])
+  })
+
+  it('returns null when the error code does not match', () => {
+    const error = Object.assign(new Error('Conflict'), {
+      status: 409,
+      data: { error: 'template_active', message: 'active', templates: ['Sales bot'] },
+    })
+    expect(getConflictTemplates(error, 'credential_in_use')).toBeNull()
+  })
+
+  it('returns null when templates is missing or not a string array', () => {
+    const error = Object.assign(new Error('Conflict'), {
+      status: 409,
+      data: { error: 'credential_in_use', message: 'in use', templates: [1, 2] },
+    })
+    expect(getConflictTemplates(error, 'credential_in_use')).toBeNull()
+  })
+
+  it('returns null for a non-object error', () => {
+    expect(getConflictTemplates('boom', 'credential_in_use')).toBeNull()
   })
 })
 

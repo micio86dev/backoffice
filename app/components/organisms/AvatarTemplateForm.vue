@@ -206,6 +206,63 @@
       </Field>
     </fieldset>
 
+    <!--
+      pluggable-conversation-llm PR P8. A separate fieldset from the
+      provider's own settings above: the binding is provider-agnostic
+      (I2/I5 gate on the MODEL, not on `provider`), so it does not belong
+      inside `activeFields`'s provider-keyed loop.
+    -->
+    <fieldset
+      class="flex flex-col gap-3 border-t border-border pt-4"
+      data-testid="template-llm-section"
+    >
+      <legend class="sr-only">{{ $t('avatar_templates.llm.section') }}</legend>
+
+      <p
+        v-if="draft.llmModelKey === null"
+        data-testid="template-llm-unbound-badge"
+        class="text-sm text-muted-foreground"
+      >
+        {{ $t('avatar_templates.llm.badge.unbound') }}
+      </p>
+
+      <LlmModelPicker
+        id="template-llm-model"
+        v-model="draft.llmModelKey"
+        :label="$t('avatar_templates.llm.picker.label')"
+        :models="models"
+      />
+      <FieldError v-if="llmModelError" data-testid="template-llm-model-error">
+        {{ llmModelError }}
+      </FieldError>
+
+      <Field :data-invalid="Boolean(llmCredentialError)">
+        <FieldLabel for="template-llm-credential">
+          {{ $t('avatar_templates.llm.credential.label') }}
+        </FieldLabel>
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+        <select
+          id="template-llm-credential"
+          data-testid="template-llm-credential"
+          autocomplete="off"
+          :aria-invalid="Boolean(llmCredentialError)"
+          :class="formControlClass"
+          :value="draft.llmCredentialId === null ? '' : String(draft.llmCredentialId)"
+          @change="onCredentialChange"
+        >
+          <option value="">{{ $t('avatar_templates.llm.credential.none') }}</option>
+          <option v-for="credential in credentials" :key="credential.id" :value="credential.id">
+            {{ credential.name }}
+          </option>
+        </select>
+        <FieldError v-if="llmCredentialError" data-testid="template-llm-credential-error">
+          {{ llmCredentialError }}
+        </FieldError>
+      </Field>
+
+      <LlmModeExplainer />
+    </fieldset>
+
     <div class="flex gap-2">
       <Button type="submit" data-testid="template-save" :disabled="saving">
         {{ $t('avatar_templates.action.save') }}
@@ -239,12 +296,17 @@
  * server `FieldSpec`s in a way the vendored `Select`/`Input` components
  * cannot support.
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass } from '@/components/ui/form-control'
 import { getErrorFields } from '@/utils/http-error'
+import { useLlmCredentials } from '@/composables/useLlmCredentials'
+import { useLlmModels } from '@/composables/useLlmModels'
+import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
+import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
+import type { LlmCredential, LlmModel } from '@/types/llm'
 
 const props = defineProps<{
   template: Partial<AvatarTemplate>
@@ -270,6 +332,13 @@ const draft = ref({
   description: props.template.description ?? '',
   provider: (props.template.provider ?? 'heygen') as ProviderName,
   config: { ...(props.template.config ?? {}) } as Record<string, unknown>,
+  // pluggable-conversation-llm PR P8. `llmModelKey` is the PICKER's value
+  // (design D1's natural key — `LlmModelPicker` is built around it, not a
+  // numeric id). `llmCredentialId` needs no such translation:
+  // `LlmCredentialResource` has always serialized its own `id` — there was
+  // never a read-surface gap on the credential side, only on the model side.
+  llmModelKey: null as string | null,
+  llmCredentialId: props.template.llm_credential_id ?? null,
 })
 
 const isNew = computed(() => props.template.id === undefined)
@@ -279,6 +348,84 @@ const nameError = ref<string | undefined>(undefined)
 const descriptionError = ref<string | undefined>(undefined)
 const configErrors = ref<Record<string, string | undefined>>({})
 const unmappedErrors = ref<string[]>([])
+const llmModelError = ref<string | undefined>(undefined)
+const llmCredentialError = ref<string | undefined>(undefined)
+
+// The models list is the ONLY place an id↔key mapping can be resolved from
+// (design D1: `LlmModelResource` exposes both now; the picker still keys on
+// `key`). Loaded once, not cached across mounts — this form is short-lived
+// and a stale registry read is worse than a second request, same doctrine
+// as `useLlmModels`/`useLlmCredentials`'s own docblocks.
+const models = ref<LlmModel[]>([])
+const credentials = ref<LlmCredential[]>([])
+
+const { listModels } = useLlmModels()
+const { listCredentials } = useLlmCredentials()
+
+onMounted(async () => {
+  // `Promise.allSettled`, deliberately not a try/rescue pair: either load
+  // failing must leave the OTHER one intact, and `form-contract.spec.ts`'s
+  // R3 guard requires every rejection-handling block in a form file to route
+  // through `applyServerFieldErrors` — which a background catalogue load has
+  // no business doing, since it is not a submit rejection.
+  const [modelsOutcome, credentialsOutcome] = await Promise.allSettled([
+    listModels(),
+    listCredentials(),
+  ])
+
+  if (modelsOutcome.status === 'fulfilled') {
+    models.value = modelsOutcome.value.data
+
+    // I5's grandfathering trap, resolved here rather than in the picker:
+    // the registry NEVER deletes a withdrawn model (`is_available: false`
+    // only), so a template already bound to one still finds it in this
+    // list — its `key` is what the picker needs to render it selected AND
+    // labelled, and what makes the round-trip on submit below possible at
+    // all.
+    const boundModel = models.value.find((model) => model.id === props.template.llm_model_id)
+    draft.value.llmModelKey = boundModel?.key ?? null
+  }
+  // A rejected load leaves `models`/`credentials` empty: the picker renders
+  // only the "provider default" option, which is honest — better than
+  // pretending a catalogue exists.
+
+  if (credentialsOutcome.status === 'fulfilled') {
+    credentials.value = credentialsOutcome.value.data
+  }
+})
+
+// Invariant I1 (both-or-neither) is a DB CHECK, not a suggestion — clearing
+// ONE binding field must clear the other, or a submit reaches the server
+// half-bound and comes back as a 422 the operator did not cause on purpose.
+watch(
+  () => draft.value.llmModelKey,
+  (key) => {
+    if (key === null) draft.value.llmCredentialId = null
+  }
+)
+watch(
+  () => draft.value.llmCredentialId,
+  (id) => {
+    if (id === null) draft.value.llmModelKey = null
+  }
+)
+
+function onCredentialChange(event: Event): void {
+  const select = event.target as HTMLSelectElement
+  draft.value.llmCredentialId = select.value === '' ? null : Number(select.value)
+}
+
+/**
+ * The picker emits a `key`; the API wants the matching `id`. `null` maps to
+ * `null` unconditionally — an unbind must reach the server as an explicit
+ * `null`, never be silently dropped as "unchanged" (see
+ * `useAvatarTemplates.ts`'s docblock on the same point).
+ */
+function resolveModelId(key: string | null): number | null {
+  if (key === null) return null
+
+  return models.value.find((model) => model.key === key)?.id ?? null
+}
 
 const nameDescribedBy = computed(() =>
   [nameError.value ? 'template-name-error' : null, 'template-name-help']
@@ -462,6 +609,8 @@ watch(
     descriptionError.value = undefined
     configErrors.value = {}
     unmappedErrors.value = []
+    llmModelError.value = undefined
+    llmCredentialError.value = undefined
 
     const fields = getErrorFields(submitError)
     if (fields === null) return
@@ -472,6 +621,25 @@ watch(
     for (const [serverField, messages] of Object.entries(fields)) {
       const message = messages?.[0]
       if (message === undefined) continue
+
+      // `llm_model_id` carries BOTH I2's `mode_unsupported` and I5's
+      // `model_unavailable` (`AvatarTemplate::booted()`); `llm_credential_id`
+      // carries I3/I4's `credential_not_found` for EITHER "no such
+      // credential" or "another org's credential" — deliberately one code
+      // for both, per design D9's existence-oracle doctrine, so this mapper
+      // makes no attempt to tell them apart. Same `config.{key}` mechanism as
+      // the branch below: a `te()`-gated translation, falling back to the
+      // raw server code when no copy exists for it yet.
+      if (serverField === 'llm_model_id' || serverField === 'llm_credential_id') {
+        const translationKey = `avatar_templates.error.llm.${message}`
+        const hasTranslation = typeof te === 'function' ? te(translationKey) : true
+        const resolved = hasTranslation ? t(translationKey) : message
+
+        if (serverField === 'llm_model_id') llmModelError.value = resolved
+        else llmCredentialError.value = resolved
+
+        continue
+      }
 
       if (serverField.startsWith(CONFIG_PREFIX)) {
         const key = serverField.slice(CONFIG_PREFIX.length)
@@ -513,6 +681,8 @@ function submit(): void {
     description: draft.value.description === '' ? null : draft.value.description,
     provider: draft.value.provider,
     config: draft.value.config,
+    llm_model_id: resolveModelId(draft.value.llmModelKey),
+    llm_credential_id: draft.value.llmCredentialId,
   })
 }
 </script>

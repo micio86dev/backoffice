@@ -63,6 +63,43 @@ describe('useAvatarTemplates', () => {
     expect(options.body).not.toHaveProperty('provider')
   })
 
+  it('forwards llm_model_id and llm_credential_id on create when the form supplies a binding', async () => {
+    await useAvatarTemplates().createTemplate({
+      name: 'X',
+      provider: 'heygen',
+      config: { avatarId: 'a' },
+      llm_model_id: 5,
+      llm_credential_id: 9,
+    })
+
+    expect(apiFetch).toHaveBeenCalledWith('/avatar-templates', {
+      method: 'POST',
+      body: {
+        name: 'X',
+        provider: 'heygen',
+        config: { avatarId: 'a' },
+        llm_model_id: 5,
+        llm_credential_id: 9,
+      },
+    })
+  })
+
+  it('forwards explicit nulls on update so an unbind actually clears both fields', async () => {
+    // pluggable-conversation-llm invariant I1 (both-or-neither): an explicit
+    // `null` must reach the API, not be dropped as "unset" — a composable
+    // that stripped `null` values could never unbind a template again.
+    await useAvatarTemplates().updateTemplate(7, {
+      llm_model_id: null,
+      llm_credential_id: null,
+    })
+
+    const [path, options] = apiFetch.mock.calls[0] as [string, { method: string; body: object }]
+
+    expect(path).toBe('/avatar-templates/7')
+    expect(options.method).toBe('PATCH')
+    expect(options.body).toEqual({ llm_model_id: null, llm_credential_id: null })
+  })
+
   it('activates through its own endpoint, not a PATCH of is_active', async () => {
     await useAvatarTemplates().activateTemplate(3)
 

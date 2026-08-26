@@ -665,11 +665,17 @@
       }
     },
     "llm": {
+      "section": "Conversation model",
       "picker": {
+        "label": "Model",
         "none": "Provider default (no model bound)",
         "groupManaged": "Text (managed)",
         "groupLive": "Live — coming soon",
         "withdrawn": "no longer available"
+      },
+      "credential": {
+        "label": "API credential",
+        "none": "No credential selected"
       },
       "explainer": {
         "managedScope": "In managed mode, the avatar provider still handles speech recognition, voice synthesis and turn-taking — only the reasoning model itself is swapped.",
@@ -688,6 +694,12 @@
         "range": "This value is out of the allowed range.",
         "enum": "This value is not one of the allowed options.",
         "unknown": "This setting does not exist for the selected service."
+      },
+      "llm": {
+        "mode_unsupported": "This model does not support managed mode yet.",
+        "model_unavailable": "This model is no longer available. Choose a different one.",
+        "credential_not_found": "This credential could not be used. Choose a different one.",
+        "vendor_mismatch": "This credential does not match the selected model's provider."
       }
     },
     "warning": {

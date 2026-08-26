@@ -34,13 +34,27 @@ export function useAvatarTemplates() {
     description?: string | null
     provider: AvatarTemplate['provider']
     config: Record<string, unknown>
+    /**
+     * Both-or-neither (design D4, invariant I1 — a DB CHECK, not just a
+     * frontend convention). `null` is a meaningful value here, not "absent":
+     * `AvatarTemplateForm` sends it explicitly to unbind, so this composable
+     * must forward it as-is rather than treat it as an omittable field.
+     */
+    llm_model_id?: number | null
+    llm_credential_id?: number | null
   }): Promise<TemplateResponse> {
     return apiFetch<TemplateResponse>('/avatar-templates', { method: 'POST', body: payload })
   }
 
   async function updateTemplate(
     id: number | string,
-    payload: { name?: string; description?: string | null; config?: Record<string, unknown> }
+    payload: {
+      name?: string
+      description?: string | null
+      config?: Record<string, unknown>
+      llm_model_id?: number | null
+      llm_credential_id?: number | null
+    }
   ): Promise<TemplateResponse> {
     // `provider` is deliberately absent from the accepted payload. The API
     // refuses to change it — every knob would then belong to the other

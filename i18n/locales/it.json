@@ -665,11 +665,17 @@
       }
     },
     "llm": {
+      "section": "Modello di conversazione",
       "picker": {
+        "label": "Modello",
         "none": "Predefinito del fornitore (nessun modello associato)",
         "groupManaged": "Testo (gestito)",
         "groupLive": "Live — in arrivo",
         "withdrawn": "non più disponibile"
+      },
+      "credential": {
+        "label": "Credenziale API",
+        "none": "Nessuna credenziale selezionata"
       },
       "explainer": {
         "managedScope": "In modalità gestita, il fornitore dell'avatar continua a occuparsi di riconoscimento vocale, sintesi vocale e gestione dei turni di conversazione: viene sostituito solo il modello di ragionamento.",
@@ -688,6 +694,12 @@
         "range": "Questo valore è fuori dall'intervallo consentito.",
         "enum": "Questo valore non è tra le opzioni consentite.",
         "unknown": "Questa impostazione non esiste per il servizio selezionato."
+      },
+      "llm": {
+        "mode_unsupported": "Questo modello non supporta ancora la modalità gestita.",
+        "model_unavailable": "Questo modello non è più disponibile. Selezionane un altro.",
+        "credential_not_found": "Questa credenziale non può essere utilizzata. Selezionane un'altra.",
+        "vendor_mismatch": "Questa credenziale non corrisponde al fornitore del modello selezionato."
       }
     },
     "warning": {

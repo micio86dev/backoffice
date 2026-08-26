@@ -1347,6 +1347,10 @@ export interface components {
             is_active: boolean;
             created_at: string | null;
             updated_at: string | null;
+            llm_model_id: number | null;
+            llm_credential_id: number | null;
+            llm_sync_status: string | null;
+            llm_synced_at: string | null;
         };
         /** BarsIndicatorResource */
         BarsIndicatorResource: {
@@ -1423,6 +1427,7 @@ export interface components {
         };
         /** LlmModelResource */
         LlmModelResource: {
+            id: number;
             key: string;
             vendor: string;
             display_name: string;

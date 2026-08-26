@@ -664,6 +664,21 @@
         "numberOutOfRange": "Enter a value within the allowed range."
       }
     },
+    "llm": {
+      "picker": {
+        "none": "Provider default (no model bound)",
+        "groupManaged": "Text (managed)",
+        "groupLive": "Live — coming soon",
+        "withdrawn": "no longer available"
+      },
+      "explainer": {
+        "managedScope": "In managed mode, the avatar provider still handles speech recognition, voice synthesis and turn-taking — only the reasoning model itself is swapped.",
+        "costUnavailable": "Actual token usage is not shown here: the provider calls Google directly on BEAI's behalf, so BEAI never receives a usage report to measure."
+      },
+      "badge": {
+        "unbound": "No model bound — using the provider default"
+      }
+    },
     "error": {
       "load_title": "Could not load templates",
       "load_body": "Try again. If it keeps failing, check that you hold the administrator role.",

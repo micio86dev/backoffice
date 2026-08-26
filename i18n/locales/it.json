@@ -664,6 +664,21 @@
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
       }
     },
+    "llm": {
+      "picker": {
+        "none": "Predefinito del fornitore (nessun modello associato)",
+        "groupManaged": "Testo (gestito)",
+        "groupLive": "Live — in arrivo",
+        "withdrawn": "non più disponibile"
+      },
+      "explainer": {
+        "managedScope": "In modalità gestita, il fornitore dell'avatar continua a occuparsi di riconoscimento vocale, sintesi vocale e gestione dei turni di conversazione: viene sostituito solo il modello di ragionamento.",
+        "costUnavailable": "L'utilizzo effettivo dei token non è mostrato qui: il fornitore chiama Google direttamente per conto di BEAI, quindi BEAI non riceve mai un resoconto di utilizzo da misurare."
+      },
+      "badge": {
+        "unbound": "Nessun modello associato — in uso il valore predefinito del fornitore"
+      }
+    },
     "error": {
       "load_title": "Impossibile caricare i template",
       "load_body": "Riprova. Se il problema persiste, controlla di avere il ruolo di amministratore.",

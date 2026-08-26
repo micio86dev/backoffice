@@ -78,3 +78,34 @@ export interface CredentialInUseError {
   message: string
   templates: string[]
 }
+
+/**
+ * LLM model catalogue shapes (pluggable-conversation-llm PR P8).
+ *
+ * `capability`/`mode` are inferred by Scramble as plain `string`, because
+ * they come from a PHP enum's `->value` (`LlmCapability`/`LlmMode`), not an
+ * OpenAPI enum. Narrowed here with the same `Omit` + re-add pattern as
+ * `LlmCredential.validation_error` above.
+ *
+ * There is deliberately NO numeric `id` field on this type: `LlmModelResource`
+ * (`api/app/Http/Resources/LlmModelResource.php`) does not serialize one —
+ * `key` (the vendor's own model id, design D1's natural key) is the only
+ * identifier this endpoint exposes. `LlmModelPicker` is built around `key` for
+ * exactly this reason; see the PR P8 apply-progress "Deviations" section for
+ * the read-surface gap this leaves in `AvatarTemplateForm`'s binding wiring.
+ */
+export type LlmModelCapability = 'text' | 'native_duplex'
+
+/** Derived server-side from `capability` (design D1: "there is no `mode` column"). */
+export type LlmModelMode = 'managed' | 'native_duplex'
+
+type GeneratedLlmModel = components['schemas']['LlmModelResource']
+
+export type LlmModel = Omit<GeneratedLlmModel, 'capability' | 'mode'> & {
+  capability: LlmModelCapability
+  mode: LlmModelMode
+}
+
+export interface LlmModelListResponse {
+  data: LlmModel[]
+}

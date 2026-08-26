@@ -437,6 +437,46 @@
         "state": "Stato",
         "actions": "Azioni"
       }
+    },
+    "llmCredentials": {
+      "new": "Nuova credenziale",
+      "name": "Nome",
+      "nameRequired": "Inserisci un nome per questa credenziale.",
+      "vendorNote": "Fornitore: Google (Gemini). Il supporto per altri fornitori comparirà qui non appena disponibile.",
+      "apiKey": "Chiave API",
+      "apiKeyRequired": "Inserisci una chiave API.",
+      "create": "Crea credenziale",
+      "createError": "Non è stato possibile creare questa credenziale. Controlla i campi evidenziati.",
+      "empty": "Nessuna credenziale per il modello di conversazione ancora presente.",
+      "rotate": "Ruota",
+      "rotateTitle": "Ruota la chiave di questa credenziale",
+      "rotateNewKey": "Nuova chiave API",
+      "rotateSubmit": "Ruota chiave",
+      "rotateSuccess": "La chiave è stata ruotata correttamente.",
+      "rotateError": "Non è stato possibile ruotare questa chiave. Controlla il campo evidenziato.",
+      "remove": "Rimuovi",
+      "confirmRemoveTitle": "Rimuovere questa credenziale?",
+      "confirmRemoveDescription": "I template che usano questa credenziale avranno bisogno di una nuova credenziale collegata prima di poter sincronizzare di nuovo. Questa azione non può essere annullata.",
+      "removeConflict": "In uso dai seguenti template — scollegali prima di rimuoverla:",
+      "vendor": {
+        "google": "Google (Gemini)"
+      },
+      "status": {
+        "verified": "Verificata",
+        "unknown": "Richiede attenzione"
+      },
+      "error": {
+        "invalidKey": "Questa chiave è stata rifiutata dal fornitore. Controllala e riprova.",
+        "rateLimited": "Salvata, ma al momento il fornitore sta limitando le verifiche. Verrà ritentata automaticamente al prossimo utilizzo.",
+        "unreachable": "Salvata, ma non è stato possibile raggiungere il fornitore per verificarla. Verrà ritentata automaticamente al prossimo utilizzo."
+      },
+      "table": {
+        "name": "Nome",
+        "vendor": "Fornitore",
+        "key": "Chiave",
+        "status": "Stato",
+        "actions": "Azioni"
+      }
     }
   },
   "users": {
@@ -624,6 +664,27 @@
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
       }
     },
+    "llm": {
+      "section": "Modello di conversazione",
+      "picker": {
+        "label": "Modello",
+        "none": "Predefinito del fornitore (nessun modello associato)",
+        "groupManaged": "Testo (gestito)",
+        "groupLive": "Live — in arrivo",
+        "withdrawn": "non più disponibile"
+      },
+      "credential": {
+        "label": "Credenziale API",
+        "none": "Nessuna credenziale selezionata"
+      },
+      "explainer": {
+        "managedScope": "In modalità gestita, il fornitore dell'avatar continua a occuparsi di riconoscimento vocale, sintesi vocale e gestione dei turni di conversazione: viene sostituito solo il modello di ragionamento.",
+        "costUnavailable": "L'utilizzo effettivo dei token non è mostrato qui: il fornitore chiama Google direttamente per conto di BEAI, quindi BEAI non riceve mai un resoconto di utilizzo da misurare."
+      },
+      "badge": {
+        "unbound": "Nessun modello associato — in uso il valore predefinito del fornitore"
+      }
+    },
     "error": {
       "load_title": "Impossibile caricare i template",
       "load_body": "Riprova. Se il problema persiste, controlla di avere il ruolo di amministratore.",
@@ -633,6 +694,12 @@
         "range": "Questo valore è fuori dall'intervallo consentito.",
         "enum": "Questo valore non è tra le opzioni consentite.",
         "unknown": "Questa impostazione non esiste per il servizio selezionato."
+      },
+      "llm": {
+        "mode_unsupported": "Questo modello non supporta ancora la modalità gestita.",
+        "model_unavailable": "Questo modello non è più disponibile. Selezionane un altro.",
+        "credential_not_found": "Questa credenziale non può essere utilizzata. Selezionane un'altra.",
+        "vendor_mismatch": "Questa credenziale non corrisponde al fornitore del modello selezionato."
       }
     },
     "warning": {

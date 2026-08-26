@@ -437,6 +437,46 @@
         "state": "State",
         "actions": "Actions"
       }
+    },
+    "llmCredentials": {
+      "new": "New credential",
+      "name": "Name",
+      "nameRequired": "Enter a name for this credential.",
+      "vendorNote": "Vendor: Google (Gemini). Support for additional vendors will appear here when available.",
+      "apiKey": "API key",
+      "apiKeyRequired": "Enter an API key.",
+      "create": "Create credential",
+      "createError": "This credential could not be created. Please review the highlighted fields.",
+      "empty": "No conversation-LLM credentials yet.",
+      "rotate": "Rotate",
+      "rotateTitle": "Rotate this credential's key",
+      "rotateNewKey": "New API key",
+      "rotateSubmit": "Rotate key",
+      "rotateSuccess": "The key was rotated successfully.",
+      "rotateError": "This key could not be rotated. Please review the highlighted field.",
+      "remove": "Remove",
+      "confirmRemoveTitle": "Remove this credential?",
+      "confirmRemoveDescription": "Templates using this credential will need a new one bound before they can sync again. This cannot be undone.",
+      "removeConflict": "Used by the following templates — unbind them first:",
+      "vendor": {
+        "google": "Google (Gemini)"
+      },
+      "status": {
+        "verified": "Verified",
+        "unknown": "Needs attention"
+      },
+      "error": {
+        "invalidKey": "This key was rejected by the provider. Check it and try again.",
+        "rateLimited": "Stored, but the provider is currently rate-limiting verification. It will be retried automatically on next use.",
+        "unreachable": "Stored, but the provider could not be reached to verify it. It will be retried automatically on next use."
+      },
+      "table": {
+        "name": "Name",
+        "vendor": "Vendor",
+        "key": "Key",
+        "status": "Status",
+        "actions": "Actions"
+      }
     }
   },
   "users": {

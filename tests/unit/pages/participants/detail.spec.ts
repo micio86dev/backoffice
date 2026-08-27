@@ -9,6 +9,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
+// The BARS report's glossary tips are reka-ui tooltips, and `TooltipRoot`
+// THROWS without a provider ancestor. In the running app that provider is
+// mounted once, application-wide, by SidebarProvider inside
+// layouts/default.vue — which a page spec mounts outside of, so the spec has
+// to stand in for the layout.
+import { withTooltipProvider } from '../../support/tooltip-host'
 
 const tMock = (key: string) => key
 
@@ -174,7 +180,7 @@ describe('pages/participants/[id].vue', () => {
     }))
 
     const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-    const wrapper = mount(DetailPage, {
+    const wrapper = mount(withTooltipProvider(DetailPage), {
       global: {
         mocks: { $t: tMock },
         stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -298,7 +304,7 @@ describe('pages/participants/[id].vue', () => {
     }))
 
     const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-    const wrapper = mount(DetailPage, {
+    const wrapper = mount(withTooltipProvider(DetailPage), {
       global: {
         mocks: { $t: tMock },
         stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -321,7 +327,7 @@ describe('pages/participants/[id].vue', () => {
     }))
 
     const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-    const wrapper = mount(DetailPage, {
+    const wrapper = mount(withTooltipProvider(DetailPage), {
       global: {
         mocks: { $t: tMock },
         stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -342,7 +348,7 @@ describe('pages/participants/[id].vue', () => {
     }))
 
     const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-    const wrapper = mount(DetailPage, {
+    const wrapper = mount(withTooltipProvider(DetailPage), {
       global: {
         mocks: { $t: tMock },
         stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -368,7 +374,7 @@ describe('pages/participants/[id].vue', () => {
     }))
 
     const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-    mount(DetailPage, {
+    mount(withTooltipProvider(DetailPage), {
       global: {
         mocks: { $t: tMock },
         stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -401,7 +407,7 @@ describe('pages/participants/[id].vue', () => {
       }))
 
       const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-      const wrapper = mount(DetailPage, {
+      const wrapper = mount(withTooltipProvider(DetailPage), {
         global: {
           mocks: { $t: tMock },
           stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -505,7 +511,7 @@ describe('pages/participants/[id].vue', () => {
       }))
 
       const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-      const wrapper = mount(DetailPage, {
+      const wrapper = mount(withTooltipProvider(DetailPage), {
         global: {
           mocks: { $t: tMock },
           stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
@@ -606,7 +612,7 @@ describe('pages/participants/[id].vue', () => {
         }))
 
         const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
-        const wrapper = mount(DetailPage, {
+        const wrapper = mount(withTooltipProvider(DetailPage), {
           global: {
             mocks: { $t: tMock },
             stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },

@@ -1,5 +1,12 @@
 {
   "welcome": "Benvenuto",
+  "common": {
+    "action": {
+      "save": "Salva",
+      "cancel": "Annulla",
+      "close": "Chiudi"
+    }
+  },
   "login": {
     "title": "Accedi",
     "subtitle": "Accedi al pannello amministrativo BEAI",
@@ -321,8 +328,21 @@
       "indicators": "Indicatori"
     },
     "excerpts": {
-      "title": "Estratti (testuali dalla trascrizione)",
       "empty": "Nessun estratto disponibile per questo indicatore"
+    },
+    "help": {
+      "trigger": "Spiega «{term}»"
+    },
+    "glossary": {
+      "label": "Parole usate in questo report:"
+    },
+    "evidence": {
+      "title": "Le evidenze dietro ogni punteggio",
+      "intro": "Una riga per indicatore, nello stesso ordine dei punteggi della competenza nella tabella qui sopra. Apri una riga per leggere perché è stato assegnato quel punteggio e le parole del candidato su cui si basa.",
+      "explanation": "Perché questo punteggio",
+      "noIndicators": "Questa competenza non ha indicatori da mostrare.",
+      "expandAll": "Espandi tutto",
+      "collapseAll": "Comprimi tutto"
     },
     "states": {
       "loading": "Caricamento del report di valutazione…",
@@ -870,11 +890,19 @@
       },
       "bars": {
         "term": "BARS",
-        "definition": "Scala di valutazione ancorata a comportamenti. Ogni risposta viene confrontata con comportamenti di riferimento scritti e valutata 1, 3 o 5 — mai un valore intermedio."
+        "definition": "Scala di valutazione ancorata a comportamenti. Ogni risposta viene confrontata con comportamenti di riferimento scritti e valutata da 1 a 5: 1, 3 e 5 sono le ancore scritte, mentre 2 e 4 si usano quando l'evidenza non corrisponde a nessuna delle due ancore che la delimitano. Un indicatore privo di evidenze valutabili non riceve alcun punteggio ed è escluso dalla media."
       },
       "competency": {
         "term": "Competenza",
         "definition": "Una capacità valutata. Il punteggio è la media degli indicatori che è stato possibile valutare."
+      },
+      "indicator": {
+        "term": "Indicatore",
+        "definition": "Un comportamento osservabile che compone una competenza. Ogni indicatore è valutato sulle proprie evidenze, e il punteggio della competenza è la media degli indicatori che è stato possibile valutare."
+      },
+      "excerpt": {
+        "term": "Estratto",
+        "definition": "Un passaggio ripreso parola per parola dalla trascrizione. È l'evidenza su cui poggia il punteggio di un indicatore: viene verificata sulla trascrizione e non viene mai riscritta né riassunta."
       },
       "reliability": {
         "term": "Affidabilità",

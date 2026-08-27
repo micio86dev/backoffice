@@ -41,6 +41,23 @@ const COVERAGE_KEY_PATHS = [
   'projects.table.uncoveredCompetencies',
 ] as const
 
+// Evaluation-report clarity: the glossary tips above the grid and the
+// indicator/score/evidence accordion that replaced the flat excerpts block.
+const REPORT_CLARITY_KEY_PATHS = [
+  'help.glossary.indicator.term',
+  'help.glossary.indicator.definition',
+  'help.glossary.excerpt.term',
+  'help.glossary.excerpt.definition',
+  'report.help.trigger',
+  'report.glossary.label',
+  'report.evidence.title',
+  'report.evidence.intro',
+  'report.evidence.explanation',
+  'report.evidence.noIndicators',
+  'report.evidence.expandAll',
+  'report.evidence.collapseAll',
+] as const
+
 function get(obj: unknown, path: string): unknown {
   return path
     .split('.')
@@ -86,5 +103,46 @@ describe('form help text — locale key parity', () => {
     expect(get(IT, path)).not.toBe('')
     expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
     expect(get(EN, path)).not.toBe('')
+  })
+
+  it.each(REPORT_CLARITY_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
+  })
+})
+
+/**
+ * `help.glossary.bars.definition` shipped a false statement: that a BARS
+ * answer is "scored 1, 3 or 5 — never a value in between". The product scores
+ * on {1,2,3,4,5} ∪ {-1}; 2 and 4 are RESIDUAL levels, legal whenever the
+ * evidence matches neither bounding anchor (CLAUDE.md, DESIGN.md §8.3), and
+ * -1 means unassessable and is excluded from the competency mean.
+ *
+ * That string is now surfaced in a tooltip on the report itself, next to the
+ * chips that visibly contradict it — so the lie had to go before it got a more
+ * prominent home. These tests keep it gone.
+ */
+describe('help.glossary.bars.definition describes the real 1–5 scale', () => {
+  const definition = (locale: unknown) => String(get(locale, 'help.glossary.bars.definition'))
+
+  it('no longer claims 1, 3 and 5 are the only possible scores', () => {
+    expect(definition(EN)).not.toMatch(/1,\s*3\s*or\s*5/i)
+    expect(definition(IT)).not.toMatch(/1,\s*3\s*o\s*5/i)
+    expect(definition(EN)).not.toMatch(/never a value in between/i)
+    expect(definition(IT)).not.toMatch(/mai un valore intermedio/i)
+  })
+
+  it('accounts for the residual levels 2 and 4', () => {
+    for (const locale of [EN, IT]) {
+      expect(definition(locale)).toMatch(/\b2\b/)
+      expect(definition(locale)).toMatch(/\b4\b/)
+    }
+  })
+
+  it('says an unassessable indicator is left out of the average', () => {
+    expect(definition(EN)).toMatch(/average/i)
+    expect(definition(IT)).toMatch(/media/i)
   })
 })

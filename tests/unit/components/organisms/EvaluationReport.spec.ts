@@ -19,6 +19,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import EvaluationReport from '../../../../app/components/organisms/EvaluationReport.vue'
+import { withTooltipProvider } from '../../support/tooltip-host'
 import type {
   EvaluationReportData,
   EvaluationScoringMeta,
@@ -79,8 +80,10 @@ function mountReport(
   locale: string = 'en',
   meta: EvaluationScoringMeta = SCORING_META
 ) {
-  return mount(EvaluationReport, {
-    props: { evaluation, locale, meta },
+  // The glossary tips are reka-ui tooltips; in the app the provider is mounted
+  // once by SidebarProvider in layouts/default.vue, so a spec that mounts this
+  // organism on its own has to supply it.
+  return mount(withTooltipProvider(EvaluationReport, { evaluation, locale, meta }), {
     global: { mocks: { $t: tMock } },
   })
 }
@@ -105,8 +108,16 @@ describe('EvaluationReport', () => {
     expect(wrapper.text()).toContain('report.chip.unassessable')
   })
 
-  it('renders verbatim excerpts for the assessed indicators, monospace', () => {
+  it('names every indicator up front, and reveals its verbatim excerpt on request', async () => {
     const wrapper = mountReport(SLF_FIXTURE)
+
+    // Collapsed, the report reads as a summary: indicator text and its score
+    // chip, no wall of transcript.
+    expect(wrapper.text()).toContain('Describe products and services accurately')
+    expect(wrapper.text()).not.toContain('Durante un pranzo tra colleghi ho dovuto...')
+
+    await wrapper.findAll('[data-slot="accordion-trigger"]')[0]!.trigger('click')
+
     expect(wrapper.text()).toContain('Durante un pranzo tra colleghi ho dovuto...')
     expect(wrapper.find('.font-mono').exists()).toBe(true)
   })
@@ -121,6 +132,49 @@ describe('EvaluationReport', () => {
     expect(tableText).toContain('STG')
     expect(tableText).toContain('–')
     expect(tableText).not.toMatch(/\b0\b/)
+  })
+})
+
+describe('EvaluationReport — the grid stays pixel-stable', () => {
+  /**
+   * `tests/e2e/admin-flow.spec.ts` screenshots `getByRole('table')` against
+   * FOUR committed baselines (chromium/webkit × darwin/linux). Anything drawn
+   * INSIDE the table's box invalidates all four, and only two of them can be
+   * regenerated on a developer machine — the linux pair belongs to CI. The
+   * glossary and the evidence accordion are therefore siblings of the table,
+   * never children of it. These tests are the guard rail that says so.
+   */
+  it('keeps the glossary tips outside the <table>', () => {
+    const wrapper = mountReport(SLF_FIXTURE)
+
+    expect(wrapper.text()).toContain('help.glossary.indicator.term')
+    expect(wrapper.find('table').text()).not.toContain('help.glossary.indicator.term')
+    expect(wrapper.find('table').findAll('button')).toHaveLength(0)
+  })
+
+  it('keeps the evidence accordion outside the <table>', () => {
+    const wrapper = mountReport(SLF_FIXTURE)
+
+    expect(wrapper.findAll('[data-slot="accordion-trigger"]').length).toBeGreaterThan(0)
+    expect(wrapper.find('table').findAll('[data-slot="accordion-trigger"]')).toHaveLength(0)
+  })
+
+  it('leaves the table cells exactly as the baseline captured them', () => {
+    const cells = mountReport(SLF_FIXTURE)
+      .find('table')
+      .findAll('th, td')
+      .map((cell) => cell.text().replace(/\s+/g, ' '))
+
+    expect(cells).toEqual([
+      'report.table.competency',
+      'report.table.mean',
+      'report.table.reliability',
+      'report.table.indicators',
+      'SLF',
+      '4.0',
+      'report.reliability: 67%',
+      '5report.chip.high3report.chip.mid–report.chip.unassessable',
+    ])
   })
 })
 

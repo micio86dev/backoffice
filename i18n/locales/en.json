@@ -1,5 +1,12 @@
 {
   "welcome": "Welcome",
+  "common": {
+    "action": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close"
+    }
+  },
   "login": {
     "title": "Sign in",
     "subtitle": "Sign in to the BEAI admin panel",
@@ -321,8 +328,21 @@
       "indicators": "Indicators"
     },
     "excerpts": {
-      "title": "Excerpts (verbatim from transcript)",
       "empty": "No excerpts available for this indicator"
+    },
+    "help": {
+      "trigger": "Explain “{term}”"
+    },
+    "glossary": {
+      "label": "Words used in this report:"
+    },
+    "evidence": {
+      "title": "Evidence behind each score",
+      "intro": "One row per indicator, in the same order as that competency's scores in the table above. Open a row to read why the score was given and the candidate's own words behind it.",
+      "explanation": "Why this score",
+      "noIndicators": "This competency has no indicators to show.",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all"
     },
     "states": {
       "loading": "Loading the evaluation report…",
@@ -870,11 +890,19 @@
       },
       "bars": {
         "term": "BARS",
-        "definition": "Behaviourally Anchored Rating Scale. Each answer is matched against written reference behaviours and scored 1, 3 or 5 — never a value in between."
+        "definition": "Behaviourally Anchored Rating Scale. Each answer is compared with written reference behaviours and scored from 1 to 5: 1, 3 and 5 are the written anchors, while 2 and 4 are used when the evidence matches neither of the two anchors around it. An indicator with no assessable evidence gets no score at all and is left out of the average."
       },
       "competency": {
         "term": "Competency",
         "definition": "One assessed capability. Its score is the average of the indicators that could actually be scored."
+      },
+      "indicator": {
+        "term": "Indicator",
+        "definition": "One observable behaviour that makes up a competency. Each indicator is scored on its own evidence, and the competency score is the average of the indicators that could be scored."
+      },
+      "excerpt": {
+        "term": "Excerpt",
+        "definition": "A passage taken word for word from the transcript. It is the evidence an indicator's score rests on, checked against the transcript and never rewritten or summarised."
       },
       "reliability": {
         "term": "Reliability",

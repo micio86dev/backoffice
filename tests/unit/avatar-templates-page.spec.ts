@@ -428,7 +428,7 @@ describe('AvatarTemplatesPage', () => {
     await waitForTestId('template-form')
 
     const cancelButton = document.body.querySelector<HTMLButtonElement>(
-      '[data-testid="template-cancel"]'
+      '[data-testid="form-drawer-cancel"]'
     )
     cancelButton!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -461,7 +461,7 @@ describe('AvatarTemplatesPage', () => {
   })
 
   // The footer's Save/Cancel controls must stay reachable without scrolling
-  // — the exact defect pages/projects/index.vue's Dialog comment documents,
+  // — the exact defect the project form's old centred Dialog carried,
   // and the reason FormDrawer exists as a shared wrapper rather than each
   // page hand-rolling its own Sheet usage.
   it('keeps the footer actions outside the scrolling region', async () => {
@@ -471,7 +471,7 @@ describe('AvatarTemplatesPage', () => {
     await waitForTestId('template-form')
 
     const scrollRegion = document.body.querySelector('.overflow-y-auto')
-    const saveButton = document.body.querySelector('[data-testid="template-save"]')
+    const saveButton = document.body.querySelector('[data-testid="form-drawer-save"]')
 
     expect(scrollRegion).not.toBeNull()
     expect(saveButton).not.toBeNull()

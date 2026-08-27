@@ -1,5 +1,10 @@
 <template>
-  <form data-testid="project-form" novalidate @submit.prevent="onSubmit">
+  <!--
+    `id` is load-bearing, not decoration (feature/form-drawer): the submit
+    control lives in FormDrawer's non-scrolling footer, OUTSIDE this element,
+    and `<button form="project-form">` is what connects the two.
+  -->
+  <form id="project-form" data-testid="project-form" novalidate @submit.prevent="onSubmit">
     <FieldGroup>
       <Field :data-invalid="Boolean(errors.name)">
         <FieldLabel for="project-form-name">{{ $t('projects.form.name') }}</FieldLabel>
@@ -307,18 +312,15 @@
         <AlertDescription>{{ formMessage.text }}</AlertDescription>
       </Alert>
 
-      <div class="flex items-center gap-2">
-        <Button type="submit" :disabled="saving" data-testid="project-form-submit">
-          {{ saving ? $t('projects.action.save') : $t('projects.action.save') }}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          data-testid="project-form-cancel"
-          @click="$emit('close')"
-        >
-          {{ $t('projects.action.cancel') }}
-        </Button>
+      <!--
+        Save and Cancel are NOT here — they live in FormDrawer's footer, where
+        a form this long cannot scroll them out of reach (feature/form-drawer).
+        Activate and Archive stay: they are lifecycle transitions on the
+        record, applied immediately and independently of whether the draft in
+        this form has been saved, so grouping them with the form's own submit
+        would misrepresent what they do.
+      -->
+      <div v-if="nextTransition !== null" class="flex items-center gap-2">
         <Button
           v-if="nextTransition === 'active'"
           type="button"
@@ -414,7 +416,16 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'close' | 'saved'): void
+  (e: 'saved'): void
+  /**
+   * feature/form-drawer. This form owns its own persistence (and therefore its
+   * own in-flight flag), but the submit control it belongs to now lives in the
+   * drawer footer above it. Publishing the flag is what lets the shared footer
+   * disable that control — the alternative, lifting `createProject`/
+   * `updateProject` up to the page, would dismantle the self-contained shape
+   * D9 chose deliberately.
+   */
+  (e: 'update:pending', value: boolean): void
 }>()
 
 const { createProject, updateProject } = useProjects()
@@ -440,6 +451,12 @@ const webhookUrl = ref(props.project?.webhook_url ?? '')
 const webhookSecret = ref<string | undefined>(undefined)
 
 const saving = ref(false)
+
+// Published rather than watched from the outside, and `immediate` so a drawer
+// that mounts mid-flight (or after a previous failed submit) starts from the
+// truth rather than from its own default.
+watch(saving, (value) => emit('update:pending', value), { immediate: true })
+
 // D7: a single boolean is sufficient here (unlike the nullable-ref contract
 // for row-scoped targets elsewhere) — archive acts on `props.project`
 // itself, there is no "which row" to carry.

@@ -13,18 +13,32 @@
 
       <!--
         The scroll region is its OWN flex item (flex-1 + overflow-y-auto),
-        siblings of the header/footer rather than a parent of them. This is
-        the fix for the defect pages/projects/index.vue's Dialog comment
-        documents: a long form growing past the viewport must never take its
-        submit button down with it — the footer below is a SIBLING, never a
-        descendant, of this element.
+        sibling to the header/footer rather than a parent of them. This is the
+        fix for the defect the project form's old centred Dialog carried (it
+        needed a `max-h-[85vh]` cap to hold it off): a long form growing past
+        the viewport must never take its submit button down with it — the
+        footer below is a SIBLING, never a descendant, of this element.
       -->
       <div class="flex-1 overflow-y-auto px-4 py-4">
         <slot />
       </div>
 
+      <!--
+        The default footer IS the standard: a drawer that names the form it
+        drives gets the shared submit/cancel pair with no markup of its own.
+        The `footer` slot stays available for the rare call site that needs
+        something else, and overrides the default when supplied.
+      -->
       <SheetFooter class="shrink-0 flex-row justify-end gap-2 border-t border-border">
-        <slot name="footer" />
+        <slot name="footer">
+          <FormDrawerActions
+            v-if="formId"
+            :form-id="formId"
+            :pending="pending"
+            :submit-label="submitLabel"
+            @cancel="emit('update:open', false)"
+          />
+        </slot>
       </SheetFooter>
     </SheetContent>
   </Sheet>
@@ -43,10 +57,13 @@
  * What this wrapper adds on top of the bare primitive:
  *   - a width that fits a two-column form (`Sheet`'s own default,
  *     `sm:max-w-sm`/384px, is a mobile-menu width, not a form width),
- *   - a footer region that never scrolls out of reach — the exact defect
- *     `pages/projects/index.vue`'s Dialog usage documents: a long form
- *     growing past the viewport took its submit button with it, and E2E
- *     caught it as a click that retried until it timed out,
+ *   - a footer region that never scrolls out of reach — the exact defect the
+ *     project form's old centred Dialog carried: a long form growing past the
+ *     viewport took its submit button with it, and E2E caught it as a click
+ *     that retried until it timed out,
+ *   - a DEFAULT footer (`FormDrawerActions`) so a new CRUD form costs a
+ *     `form-id` prop and an `id` on its `<form>` rather than another
+ *     hand-copied submit/cancel pair,
  *   - `SheetTitle`/`SheetDescription` wiring so reka-ui's own
  *     `aria-labelledby`/`aria-describedby` machinery always has a real
  *     target, or is explicitly suppressed rather than left dangling,
@@ -63,11 +80,22 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import FormDrawerActions from './FormDrawerActions.vue'
 
 const props = defineProps<{
   open: boolean
   title: string
   description?: string
+  /**
+   * The `id` of the `<form>` inside the default slot. Supplying it opts the
+   * drawer into the standard footer (submit + cancel); omitting it leaves the
+   * footer to the `footer` slot.
+   */
+  formId?: string
+  /** True while the submit request is in flight — disables the submit control. */
+  pending?: boolean
+  /** Overrides the shared "Save" verb on the default footer's submit control. */
+  submitLabel?: string
 }>()
 
 const emit = defineEmits<{

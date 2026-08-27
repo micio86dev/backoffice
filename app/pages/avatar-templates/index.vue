@@ -105,13 +105,15 @@
       Right-side drawer, not a sibling below the list (feature/form-drawer):
       the form has up to 15 generated fields plus 3 static ones plus the LLM
       binding section, and FormDrawer's own height cap + internal scroll is
-      what keeps its footer actions reachable — the defect documented on
-      pages/projects/index.vue's Dialog usage, which this one form is longer
-      than.
+      what keeps its footer actions reachable — the defect the project form's
+      old centred Dialog carried, which this one form is longer than. Every
+      CRUD form in the backoffice now goes through this same wrapper.
     -->
     <FormDrawer
       :open="editing !== null"
       :title="formTitle"
+      form-id="template-form"
+      :pending="saving"
       @update:open="(open) => !open && (editing = null)"
     >
       <AvatarTemplateForm
@@ -123,27 +125,6 @@
         data-testid="template-form"
         @submit="save"
       />
-
-      <template #footer>
-        <!--
-          The `form="template-form"` attribute submits AvatarTemplateForm's
-          markup from OUTSIDE it — this button lives in FormDrawer's
-          non-scrolling footer region while the form markup itself is inside
-          the scrolling body, and this native HTML attribute is what connects
-          them without any ref plumbing.
-        -->
-        <Button type="submit" form="template-form" data-testid="template-save" :disabled="saving">
-          {{ $t('avatar_templates.action.save') }}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          data-testid="template-cancel"
-          @click="editing = null"
-        >
-          {{ $t('avatar_templates.action.cancel') }}
-        </Button>
-      </template>
     </FormDrawer>
 
     <!--
@@ -189,7 +170,6 @@ import { useCurrentUser } from '@/composables/useCurrentUser'
  */
 import { computed, onMounted, ref } from 'vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
 import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'

@@ -54,65 +54,78 @@
       </TableBody>
     </Table>
 
-    <Dialog :open="creating" @update:open="(open) => !open && (creating = false)">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{{ $t('settings.apiKeys.new') }}</DialogTitle>
-        </DialogHeader>
-        <form data-testid="api-key-form" novalidate @submit.prevent="onCreate">
-          <FieldGroup>
-            <Field :data-invalid="Boolean(errors.name)">
-              <FieldLabel for="api-key-form-name">{{ $t('settings.apiKeys.name') }}</FieldLabel>
-              <Input
-                id="api-key-form-name"
-                v-model="name"
-                autocomplete="off"
-                :aria-invalid="Boolean(errors.name)"
-                :aria-describedby="nameDescribedBy"
-                data-testid="api-key-form-name"
-              />
-              <FieldDescription id="api-key-form-name-help">
-                {{ $t('settings.apiKeys.help.name') }}
-              </FieldDescription>
-              <FieldError
-                v-if="errors.name"
-                id="api-key-form-name-error"
-                data-testid="api-key-form-name-error"
-                >{{ errors.name }}</FieldError
-              >
-            </Field>
-            <!--
+    <!--
+      Right-side drawer, not a centred dialog (feature/form-drawer): the
+      create-key FORM is a record-creating form launched from a list, which is
+      the drawer case. The raw-key reveal below deliberately stays a Dialog —
+      see its own comment.
+
+      `id` is load-bearing, not decoration: the submit control lives in the
+      drawer's non-scrolling footer, OUTSIDE this form, and
+      `<button form="api-key-form">` is what connects the two.
+    -->
+    <FormDrawer
+      :open="creating"
+      :title="$t('settings.apiKeys.new')"
+      form-id="api-key-form"
+      :pending="creatingKey"
+      :submit-label="$t('settings.apiKeys.create')"
+      @update:open="(open) => !open && (creating = false)"
+    >
+      <form id="api-key-form" data-testid="api-key-form" novalidate @submit.prevent="onCreate">
+        <FieldGroup>
+          <Field :data-invalid="Boolean(errors.name)">
+            <FieldLabel for="api-key-form-name">{{ $t('settings.apiKeys.name') }}</FieldLabel>
+            <Input
+              id="api-key-form-name"
+              v-model="name"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.name)"
+              :aria-describedby="nameDescribedBy"
+              data-testid="api-key-form-name"
+            />
+            <FieldDescription id="api-key-form-name-help">
+              {{ $t('settings.apiKeys.help.name') }}
+            </FieldDescription>
+            <FieldError
+              v-if="errors.name"
+              id="api-key-form-name-error"
+              data-testid="api-key-form-name-error"
+              >{{ errors.name }}</FieldError
+            >
+          </Field>
+          <!--
               Abilities are a CLOSED set validated server-side against
               config/m2m_abilities.php; a free-text field made every key
               creation a guessing game against names the operator has no way
               to know, and any typo came back as an opaque 422. A checkbox
               group makes the whole grant surface visible and unguessable-wrong.
             -->
-            <FieldSet
-              :data-invalid="Boolean(errors.abilities)"
-              :aria-invalid="errors.abilities ? 'true' : undefined"
-              :aria-describedby="errors.abilities ? 'api-key-form-abilities-error' : undefined"
-              data-testid="api-key-form-abilities"
+          <FieldSet
+            :data-invalid="Boolean(errors.abilities)"
+            :aria-invalid="errors.abilities ? 'true' : undefined"
+            :aria-describedby="errors.abilities ? 'api-key-form-abilities-error' : undefined"
+            data-testid="api-key-form-abilities"
+          >
+            <FieldLegend variant="label">{{ $t('settings.apiKeys.abilities') }}</FieldLegend>
+            <FieldDescription>{{ $t('settings.apiKeys.abilitiesDescription') }}</FieldDescription>
+            <Alert
+              v-if="abilitiesError"
+              variant="destructive"
+              data-testid="api-key-abilities-error"
             >
-              <FieldLegend variant="label">{{ $t('settings.apiKeys.abilities') }}</FieldLegend>
-              <FieldDescription>{{ $t('settings.apiKeys.abilitiesDescription') }}</FieldDescription>
-              <Alert
-                v-if="abilitiesError"
-                variant="destructive"
-                data-testid="api-key-abilities-error"
-              >
-                <AlertDescription>{{ $t('settings.apiKeys.abilitiesLoadError') }}</AlertDescription>
-              </Alert>
-              <ul
-                v-else
-                class="divide-y divide-border overflow-hidden rounded-lg border border-border"
-                :data-invalid="Boolean(errors.abilities)"
-              >
-                <li v-for="ability in abilities" :key="ability.value">
-                  <div
-                    class="flex items-center gap-3 px-3 py-2.5 transition-colors has-data-checked:bg-primary/5 hover:bg-muted"
-                  >
-                    <!--
+              <AlertDescription>{{ $t('settings.apiKeys.abilitiesLoadError') }}</AlertDescription>
+            </Alert>
+            <ul
+              v-else
+              class="divide-y divide-border overflow-hidden rounded-lg border border-border"
+              :data-invalid="Boolean(errors.abilities)"
+            >
+              <li v-for="ability in abilities" :key="ability.value">
+                <div
+                  class="flex items-center gap-3 px-3 py-2.5 transition-colors has-data-checked:bg-primary/5 hover:bg-muted"
+                >
+                  <!--
                       Deliberately `FieldTitle`, not `Label`: a <label for>
                       cannot name a reka-ui checkbox, because the primitive
                       renders a <button role="checkbox"> and a <button> is not
@@ -120,57 +133,65 @@
                       the click would ever reach it. The name is wired through
                       `aria-labelledby`, and the click is forwarded explicitly.
                     -->
-                    <Checkbox
-                      :id="`api-key-ability-${ability.id}`"
-                      :aria-labelledby="`api-key-ability-${ability.id}-label`"
-                      :model-value="selectedAbilities.includes(ability.value)"
-                      :data-testid="`api-key-ability-${ability.id}`"
-                      @update:model-value="(checked) => toggleAbility(ability.value, checked)"
-                    />
-                    <FieldTitle
-                      :id="`api-key-ability-${ability.id}-label`"
-                      class="flex flex-1 cursor-pointer items-baseline justify-between gap-3"
-                      @click="
-                        toggleAbility(ability.value, !selectedAbilities.includes(ability.value))
-                      "
-                    >
-                      <span class="text-foreground">{{ ability.label }}</span>
-                      <code class="font-mono text-xs font-normal text-muted-foreground">{{
-                        ability.value
-                      }}</code>
-                    </FieldTitle>
-                  </div>
-                </li>
-              </ul>
-              <FieldError
-                v-if="errors.abilities"
-                id="api-key-form-abilities-error"
-                data-testid="api-key-form-abilities-error"
-                >{{ errors.abilities }}</FieldError
-              >
-            </FieldSet>
-            <Alert
-              v-if="formMessage"
-              variant="destructive"
-              role="alert"
-              aria-live="polite"
-              data-testid="api-key-form-banner"
+                  <Checkbox
+                    :id="`api-key-ability-${ability.id}`"
+                    :aria-labelledby="`api-key-ability-${ability.id}-label`"
+                    :model-value="selectedAbilities.includes(ability.value)"
+                    :data-testid="`api-key-ability-${ability.id}`"
+                    @update:model-value="(checked) => toggleAbility(ability.value, checked)"
+                  />
+                  <FieldTitle
+                    :id="`api-key-ability-${ability.id}-label`"
+                    class="flex flex-1 cursor-pointer items-baseline justify-between gap-3"
+                    @click="
+                      toggleAbility(ability.value, !selectedAbilities.includes(ability.value))
+                    "
+                  >
+                    <span class="text-foreground">{{ ability.label }}</span>
+                    <code class="font-mono text-xs font-normal text-muted-foreground">{{
+                      ability.value
+                    }}</code>
+                  </FieldTitle>
+                </div>
+              </li>
+            </ul>
+            <FieldError
+              v-if="errors.abilities"
+              id="api-key-form-abilities-error"
+              data-testid="api-key-form-abilities-error"
+              >{{ errors.abilities }}</FieldError
             >
-              <AlertDescription>{{ formMessage }}</AlertDescription>
-            </Alert>
-            <Button type="submit" :disabled="creatingKey">{{
-              $t('settings.apiKeys.create')
-            }}</Button>
-          </FieldGroup>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </FieldSet>
+          <Alert
+            v-if="formMessage"
+            variant="destructive"
+            role="alert"
+            aria-live="polite"
+            data-testid="api-key-form-banner"
+          >
+            <AlertDescription>{{ formMessage }}</AlertDescription>
+          </Alert>
+          <!--
+              No submit control here — it lives in FormDrawer's non-scrolling
+              footer, wired back by this form's `id`. The banner above is the
+              last thing in the drawer's scrolling body, so it and the submit
+              control stay visible together however far the form is scrolled.
+            -->
+        </FieldGroup>
+      </form>
+    </FormDrawer>
 
     <!--
       The raw key dialog is deliberately a SEPARATE piece of state
       (`rawKeyReveal`), held only in-memory for this component's lifetime —
       never persisted, never re-derivable from a later GET (the API itself
       never returns it again).
+
+      Deliberately still a Dialog, not a FormDrawer (feature/form-drawer). This
+      is a one-time secret disclosure with a copy affordance and an
+      acknowledge control — there is nothing to fill in and nothing to submit,
+      so the form-drawer standard does not apply to it. A centred modal that
+      interrupts is the right shape for a value that can never be shown again.
     -->
     <Dialog :open="rawKeyReveal !== null" @update:open="(open) => !open && (rawKeyReveal = null)">
       <DialogContent>
@@ -241,6 +262,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import FormattedDate from '@/components/atoms/FormattedDate.vue'
 import ApiKeyStateBadge from '@/components/atoms/ApiKeyStateBadge.vue'
 import { useApiClients, type ApiClient } from '@/composables/useApiClients'

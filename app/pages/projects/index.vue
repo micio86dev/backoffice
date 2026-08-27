@@ -26,29 +26,30 @@
       @edit="onEdit"
     />
 
-    <Dialog :open="editing !== null" @update:open="(open) => !open && (editing = null)">
-      <!--
-        The height cap and internal scroll are load-bearing, not polish. The
-        project form is the longest in the product, and without them the dialog
-        grew past the viewport and took its submit button with it: the control
-        was visible, enabled and stable, and simply not reachable — E2E caught
-        it as a click that retried until it timed out. A form you cannot submit
-        is not a styling issue.
-      -->
-      <DialogContent class="flex max-h-[85vh] flex-col overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {{ editing === 'new' ? $t('projects.form.newTitle') : $t('projects.form.editTitle') }}
-          </DialogTitle>
-        </DialogHeader>
-        <ProjectForm
-          v-if="editing !== null"
-          :project="editingProject"
-          @close="editing = null"
-          @saved="onFormSaved"
-        />
-      </DialogContent>
-    </Dialog>
+    <!--
+      Right-side drawer, not a centred dialog (feature/form-drawer). The
+      Dialog this replaces needed a `max-h-[85vh]` cap plus its own internal
+      scroll because the project form — the longest in the product — otherwise
+      grew past the viewport and took its submit button with it: the control
+      was visible, enabled and stable, and simply not reachable, which E2E
+      caught as a click that retried until it timed out. FormDrawer's footer is
+      a SIBLING of the scroll region rather than a descendant, so that defect
+      is structurally impossible here instead of held off by a magic height.
+    -->
+    <FormDrawer
+      :open="editing !== null"
+      :title="editing === 'new' ? $t('projects.form.newTitle') : $t('projects.form.editTitle')"
+      form-id="project-form"
+      :pending="saving"
+      @update:open="(open) => !open && (editing = null)"
+    >
+      <ProjectForm
+        v-if="editing !== null"
+        :project="editingProject"
+        @update:pending="(value) => (saving = value)"
+        @saved="onFormSaved"
+      />
+    </FormDrawer>
   </div>
 </template>
 
@@ -57,7 +58,7 @@ import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useBarsCoverage } from '@/composables/useBarsCoverage'
@@ -107,6 +108,11 @@ const projects = ref<Project[]>([])
 
 // null = closed, 'new' = create form, number id = edit form for that project.
 const editing = ref<'new' | number | null>(null)
+
+// Mirrored from ProjectForm's own in-flight flag (feature/form-drawer). The
+// form still owns persistence; the drawer footer that holds its submit control
+// needs to know when that control must be disabled.
+const saving = ref(false)
 
 const editingProject = computed<Project | null>(() => {
   if (editing.value === null || editing.value === 'new') return null

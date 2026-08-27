@@ -107,6 +107,39 @@ interface FormFile {
   source: string
 }
 
+/**
+ * Strips only DELIMITED comment blocks — `<!-- ... -->` and `/* ... *\/`.
+ *
+ * Deliberately narrower than `stripComments` below, which also removes `//`
+ * to end-of-line: in a Vue TEMPLATE a `//` appears inside ordinary attribute
+ * values (any `https://` URL), and stripping the rest of that line could take
+ * a real `<form` tag with it. Block delimiters carry no such ambiguity.
+ */
+function stripCommentBlocks(source: string): string {
+  return source.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+/**
+ * True when the file contains a real `<form` TAG, not merely a comment that
+ * talks about one.
+ *
+ * feature/form-drawer made this distinction load-bearing: `FormDrawer.vue` and
+ * `FormDrawerActions.vue` are the shared drawer layer — they render no `<form>`
+ * of their own, they render the SUBMIT CONTROL for a form that lives elsewhere
+ * — but their docblocks necessarily explain the `<form>`/`form=""` association
+ * they exist to manage. A raw substring scan classified both as form files and
+ * demanded `novalidate` and a `FieldError` import from components that have
+ * neither a field nor a validation concern.
+ *
+ * The fix is the same one R3 already needed for the same reason (a comment
+ * merely NAMING `applyServerFieldErrors` used to satisfy it): look at live
+ * code, not at prose. Allowlisting the two files would have been strictly
+ * worse — it would leave the scanner wrong and paper over it per-file.
+ */
+function containsFormTag(source: string): boolean {
+  return stripCommentBlocks(source).includes('<form')
+}
+
 function formFiles(): FormFile[] {
   return collectVueFiles(APP_ROOT)
     .map((absolutePath) => ({
@@ -114,7 +147,7 @@ function formFiles(): FormFile[] {
       relativePath: relative(APP_ROOT, absolutePath),
       source: readFileSync(absolutePath, 'utf-8'),
     }))
-    .filter((file) => file.source.includes('<form'))
+    .filter((file) => containsFormTag(file.source))
 }
 
 function r1Violations(files: FormFile[]): string[] {
@@ -217,5 +250,40 @@ describe('the guard actually detects a violation', () => {
     expect(source).toContain('applyServerFieldErrors')
 
     expect(r3Violations([file])).toEqual([fixturePath])
+  })
+
+  // The same class of loophole as the R3 one above, in the opposite
+  // direction: a file whose ONLY `<form` is inside a comment is not a form
+  // file, and demanding `novalidate`/`FieldError` of it is a false positive,
+  // not a finding. `FormDrawerActions.vue` — a footer that renders the submit
+  // control for a form living in another component — is the real case this
+  // exists for.
+  it('does not classify a file as a form when its only <form is inside a comment', () => {
+    const commentOnly = [
+      '<template>',
+      '  <!-- Submits the <form> named by formId, from outside it. -->',
+      '  <button type="submit" :form="formId">Save</button>',
+      '</template>',
+      '<script setup lang="ts">',
+      '/** The `id` of the `<form>` this footer submits. */',
+      'defineProps<{ formId: string }>()',
+      '</script>',
+    ].join('\n')
+
+    // Sanity check on the sample itself: it DOES contain the bare substring,
+    // so a scan that only looks for that would wrongly classify it.
+    expect(commentOnly).toContain('<form')
+    expect(containsFormTag(commentOnly)).toBe(false)
+  })
+
+  it('still classifies a real form tag as a form, even alongside a comment mentioning one', () => {
+    const realForm = [
+      '<template>',
+      '  <!-- This <form> is the real one. -->',
+      '  <form novalidate><input /></form>',
+      '</template>',
+    ].join('\n')
+
+    expect(containsFormTag(realForm)).toBe(true)
   })
 })

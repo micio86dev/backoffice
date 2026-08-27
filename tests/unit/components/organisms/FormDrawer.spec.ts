@@ -163,6 +163,74 @@ describe('FormDrawer', () => {
     expect(content.className).toContain('motion-reduce:')
   })
 
+  it('renders the shared submit/cancel pair when given a form id and no footer slot', async () => {
+    // The whole point of the rollout: a sixth form supplies a `form-id` and
+    // gets the standard footer, rather than hand-copying a button pair.
+    mount(FormDrawer, {
+      props: { open: true, title: 'Test drawer', formId: 'demo-form' },
+      slots: { default: '<form id="demo-form"><input type="text" /></form>' },
+      attachTo: document.body,
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    const submit = await waitFor(
+      () => document.body.querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]'),
+      'the default footer submit control to render'
+    )
+
+    expect(submit.getAttribute('form')).toBe('demo-form')
+    expect(document.body.querySelector('[data-testid="form-drawer-cancel"]')).not.toBeNull()
+  })
+
+  it('closes the drawer when the default footer cancel is activated', async () => {
+    const wrapper = mount(FormDrawer, {
+      props: { open: true, title: 'Test drawer', formId: 'demo-form' },
+      slots: { default: '<form id="demo-form"><input type="text" /></form>' },
+      attachTo: document.body,
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    const cancel = await waitFor(
+      () => document.body.querySelector<HTMLButtonElement>('[data-testid="form-drawer-cancel"]'),
+      'the default footer cancel control to render'
+    )
+    cancel.click()
+    await flushPromises()
+
+    expect(wrapper.emitted('update:open')?.at(-1)).toEqual([false])
+  })
+
+  it('forwards pending to the default footer, so every drawer disables submit the same way', async () => {
+    mount(FormDrawer, {
+      props: { open: true, title: 'Test drawer', formId: 'demo-form', pending: true },
+      slots: { default: '<form id="demo-form"><input type="text" /></form>' },
+      attachTo: document.body,
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    const submit = await waitFor(
+      () => document.body.querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]'),
+      'the default footer submit control to render'
+    )
+
+    expect(submit.disabled).toBe(true)
+  })
+
+  it('lets an explicit footer slot win over the default pair', async () => {
+    mountDrawer({ open: true })
+    await flushPromises()
+
+    await waitFor(
+      () => document.body.querySelector('[data-testid="drawer-footer-action"]'),
+      'the explicit footer slot content to render'
+    )
+
+    expect(document.body.querySelector('[data-testid="form-drawer-save"]')).toBeNull()
+  })
+
   it('sizes the drawer wide enough for a two-column form', async () => {
     mountDrawer({ open: true })
     await flushPromises()

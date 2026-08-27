@@ -65,29 +65,59 @@
 
   <!--
     "Invite candidate" (design D4, surface B): opens a form for a candidate
-    not yet in the system. On success the dialog body swaps to
+    not yet in the system. On success the drawer body swaps to
     EntryLinkPanel — the SAME shared organism the participant-detail
     re-issue card renders, so the single-use/expiry disclosure never drifts
     between the two surfaces.
+
+    A right-side drawer, not a centred dialog (feature/form-drawer): this is a
+    create form launched from a table row. The two stages deliberately stay in
+    ONE surface rather than becoming a drawer plus a separate reveal dialog —
+    the minted link has to appear where the form was, or the operator loses
+    the thread between what they submitted and the single-use link it
+    produced. Only the FOOTER differs between the stages, which is exactly
+    what FormDrawer's `footer` slot escape hatch is for.
   -->
-  <Dialog :open="inviteTarget !== null" @update:open="(open) => !open && closeInvite()">
-    <DialogContent>
-      <DialogHeader>
-        <DialogTitle>{{ $t('entryLink.invite') }}</DialogTitle>
-      </DialogHeader>
-      <EntryLinkPanel
+  <FormDrawer
+    :open="inviteTarget !== null"
+    :title="$t('entryLink.invite')"
+    @update:open="(open) => !open && closeInvite()"
+  >
+    <EntryLinkPanel
+      v-if="mintedLink"
+      :link="mintedLink"
+      :locale="locale"
+      @generate="onRequestAnotherLink"
+    />
+    <EntryLinkForm
+      v-else-if="inviteTarget"
+      :project-id="inviteTarget.id"
+      @update:pending="(value) => (minting = value)"
+      @success="onInviteSuccess"
+    />
+
+    <template #footer>
+      <!--
+        Once the link exists there is nothing left to submit, and a Save
+        control pointing at a form no longer in the DOM would be inert.
+      -->
+      <Button
         v-if="mintedLink"
-        :link="mintedLink"
-        :locale="locale"
-        @generate="onRequestAnotherLink"
+        variant="outline"
+        data-testid="entry-link-close"
+        @click="closeInvite"
+      >
+        {{ $t('common.action.close') }}
+      </Button>
+      <FormDrawerActions
+        v-else
+        form-id="entry-link-form"
+        :pending="minting"
+        :submit-label="$t('entryLink.form.submit')"
+        @cancel="closeInvite"
       />
-      <EntryLinkForm
-        v-else-if="inviteTarget"
-        :project-id="inviteTarget.id"
-        @success="onInviteSuccess"
-      />
-    </DialogContent>
-  </Dialog>
+    </template>
+  </FormDrawer>
 </template>
 
 <script setup lang="ts">
@@ -102,7 +132,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
+import FormDrawerActions from '@/components/organisms/FormDrawerActions.vue'
 import ProjectStatusBadge from '@/components/atoms/ProjectStatusBadge.vue'
 import EntryLinkForm from '@/components/organisms/EntryLinkForm.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
@@ -151,6 +182,9 @@ function uncoveredCount(project: Project): number {
 
 const inviteTarget = ref<Project | null>(null)
 const mintedLink = ref<EntryLink | null>(null)
+// Mirrored from EntryLinkForm's own in-flight flag (feature/form-drawer): the
+// form still owns the request, the drawer footer holds its submit control.
+const minting = ref(false)
 
 function openInvite(project: Project): void {
   inviteTarget.value = project

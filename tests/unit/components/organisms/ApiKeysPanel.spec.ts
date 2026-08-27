@@ -645,4 +645,136 @@ describe('ApiKeysPanel — state badge and Revoke guard (D3)', () => {
 
     expect(wrapper.find('[data-testid="api-key-revoke-1"]').exists()).toBe(true)
   })
+
+  // feature/form-drawer — the create-key FORM moves onto the shared drawer.
+  // The raw-key reveal that follows it deliberately does NOT: it is a one-time
+  // secret disclosure with an acknowledge control, not a form, and a modal that
+  // interrupts is the right shape for something that can never be shown again.
+  describe('the create-key drawer', () => {
+    const formInDrawer = () =>
+      document.body.querySelector('[data-testid="form-drawer"] [data-testid="api-key-form"]')
+
+    async function openCreateDrawer() {
+      const wrapper = mount(ApiKeysPanel, {
+        global: { mocks: { $t: tMock } },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+      await waitFor(formInDrawer, 'the API key form to mount inside the drawer')
+
+      return wrapper
+    }
+
+    function fillName(value: string): void {
+      const input = document.body.querySelector<HTMLInputElement>(
+        '[data-testid="api-key-form-name"]'
+      )
+      input!.value = value
+      input!.dispatchEvent(new Event('input'))
+    }
+
+    function submitFromFooter(): void {
+      document.body
+        .querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    }
+
+    it('renders the create form inside the drawer', async () => {
+      const wrapper = await openCreateDrawer()
+
+      expect(formInDrawer()).not.toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('keeps the submit control out of the scrolling region', async () => {
+      const wrapper = await openCreateDrawer()
+
+      const scrollRegion = document.body.querySelector('.overflow-y-auto')
+      const submit = document.body.querySelector('[data-testid="form-drawer-save"]')
+
+      expect(submit).not.toBeNull()
+      expect(scrollRegion!.contains(submit)).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('closes the drawer and reveals the raw key on a successful create', async () => {
+      createClientMock.mockResolvedValue({ api_key: 'beai_raw_key_shown_once' })
+      const wrapper = await openCreateDrawer()
+
+      fillName('CI key')
+      document.body
+        .querySelector<HTMLElement>('[data-testid="api-key-ability-participants-read"]')
+        ?.click()
+      await flushPromises()
+      submitFromFooter()
+      await waitFor(
+        () => document.body.querySelector('[data-testid="api-key-raw-value"]'),
+        'the raw key reveal to render'
+      )
+
+      expect(createClientMock).toHaveBeenCalled()
+      expect(formInDrawer()).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('leaves the drawer OPEN with the field error visible when the create is rejected', async () => {
+      createClientMock.mockRejectedValue(
+        Object.assign(new Error('Unprocessable'), {
+          status: 422,
+          data: { errors: { name: ['That name is already in use.'] } },
+        })
+      )
+      const wrapper = await openCreateDrawer()
+
+      fillName('CI key')
+      document.body
+        .querySelector<HTMLElement>('[data-testid="api-key-ability-participants-read"]')
+        ?.click()
+      await flushPromises()
+      submitFromFooter()
+      const error = await waitFor(
+        () => document.body.querySelector('[data-testid="api-key-form-name-error"]'),
+        'the server field error to render on the name field'
+      )
+
+      expect(formInDrawer()).not.toBeNull()
+      expect(error.textContent).toContain('That name is already in use.')
+      expect(document.body.querySelector('[data-testid="api-key-raw-value"]')).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('closes on the drawer footer cancel without creating anything', async () => {
+      const wrapper = await openCreateDrawer()
+
+      const cancel = document.body.querySelector<HTMLButtonElement>(
+        '[data-testid="form-drawer-cancel"]'
+      )
+      cancel!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      cancel!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await waitFor(() => formInDrawer() === null, 'the drawer to close after cancel')
+
+      expect(createClientMock).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('closes on Escape without creating anything', async () => {
+      const wrapper = await openCreateDrawer()
+
+      formInDrawer()!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      )
+      await waitFor(() => formInDrawer() === null, 'the drawer to close after Escape')
+
+      expect(createClientMock).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+  })
 })

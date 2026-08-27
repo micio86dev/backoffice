@@ -10,6 +10,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { confirmDialog } from './support/confirm'
+import { waitFor, waitForTestId } from './support/wait-for'
 
 /**
  * The rendered text of the currently-open ConfirmDialog ONLY — never
@@ -20,6 +21,24 @@ import { confirmDialog } from './support/confirm'
  */
 function openDialogText(): string {
   return document.body.querySelector('[role="alertdialog"]')?.textContent ?? ''
+}
+
+/**
+ * feature/form-drawer: the form now renders inside FormDrawer's `Sheet`,
+ * which teleports to `document.body` via reka-ui's `DialogPortal` —
+ * `wrapper.find(...)` only searches the wrapper's own subtree and will never
+ * see it, the same teleport-aware pattern `ConfirmDialog`'s spec already
+ * proved for the confirmation dialogs on this same page.
+ */
+function templateForm(): HTMLFormElement | null {
+  return document.body.querySelector<HTMLFormElement>('[data-testid="template-form"]')
+}
+
+/** A real submit, dispatched on the teleported `<form>` directly. */
+async function submitTemplateForm(): Promise<void> {
+  const form = await waitForTestId<HTMLFormElement>('template-form')
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  await flushPromises()
 }
 
 // Echoes interpolation params so assertions can observe rendered content
@@ -305,8 +324,11 @@ describe('AvatarTemplatesPage', () => {
 
     await wrapper.find('[data-testid="template-new"]').trigger('click')
 
-    expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="template-field-name"]').attributes('value') ?? '').toBe('')
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+
+    expect(form).not.toBeNull()
+    expect(nameField?.value ?? '').toBe('')
   })
 
   it('opens the form populated when editing', async () => {
@@ -314,18 +336,22 @@ describe('AvatarTemplatesPage', () => {
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
 
-    const input = wrapper.find('[data-testid="template-field-name"]').element as HTMLInputElement
+    const form = await waitForTestId('template-form')
+    const input = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
 
-    expect(input.value).toBe('Recruiter voice')
+    expect(input?.value).toBe('Recruiter voice')
   })
 
   it('creates on submit when the template has no id', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-new"]').trigger('click')
-    await wrapper.find('[data-testid="template-field-name"]').setValue('Fresh')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+    nameField!.value = 'Fresh'
+    nameField!.dispatchEvent(new Event('input'))
+
+    await submitTemplateForm()
 
     expect(api.createTemplate).toHaveBeenCalled()
     expect(api.updateTemplate).not.toHaveBeenCalled()
@@ -335,8 +361,7 @@ describe('AvatarTemplatesPage', () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submitTemplateForm()
 
     expect(api.updateTemplate).toHaveBeenCalled()
     expect(api.createTemplate).not.toHaveBeenCalled()
@@ -361,30 +386,95 @@ describe('AvatarTemplatesPage', () => {
     })
 
     await wrapper.find('[data-testid="template-new"]').trigger('click')
-    await wrapper.find('[data-testid="template-field-name"]').setValue('Broken')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+    nameField!.value = 'Broken'
+    nameField!.dispatchEvent(new Event('input'))
 
-    // Closing the form on a validation failure would discard everything the
-    // operator typed to tell them one of the fields was wrong.
-    expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(true)
+    await submitTemplateForm()
+
+    // A failed save (422) leaves the drawer OPEN with errors visible —
+    // closing it would discard everything the operator typed to tell them
+    // one of the fields was wrong.
+    expect(templateForm()).not.toBeNull()
     // `avatarId` IS a field this page's spec renders — claimed onto its own
     // control rather than flattened into the summary.
-    expect(wrapper.find('[data-testid="template-config-avatarId-error"]').exists()).toBe(true)
+    expect(
+      document.body.querySelector('[data-testid="template-config-avatarId-error"]')
+    ).not.toBeNull()
     // `voiceSpeed` names no field this page's spec renders — an unplaceable
     // message still has to reach the operator, so it stays in the summary.
-    expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain('range')
+    const summary = document.body.querySelector('[data-testid="template-form-errors"]')
+    expect(summary?.querySelectorAll('li')).toHaveLength(1)
+    expect(summary?.textContent).toContain('range')
   })
 
   it('closes the form and reloads after a successful save', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
-    await wrapper.find('form').trigger('submit')
+    await submitTemplateForm()
+
+    expect(templateForm()).toBeNull()
+    expect(api.listTemplates).toHaveBeenCalledTimes(2)
+  })
+
+  // Non-negotiable RED spec: cancel closes the drawer and leaves the list
+  // untouched — no request fired, no reload.
+  it('closes the drawer on cancel without touching the list', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await waitForTestId('template-form')
+
+    const cancelButton = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="template-cancel"]'
+    )
+    cancelButton!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(false)
-    expect(api.listTemplates).toHaveBeenCalledTimes(2)
+    expect(templateForm()).toBeNull()
+    expect(api.updateTemplate).not.toHaveBeenCalled()
+    expect(api.listTemplates).toHaveBeenCalledTimes(1)
+  })
+
+  // Non-negotiable RED spec: Escape closes the drawer and leaves the list
+  // untouched, exactly like cancel — reka-ui's DialogContent handles Escape
+  // internally and emits update:open(false), which the page maps onto
+  // `editing = null` the same way the cancel button's click does.
+  it('closes the drawer on Escape without touching the list', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    const form = await waitForTestId('template-form')
+
+    form.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+    await flushPromises()
+    await waitFor(() => templateForm() === null, 'the drawer to close after Escape')
+
+    expect(templateForm()).toBeNull()
+    expect(api.updateTemplate).not.toHaveBeenCalled()
+    expect(api.listTemplates).toHaveBeenCalledTimes(1)
+  })
+
+  // The footer's Save/Cancel controls must stay reachable without scrolling
+  // — the exact defect pages/projects/index.vue's Dialog comment documents,
+  // and the reason FormDrawer exists as a shared wrapper rather than each
+  // page hand-rolling its own Sheet usage.
+  it('keeps the footer actions outside the scrolling region', async () => {
+    const { wrapper } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await waitForTestId('template-form')
+
+    const scrollRegion = document.body.querySelector('.overflow-y-auto')
+    const saveButton = document.body.querySelector('[data-testid="template-save"]')
+
+    expect(scrollRegion).not.toBeNull()
+    expect(saveButton).not.toBeNull()
+    expect(scrollRegion!.contains(saveButton)).toBe(false)
   })
 })

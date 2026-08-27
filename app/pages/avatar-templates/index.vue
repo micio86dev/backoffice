@@ -101,16 +101,50 @@
       </li>
     </ul>
 
-    <AvatarTemplateForm
-      v-if="editing !== null"
-      :template="editing"
-      :field-specs="fieldSpecs"
-      :saving="saving"
-      :submit-error="submitError"
-      data-testid="template-form"
-      @cancel="editing = null"
-      @submit="save"
-    />
+    <!--
+      Right-side drawer, not a sibling below the list (feature/form-drawer):
+      the form has up to 15 generated fields plus 3 static ones plus the LLM
+      binding section, and FormDrawer's own height cap + internal scroll is
+      what keeps its footer actions reachable — the defect documented on
+      pages/projects/index.vue's Dialog usage, which this one form is longer
+      than.
+    -->
+    <FormDrawer
+      :open="editing !== null"
+      :title="formTitle"
+      @update:open="(open) => !open && (editing = null)"
+    >
+      <AvatarTemplateForm
+        v-if="editing !== null"
+        :template="editing"
+        :field-specs="fieldSpecs"
+        :saving="saving"
+        :submit-error="submitError"
+        data-testid="template-form"
+        @submit="save"
+      />
+
+      <template #footer>
+        <!--
+          The `form="template-form"` attribute submits AvatarTemplateForm's
+          markup from OUTSIDE it — this button lives in FormDrawer's
+          non-scrolling footer region while the form markup itself is inside
+          the scrolling body, and this native HTML attribute is what connects
+          them without any ref plumbing.
+        -->
+        <Button type="submit" form="template-form" data-testid="template-save" :disabled="saving">
+          {{ $t('avatar_templates.action.save') }}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          data-testid="template-cancel"
+          @click="editing = null"
+        >
+          {{ $t('avatar_templates.action.cancel') }}
+        </Button>
+      </template>
+    </FormDrawer>
 
     <!--
       Activation's blast radius: the server atomically swaps the org's single
@@ -155,7 +189,9 @@ import { useCurrentUser } from '@/composables/useCurrentUser'
  */
 import { computed, onMounted, ref } from 'vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
@@ -192,6 +228,14 @@ const submitError = ref<unknown | null>(null)
 
 /** null = closed; an object with no id = creating. */
 const editing = ref<Partial<AvatarTemplate> | null>(null)
+
+// FormDrawer's own title, not AvatarTemplateForm's — the form is layout-only
+// now (feature/form-drawer) and no longer renders a heading of its own.
+const formTitle = computed(() =>
+  editing.value?.id === undefined
+    ? t('avatar_templates.form.new_title')
+    : t('avatar_templates.form.edit_title')
+)
 
 // Confirmation call-site contract (design.md D4): a single nullable ref per
 // dialog, `:open` derived from it, `@cancel` clears it and nothing else,

@@ -13,11 +13,13 @@
     </Alert>
 
     <!--
-      Vertical section rail, not a horizontal tab strip. These four sections are
+      Vertical section rail, not a horizontal tab strip. These sections are
       distinct destinations with different shapes (form, table + dialog, form,
-      table), not peer views of one dataset, and the labels run 11-28 characters
-      in Italian — a horizontal strip reflowed unpredictably and carried no
-      information scent. `orientation="vertical"` keeps the reka-ui tab
+      table, table + drawer), not peer views of one dataset, and the labels run
+      11-33 characters in Italian — a horizontal strip reflowed unpredictably
+      and carried no information scent. A rail also absorbs a fifth entry
+      without reflowing, which is why the LLM-credentials section could be
+      added here at all. `orientation="vertical"` keeps the reka-ui tab
       semantics (`role="tab"` / `role="tabpanel"` / arrow-key roving focus)
       and keeps lazy panel mounting: still no `force-mount`, so only the
       section the operator is looking at is ever in the DOM (D10).
@@ -27,7 +29,7 @@
         class="sticky top-6 w-64 shrink-0 items-stretch gap-1 rounded-none bg-transparent p-0"
       >
         <TabsTrigger
-          v-for="section in SECTIONS"
+          v-for="section in visibleSections"
           :key="section.value"
           :value="section.value"
           class="h-auto w-full flex-none items-start justify-start gap-3 whitespace-normal rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-card data-active:bg-primary/10 [&_svg]:mt-0.5 data-active:[&_svg]:text-primary [&_[data-part=label]]:text-foreground data-active:[&_[data-part=label]]:text-primary"
@@ -46,7 +48,7 @@
 
       <div class="min-w-0 flex-1">
         <TabsContent
-          v-for="section in SECTIONS"
+          v-for="section in visibleSections"
           :key="section.value"
           :value="section.value"
           class="flex flex-col gap-5"
@@ -76,11 +78,18 @@
 <script setup lang="ts">
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-import { BuildingOffice2Icon, KeyIcon, BoltIcon, UserGroupIcon } from '@heroicons/vue/24/outline'
+import {
+  BuildingOffice2Icon,
+  KeyIcon,
+  BoltIcon,
+  UserGroupIcon,
+  CpuChipIcon,
+} from '@heroicons/vue/24/outline'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
+import { useCurrentUser } from '@/composables/useCurrentUser'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -95,6 +104,9 @@ const WebhookDefaultsForm = defineAsyncComponent(
 )
 const ApiKeysPanel = defineAsyncComponent(() => import('@/components/organisms/ApiKeysPanel.vue'))
 const UsersPanel = defineAsyncComponent(() => import('@/components/organisms/UsersPanel.vue'))
+const LlmCredentialsPanel = defineAsyncComponent(
+  () => import('@/components/organisms/LlmCredentialsPanel.vue')
+)
 
 // The rail and the panel headers read from the same source, so a section can
 // never show one label in the nav and another above its content.
@@ -106,6 +118,7 @@ const SECTIONS = [
     icon: BuildingOffice2Icon,
     component: OrganizationProfileForm,
     needsOrganization: true,
+    adminOnly: false,
   },
   {
     value: 'apiKeys',
@@ -114,6 +127,7 @@ const SECTIONS = [
     icon: KeyIcon,
     component: ApiKeysPanel,
     needsOrganization: false,
+    adminOnly: false,
   },
   {
     value: 'webhooks',
@@ -122,6 +136,7 @@ const SECTIONS = [
     icon: BoltIcon,
     component: WebhookDefaultsForm,
     needsOrganization: true,
+    adminOnly: false,
   },
   {
     value: 'users',
@@ -130,6 +145,20 @@ const SECTIONS = [
     icon: UserGroupIcon,
     component: UsersPanel,
     needsOrganization: false,
+    adminOnly: false,
+  },
+  {
+    value: 'llmCredentials',
+    labelKey: 'settings.tabs.llmCredentials',
+    descriptionKey: 'settings.sectionDescription.llmCredentials',
+    icon: CpuChipIcon,
+    component: LlmCredentialsPanel,
+    needsOrganization: false,
+    // The ONLY gated section on this page. `/llm-credentials` is admin-only
+    // server-side (`LlmCredentialPolicy`), and what it manages is a
+    // decryptable vendor API key — so the client-side gate is tighter than
+    // the four ungated sections above, never looser.
+    adminOnly: true,
   },
 ] as const
 
@@ -148,6 +177,16 @@ const { fetchOrganization } = useOrganization()
 
 const organization = ref<OrganizationResponse['data'] | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
+
+// Affordance only — the server enforces (`LlmCredentialPolicy`). Starts
+// `false` and stays `false` on any failure, so a transient `/auth/me` error
+// can never hand an operator a section they are not entitled to. Same
+// fail-closed shape as `avatar-templates/index.vue`'s admin gate.
+const isAdmin = ref(false)
+
+const visibleSections = computed(() =>
+  SECTIONS.filter((section) => !section.adminOnly || isAdmin.value)
+)
 
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))
@@ -168,5 +207,14 @@ async function onSaved(): Promise<void> {
 
 onMounted(() => {
   void load()
+  void loadRoles()
 })
+
+async function loadRoles(): Promise<void> {
+  try {
+    isAdmin.value = (await useCurrentUser().ensureLoaded()).roles.includes('admin')
+  } catch {
+    isAdmin.value = false
+  }
+}
 </script>

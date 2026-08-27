@@ -347,7 +347,7 @@ import { useSessionReview, type SessionSummary } from '@/composables/useSessionR
 import { useEntryLinks } from '@/composables/useEntryLinks'
 import { useProfile } from '@/composables/useProfile'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
-import { formatDate, formatDuration } from '@/utils/format'
+import { formatDate, formatDuration, formatUsdAmount } from '@/utils/format'
 import {
   projectAccessibility,
   type ProjectAccessibilityReason,
@@ -438,7 +438,11 @@ const elapsedCoverageLabel = computed(() => {
 // find a discrepancy that was never a defect.
 const costLabel = computed(() => {
   if (!participant.value || participant.value.cost.amount === null) return '–'
-  return t('review.costValue', { usd: participant.value.cost.amount.toFixed(2) })
+  // Same formatter as SessionReviewPanel's cost lines: one copy key must
+  // not render through two different number formatters.
+  return t('review.costValue', {
+    usd: formatUsdAmount(participant.value.cost.amount, locale.value),
+  })
 })
 
 const costCoverageLabel = computed(() => {

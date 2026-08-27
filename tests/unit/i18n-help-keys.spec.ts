@@ -58,6 +58,27 @@ const REPORT_CLARITY_KEY_PATHS = [
   'report.evidence.collapseAll',
 ] as const
 
+// Conversation-LLM cost (pluggable-conversation-llm P9): the two surfaces
+// that price a session or a template, plus the glossary term they share. The
+// copy IS the safeguard here — every one of these strings exists to stop a
+// figure being read as a bill, a rate, or a zero — so a locale that forgot one
+// must fail here rather than ship a blank line where the caveat belonged.
+const LLM_COST_KEY_PATHS = [
+  'help.glossary.llmCost.term',
+  'help.glossary.llmCost.definition',
+  'review.cost.separateMeters',
+  'review.cost.avatarMeter',
+  'review.cost.llmMeter',
+  'review.cost.llmEstimated',
+  'review.cost.llmActual',
+  'review.cost.llmNotBilled',
+  'avatar_templates.llmForecastIntro',
+  'avatar_templates.llmForecast',
+  'avatar_templates.llmForecastUnavailable',
+  'settings.tabs.llmCredentials',
+  'settings.sectionDescription.llmCredentials',
+] as const
+
 function get(obj: unknown, path: string): unknown {
   return path
     .split('.')
@@ -110,6 +131,42 @@ describe('form help text — locale key parity', () => {
     expect(get(IT, path)).not.toBe('')
     expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
     expect(get(EN, path)).not.toBe('')
+  })
+
+  it.each(LLM_COST_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
+  })
+})
+
+/**
+ * The two refusals this feature exists to encode live in the COPY, not only in
+ * the components — so they are asserted against the copy.
+ *
+ * 1. No per-minute LLM rate. Input tokens grow quadratically in turn count,
+ *    so a rate is arithmetically meaningless and invites an operator to
+ *    multiply it by a session length and be confidently wrong.
+ * 2. Avatar minutes and LLM tokens are two vendors on two meters, never one
+ *    total (ratified at `SessionCostEstimator.php:20-22`).
+ */
+describe('conversation-LLM cost copy states its own caveats', () => {
+  it('the template forecast says it is a total for a reference interview, not a rate', () => {
+    expect(String(get(EN, 'avatar_templates.llmForecast'))).toMatch(/not a rate per minute/i)
+    expect(String(get(IT, 'avatar_templates.llmForecast'))).toMatch(/non una tariffa al minuto/i)
+  })
+
+  it('the session review says the two meters are never added together', () => {
+    expect(String(get(EN, 'review.cost.separateMeters'))).toMatch(/never added together/i)
+    expect(String(get(IT, 'review.cost.separateMeters'))).toMatch(/mai sommati/i)
+  })
+
+  // "Absent" and "zero" are different claims, and the copy has to say which
+  // one it is making.
+  it('the not-billed line refuses to be read as a charge of zero', () => {
+    expect(String(get(EN, 'review.cost.llmNotBilled'))).toMatch(/not a charge of zero/i)
+    expect(String(get(IT, 'review.cost.llmNotBilled'))).toMatch(/addebito pari a zero/i)
   })
 })
 

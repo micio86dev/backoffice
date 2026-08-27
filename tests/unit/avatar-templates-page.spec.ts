@@ -10,6 +10,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { confirmDialog } from './support/confirm'
+import { withTooltipProvider } from './support/tooltip-host'
 import { waitFor, waitForTestId } from './support/wait-for'
 
 /**
@@ -60,6 +61,13 @@ function template(overrides: Record<string, unknown> = {}) {
     is_active: false,
     created_at: null,
     updated_at: null,
+    llm_model_id: 3,
+    llm_credential_id: 4,
+    llm_sync_status: 'synced',
+    llm_synced_at: null,
+    // 0.30 over a 15-minute reference interview: a per-minute rate would
+    // read 0,02, so the forbidden rendering is detectable as a substring.
+    llm: { estimated_cost_usd_per_interview: { minutes: 15, turns: 60, usd: 0.3 } },
     ...overrides,
   }
 }
@@ -94,7 +102,12 @@ async function mountPage(handlers: Handlers = {}) {
   }))
 
   const Page = (await import('../../app/pages/avatar-templates/index.vue')).default
-  const wrapper = mount(Page, { global: { mocks: { $t: tMock } }, attachTo: document.body })
+  // HelpTip's TooltipRoot throws without a provider; in the app one is
+  // mounted application-wide by SidebarProvider in layouts/default.vue.
+  const wrapper = mount(withTooltipProvider(Page), {
+    global: { mocks: { $t: tMock } },
+    attachTo: document.body,
+  })
   await flushPromises()
 
   return { wrapper, api }
@@ -476,5 +489,75 @@ describe('AvatarTemplatesPage', () => {
     expect(scrollRegion).not.toBeNull()
     expect(saveButton).not.toBeNull()
     expect(scrollRegion!.contains(saveButton)).toBe(false)
+  })
+})
+
+/**
+ * Per-template conversation-LLM forecast (pluggable-conversation-llm P9).
+ *
+ * `AvatarTemplateResource.llm.estimated_cost_usd_per_interview` is a TOTAL
+ * for one reference interview, computed server-side by the same estimator the
+ * real `/end` write uses. The two rules that bind this surface:
+ *
+ * - It is never expressed per minute. Input tokens grow QUADRATICALLY in turn
+ *   count (the whole conversation is re-sent every turn), so a rate misstates
+ *   cost at any other interview length and invites an operator to multiply.
+ * - `null` means no usable model binding, and must read as "not forecastable",
+ *   never as a forecast of zero.
+ */
+describe('AvatarTemplatesPage — conversation-LLM forecast', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    tMock.mockClear()
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, locale: ref('it') }))
+    )
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('states the forecast as a total for a named reference interview', async () => {
+    const { wrapper } = await mountPage()
+
+    const line = wrapper.get('[data-testid="template-llm-forecast-1"]')
+    expect(line.text()).toContain('avatar_templates.llmForecast')
+    // The shape travels with the number: a total is only interpretable
+    // alongside the interview it is a total FOR.
+    expect(line.text()).toContain('0,30')
+    expect(line.text()).toContain('15')
+    expect(line.text()).toContain('60')
+  })
+
+  it('never states a per-minute LLM rate', async () => {
+    const { wrapper } = await mountPage()
+
+    // 0.30 over the 15-minute reference interview would be 0,02 per minute.
+    expect(wrapper.text()).not.toContain('0,02')
+  })
+
+  it('says a template with no model bound cannot be forecast, rather than forecasting zero', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [template({ llm: { estimated_cost_usd_per_interview: null } })],
+      }),
+    })
+
+    const line = wrapper.get('[data-testid="template-llm-forecast-1"]')
+    expect(line.text()).toContain('avatar_templates.llmForecastUnavailable')
+    // Zero is a price. An unbound template has no price at all.
+    expect(line.text()).not.toContain('0,00')
+  })
+
+  // The figure is not self-explanatory: an operator has to know it is an
+  // estimate, that it covers only the language model, and why no rate exists.
+  it('offers the definition of the figure without requiring a pointer', async () => {
+    const { wrapper } = await mountPage()
+
+    expect(wrapper.text()).toContain('help.glossary.llmCost.definition')
   })
 })

@@ -1,11 +1,24 @@
 /**
  * useSessionReview — the interview session review surface (C11).
  *
- * Hand-typed for the same reason as the dashboard composables: Scramble cannot
- * trace a shape through a JsonResource `toArray()`. Source of truth is
- * `api/app/Http/Resources/Admin/SessionReviewResource.php`.
+ * Mostly hand-typed, for the same reason as the dashboard composables:
+ * Scramble cannot trace a shape through a JsonResource `toArray()`. Source of
+ * truth is `api/app/Http/Resources/Admin/SessionReviewResource.php`.
+ *
+ * `cost` is the exception and is DERIVED from the generated client — the
+ * generator gets that one right, and see its own docblock for why a
+ * hand-written copy would be a liability rather than a safeguard. Prefer
+ * deriving any future field the generator types correctly; hand-write only
+ * what it gets wrong, and say which.
+ *
+ * `SessionSummaryResource` also carries `llm_cost_usd` (a per-session LLM
+ * total, `null` when the session was never billed). It is deliberately NOT
+ * surfaced on `SessionSummary` yet: the session LIST does not price sessions
+ * today, and adding a bare figure to a list without the two-meter framing the
+ * review gives it (DESIGN.md §8.2.5) is how a cost number gets read as a bill.
  */
 import { useApi } from './useApi'
+import type { components } from '../../types/api'
 
 export interface IntegrityEventRow {
   kind: string
@@ -68,14 +81,23 @@ export interface SessionReview extends SessionSummary {
   integrity: IntegritySummary
   snapshots: SnapshotRow[]
   /**
-   * Avatar minutes only, and always an estimate. LLM token spend is absent by
-   * design: `ai_requests` carries no session id, so it cannot be attributed to
-   * one session without inventing the link.
+   * TWO meters, never one total, and always an estimate.
+   *
+   * DERIVED from the generated client rather than restated here. Scramble
+   * types `integrity` wrongly (it reports `counts` as a `string` and both
+   * `events` and `unavailable_layers` as `unknown[]`), which is why the rest
+   * of this interface stays hand-written — but it gets `cost` exactly right,
+   * and a hand-written copy of a shape the generator already knows is a
+   * second source of truth that can only drift. If the server adds a field
+   * here it appears without an edit; if one is removed, this file stops
+   * compiling.
+   *
+   * `avatar` is null when the session cannot be priced (unfinished, or an
+   * unrecognised provider). `llm` is null when there is NO usage row at all —
+   * the binding resolved unbound or degraded, so nothing was billed. Neither
+   * is ever rendered as zero: zero is a price.
    */
-  cost: {
-    avatar: { provider: string; minutes: number; usd: number } | null
-    is_estimate: true
-  }
+  cost: components['schemas']['SessionReviewResource']['cost']
 }
 
 export function useSessionReview() {

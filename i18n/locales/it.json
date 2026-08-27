@@ -381,13 +381,15 @@
       "organization": "Profilo organizzazione",
       "apiKeys": "Chiavi API",
       "webhooks": "Valori predefiniti webhook",
-      "users": "Utenti e ruoli"
+      "users": "Utenti e ruoli",
+      "llmCredentials": "Credenziali LLM di conversazione"
     },
     "sectionDescription": {
       "organization": "Nome e identificatore del tenant",
       "apiKeys": "Credenziali per l'accesso machine-to-machine",
       "webhooks": "Dove BEAI recapita gli eventi di avanzamento e valutazione",
-      "users": "Chi può accedere e cosa può fare"
+      "users": "Chi può accedere e cosa può fare",
+      "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista"
     },
     "organization": {
       "name": "Nome",
@@ -794,7 +796,10 @@
       "voiceStability": "Quanto è costante il tono (0–1). Valori alti = voce più uniforme e prevedibile; valori bassi = più espressiva ma variabile.",
       "voiceStyle": "Quanta enfasi/espressività aggiungere (0–1). 0 = neutro. Valori alti possono suonare esagerati.",
       "voiceUseSpeakerBoost": "Rende la voce più chiara e presente, più simile all'originale. Costa un filo di latenza in più. Di solito conviene tenerlo attivo."
-    }
+    },
+    "llmForecastIntro": "Ogni template qui sotto riporta una stima di quanto costa in token dell'LLM di conversazione una singola intervista tipica. I minuti dell'avatar sono fatturati da un fornitore diverso su un contatore diverso e non sono inclusi.",
+    "llmForecast": "≈ $ {amount} in token LLM per un'intervista tipica di {minutes} minuti e {turns} turni. È una stima, ed è il totale di quell'intera intervista — non una tariffa al minuto.",
+    "llmForecastUnavailable": "A questo template non è associato alcun modello di conversazione, quindi il suo costo LLM non può essere stimato."
   },
   "help": {
     "label": "Aiuto",
@@ -923,6 +928,10 @@
       "avatarTemplate": {
         "term": "Template avatar",
         "definition": "Impostazioni riutilizzabili di voce e aspetto dell'intervistatore."
+      },
+      "llmCost": {
+        "term": "costo LLM di conversazione",
+        "definition": "Quanto costa il modello linguistico che sta dietro all'intervista. È stimato dai turni e dai caratteri effettivamente scambiati, mai letto da una fattura del fornitore. Non viene mai espresso al minuto: a ogni turno il modello riceve di nuovo l'intera conversazione, quindi il ventesimo minuto costa diverse volte il primo, e moltiplicare un valore al minuto per la durata della sessione dà un risultato sbagliato. È fatturato da un fornitore diverso da quello dei minuti dell'avatar e non va mai sommato a essi."
       }
     }
   },
@@ -986,6 +995,14 @@
       "open": "Apri resoconto",
       "nav": "Naviga tra le sessioni",
       "current": "Sessione corrente ({competency})"
+    },
+    "cost": {
+      "separateMeters": "I minuti dell'avatar e i token dell'LLM di conversazione sono fatturati da due fornitori diversi su due contatori diversi. Vengono mostrati separatamente e non vengono mai sommati. Entrambi sono stime: nessun fornitore espone un importo fatturato per singola sessione.",
+      "avatarMeter": "Minuti dell'avatar ({provider}) — stima",
+      "llmMeter": "LLM di conversazione",
+      "llmEstimated": "Token LLM di conversazione — stima",
+      "llmActual": "Token LLM di conversazione — effettivo",
+      "llmNotBilled": "Questa sessione non ha usato un modello gestito da BEAI, quindi non è stato registrato alcun costo per i token. Non si tratta di un addebito pari a zero."
     }
   }
 }

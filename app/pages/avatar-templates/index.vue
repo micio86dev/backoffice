@@ -6,6 +6,18 @@
         <p class="mt-1 max-w-2xl text-sm text-muted-foreground">
           {{ $t('avatar_templates.intro') }}
         </p>
+        <!--
+          One glossary trigger for the whole list rather than one per row: the
+          term is the same on every row, and N focusable triggers would put N
+          copies of one definition in the tab order. Same idiom as the report
+          grid's glossary row (DESIGN.md §8.3).
+        -->
+        <p
+          class="mt-2 flex max-w-2xl flex-wrap items-baseline gap-x-1.5 text-sm text-muted-foreground"
+        >
+          <span>{{ $t('avatar_templates.llmForecastIntro') }}</span>
+          <HelpTip term="llmCost" />
+        </p>
       </div>
       <TemplatePortability :is-admin="isAdmin" @imported="load" />
       <button
@@ -61,6 +73,25 @@
           </p>
           <p v-if="template.description" class="text-sm text-muted-foreground">
             {{ template.description }}
+          </p>
+          <!--
+            A TOTAL for one reference interview, never a per-minute rate: the
+            model is re-sent the whole conversation on every turn, so input
+            tokens grow quadratically in turn count and a rate misstates cost
+            at any other length. The reference shape travels with the number,
+            because a total only means something alongside the interview it is
+            a total for.
+
+            Only the language model is priced here. Avatar minutes are a
+            different vendor on a different meter and are shown on the session
+            review, never summed with this — the refusal ratified at
+            `api/app/Services/Proctoring/SessionCostEstimator.php:20-22`.
+          -->
+          <p
+            class="mt-1 text-sm text-muted-foreground"
+            :data-testid="`template-llm-forecast-${template.id}`"
+          >
+            {{ forecastLabel(template) }}
           </p>
         </div>
 
@@ -156,6 +187,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpTip from '@/components/atoms/HelpTip.vue'
 import TemplatePortability from '@/components/organisms/TemplatePortability.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 /**
@@ -174,11 +206,32 @@ import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
+import { formatUsdAmount } from '@/utils/format'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 
 definePageMeta({ name: 'avatar-templates' })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+/**
+ * What one typical interview on this template costs in conversation-LLM
+ * tokens, as the API forecast it.
+ *
+ * `null` means the template has no usable model binding — no model, or a model
+ * the price list no longer carries. That reads as "cannot be forecast", never
+ * as a forecast of zero: zero is a price, and this template has none.
+ */
+function forecastLabel(template: AvatarTemplate): string {
+  const forecast = template.llm?.estimated_cost_usd_per_interview
+
+  if (!forecast) return t('avatar_templates.llmForecastUnavailable')
+
+  return t('avatar_templates.llmForecast', {
+    amount: formatUsdAmount(forecast.usd, locale.value),
+    minutes: forecast.minutes,
+    turns: forecast.turns,
+  })
+}
 
 useHead({
   title: () => t('avatar_templates.title'),

@@ -4,11 +4,91 @@
       Facts first: an operator opening a review wants to know what ran, for how
       long, and roughly what it cost, before being shown anything interpretive.
     -->
-    <section class="grid gap-4 md:grid-cols-4" aria-label="">
+    <section class="grid gap-4 md:grid-cols-3" aria-label="">
       <MetricCard :label="$t('review.duration')" :value="durationLabel" />
       <MetricCard :label="$t('review.provider')" :value="review.provider" />
       <MetricCard :label="$t('review.status')" :value="review.status" />
-      <MetricCard :label="$t('review.costEstimate')" :value="costLabel" />
+    </section>
+
+    <!--
+      Cost gets a section of its own rather than a fourth metric card, because
+      there is no single cost figure to put on a card. Avatar minutes and
+      conversation-LLM tokens are billed by DIFFERENT vendors on DIFFERENT
+      meters, and the refusal to add them is already ratified server-side at
+      `api/app/Services/Proctoring/SessionCostEstimator.php:20-22` — "one
+      total would be a number with no owner". Two labelled lines, each naming
+      its meter, is the only honest rendering.
+    -->
+    <section class="flex flex-col gap-3" aria-labelledby="review-cost-heading">
+      <div class="flex items-center gap-2">
+        <h2 id="review-cost-heading" class="text-lg font-semibold text-foreground">
+          {{ $t('review.costEstimate') }}
+        </h2>
+        <HelpTip term="llmCost" />
+      </div>
+
+      <p class="max-w-[65ch] text-sm text-muted-foreground">
+        {{ $t('review.cost.separateMeters') }}
+      </p>
+
+      <dl class="flex flex-col" data-testid="session-cost">
+        <div
+          class="flex flex-wrap items-baseline justify-between gap-4 border-b border-border py-2"
+          data-testid="cost-avatar"
+        >
+          <dt class="text-sm text-muted-foreground">
+            {{ $t('review.cost.avatarMeter', { provider: review.provider }) }}
+          </dt>
+          <dd class="text-sm font-medium text-foreground">{{ avatarCostLabel }}</dd>
+        </div>
+
+        <!--
+          Every row is a DIRECT `div > dt + dd` child of the `dl`, and stays
+          that way. Grouping the LLM rows under a second wrapper div nested one
+          level deeper is real, serious axe breakage (`definition-list` +
+          `dlitem`) — caught by `tests/e2e/session-review-cost.spec.ts`'s axe
+          run, not by a component spec, which is why that E2E exists.
+
+          No usage row at all: the session's LLM binding resolved unbound or
+          degraded, so BEAI never ran a model it can price. Rendering 0 here
+          would state a price — and the wrong one.
+        -->
+        <div
+          v-if="review.cost.llm === null"
+          class="flex flex-wrap items-baseline justify-between gap-4 py-2"
+          data-testid="cost-llm-absent"
+        >
+          <dt class="text-sm text-muted-foreground">{{ $t('review.cost.llmMeter') }}</dt>
+          <dd class="max-w-[45ch] text-sm text-muted-foreground">
+            {{ $t('review.cost.llmNotBilled') }}
+          </dd>
+        </div>
+
+        <div
+          v-else
+          class="flex flex-wrap items-baseline justify-between gap-4 py-2"
+          data-testid="cost-llm-estimated"
+        >
+          <dt class="text-sm text-muted-foreground">{{ $t('review.cost.llmEstimated') }}</dt>
+          <dd class="text-sm font-medium text-foreground">{{ llmEstimatedLabel }}</dd>
+        </div>
+
+        <!--
+          Rendered ONLY when the API sends a figure. In managed mode the
+          provider calls Google on its own account, so `actual_usd` is
+          permanently null and an always-empty Actual row would be a knob that
+          never turns. The column exists for a later change in which BEAI runs
+          the model itself.
+        -->
+        <div
+          v-if="review.cost.llm !== null && review.cost.llm.actual_usd !== null"
+          class="flex flex-wrap items-baseline justify-between gap-4 border-t border-border py-2"
+          data-testid="cost-llm-actual"
+        >
+          <dt class="text-sm text-muted-foreground">{{ $t('review.cost.llmActual') }}</dt>
+          <dd class="text-sm font-medium text-foreground">{{ llmActualLabel }}</dd>
+        </div>
+      </dl>
     </section>
 
     <section class="flex flex-col gap-3" aria-labelledby="review-integrity-heading">
@@ -135,8 +215,9 @@
  */
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
+import HelpTip from '@/components/atoms/HelpTip.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
-import { formatDate, formatDuration } from '@/utils/format'
+import { formatDate, formatDuration, formatUsdAmount } from '@/utils/format'
 import type { IntegrityEventRow, SessionReview } from '@/composables/useSessionReview'
 
 const props = defineProps<{
@@ -176,11 +257,45 @@ const durationLabel = computed(() => formatDuration(props.review.duration_second
 // Always the word "estimate": no provider exposes a per-session billed amount,
 // and an operator who reads this as an invoice line will reconcile it against a
 // real bill and find a discrepancy that was never a defect.
-const costLabel = computed(() => {
+//
+// One formatter for every cost figure on this panel. Two meters rendered by
+// two different code paths drift into two different shapes, and a reader
+// comparing them then has to work out whether the difference is in the money
+// or in the formatting.
+function costLabel(usd: number): string {
+  return t('review.costValue', { usd: formatUsdAmount(usd, props.locale) })
+}
+
+const avatarCostLabel = computed(() => {
   const avatar = props.review.cost.avatar
+  // A dash, never 0 — an unpriceable session is not a free one.
   if (avatar === null) return '–'
 
-  return t('review.costValue', { usd: avatar.usd.toFixed(2) })
+  return costLabel(avatar.usd)
+})
+
+/**
+ * The session's conversation-LLM spend, as a TOTAL for the session.
+ *
+ * Deliberately NOT divided by duration. Input tokens grow QUADRATICALLY in
+ * turn count, because the model is re-sent the entire conversation on every
+ * turn — minute 20 costs several times minute 1. A per-minute figure would be
+ * arithmetically meaningless, and worse, an operator would multiply it by a
+ * session length and get a confidently wrong answer.
+ */
+const llmEstimatedLabel = computed(() => {
+  const usd = props.review.cost.llm?.estimated_usd
+  if (usd === null || usd === undefined) return '–'
+
+  return costLabel(usd)
+})
+
+/** Present only in a future non-managed mode; see the template comment. */
+const llmActualLabel = computed(() => {
+  const usd = props.review.cost.llm?.actual_usd
+  if (usd === null || usd === undefined) return '–'
+
+  return formatUsdAmount(usd, props.locale)
 })
 
 function durationOf(event: IntegrityEventRow): number | null {

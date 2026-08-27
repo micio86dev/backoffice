@@ -44,6 +44,35 @@ export function formatDuration(
 }
 
 /**
+ * A USD figure, number only — the `$` lives in the `review.costValue` copy
+ * key, so every cost line in the product renders through one formatter and the
+ * avatar and conversation-LLM lines cannot drift into two different shapes.
+ *
+ * Precision widens BELOW a cent and only there. One interview's
+ * conversation-LLM spend is routinely a fraction of a cent, and two fraction
+ * digits would round a real charge to `0.00` — which reads as free. Zero is a
+ * price; "we did not run this model" is not, and that case arrives as `null`
+ * from the API and is rendered as absent by the caller, never routed here.
+ *
+ * At or above a cent the figure stays at two digits: a $2.34567 estimate must
+ * not sprout four decimals of noise it cannot justify.
+ *
+ * Below a cent it switches to SIGNIFICANT digits rather than a wider fixed
+ * decimal count — a fixed count only moves the boundary at which a real charge
+ * starts rendering as `0.0000`, it does not remove it.
+ */
+export function formatUsdAmount(usd: number, locale: string): string {
+  if (usd !== 0 && Math.abs(usd) < 0.01) {
+    return new Intl.NumberFormat(locale, { maximumSignificantDigits: 2 }).format(usd)
+  }
+
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(usd)
+}
+
+/**
  * Competency mean (DESIGN.md §8.3): always at least 1 decimal (so a
  * whole-number mean like `4` renders `4.0`, never truncated-looking `4`),
  * rounded to at most 2 decimals otherwise (e.g. `11/3` -> `3.67`, matching

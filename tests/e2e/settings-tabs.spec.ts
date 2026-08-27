@@ -190,3 +190,93 @@ test.describe('Settings tabs (Unit 6)', () => {
     await checkA11y(page)
   })
 })
+
+/**
+ * Conversation-LLM credentials — reachability and the role gate
+ * (pluggable-conversation-llm P9).
+ *
+ * `LlmCredentialsPanel.vue` existed, was fully unit-tested, and until this
+ * change NO ROUTE MOUNTED IT: an admin could not reach the credential vault
+ * from the running application at all. Reachability is therefore the assertion
+ * that matters here, and only an E2E can make it — a component spec proves the
+ * panel renders, never that anyone can get to it.
+ *
+ * The gate is tighter than the four ungated sections, never looser:
+ * `/llm-credentials` is admin-only server-side (`LlmCredentialPolicy`) and the
+ * row holds a decryptable vendor API key. The section does not render for
+ * other roles at all (DESIGN.md §8.2.1, same doctrine as §8.2.6).
+ */
+const CREDENTIAL = {
+  id: 1,
+  name: 'Gemini production',
+  vendor: 'google',
+  key_last_four: '9f2c',
+  validated_at: '2026-08-01T09:00:00Z',
+  validation_error: null,
+  created_at: '2026-08-01T09:00:00Z',
+}
+
+async function mockIdentity(page: import('@playwright/test').Page, roles: string[]): Promise<void> {
+  await page.route(
+    (url) => url.pathname === '/auth/me',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            user: {
+              id: 1,
+              name: 'Ada Lovelace',
+              email: 'ada@example.com',
+              locale: 'it',
+              photo_url: null,
+            },
+            organization: { id: 1, name: 'Acme' },
+            roles,
+          })
+        : route.continue()
+  )
+  await page.route(
+    (url) => url.pathname === '/llm-credentials',
+    (route) => (isDataRequest(route) ? jsonRoute(route, { data: [CREDENTIAL] }) : route.continue())
+  )
+}
+
+test.describe('Settings — conversation-LLM credentials', () => {
+  test('an admin can reach the credential vault from /settings', async ({ page }) => {
+    await mockAdminApi(page)
+    await mockIdentity(page, ['admin'])
+    await login(page)
+    await page.goto('/settings')
+
+    const tab = page.getByRole('tab', { name: 'Credenziali LLM di conversazione' })
+    await expect(tab).toBeVisible()
+    await tab.click()
+
+    // The panel is really mounted and really fetched, not just a rail entry.
+    await expect(page.getByText('Gemini production')).toBeVisible()
+    await expect(page.getByTestId('llm-credentials-new')).toBeVisible()
+  })
+
+  test('a non-admin is not offered the section at all', async ({ page }) => {
+    await mockAdminApi(page)
+    await mockIdentity(page, ['operator'])
+    await login(page)
+    await page.goto('/settings')
+
+    // The four ungated sections are still there — this is a gate on one
+    // section, not a broken page.
+    await expect(page.getByRole('tab', { name: 'Profilo organizzazione' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Credenziali LLM di conversazione' })).toHaveCount(0)
+  })
+
+  test('the credential vault panel is WCAG 2.1 AA clean', async ({ page }) => {
+    await mockAdminApi(page)
+    await mockIdentity(page, ['admin'])
+    await login(page)
+    await page.goto('/settings')
+
+    await page.getByRole('tab', { name: 'Credenziali LLM di conversazione' }).click()
+    await expect(page.getByText('Gemini production')).toBeVisible()
+
+    await checkA11y(page)
+  })
+})

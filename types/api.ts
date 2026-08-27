@@ -1351,6 +1351,13 @@ export interface components {
             llm_credential_id: number | null;
             llm_sync_status: string | null;
             llm_synced_at: string | null;
+            llm: {
+                estimated_cost_usd_per_interview: {
+                    minutes: number;
+                    turns: number;
+                    usd: number;
+                } | null;
+            };
         };
         /** BarsIndicatorResource */
         BarsIndicatorResource: {
@@ -1621,16 +1628,28 @@ export interface components {
             };
             snapshots: unknown[];
             /**
-             * @description Avatar minutes only. `ai_requests` has no interview_session_id,
+             * @description TWO SEPARATE labelled lines, never one combined total — the
+             *     same refusal already ratified at `SessionCostEstimator.php:20-22`
+             *     for avatar-vs-LLM spend: different vendors, different meters. `avatar`: minutes only. `ai_requests` has no interview_session_id,
              *     so LLM spend cannot be attributed to one session without
              *     inventing the link — and a plausible number with no basis is
              *     worse than an absent one (D5).
+             *
+             *     `llm`: null when the session was never billed (unbound/degraded —
+             *     no vendor default is priced). When present, `actual_usd`
+             *     renders ONLY when non-null (pluggable-conversation-llm PR P6b,
+             *     design D5: permanently null in managed mode, reserved for a
+             *     future native_duplex change).
              */
             cost: {
                 avatar: {
                     provider: string;
                     minutes: number;
                     usd: number;
+                } | null;
+                llm: {
+                    estimated_usd: number | null;
+                    actual_usd: number | null;
                 } | null;
                 is_estimate: boolean;
             };
@@ -1647,6 +1666,15 @@ export interface components {
             ended_at: string | null;
             duration_seconds: number | null;
             integrity_event_count: string | 0;
+            /**
+             * @description (pluggable-conversation-llm PR P6b) A separate line, never
+             *     combined with any avatar-minute figure. `actual_cost_usd` is
+             *     preferred when non-null (permanently null in managed mode;
+             *     reserved for a future native_duplex change). `null` — never
+             *     `0` — when the session was never billed (no usage row: it
+             *     resolved unbound/degraded).
+             */
+            llm_cost_usd: number | null;
         };
         /**
          * StoreProjectRequest

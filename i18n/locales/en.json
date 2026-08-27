@@ -381,13 +381,15 @@
       "organization": "Organization profile",
       "apiKeys": "API keys",
       "webhooks": "Webhook defaults",
-      "users": "Users & roles"
+      "users": "Users & roles",
+      "llmCredentials": "Conversation LLM credentials"
     },
     "sectionDescription": {
       "organization": "Name and tenancy identifier",
       "apiKeys": "Credentials for machine-to-machine access",
       "webhooks": "Where BEAI delivers progress and evaluation events",
-      "users": "Who can sign in, and what they are allowed to do"
+      "users": "Who can sign in, and what they are allowed to do",
+      "llmCredentials": "The vendor API key the interview model runs on"
     },
     "organization": {
       "name": "Name",
@@ -794,7 +796,10 @@
       "voiceStability": "How steady the tone is (0–1). High = more uniform and predictable; low = more expressive but variable.",
       "voiceStyle": "How much emphasis/expressiveness to add (0–1). 0 = neutral. High values can sound over the top.",
       "voiceUseSpeakerBoost": "Makes the voice clearer and more present, closer to the original. Costs a little extra latency. Usually worth keeping on."
-    }
+    },
+    "llmForecastIntro": "Each template below carries an estimate of what one typical interview costs in conversation-LLM tokens. Avatar minutes are billed by a different vendor on a different meter and are not included here.",
+    "llmForecast": "≈ $ {amount} in LLM tokens for a typical {minutes}-minute, {turns}-turn interview. An estimate, and a total for that whole interview — not a rate per minute.",
+    "llmForecastUnavailable": "No conversation model is bound to this template, so its LLM cost cannot be forecast."
   },
   "help": {
     "label": "Help",
@@ -923,6 +928,10 @@
       "avatarTemplate": {
         "term": "Avatar template",
         "definition": "Reusable voice and appearance settings for the interviewer."
+      },
+      "llmCost": {
+        "term": "conversation LLM cost",
+        "definition": "What the language model behind the interview costs. It is estimated from the turns and characters actually exchanged, never read off a vendor invoice. It is never expressed per minute: the model is re-sent the whole conversation on every turn, so the twentieth minute costs several times the first, and multiplying a per-minute figure by a session length gives a wrong answer. It is billed by a different vendor than the avatar minutes and is never added to them."
       }
     }
   },
@@ -986,6 +995,14 @@
       "open": "Open review",
       "nav": "Navigate between sessions",
       "current": "Current session ({competency})"
+    },
+    "cost": {
+      "separateMeters": "Avatar minutes and conversation-LLM tokens are billed by two different vendors on two different meters. They are shown separately and are never added together. Both are estimates: no vendor exposes a per-session billed amount.",
+      "avatarMeter": "Avatar minutes ({provider}) — estimated",
+      "llmMeter": "Conversation LLM",
+      "llmEstimated": "Conversation LLM tokens — estimated",
+      "llmActual": "Conversation LLM tokens — actual",
+      "llmNotBilled": "This session did not run on a model BEAI manages, so no token cost was recorded. That is not a charge of zero."
     }
   }
 }

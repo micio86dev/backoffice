@@ -28,10 +28,49 @@
  */
 import { useAuth } from '@/composables/useAuth'
 
-const PUBLIC_PATHS = ['/unsupported', '/login', '/health']
+/**
+ * First path segment of each pre-auth surface, locale prefix excluded.
+ *
+ * `/forgot-password` and `/reset-password` (self-service-password-reset) are
+ * reached, by definition, by someone with no session — a guard that bounces
+ * them to /login is a recovery flow nobody can enter.
+ */
+const PUBLIC_ROOTS = new Set([
+  'unsupported',
+  'login',
+  'health',
+  'forgot-password',
+  'reset-password',
+])
+
+/**
+ * The route's own first segment, skipping an `@nuxtjs/i18n` locale prefix.
+ *
+ * REPLACES an `endsWith` match over full paths, which this change made
+ * unworkable: the reset link carries its token as a PATH SEGMENT
+ * (`api/app/Jobs/SendPasswordResetLinkJob.php:135`), so
+ * `/reset-password/{token}` ends with the token, never with the route. It is
+ * also strictly tighter than what it replaces — `endsWith` would have made a
+ * hypothetical `/projects/login` public, and this does not.
+ *
+ * `strategy: 'prefix_except_default'` with `it` as default means the prefix,
+ * when present, is a two-letter locale code and never a page: no route in this
+ * app has a two-letter first segment.
+ */
+function routeRoot(path: string): string | undefined {
+  const segments = path.split('/').filter((segment) => segment !== '')
+  const head = segments[0]
+
+  if (head !== undefined && segments.length > 1 && /^[a-z]{2}$/.test(head)) {
+    return segments[1]
+  }
+
+  return head
+}
 
 export default defineNuxtRouteMiddleware((to) => {
-  if (PUBLIC_PATHS.some((path) => to.path.endsWith(path))) {
+  const root = routeRoot(to.path)
+  if (root !== undefined && PUBLIC_ROOTS.has(root)) {
     return
   }
 

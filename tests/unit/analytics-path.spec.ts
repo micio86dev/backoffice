@@ -84,4 +84,58 @@ describe('isAnalyticsSafeRoute', () => {
     expect(isAnalyticsSafeRoute('/')).toBe(true)
     expect(isAnalyticsSafeRoute('/unsupported')).toBe(true)
   })
+
+  // Same reasoning as /login, one step stronger: /reset-password is where a
+  // NEW credential is typed, and its URL carries a live single-use token in a
+  // path segment. /forgot-password takes the address the whole flow refuses to
+  // confirm the existence of.
+  it('marks the password-recovery pages as UNSAFE', () => {
+    expect(isAnalyticsSafeRoute('/forgot-password')).toBe(false)
+    expect(isAnalyticsSafeRoute('/en/forgot-password')).toBe(false)
+    expect(isAnalyticsSafeRoute('/reset-password')).toBe(false)
+    expect(isAnalyticsSafeRoute('/reset-password/a-live-token')).toBe(false)
+    expect(isAnalyticsSafeRoute('/en/reset-password/a-live-token')).toBe(false)
+  })
+})
+
+/**
+ * self-service-password-reset — the reset link is
+ * `{origin}/reset-password/{token}?email={address}` (`SendPasswordResetLinkJob.php:135`),
+ * so for the first time in this app a live credential rides in a backoffice
+ * URL PATH. `redactAnalyticsPath` previously only collapsed
+ * `/participants/:id`, which means the token would have reached GA4 as a
+ * verbatim `page_path` and Sentry as a verbatim `request.url` — `redactUrl`
+ * delegates here.
+ */
+describe('redactAnalyticsPath — the password reset token', () => {
+  it('collapses the token segment to a placeholder', () => {
+    expect(redactAnalyticsPath('/reset-password/a-live-single-use-token')).toBe(
+      '/reset-password/:token'
+    )
+  })
+
+  it('collapses it under a locale prefix too', () => {
+    expect(redactAnalyticsPath('/en/reset-password/a-live-single-use-token')).toBe(
+      '/en/reset-password/:token'
+    )
+  })
+
+  it('leaves the token-less form of the route alone', () => {
+    expect(redactAnalyticsPath('/reset-password')).toBe('/reset-password')
+    expect(redactAnalyticsPath('/en/reset-password')).toBe('/en/reset-password')
+    expect(redactAnalyticsPath('/forgot-password')).toBe('/forgot-password')
+  })
+
+  it('never returns anything but the placeholder after /reset-password/', () => {
+    // The property, not the examples: Laravel's broker token is an opaque
+    // 64-char hex string today, and this must hold whatever it becomes.
+    for (const path of [
+      '/reset-password/0123456789abcdef',
+      '/reset-password/' + 'f'.repeat(64),
+      '/en/reset-password/tok?email=ada%40example.com',
+      '/reset-password/tok/',
+    ]) {
+      expect(redactAnalyticsPath(path)).toMatch(/\/reset-password\/:token$/)
+    }
+  })
 })

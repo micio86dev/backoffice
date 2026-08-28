@@ -1,5 +1,7 @@
 <template>
   <div class="flex flex-col gap-6">
+    <ReportGlossary />
+
     <Table>
       <TableCaption>{{ $t('report.table.caption') }}</TableCaption>
       <TableHeader>
@@ -26,32 +28,31 @@
       {{ meta.model_version }} · framework {{ meta.framework_version }}
     </p>
 
-    <div class="flex flex-col gap-4">
-      <h3 class="text-foreground text-sm font-semibold">{{ $t('report.excerpts.title') }}</h3>
-      <div v-for="(result, code) in evaluation" :key="code" class="flex flex-col gap-2">
-        <p class="text-muted-foreground text-xs font-semibold uppercase">{{ code }}</p>
-        <ExcerptList
-          v-for="(behavior, index) in result.behaviors"
-          :key="index"
-          :indicator="behavior.indicator"
-          :excerpts="behavior.excerpts"
-        />
-      </div>
-    </div>
+    <EvidenceAccordion :evaluation="evaluation" />
   </div>
 </template>
 
 <script setup lang="ts">
 // Full BARS competency grid (D8, DESIGN.md §8.3) — <table> + <caption> +
-// per-competency CompetencyRows + per-indicator ExcerptLists. Presentational
-// only: the container (participant detail page) fetches the data and
-// resolves the 409/403/404/loading states before ever mounting this.
+// per-competency CompetencyRows, with the glossary above it and the
+// indicator-level evidence below it. Presentational only: the container
+// (participant detail page) fetches the data and resolves the
+// 409/403/404/loading states before ever mounting this.
 //
 // `meta` (D7, bars-full-scale-1-5): the Evaluation's scoring provenance,
-// rendered as an unobtrusive footnote between the table and the excerpts
+// rendered as an unobtrusive footnote between the table and the evidence
 // block — muted, small, but always present (never collapsed behind a
 // disclosure). The label is localized; the three values are LITERAL in
 // every locale (CLAUDE.md — machine-facing values are never translated).
+//
+// NOTHING new is drawn INSIDE the <table>. tests/e2e/admin-flow.spec.ts
+// screenshots `getByRole('table')` against four committed baselines
+// (chromium/webkit × darwin/linux) and only the darwin pair can be
+// regenerated off CI, so the grid's own box is treated as frozen. The
+// glossary is its previous sibling and the evidence accordion its later one;
+// EvaluationReport.spec.ts asserts that boundary so a future edit that drifts
+// a tooltip into a <th> fails in unit tests rather than in CI's screenshot
+// diff.
 import {
   Table,
   TableBody,
@@ -61,7 +62,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import CompetencyRow from '@/components/molecules/CompetencyRow.vue'
-import ExcerptList from '@/components/molecules/ExcerptList.vue'
+import ReportGlossary from '@/components/molecules/ReportGlossary.vue'
+import EvidenceAccordion from '@/components/organisms/EvidenceAccordion.vue'
 import type { EvaluationReportData, EvaluationScoringMeta } from '@/composables/useEvaluationReport'
 
 defineProps<{

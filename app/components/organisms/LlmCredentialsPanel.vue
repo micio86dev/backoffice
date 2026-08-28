@@ -76,100 +76,125 @@
       </TableBody>
     </Table>
 
-    <Dialog :open="creating" @update:open="(open) => !open && closeCreateDialog()">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{{ $t('settings.llmCredentials.new') }}</DialogTitle>
-        </DialogHeader>
-        <form data-testid="llm-credential-form" novalidate @submit.prevent="onCreate">
-          <FieldGroup>
-            <Field :data-invalid="Boolean(errors.name)">
-              <FieldLabel for="llm-credential-form-name">{{
-                $t('settings.llmCredentials.name')
-              }}</FieldLabel>
-              <Input
-                id="llm-credential-form-name"
-                v-model="name"
-                autocomplete="off"
-                :aria-invalid="Boolean(errors.name)"
-                :aria-describedby="errors.name ? 'llm-credential-form-name-error' : undefined"
-                data-testid="llm-credential-form-name"
-              />
-              <FieldError
-                v-if="errors.name"
-                id="llm-credential-form-name-error"
-                data-testid="llm-credential-form-name-error"
-                >{{ errors.name }}</FieldError
-              >
-            </Field>
-            <!-- Only one vendor exists server-side (`in:google`) — a picker
+    <!--
+      Right-side drawer, not a centred dialog (feature/form-drawer). `id` is
+      load-bearing, not decoration: the submit control lives in the drawer's
+      non-scrolling footer, OUTSIDE this form, and
+      `<button form="llm-credential-form">` is what connects the two.
+    -->
+    <FormDrawer
+      :open="creating"
+      :title="$t('settings.llmCredentials.new')"
+      form-id="llm-credential-form"
+      :pending="creatingBusy"
+      :submit-label="$t('settings.llmCredentials.create')"
+      @update:open="(open) => !open && closeCreateDialog()"
+    >
+      <form
+        id="llm-credential-form"
+        data-testid="llm-credential-form"
+        novalidate
+        @submit.prevent="onCreate"
+      >
+        <FieldGroup>
+          <Field :data-invalid="Boolean(errors.name)">
+            <FieldLabel for="llm-credential-form-name">{{
+              $t('settings.llmCredentials.name')
+            }}</FieldLabel>
+            <Input
+              id="llm-credential-form-name"
+              v-model="name"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.name)"
+              :aria-describedby="errors.name ? 'llm-credential-form-name-error' : undefined"
+              data-testid="llm-credential-form-name"
+            />
+            <FieldError
+              v-if="errors.name"
+              id="llm-credential-form-name-error"
+              data-testid="llm-credential-form-name-error"
+              >{{ errors.name }}</FieldError
+            >
+          </Field>
+          <!-- Only one vendor exists server-side (`in:google`) — a picker
                  with a single, unremovable option is a control whose only
                  outcome is itself, so this states the fact instead. -->
-            <FieldDescription data-testid="llm-credential-form-vendor-note">
-              {{ $t('settings.llmCredentials.vendorNote') }}
-            </FieldDescription>
-            <!--
+          <FieldDescription data-testid="llm-credential-form-vendor-note">
+            {{ $t('settings.llmCredentials.vendorNote') }}
+          </FieldDescription>
+          <!--
               No outer `<Field>` wrapper here — WriteOnlySecretField already
               renders its OWN `<Field>` internally (its own template root),
               so wrapping it again would nest two. `FieldError` needs no
               Field ancestor (it is a standalone, styled paragraph), so it is
               a plain sibling instead.
             -->
-            <WriteOnlySecretField
-              id="llm-credential-form-api-key"
-              :label="$t('settings.llmCredentials.apiKey')"
-              :configured="false"
-              @update:value="(value) => (apiKeyDraft = value)"
-            />
-            <FieldError
-              v-if="errors.apiKey"
-              id="llm-credential-form-api-key-error"
-              data-testid="llm-credential-form-api-key-error"
-              >{{ errors.apiKey }}</FieldError
-            >
-            <Alert
-              v-if="formMessage"
-              variant="destructive"
-              role="alert"
-              aria-live="polite"
-              data-testid="llm-credential-form-banner"
-            >
-              <AlertDescription>{{ formMessage }}</AlertDescription>
-            </Alert>
-            <Button type="submit" :disabled="creatingBusy">{{
-              $t('settings.llmCredentials.create')
-            }}</Button>
-          </FieldGroup>
-        </form>
-      </DialogContent>
-    </Dialog>
+          <WriteOnlySecretField
+            id="llm-credential-form-api-key"
+            :label="$t('settings.llmCredentials.apiKey')"
+            :configured="false"
+            @update:value="(value) => (apiKeyDraft = value)"
+          />
+          <FieldError
+            v-if="errors.apiKey"
+            id="llm-credential-form-api-key-error"
+            data-testid="llm-credential-form-api-key-error"
+            >{{ errors.apiKey }}</FieldError
+          >
+          <Alert
+            v-if="formMessage"
+            variant="destructive"
+            role="alert"
+            aria-live="polite"
+            data-testid="llm-credential-form-banner"
+          >
+            <AlertDescription>{{ formMessage }}</AlertDescription>
+          </Alert>
+          <!--
+              No submit control here — it lives in FormDrawer's non-scrolling
+              footer, wired back by this form's `id`.
+            -->
+        </FieldGroup>
+      </form>
+    </FormDrawer>
 
-    <Dialog :open="rotateTarget !== null" @update:open="(open) => !open && closeRotateDialog()">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{{ $t('settings.llmCredentials.rotateTitle') }}</DialogTitle>
-        </DialogHeader>
-        <form data-testid="llm-credential-rotate-form" novalidate @submit.prevent="onRotate">
-          <FieldGroup>
-            <WriteOnlySecretField
-              id="llm-credential-rotate-api-key"
-              :label="$t('settings.llmCredentials.rotateNewKey')"
-              :configured="true"
-              @update:value="(value) => (rotateApiKeyDraft = value)"
-            />
-            <FieldError
-              v-if="rotateError"
-              id="llm-credential-rotate-error"
-              data-testid="llm-credential-rotate-error"
-              >{{ rotateError }}</FieldError
-            >
-            <Button type="submit" :disabled="rotateBusy">{{
-              $t('settings.llmCredentials.rotateSubmit')
-            }}</Button>
-          </FieldGroup>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <!--
+      Rotation is a FORM, not a confirmation: it takes a new secret the
+      operator types, and it can be rejected field-by-field. So it gets the
+      same drawer treatment as create (feature/form-drawer). Only the REMOVE
+      step below stays a ConfirmDialog — that one asks a yes/no question and
+      collects nothing.
+    -->
+    <FormDrawer
+      :open="rotateTarget !== null"
+      :title="$t('settings.llmCredentials.rotateTitle')"
+      form-id="llm-credential-rotate-form"
+      :pending="rotateBusy"
+      :submit-label="$t('settings.llmCredentials.rotateSubmit')"
+      @update:open="(open) => !open && closeRotateDialog()"
+    >
+      <form
+        id="llm-credential-rotate-form"
+        data-testid="llm-credential-rotate-form"
+        novalidate
+        @submit.prevent="onRotate"
+      >
+        <FieldGroup>
+          <WriteOnlySecretField
+            id="llm-credential-rotate-api-key"
+            :label="$t('settings.llmCredentials.rotateNewKey')"
+            :configured="true"
+            @update:value="(value) => (rotateApiKeyDraft = value)"
+          />
+          <FieldError
+            v-if="rotateError"
+            id="llm-credential-rotate-error"
+            data-testid="llm-credential-rotate-error"
+            >{{ rotateError }}</FieldError
+          >
+        </FieldGroup>
+      </form>
+    </FormDrawer>
 
     <Alert
       v-if="rotateSuccessMessage"
@@ -220,8 +245,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import WriteOnlySecretField from '@/components/molecules/WriteOnlySecretField.vue'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import type { LlmCredential, LlmCredentialValidationError } from '@/types/llm'

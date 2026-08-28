@@ -1,9 +1,10 @@
 <template>
-  <form novalidate @submit.prevent="submit">
-    <h2 class="text-lg font-semibold text-foreground">
-      {{ isNew ? $t('avatar_templates.form.new_title') : $t('avatar_templates.form.edit_title') }}
-    </h2>
-
+  <form id="template-form" novalidate class="flex flex-col gap-6" @submit.prevent="submit">
+    <!--
+      The title itself lives on FormDrawer's SheetTitle now (the page sets
+      it from `editing?.id`), not here — this form is layout-only and a
+      second, duplicate heading would fight the drawer's own for attention.
+    -->
     <!--
       D4: kept as the form-level banner, fed ONLY by messages the per-field
       parsing below could not place — a config message naming a knob the
@@ -112,10 +113,11 @@
       </FieldDescription>
     </Field>
 
-    <fieldset class="flex flex-col gap-3 border-t border-border pt-4">
+    <fieldset class="border-t border-border pt-4">
       <legend class="sr-only">{{ $t('avatar_templates.form.settings') }}</legend>
 
-      <!--
+      <div data-testid="template-config-fields" :class="configFieldsClass">
+        <!--
         A checkbox lays out horizontally, everything else vertically, and that
         is a layout fact rather than taste. `fieldVariants`' vertical
         orientation carries `*:w-full`, which stretches EVERY direct child to
@@ -127,83 +129,104 @@
         items-center`, which is also what a checkbox beside its label should
         look like.
       -->
-      <Field
-        v-for="field in activeFields"
-        :key="field.key"
-        :orientation="field.type === 'checkbox' ? 'horizontal' : 'vertical'"
-        :data-invalid="Boolean(configErrors[field.key])"
-      >
-        <FieldLabel :for="`template-config-${field.key}`">
-          {{ $t(field.label_key) }}
-          <abbr
-            v-if="field.required"
-            :title="$t('avatar_templates.form.required')"
-            class="no-underline"
-            >*</abbr
-          >
-        </FieldLabel>
-
-        <select
-          v-if="field.type === 'select'"
-          :id="`template-config-${field.key}`"
-          :data-testid="`template-config-${field.key}`"
-          :value="stringValue(field.key)"
-          autocomplete="off"
-          :aria-invalid="Boolean(configErrors[field.key])"
-          :aria-required="field.required ? 'true' : undefined"
-          :aria-describedby="describedBy(field)"
-          :class="formControlClass"
-          @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
+        <Field
+          v-for="field in activeFields"
+          :key="field.key"
+          :orientation="field.type === 'checkbox' ? 'horizontal' : 'vertical'"
+          :data-invalid="Boolean(configErrors[field.key])"
         >
-          <!--
+          <FieldLabel :for="`template-config-${field.key}`">
+            {{ $t(field.label_key) }}
+            <abbr
+              v-if="field.required"
+              :title="$t('avatar_templates.form.required')"
+              class="no-underline"
+              >*</abbr
+            >
+          </FieldLabel>
+
+          <select
+            v-if="field.type === 'select'"
+            :id="`template-config-${field.key}`"
+            :data-testid="`template-config-${field.key}`"
+            :value="stringValue(field.key)"
+            autocomplete="off"
+            :aria-invalid="Boolean(configErrors[field.key])"
+            :aria-required="field.required ? 'true' : undefined"
+            :aria-describedby="describedBy(field)"
+            :class="formControlClass"
+            @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
+          >
+            <!--
             An empty option is essential, not decoration: absent means "use the
             provider's default", and without a way back to absent an operator
             who opens a select can never unset it again.
           -->
-          <option value="">{{ $t('avatar_templates.form.default') }}</option>
-          <option v-for="option in field.options ?? []" :key="option" :value="option">
-            {{ option }}
-          </option>
-        </select>
+            <option value="">{{ $t('avatar_templates.form.default') }}</option>
+            <option v-for="option in field.options ?? []" :key="option" :value="option">
+              {{ option }}
+            </option>
+          </select>
 
-        <input
-          v-else-if="field.type === 'checkbox'"
-          :id="`template-config-${field.key}`"
-          :data-testid="`template-config-${field.key}`"
-          type="checkbox"
-          :checked="draft.config[field.key] === true"
-          :aria-invalid="Boolean(configErrors[field.key])"
-          :aria-required="field.required ? 'true' : undefined"
-          :aria-describedby="describedBy(field)"
-          class="size-4 self-start accent-primary"
-          @change="onFieldChange(field, ($event.target as HTMLInputElement).checked)"
-        />
+          <input
+            v-else-if="field.type === 'checkbox'"
+            :id="`template-config-${field.key}`"
+            :data-testid="`template-config-${field.key}`"
+            type="checkbox"
+            :checked="draft.config[field.key] === true"
+            :aria-invalid="Boolean(configErrors[field.key])"
+            :aria-required="field.required ? 'true' : undefined"
+            :aria-describedby="describedBy(field)"
+            class="size-4 self-start accent-primary"
+            @change="onFieldChange(field, ($event.target as HTMLInputElement).checked)"
+          />
 
-        <input
-          v-else
-          :id="`template-config-${field.key}`"
-          :data-testid="`template-config-${field.key}`"
-          :type="field.type === 'number' ? 'number' : 'text'"
-          :value="stringValue(field.key)"
-          autocomplete="off"
-          :aria-invalid="Boolean(configErrors[field.key])"
-          :aria-required="field.required ? 'true' : undefined"
-          :aria-describedby="describedBy(field)"
-          :class="formControlClass"
-          @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
-          @blur="validateConfigField(field)"
-        />
-        <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
-          {{ $t(field.hint_key) }}
-        </FieldDescription>
-        <FieldError
-          v-if="configErrors[field.key]"
-          :id="`template-config-${field.key}-error`"
-          :data-testid="`template-config-${field.key}-error`"
-        >
-          {{ configErrors[field.key] }}
-        </FieldError>
-      </Field>
+          <!--
+          min/max/step come from the server FieldSpec and used to be dropped on
+          the floor: the API has serialised all three since FieldSpec.php:60,
+          and this input rendered none of them. A browser then defaults to
+          step=1, so `voiceSpeed` (0.8–1.2, step 0.01) moved a whole unit per
+          arrow press — out of range on the first click, and the same on every
+          other fractional knob (voiceStability, voiceSimilarityBoost,
+          voiceStyle, llmTemperature).
+
+          Bound for `number` ONLY: on a text input `step` is meaningless and
+          min/max silently change meaning — they constrain LENGTH, not value.
+
+          This does not hand validation to the browser. The form is `novalidate`
+          and validateConfigField() still owns min/max, with `step` deliberately
+          unvalidated. These attributes drive the spinner increment and the
+          mobile numeric keypad, nothing more.
+        -->
+          <input
+            v-else
+            :id="`template-config-${field.key}`"
+            :data-testid="`template-config-${field.key}`"
+            :type="field.type === 'number' ? 'number' : 'text'"
+            :value="stringValue(field.key)"
+            autocomplete="off"
+            :min="field.type === 'number' ? field.min : undefined"
+            :max="field.type === 'number' ? field.max : undefined"
+            :step="field.type === 'number' ? (field.step ?? undefined) : undefined"
+            :aria-invalid="Boolean(configErrors[field.key])"
+            :aria-required="field.required ? 'true' : undefined"
+            :aria-describedby="describedBy(field)"
+            :class="formControlClass"
+            @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
+            @blur="validateConfigField(field)"
+          />
+          <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
+            {{ $t(field.hint_key) }}
+          </FieldDescription>
+          <FieldError
+            v-if="configErrors[field.key]"
+            :id="`template-config-${field.key}-error`"
+            :data-testid="`template-config-${field.key}-error`"
+          >
+            {{ configErrors[field.key] }}
+          </FieldError>
+        </Field>
+      </div>
     </fieldset>
 
     <!--
@@ -262,15 +285,6 @@
 
       <LlmModeExplainer />
     </fieldset>
-
-    <div class="flex gap-2">
-      <Button type="submit" data-testid="template-save" :disabled="saving">
-        {{ $t('avatar_templates.action.save') }}
-      </Button>
-      <Button type="button" variant="outline" data-testid="template-cancel" @click="emit('cancel')">
-        {{ $t('avatar_templates.action.cancel') }}
-      </Button>
-    </div>
   </form>
 </template>
 
@@ -297,7 +311,6 @@
  * cannot support.
  */
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass } from '@/components/ui/form-control'
 import { getErrorFields } from '@/utils/http-error'
@@ -316,7 +329,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'cancel'): void
   (e: 'submit', payload: Partial<AvatarTemplate>): void
 }>()
 
@@ -324,6 +336,15 @@ const { t, te } = useI18n()
 
 const NAME_MAX_LENGTH = 120
 const DESCRIPTION_MAX_LENGTH = 500
+
+// feature/form-drawer: two columns benefit the GENERATED provider fields (up
+// to 15 for tavus, 11 for heygen) once there are enough to fill a row each —
+// below this, two columns just leaves one side of the drawer empty-looking
+// and makes a short form feel sparser than a single column would. Four is the
+// largest count that still reads naturally stacked (it is exactly the count
+// the admin-backoffice "settings" fixture uses); five is where a second
+// column starts pulling its own weight.
+const TWO_COLUMN_MIN_FIELDS = 5
 
 const providers: ProviderName[] = ['heygen', 'tavus']
 
@@ -343,6 +364,16 @@ const draft = ref({
 
 const isNew = computed(() => props.template.id === undefined)
 const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
+
+// A CSS grid, not `Field`'s own `orientation` prop — orientation controls a
+// SINGLE field's internal label/control layout (asserted unchanged by
+// `avatar-template-form.spec.ts`'s checkbox-vs-text test) and is orthogonal
+// to how MULTIPLE fields are arranged relative to each other.
+const configFieldsClass = computed(() =>
+  activeFields.value.length >= TWO_COLUMN_MIN_FIELDS
+    ? 'grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'
+    : 'flex flex-col gap-3'
+)
 
 const nameError = ref<string | undefined>(undefined)
 const descriptionError = ref<string | undefined>(undefined)

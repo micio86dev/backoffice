@@ -10,6 +10,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { confirmDialog } from './support/confirm'
+import { withTooltipProvider } from './support/tooltip-host'
+import { waitFor, waitForTestId } from './support/wait-for'
 
 /**
  * The rendered text of the currently-open ConfirmDialog ONLY — never
@@ -20,6 +22,24 @@ import { confirmDialog } from './support/confirm'
  */
 function openDialogText(): string {
   return document.body.querySelector('[role="alertdialog"]')?.textContent ?? ''
+}
+
+/**
+ * feature/form-drawer: the form now renders inside FormDrawer's `Sheet`,
+ * which teleports to `document.body` via reka-ui's `DialogPortal` —
+ * `wrapper.find(...)` only searches the wrapper's own subtree and will never
+ * see it, the same teleport-aware pattern `ConfirmDialog`'s spec already
+ * proved for the confirmation dialogs on this same page.
+ */
+function templateForm(): HTMLFormElement | null {
+  return document.body.querySelector<HTMLFormElement>('[data-testid="template-form"]')
+}
+
+/** A real submit, dispatched on the teleported `<form>` directly. */
+async function submitTemplateForm(): Promise<void> {
+  const form = await waitForTestId<HTMLFormElement>('template-form')
+  form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  await flushPromises()
 }
 
 // Echoes interpolation params so assertions can observe rendered content
@@ -41,6 +61,13 @@ function template(overrides: Record<string, unknown> = {}) {
     is_active: false,
     created_at: null,
     updated_at: null,
+    llm_model_id: 3,
+    llm_credential_id: 4,
+    llm_sync_status: 'synced',
+    llm_synced_at: null,
+    // 0.30 over a 15-minute reference interview: a per-minute rate would
+    // read 0,02, so the forbidden rendering is detectable as a substring.
+    llm: { estimated_cost_usd_per_interview: { minutes: 15, turns: 60, usd: 0.3 } },
     ...overrides,
   }
 }
@@ -75,7 +102,12 @@ async function mountPage(handlers: Handlers = {}) {
   }))
 
   const Page = (await import('../../app/pages/avatar-templates/index.vue')).default
-  const wrapper = mount(Page, { global: { mocks: { $t: tMock } }, attachTo: document.body })
+  // HelpTip's TooltipRoot throws without a provider; in the app one is
+  // mounted application-wide by SidebarProvider in layouts/default.vue.
+  const wrapper = mount(withTooltipProvider(Page), {
+    global: { mocks: { $t: tMock } },
+    attachTo: document.body,
+  })
   await flushPromises()
 
   return { wrapper, api }
@@ -305,8 +337,11 @@ describe('AvatarTemplatesPage', () => {
 
     await wrapper.find('[data-testid="template-new"]').trigger('click')
 
-    expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="template-field-name"]').attributes('value') ?? '').toBe('')
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+
+    expect(form).not.toBeNull()
+    expect(nameField?.value ?? '').toBe('')
   })
 
   it('opens the form populated when editing', async () => {
@@ -314,18 +349,22 @@ describe('AvatarTemplatesPage', () => {
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
 
-    const input = wrapper.find('[data-testid="template-field-name"]').element as HTMLInputElement
+    const form = await waitForTestId('template-form')
+    const input = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
 
-    expect(input.value).toBe('Recruiter voice')
+    expect(input?.value).toBe('Recruiter voice')
   })
 
   it('creates on submit when the template has no id', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-new"]').trigger('click')
-    await wrapper.find('[data-testid="template-field-name"]').setValue('Fresh')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+    nameField!.value = 'Fresh'
+    nameField!.dispatchEvent(new Event('input'))
+
+    await submitTemplateForm()
 
     expect(api.createTemplate).toHaveBeenCalled()
     expect(api.updateTemplate).not.toHaveBeenCalled()
@@ -335,8 +374,7 @@ describe('AvatarTemplatesPage', () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    await submitTemplateForm()
 
     expect(api.updateTemplate).toHaveBeenCalled()
     expect(api.createTemplate).not.toHaveBeenCalled()
@@ -361,30 +399,165 @@ describe('AvatarTemplatesPage', () => {
     })
 
     await wrapper.find('[data-testid="template-new"]').trigger('click')
-    await wrapper.find('[data-testid="template-field-name"]').setValue('Broken')
-    await wrapper.find('form').trigger('submit')
-    await flushPromises()
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+    nameField!.value = 'Broken'
+    nameField!.dispatchEvent(new Event('input'))
 
-    // Closing the form on a validation failure would discard everything the
-    // operator typed to tell them one of the fields was wrong.
-    expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(true)
+    await submitTemplateForm()
+
+    // A failed save (422) leaves the drawer OPEN with errors visible —
+    // closing it would discard everything the operator typed to tell them
+    // one of the fields was wrong.
+    expect(templateForm()).not.toBeNull()
     // `avatarId` IS a field this page's spec renders — claimed onto its own
     // control rather than flattened into the summary.
-    expect(wrapper.find('[data-testid="template-config-avatarId-error"]').exists()).toBe(true)
+    expect(
+      document.body.querySelector('[data-testid="template-config-avatarId-error"]')
+    ).not.toBeNull()
     // `voiceSpeed` names no field this page's spec renders — an unplaceable
     // message still has to reach the operator, so it stays in the summary.
-    expect(wrapper.findAll('[data-testid="template-form-errors"] li')).toHaveLength(1)
-    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain('range')
+    const summary = document.body.querySelector('[data-testid="template-form-errors"]')
+    expect(summary?.querySelectorAll('li')).toHaveLength(1)
+    expect(summary?.textContent).toContain('range')
   })
 
   it('closes the form and reloads after a successful save', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
-    await wrapper.find('form').trigger('submit')
+    await submitTemplateForm()
+
+    expect(templateForm()).toBeNull()
+    expect(api.listTemplates).toHaveBeenCalledTimes(2)
+  })
+
+  // Non-negotiable RED spec: cancel closes the drawer and leaves the list
+  // untouched — no request fired, no reload.
+  it('closes the drawer on cancel without touching the list', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await waitForTestId('template-form')
+
+    const cancelButton = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="form-drawer-cancel"]'
+    )
+    cancelButton!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    cancelButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="template-form"]').exists()).toBe(false)
-    expect(api.listTemplates).toHaveBeenCalledTimes(2)
+    expect(templateForm()).toBeNull()
+    expect(api.updateTemplate).not.toHaveBeenCalled()
+    expect(api.listTemplates).toHaveBeenCalledTimes(1)
+  })
+
+  // Non-negotiable RED spec: Escape closes the drawer and leaves the list
+  // untouched, exactly like cancel — reka-ui's DialogContent handles Escape
+  // internally and emits update:open(false), which the page maps onto
+  // `editing = null` the same way the cancel button's click does.
+  it('closes the drawer on Escape without touching the list', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    const form = await waitForTestId('template-form')
+
+    form.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+    await flushPromises()
+    await waitFor(() => templateForm() === null, 'the drawer to close after Escape')
+
+    expect(templateForm()).toBeNull()
+    expect(api.updateTemplate).not.toHaveBeenCalled()
+    expect(api.listTemplates).toHaveBeenCalledTimes(1)
+  })
+
+  // The footer's Save/Cancel controls must stay reachable without scrolling
+  // — the exact defect the project form's old centred Dialog carried,
+  // and the reason FormDrawer exists as a shared wrapper rather than each
+  // page hand-rolling its own Sheet usage.
+  it('keeps the footer actions outside the scrolling region', async () => {
+    const { wrapper } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await waitForTestId('template-form')
+
+    const scrollRegion = document.body.querySelector('.overflow-y-auto')
+    const saveButton = document.body.querySelector('[data-testid="form-drawer-save"]')
+
+    expect(scrollRegion).not.toBeNull()
+    expect(saveButton).not.toBeNull()
+    expect(scrollRegion!.contains(saveButton)).toBe(false)
+  })
+})
+
+/**
+ * Per-template conversation-LLM forecast (pluggable-conversation-llm P9).
+ *
+ * `AvatarTemplateResource.llm.estimated_cost_usd_per_interview` is a TOTAL
+ * for one reference interview, computed server-side by the same estimator the
+ * real `/end` write uses. The two rules that bind this surface:
+ *
+ * - It is never expressed per minute. Input tokens grow QUADRATICALLY in turn
+ *   count (the whole conversation is re-sent every turn), so a rate misstates
+ *   cost at any other interview length and invites an operator to multiply.
+ * - `null` means no usable model binding, and must read as "not forecastable",
+ *   never as a forecast of zero.
+ */
+describe('AvatarTemplatesPage — conversation-LLM forecast', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    tMock.mockClear()
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, locale: ref('it') }))
+    )
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('states the forecast as a total for a named reference interview', async () => {
+    const { wrapper } = await mountPage()
+
+    const line = wrapper.get('[data-testid="template-llm-forecast-1"]')
+    expect(line.text()).toContain('avatar_templates.llmForecast')
+    // The shape travels with the number: a total is only interpretable
+    // alongside the interview it is a total FOR.
+    expect(line.text()).toContain('0,30')
+    expect(line.text()).toContain('15')
+    expect(line.text()).toContain('60')
+  })
+
+  it('never states a per-minute LLM rate', async () => {
+    const { wrapper } = await mountPage()
+
+    // 0.30 over the 15-minute reference interview would be 0,02 per minute.
+    expect(wrapper.text()).not.toContain('0,02')
+  })
+
+  it('says a template with no model bound cannot be forecast, rather than forecasting zero', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [template({ llm: { estimated_cost_usd_per_interview: null } })],
+      }),
+    })
+
+    const line = wrapper.get('[data-testid="template-llm-forecast-1"]')
+    expect(line.text()).toContain('avatar_templates.llmForecastUnavailable')
+    // Zero is a price. An unbound template has no price at all.
+    expect(line.text()).not.toContain('0,00')
+  })
+
+  // The figure is not self-explanatory: an operator has to know it is an
+  // estimate, that it covers only the language model, and why no rate exists.
+  it('offers the definition of the figure without requiring a pointer', async () => {
+    const { wrapper } = await mountPage()
+
+    expect(wrapper.text()).toContain('help.glossary.llmCost.definition')
   })
 })

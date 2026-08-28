@@ -1,5 +1,12 @@
 {
   "welcome": "Benvenuto",
+  "common": {
+    "action": {
+      "save": "Salva",
+      "cancel": "Annulla",
+      "close": "Chiudi"
+    }
+  },
   "login": {
     "title": "Accedi",
     "subtitle": "Accedi al pannello amministrativo BEAI",
@@ -321,8 +328,21 @@
       "indicators": "Indicatori"
     },
     "excerpts": {
-      "title": "Estratti (testuali dalla trascrizione)",
       "empty": "Nessun estratto disponibile per questo indicatore"
+    },
+    "help": {
+      "trigger": "Spiega «{term}»"
+    },
+    "glossary": {
+      "label": "Parole usate in questo report:"
+    },
+    "evidence": {
+      "title": "Le evidenze dietro ogni punteggio",
+      "intro": "Una riga per indicatore, nello stesso ordine dei punteggi della competenza nella tabella qui sopra. Apri una riga per leggere perché è stato assegnato quel punteggio e le parole del candidato su cui si basa.",
+      "explanation": "Perché questo punteggio",
+      "noIndicators": "Questa competenza non ha indicatori da mostrare.",
+      "expandAll": "Espandi tutto",
+      "collapseAll": "Comprimi tutto"
     },
     "states": {
       "loading": "Caricamento del report di valutazione…",
@@ -361,13 +381,15 @@
       "organization": "Profilo organizzazione",
       "apiKeys": "Chiavi API",
       "webhooks": "Valori predefiniti webhook",
-      "users": "Utenti e ruoli"
+      "users": "Utenti e ruoli",
+      "llmCredentials": "Credenziali LLM di conversazione"
     },
     "sectionDescription": {
       "organization": "Nome e identificatore del tenant",
       "apiKeys": "Credenziali per l'accesso machine-to-machine",
       "webhooks": "Dove BEAI recapita gli eventi di avanzamento e valutazione",
-      "users": "Chi può accedere e cosa può fare"
+      "users": "Chi può accedere e cosa può fare",
+      "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista"
     },
     "organization": {
       "name": "Nome",
@@ -774,7 +796,10 @@
       "voiceStability": "Quanto è costante il tono (0–1). Valori alti = voce più uniforme e prevedibile; valori bassi = più espressiva ma variabile.",
       "voiceStyle": "Quanta enfasi/espressività aggiungere (0–1). 0 = neutro. Valori alti possono suonare esagerati.",
       "voiceUseSpeakerBoost": "Rende la voce più chiara e presente, più simile all'originale. Costa un filo di latenza in più. Di solito conviene tenerlo attivo."
-    }
+    },
+    "llmForecastIntro": "Ogni template qui sotto riporta una stima di quanto costa in token dell'LLM di conversazione una singola intervista tipica. I minuti dell'avatar sono fatturati da un fornitore diverso su un contatore diverso e non sono inclusi.",
+    "llmForecast": "≈ $ {amount} in token LLM per un'intervista tipica di {minutes} minuti e {turns} turni. È una stima, ed è il totale di quell'intera intervista — non una tariffa al minuto.",
+    "llmForecastUnavailable": "A questo template non è associato alcun modello di conversazione, quindi il suo costo LLM non può essere stimato."
   },
   "help": {
     "label": "Aiuto",
@@ -870,11 +895,19 @@
       },
       "bars": {
         "term": "BARS",
-        "definition": "Scala di valutazione ancorata a comportamenti. Ogni risposta viene confrontata con comportamenti di riferimento scritti e valutata 1, 3 o 5 — mai un valore intermedio."
+        "definition": "Scala di valutazione ancorata a comportamenti. Ogni risposta viene confrontata con comportamenti di riferimento scritti e valutata da 1 a 5: 1, 3 e 5 sono le ancore scritte, mentre 2 e 4 si usano quando l'evidenza non corrisponde a nessuna delle due ancore che la delimitano. Un indicatore privo di evidenze valutabili non riceve alcun punteggio ed è escluso dalla media."
       },
       "competency": {
         "term": "Competenza",
         "definition": "Una capacità valutata. Il punteggio è la media degli indicatori che è stato possibile valutare."
+      },
+      "indicator": {
+        "term": "Indicatore",
+        "definition": "Un comportamento osservabile che compone una competenza. Ogni indicatore è valutato sulle proprie evidenze, e il punteggio della competenza è la media degli indicatori che è stato possibile valutare."
+      },
+      "excerpt": {
+        "term": "Estratto",
+        "definition": "Un passaggio ripreso parola per parola dalla trascrizione. È l'evidenza su cui poggia il punteggio di un indicatore: viene verificata sulla trascrizione e non viene mai riscritta né riassunta."
       },
       "reliability": {
         "term": "Affidabilità",
@@ -895,6 +928,10 @@
       "avatarTemplate": {
         "term": "Template avatar",
         "definition": "Impostazioni riutilizzabili di voce e aspetto dell'intervistatore."
+      },
+      "llmCost": {
+        "term": "costo LLM di conversazione",
+        "definition": "Quanto costa il modello linguistico che sta dietro all'intervista. È stimato dai turni e dai caratteri effettivamente scambiati, mai letto da una fattura del fornitore. Non viene mai espresso al minuto: a ogni turno il modello riceve di nuovo l'intera conversazione, quindi il ventesimo minuto costa diverse volte il primo, e moltiplicare un valore al minuto per la durata della sessione dà un risultato sbagliato. È fatturato da un fornitore diverso da quello dei minuti dell'avatar e non va mai sommato a essi."
       }
     }
   },
@@ -958,6 +995,14 @@
       "open": "Apri resoconto",
       "nav": "Naviga tra le sessioni",
       "current": "Sessione corrente ({competency})"
+    },
+    "cost": {
+      "separateMeters": "I minuti dell'avatar e i token dell'LLM di conversazione sono fatturati da due fornitori diversi su due contatori diversi. Vengono mostrati separatamente e non vengono mai sommati. Entrambi sono stime: nessun fornitore espone un importo fatturato per singola sessione.",
+      "avatarMeter": "Minuti dell'avatar ({provider}) — stima",
+      "llmMeter": "LLM di conversazione",
+      "llmEstimated": "Token LLM di conversazione — stima",
+      "llmActual": "Token LLM di conversazione — effettivo",
+      "llmNotBilled": "Questa sessione non ha usato un modello gestito da BEAI, quindi non è stato registrato alcun costo per i token. Non si tratta di un addebito pari a zero."
     }
   }
 }

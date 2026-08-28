@@ -6,11 +6,25 @@
  * is a verdict on a candidate, not an input to a judgement — and this panel is
  * the only place that distinction is visible.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import SessionReviewPanel from '../../../../app/components/organisms/SessionReviewPanel.vue'
+import { withTooltipProvider } from '../../support/tooltip-host'
 
-const tMock = (key: string) => key
+// Interpolates, so a cost figure can be asserted on. Keys that take no params
+// still render as the bare key, which is what the existing assertions below
+// match on. `setup.ts`'s global `useI18n` drops params by design; a spec that
+// cares about an interpolated value re-stubs it, per that file's convention.
+const tMock = (key: string, params?: Record<string, unknown>) =>
+  params === undefined ? key : `${key}:${JSON.stringify(params)}`
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'useI18n',
+    vi.fn(() => ({ t: tMock, te: () => true, locale: ref('it') }))
+  )
+})
 
 function review(over: Record<string, unknown> = {}) {
   return {
@@ -44,14 +58,22 @@ function review(over: Record<string, unknown> = {}) {
       clipboard_pastes: 0,
     },
     snapshots: [],
-    cost: { avatar: { provider: 'heygen', minutes: 10, usd: 2 }, is_estimate: true as const },
+    cost: {
+      avatar: { provider: 'heygen', minutes: 10, usd: 2 },
+      // 0.5 against an avatar total of 2 over a 600 s session: a combined
+      // total would read 2.50 and a per-minute LLM rate 0.05, so both
+      // forbidden renderings are detectable as substrings.
+      llm: { estimated_usd: 0.5, actual_usd: null },
+      is_estimate: true as const,
+    },
     ...over,
   }
 }
 
 function mountPanel(data: ReturnType<typeof review>) {
-  return mount(SessionReviewPanel, {
-    props: { review: data as never, locale: 'it' },
+  // HelpTip's TooltipRoot throws without a provider; in the app one is
+  // mounted application-wide by SidebarProvider in layouts/default.vue.
+  return mount(withTooltipProvider(SessionReviewPanel, { review: data, locale: 'it' }), {
     global: { mocks: { $t: tMock } },
   })
 }
@@ -108,7 +130,7 @@ describe('SessionReviewPanel', () => {
   })
 
   it('shows a dash rather than zero when a session cannot be priced', () => {
-    const wrapper = mountPanel(review({ cost: { avatar: null, is_estimate: true } }))
+    const wrapper = mountPanel(review({ cost: { avatar: null, llm: null, is_estimate: true } }))
 
     // Zero would claim the session was free, which is a different statement
     // from "this cannot be priced".
@@ -220,5 +242,120 @@ describe('SessionReviewPanel — coverage honesty', () => {
     const wrapper = await mountPanel({ ...review(), integrity })
 
     expect(wrapper.find('[data-testid="integrity-coverage-warning"]').exists()).toBe(false)
+  })
+})
+
+/**
+ * Conversation-LLM cost on a session review (pluggable-conversation-llm P9).
+ *
+ * Four rules, each with a reason, each pinned here:
+ *
+ * 1. Avatar minutes and LLM tokens are billed by different vendors on
+ *    different meters, so they render as two labelled lines and are NEVER
+ *    summed. The refusal is already ratified server-side at
+ *    `api/app/Services/Proctoring/SessionCostEstimator.php:20-22`: "one total
+ *    would be a number with no owner".
+ * 2. No per-minute LLM rate. Input tokens grow QUADRATICALLY in turn count —
+ *    the model re-sends the whole history every turn — so minute 20 costs
+ *    several times minute 1. A per-minute figure invites an operator to
+ *    multiply it by session length and be confidently wrong.
+ * 3. "Actual" renders only when non-null. In managed mode the provider calls
+ *    Google, so `actual_*` is permanently NULL; a blank Actual column would be
+ *    a dead knob. The columns exist for a later change where BEAI runs the
+ *    model itself.
+ * 4. Absent is not zero. A session whose LLM binding resolved unbound or
+ *    degraded has NO usage row at all, and the API sends `cost.llm: null`.
+ *    Zero is a price; absent is "we did not run this model".
+ */
+describe('SessionReviewPanel — conversation-LLM cost', () => {
+  it('renders the avatar and LLM meters as two separately labelled lines', () => {
+    const wrapper = mountPanel(review())
+
+    const avatar = wrapper.get('[data-testid="cost-avatar"]')
+    const llm = wrapper.get('[data-testid="cost-llm-estimated"]')
+
+    // Each line names its own meter — the avatar line names the avatar
+    // provider, the LLM line names the conversation model.
+    expect(avatar.text()).toContain('review.cost.avatarMeter')
+    expect(avatar.text()).toContain('heygen')
+    expect(avatar.text()).toContain('2,00')
+    expect(llm.text()).toContain('review.cost.llmEstimated')
+    expect(llm.text()).toContain('0,50')
+  })
+
+  // Rule 1.
+  it('never renders one combined avatar + LLM total', () => {
+    const text = mountPanel(review()).text()
+
+    // 2.00 + 0.50. If this string ever appears, the two meters have been
+    // added together and the sum has no owner.
+    expect(text).not.toContain('2,50')
+  })
+
+  // Rule 2.
+  it('never renders a per-minute LLM rate', () => {
+    const text = mountPanel(review()).text()
+
+    // 0.50 over a 600-second session would be 0.05/min. Input tokens grow
+    // quadratically in turn count, so that figure is arithmetically
+    // meaningless at any other interview length.
+    expect(text).not.toContain('0,05')
+    expect(text).not.toContain('perMinute')
+  })
+
+  // Rule 3.
+  it('omits the Actual line entirely while the API reports no actual figure', () => {
+    const wrapper = mountPanel(review())
+
+    expect(wrapper.find('[data-testid="cost-llm-estimated"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="cost-llm-actual"]').exists()).toBe(false)
+  })
+
+  it('renders the Actual line once the API sends one', () => {
+    const wrapper = mountPanel(
+      review({
+        cost: {
+          avatar: { provider: 'heygen', minutes: 10, usd: 2 },
+          llm: { estimated_usd: 0.5, actual_usd: 0.42 },
+          is_estimate: true,
+        },
+      })
+    )
+
+    const actual = wrapper.get('[data-testid="cost-llm-actual"]')
+    expect(actual.text()).toContain('review.cost.llmActual')
+    expect(actual.text()).toContain('0,42')
+  })
+
+  // Rule 4.
+  it('says the model was never run rather than pricing the session at zero', () => {
+    const wrapper = mountPanel(
+      review({
+        cost: {
+          avatar: { provider: 'heygen', minutes: 10, usd: 2 },
+          llm: null,
+          is_estimate: true,
+        },
+      })
+    )
+
+    const llm = wrapper.get('[data-testid="cost-llm-absent"]')
+    expect(llm.exists()).toBe(true)
+    expect(llm.text()).toContain('review.cost.llmNotBilled')
+    // Zero is a price. This session was not priced at all.
+    expect(llm.text()).not.toContain('0,00')
+    expect(wrapper.find('[data-testid="cost-llm-estimated"]').exists()).toBe(false)
+  })
+
+  // Rule 4, second half — the word "estimate" is never dropped, and the
+  // glossary tip carries the quadratic-growth explanation an operator needs
+  // before reasoning about the figure at all.
+  it('labels the LLM figure an estimate and offers its definition', () => {
+    const wrapper = mountPanel(review())
+
+    expect(wrapper.get('[data-testid="cost-llm-estimated"]').text()).toContain(
+      'review.cost.llmEstimated'
+    )
+    expect(wrapper.text()).toContain('help.glossary.llmCost.definition')
   })
 })

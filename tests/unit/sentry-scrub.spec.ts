@@ -189,4 +189,25 @@ describe('redactUrl', () => {
     expect(redactUrl(undefined)).toBeUndefined()
     expect(redactUrl('')).toBe('')
   })
+
+  // self-service-password-reset. The `token` DENIED_KEYS entry only covers a
+  // key on an object; the reset link carries the token as a URL PATH SEGMENT
+  // (`SendPasswordResetLinkJob.php:135`), which reaches Sentry through
+  // `request.url` and through every navigation breadcrumb.
+  it('collapses the reset token out of a URL, which the key denylist cannot reach', () => {
+    expect(
+      redactUrl('https://ops.beai.io/reset-password/a-live-token?email=ada%40example.com')
+    ).toBe('https://ops.beai.io/reset-password/:token')
+  })
+
+  it('collapses it out of a bare-path breadcrumb too', () => {
+    // Vue Router breadcrumbs pass `to`/`from` as paths, not absolute URLs.
+    const scrubbed = scrubBreadcrumb({
+      category: 'navigation',
+      data: { from: '/login', to: '/reset-password/a-live-token' },
+    })
+
+    expect(scrubbed.data?.['to']).toBe('/reset-password/:token')
+    expect(JSON.stringify(scrubbed)).not.toContain('a-live-token')
+  })
 })

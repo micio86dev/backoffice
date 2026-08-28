@@ -101,6 +101,23 @@ async function submitForm(wrapper: ReturnType<typeof mount>): Promise<void> {
   await flushPromises()
 }
 
+// feature/form-drawer: this file's fixture (fieldSpecs = { heygen: [], tavus:
+// [] }) is the empty-fields edge case the two-column layout must not crash
+// on — proving that BEFORE the LLM-binding tests below exercise the rest of
+// the form.
+describe('AvatarTemplateForm — two-column layout with zero generated fields (feature/form-drawer)', () => {
+  it('renders without error and in a single column when fieldSpecs is empty', async () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: baseProps(),
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    const container = wrapper.get('[data-testid="template-config-fields"]')
+    expect(container.classes()).not.toContain('grid')
+  })
+})
+
 describe('AvatarTemplateForm — unbound badge (P8.5)', () => {
   it('shows the unbound badge when the template carries no llm_model_id', async () => {
     const wrapper = mount(AvatarTemplateForm, {

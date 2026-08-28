@@ -1,5 +1,10 @@
 <template>
-  <form data-testid="user-form" novalidate @submit.prevent="onSubmit">
+  <!--
+    `id` is load-bearing, not decoration (feature/form-drawer): the submit
+    control lives in FormDrawer's non-scrolling footer, OUTSIDE this element,
+    and `<button form="user-form">` is what connects the two.
+  -->
+  <form id="user-form" data-testid="user-form" novalidate @submit.prevent="onSubmit">
     <FieldGroup>
       <Field :data-invalid="Boolean(errors.name)">
         <FieldLabel for="user-form-name">{{ $t('users.name') }}</FieldLabel>
@@ -101,9 +106,12 @@
         <AlertDescription>{{ formMessage }}</AlertDescription>
       </Alert>
 
-      <Button type="submit" :disabled="saving" data-testid="user-form-submit">
-        {{ $t('projects.action.save') }}
-      </Button>
+      <!--
+        No submit control here — it lives in FormDrawer's non-scrolling footer
+        (feature/form-drawer), wired back to this form by its `id`. The banner
+        above is the last thing in the drawer's scrolling body, so it and the
+        submit control are visible together however far the form is scrolled.
+      -->
     </FieldGroup>
   </form>
 </template>
@@ -113,10 +121,9 @@
 // admin/operator/viewer (the code-level allow-list, mirrored client-side —
 // never free text, never a BEAI role_code value). Password is admin-set
 // (D4 "New User Initial Password Set By Admin") and only offered at create.
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select,
@@ -137,6 +144,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'saved'): void
+  /**
+   * feature/form-drawer. This form owns its own persistence (and therefore its
+   * own in-flight flag), but the submit control it belongs to now lives in the
+   * drawer footer above it. Publishing the flag is what lets the shared footer
+   * disable that control.
+   */
+  (e: 'update:pending', value: boolean): void
 }>()
 
 const { createUser, updateUser } = useUsers()
@@ -153,6 +167,11 @@ const password = ref('')
 const role = ref<(typeof ACCESS_LEVELS)[number]>(props.user?.role ?? 'operator')
 
 const saving = ref(false)
+
+// `immediate` so the drawer footer starts from this form's truth rather than
+// from its own prop default.
+watch(saving, (value) => emit('update:pending', value), { immediate: true })
+
 const formMessage = ref<string | null>(null)
 const errors = ref<{ name?: string; email?: string; password?: string }>({})
 

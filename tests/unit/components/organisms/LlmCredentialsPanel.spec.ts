@@ -328,3 +328,171 @@ describe('LlmCredentialsPanel — create form 422 (invalid_key mapped, never raw
     wrapper.unmount()
   })
 })
+
+// feature/form-drawer — both of this panel's FORMS (create, and the per-row
+// key rotation) move onto the shared FormDrawer. The remove confirmation
+// deliberately does not: it is a destructive confirm, not a form.
+describe('LlmCredentialsPanel — the create and rotate drawers', () => {
+  const inDrawer = (testId: string) =>
+    document.body.querySelector(`[data-testid="form-drawer"] [data-testid="${testId}"]`)
+
+  function submitFromFooter(): void {
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  }
+
+  function setValue(testId: string, value: string): void {
+    const input = document.body.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)
+    input!.value = value
+    input!.dispatchEvent(new Event('input'))
+  }
+
+  async function mountPanel() {
+    const wrapper = mount(LlmCredentialsPanel, {
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    return wrapper
+  }
+
+  it('renders the create form inside the drawer, not a centred dialog', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credentials-new"]').trigger('click')
+    await waitFor(() => inDrawer('llm-credential-form'), 'the create form to mount in the drawer')
+
+    expect(document.body.querySelector('[data-slot="dialog-content"]')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('keeps the create submit control out of the scrolling region', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credentials-new"]').trigger('click')
+    await waitFor(() => inDrawer('llm-credential-form'), 'the create form to mount in the drawer')
+
+    const scrollRegion = document.body.querySelector('.overflow-y-auto')
+    const submit = document.body.querySelector('[data-testid="form-drawer-save"]')
+
+    expect(submit).not.toBeNull()
+    expect(scrollRegion!.contains(submit)).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('closes the create drawer on a successful create', async () => {
+    createCredentialMock.mockResolvedValue({ data: verifiedCredential })
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credentials-new"]').trigger('click')
+    await waitFor(() => inDrawer('llm-credential-form'), 'the create form to mount in the drawer')
+
+    setValue('llm-credential-form-name', 'New key')
+    setValue('llm-credential-form-api-key', 'a-live-key')
+    await flushPromises()
+    submitFromFooter()
+    await waitFor(
+      () => inDrawer('llm-credential-form') === null,
+      'the create drawer to close after a successful create'
+    )
+
+    expect(createCredentialMock).toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('leaves the create drawer OPEN with the field error visible when the create is rejected', async () => {
+    createCredentialMock.mockRejectedValue(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { api_key: ['invalid_key'] } },
+      })
+    )
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credentials-new"]').trigger('click')
+    await waitFor(() => inDrawer('llm-credential-form'), 'the create form to mount in the drawer')
+
+    setValue('llm-credential-form-name', 'New key')
+    setValue('llm-credential-form-api-key', 'a-dead-key')
+    await flushPromises()
+    submitFromFooter()
+    const error = await waitForTestId('llm-credential-form-api-key-error')
+
+    expect(inDrawer('llm-credential-form')).not.toBeNull()
+    expect(error.textContent).toContain('settings.llmCredentials.error.invalidKey')
+
+    wrapper.unmount()
+  })
+
+  it('closes the create drawer on cancel without creating anything', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credentials-new"]').trigger('click')
+    await waitFor(() => inDrawer('llm-credential-form'), 'the create form to mount in the drawer')
+
+    const cancel = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="form-drawer-cancel"]'
+    )
+    cancel!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    cancel!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(() => inDrawer('llm-credential-form') === null, 'the create drawer to close')
+
+    expect(createCredentialMock).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('renders the rotate form inside the drawer and closes it on success', async () => {
+    rotateCredentialMock.mockResolvedValue({ data: verifiedCredential })
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credential-rotate-1"]').trigger('click')
+    await waitFor(
+      () => inDrawer('llm-credential-rotate-form'),
+      'the rotate form to mount in the drawer'
+    )
+
+    setValue('llm-credential-rotate-api-key', 'a-fresh-key')
+    await flushPromises()
+    submitFromFooter()
+    await waitFor(
+      () => inDrawer('llm-credential-rotate-form') === null,
+      'the rotate drawer to close after a successful rotation'
+    )
+
+    expect(rotateCredentialMock).toHaveBeenCalledWith(1, { api_key: 'a-fresh-key' })
+
+    wrapper.unmount()
+  })
+
+  it('leaves the rotate drawer OPEN with the error visible when the rotation is rejected', async () => {
+    rotateCredentialMock.mockRejectedValue(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { api_key: ['invalid_key'] } },
+      })
+    )
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credential-rotate-1"]').trigger('click')
+    await waitFor(
+      () => inDrawer('llm-credential-rotate-form'),
+      'the rotate form to mount in the drawer'
+    )
+
+    setValue('llm-credential-rotate-api-key', 'a-dead-key')
+    await flushPromises()
+    submitFromFooter()
+    const error = await waitForTestId('llm-credential-rotate-error')
+
+    expect(inDrawer('llm-credential-rotate-form')).not.toBeNull()
+    expect(error.textContent).toContain('settings.llmCredentials.error.invalidKey')
+
+    wrapper.unmount()
+  })
+})

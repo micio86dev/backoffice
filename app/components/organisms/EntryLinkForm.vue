@@ -1,5 +1,10 @@
 <template>
-  <form data-testid="entry-link-form" novalidate @submit.prevent="onSubmit">
+  <!--
+    `id` is load-bearing, not decoration (feature/form-drawer): the submit
+    control lives in FormDrawer's non-scrolling footer, OUTSIDE this element,
+    and `<button form="entry-link-form">` is what connects the two.
+  -->
+  <form id="entry-link-form" data-testid="entry-link-form" novalidate @submit.prevent="onSubmit">
     <FieldGroup>
       <Field :data-invalid="Boolean(errors.candidateRef)">
         <FieldLabel for="entry-link-form-candidate-ref">
@@ -55,9 +60,10 @@
         <AlertDescription>{{ formMessage }}</AlertDescription>
       </Alert>
 
-      <Button type="submit" :disabled="submitting" data-testid="entry-link-form-submit">
-        {{ $t('entryLink.form.submit') }}
-      </Button>
+      <!--
+        No submit control here — it lives in FormDrawer's non-scrolling footer
+        (feature/form-drawer), wired back to this form by its `id`.
+      -->
     </FieldGroup>
   </form>
 </template>
@@ -66,10 +72,9 @@
 // EntryLinkForm — "Invite candidate" surface (design D4): candidate_ref +
 // display_name only. project_id is known from context (the project row the
 // operator opened the dialog from), never a third field to pick.
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useEntryLinks, type GenerateEntryLinkResponse } from '@/composables/useEntryLinks'
 import { applyServerFieldErrors } from '@/utils/http-error'
@@ -82,6 +87,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'success', link: GenerateEntryLinkResponse): void
+  /**
+   * feature/form-drawer. This form owns its own request (and therefore its own
+   * in-flight flag), but the submit control it belongs to now lives in the
+   * drawer footer above it. Publishing the flag is what lets the shared footer
+   * disable that control.
+   */
+  (e: 'update:pending', value: boolean): void
 }>()
 
 const { generateEntryLink } = useEntryLinks()
@@ -92,6 +104,10 @@ const displayName = ref('')
 const errors = ref<{ candidateRef?: string; displayName?: string }>({})
 const formMessage = ref<string | null>(null)
 const submitting = ref(false)
+
+// `immediate` so the drawer footer starts from this form's truth rather than
+// from its own prop default.
+watch(submitting, (value) => emit('update:pending', value), { immediate: true })
 
 function validateField(value: string, requiredKey: string, tooLongKey: string): string | undefined {
   if (value.trim() === '') return t(requiredKey)

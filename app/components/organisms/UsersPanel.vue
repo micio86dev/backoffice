@@ -64,14 +64,26 @@
       </TableBody>
     </Table>
 
-    <Dialog :open="editing !== null" @update:open="(open) => !open && (editing = null)">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{{ editing === 'new' ? $t('users.new') : $t('users.edit') }}</DialogTitle>
-        </DialogHeader>
-        <UserForm v-if="editing !== null" :user="editingUser" @saved="onFormSaved" />
-      </DialogContent>
-    </Dialog>
+    <!--
+      Right-side drawer, not a centred dialog (feature/form-drawer): a
+      record-editing form launched from a list is the drawer case, and the
+      shared wrapper is where the focus trap, focus restore, Escape handling
+      and the never-scrolling footer come from.
+    -->
+    <FormDrawer
+      :open="editing !== null"
+      :title="editing === 'new' ? $t('users.new') : $t('users.edit')"
+      form-id="user-form"
+      :pending="saving"
+      @update:open="(open) => !open && (editing = null)"
+    >
+      <UserForm
+        v-if="editing !== null"
+        :user="editingUser"
+        @update:pending="(value) => (saving = value)"
+        @saved="onFormSaved"
+      />
+    </FormDrawer>
 
     <ConfirmDialog
       :open="confirmTarget !== null"
@@ -110,7 +122,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import AccessLevelBadge from '@/components/atoms/AccessLevelBadge.vue'
 import UserStateBadge from '@/components/atoms/UserStateBadge.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
@@ -123,6 +135,9 @@ const { listUsers, deactivateUser, activateUser } = useUsers()
 
 const users = ref<User[]>([])
 const editing = ref<'new' | number | null>(null)
+// Mirrored from UserForm's own in-flight flag (feature/form-drawer): the form
+// still owns persistence, the drawer footer holds its submit control.
+const saving = ref(false)
 const confirmTarget = ref<{ user: User; action: 'deactivate' | 'activate' } | null>(null)
 
 const editingUser = computed<User | null>(() => {

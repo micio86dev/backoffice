@@ -235,12 +235,12 @@ test.describe('Projects CRUD (Unit 2b)', () => {
 
     expect(patchCount).toBe(0)
 
-    // The edit dialog is still open (cancelling the ARCHIVE confirmation
-    // only closes that nested dialog) — the archive trigger is still
+    // The edit drawer is still open (cancelling the ARCHIVE confirmation
+    // only closes that nested alertdialog) — the archive trigger is still
     // offered, which is only true if the project is still active.
     await expect(page.getByRole('button', { name: 'Archivia' })).toBeVisible()
 
-    // Closing the edit dialog and returning to the list, the row still
+    // Closing the edit drawer and returning to the list, the row still
     // reads its ORIGINAL status — cancelling touched nothing.
     await page.keyboard.press('Escape')
     await expect(page.getByRole('row', { name: /Active Project/ })).toBeVisible()

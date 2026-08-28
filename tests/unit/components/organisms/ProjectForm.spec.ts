@@ -289,8 +289,17 @@ describe('ProjectForm', () => {
     const banner = wrapper.get('[data-testid="project-form-banner"]')
     expect(banner.attributes('role')).toBe('alert')
 
+    // The banner used to be asserted as preceding this form's own submit
+    // button in document order, so an operator could not miss it. That button
+    // moved to FormDrawer's footer (feature/form-drawer) and the guarantee is
+    // now structural rather than positional: the footer never scrolls, and the
+    // banner is the LAST thing in the scrolling body, so the two are visible
+    // together no matter how far the form has been scrolled. What is still
+    // this component's own responsibility — and what stays asserted here — is
+    // that the banner is rendered inside the form at all.
     const html = wrapper.html()
-    expect(html.indexOf('project-form-banner')).toBeLessThan(html.indexOf('project-form-submit'))
+    expect(html).toContain('project-form-banner')
+    expect(html).not.toContain('project-form-submit')
   })
 
   it('maps a 422 field error onto the matching field, not only the banner', async () => {
@@ -512,9 +521,11 @@ describe('ProjectForm — archive requires confirmation (D7)', () => {
     await flushPromises()
 
     expect(updateProjectMock).not.toHaveBeenCalled()
-    expect(
-      wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
-    ).toBeUndefined()
+    // Was read off this form's own submit button being enabled; that control
+    // now lives in FormDrawer's footer and is driven by the flag this form
+    // publishes (feature/form-drawer), so the flag itself is what gets
+    // asserted — a stricter check than the button proxy it replaces.
+    expect(wrapper.emitted('update:pending')?.at(-1)).toEqual([false])
     wrapper.unmount()
   })
 
@@ -531,9 +542,11 @@ describe('ProjectForm — archive requires confirmation (D7)', () => {
     await confirmDialog('cancel')
 
     expect(updateProjectMock).not.toHaveBeenCalled()
-    expect(
-      wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
-    ).toBeUndefined()
+    // Was read off this form's own submit button being enabled; that control
+    // now lives in FormDrawer's footer and is driven by the flag this form
+    // publishes (feature/form-drawer), so the flag itself is what gets
+    // asserted — a stricter check than the button proxy it replaces.
+    expect(wrapper.emitted('update:pending')?.at(-1)).toEqual([false])
     wrapper.unmount()
   })
 
@@ -550,9 +563,11 @@ describe('ProjectForm — archive requires confirmation (D7)', () => {
     await confirmDialog('confirm')
 
     expect(updateProjectMock).toHaveBeenCalledWith(7, { status: 'archived' })
-    expect(
-      wrapper.get('[data-testid="project-form-submit"]').attributes('disabled')
-    ).toBeUndefined()
+    // Was read off this form's own submit button being enabled; that control
+    // now lives in FormDrawer's footer and is driven by the flag this form
+    // publishes (feature/form-drawer), so the flag itself is what gets
+    // asserted — a stricter check than the button proxy it replaces.
+    expect(wrapper.emitted('update:pending')?.at(-1)).toEqual([false])
     wrapper.unmount()
   })
 

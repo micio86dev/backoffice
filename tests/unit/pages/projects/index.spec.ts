@@ -125,6 +125,159 @@ describe('pages/projects/index.vue', () => {
     expect((wrapper.vm as unknown as { editing: unknown }).editing).toBe(1)
   })
 
+  // feature/form-drawer — the project form is a record-editing form launched
+  // from a list, so it moves off the centred Dialog onto the shared
+  // FormDrawer. The Dialog it replaces carried a documented defect: the
+  // longest form in the product grew past the viewport and took its submit
+  // button with it. The drawer's footer is a SIBLING of the scroll region, so
+  // that is now structurally impossible rather than capped by a magic
+  // max-height.
+  describe('the create/edit drawer (feature/form-drawer)', () => {
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    async function mountWithProjects(
+      overrides: Record<string, unknown> = {}
+    ): Promise<ReturnType<typeof mount>> {
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue(listResponse()),
+          createProject: vi.fn(),
+          updateProject: vi.fn(),
+          ...overrides,
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      return wrapper
+    }
+
+    const formInDrawer = () =>
+      document.body.querySelector('[data-testid="form-drawer"] [data-testid="project-form"]')
+
+    it('renders the form inside the drawer, not a centred dialog', async () => {
+      const wrapper = await mountWithProjects()
+
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      await waitFor(formInDrawer, 'the project form to mount inside the drawer')
+
+      expect(document.body.querySelector('[data-slot="dialog-content"]')).toBeNull()
+      expect(formInDrawer()).not.toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('keeps the submit control out of the scrolling region', async () => {
+      const wrapper = await mountWithProjects()
+
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      await waitFor(formInDrawer, 'the project form to mount inside the drawer')
+
+      const scrollRegion = document.body.querySelector('.overflow-y-auto')
+      const submit = document.body.querySelector('[data-testid="form-drawer-save"]')
+
+      expect(submit).not.toBeNull()
+      expect(scrollRegion!.contains(submit)).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    // THE regression this conversion is most likely to introduce: a drawer
+    // that closes on ANY submit, successful or not, throwing away both the
+    // operator's input and the 422 explaining what was wrong with it.
+    it('leaves the drawer OPEN with the field error visible when the save is rejected', async () => {
+      const createProject = vi.fn().mockRejectedValue(
+        Object.assign(new Error('Unprocessable'), {
+          status: 422,
+          data: { errors: { name: ['The name has already been taken.'] } },
+        })
+      )
+      const wrapper = await mountWithProjects({ createProject })
+
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      await waitFor(formInDrawer, 'the project form to mount inside the drawer')
+
+      const nameInput = document.body.querySelector<HTMLInputElement>(
+        '[data-testid="project-form-name"]'
+      )
+      const slugInput = document.body.querySelector<HTMLInputElement>(
+        '[data-testid="project-form-slug"]'
+      )
+      nameInput!.value = 'Demo'
+      nameInput!.dispatchEvent(new Event('input'))
+      slugInput!.value = 'demo'
+      slugInput!.dispatchEvent(new Event('input'))
+      // `potential`, so the submit is not also blocked by the role/competency
+      // cross-field rules a `standard` project carries.
+      document.body
+        .querySelector<HTMLButtonElement>(
+          '[data-testid="project-form-assessment-type"] button:last-child'
+        )
+        ?.click()
+      await flushPromises()
+
+      document.body
+        .querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await waitFor(
+        () => document.body.querySelector('[data-testid="project-form-name-error"]'),
+        'the server field error to render on the name field'
+      )
+
+      expect(createProject).toHaveBeenCalled()
+      expect(formInDrawer()).not.toBeNull()
+      expect(
+        document.body.querySelector('[data-testid="project-form-name-error"]')?.textContent
+      ).toContain('The name has already been taken.')
+
+      wrapper.unmount()
+    })
+
+    it('closes on the drawer footer cancel without saving', async () => {
+      const createProject = vi.fn()
+      const wrapper = await mountWithProjects({ createProject })
+
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      await waitFor(formInDrawer, 'the project form to mount inside the drawer')
+
+      const cancel = document.body.querySelector<HTMLButtonElement>(
+        '[data-testid="form-drawer-cancel"]'
+      )
+      cancel!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      cancel!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await waitFor(() => formInDrawer() === null, 'the drawer to close after cancel')
+
+      expect(createProject).not.toHaveBeenCalled()
+      expect((wrapper.vm as unknown as { editing: unknown }).editing).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('closes on Escape without saving', async () => {
+      const createProject = vi.fn()
+      const wrapper = await mountWithProjects({ createProject })
+
+      await wrapper.get('[data-testid="projects-new"]').trigger('click')
+      const form = await waitFor(formInDrawer, 'the project form to mount inside the drawer')
+
+      form.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      )
+      await waitFor(() => formInDrawer() === null, 'the drawer to close after Escape')
+
+      expect(createProject).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+  })
+
   describe('the create/edit dialog (task 21.5)', () => {
     // reka-ui's DialogContent teleports to `document.body` (real Teleport,
     // not stubbed) — mounted `attachTo: document.body` so the teleported
@@ -216,7 +369,7 @@ describe('pages/projects/index.vue', () => {
       wrapper.unmount()
     })
 
-    it('closes the dialog when the form emits close', async () => {
+    it('closes the dialog when the drawer footer cancel is activated', async () => {
       vi.doMock('../../../../app/composables/useProjects', () => ({
         useProjects: () => ({
           listProjects: vi.fn().mockResolvedValue(listResponse()),
@@ -234,11 +387,11 @@ describe('pages/projects/index.vue', () => {
       await wrapper.get('[data-testid="projects-new"]').trigger('click')
       await waitForFormOpen()
 
-      // The button lives inside the teleported Dialog content — `wrapper.get`
+      // The button lives inside the teleported drawer content — `wrapper.get`
       // only searches the wrapper's own (non-teleported) subtree, so this
       // interacts with the real DOM node directly, same as the assertions
       // above and below.
-      dialogBody().querySelector<HTMLButtonElement>('[data-testid="project-form-cancel"]')?.click()
+      dialogBody().querySelector<HTMLButtonElement>('[data-testid="form-drawer-cancel"]')?.click()
       await waitForFormClosed()
 
       expect((wrapper.vm as unknown as { editing: unknown }).editing).toBeNull()

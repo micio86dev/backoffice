@@ -141,4 +141,80 @@ describe('ProjectTable — Invite candidate (operator-interview-link)', () => {
 
     wrapper.unmount()
   })
+
+  // feature/form-drawer — "Invite candidate" is a create form launched from a
+  // table row, which is the drawer case. The two-stage flow is deliberately
+  // NOT split into a drawer plus a separate dialog: the minted link has to
+  // appear where the form was, or the operator loses the thread between what
+  // they submitted and the single-use link it produced. Only the FOOTER
+  // changes between the stages.
+  describe('the invite drawer (feature/form-drawer)', () => {
+    async function openInvite() {
+      const wrapper = mount(ProjectTable, {
+        props: { projects: [project({ id: 1, status: 'active' })], canInvite: true, locale: 'en' },
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+
+      await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+
+      return wrapper
+    }
+
+    it('renders the invite form inside the drawer, not a centred dialog', async () => {
+      const wrapper = await openInvite()
+
+      expect(
+        document.body.querySelector('[data-testid="form-drawer"] [data-testid="entry-link-form"]')
+      ).not.toBeNull()
+      expect(document.body.querySelector('[data-slot="dialog-content"]')).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('offers the shared submit/cancel pair in the footer while the form is showing', async () => {
+      const wrapper = await openInvite()
+
+      const scrollRegion = document.body.querySelector('.overflow-y-auto')
+      const submit = document.body.querySelector('[data-testid="form-drawer-save"]')
+
+      expect(submit).not.toBeNull()
+      expect(submit!.getAttribute('form')).toBe('entry-link-form')
+      expect(scrollRegion!.contains(submit)).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    // Once the link exists there is nothing left to submit, and a "Save"
+    // control pointing at a form no longer in the DOM would be inert.
+    it('replaces the submit pair with a close control once the link has been minted', async () => {
+      const wrapper = await openInvite()
+
+      wrapper.findComponent(EntryLinkForm).vm.$emit('success', {
+        entry_url: 'https://interview.example.com/interview/tok',
+        expires_at: '2026-08-17T15:32:00.000000Z',
+      })
+      await wrapper.vm.$nextTick()
+
+      expect(document.body.querySelector('[data-testid="form-drawer-save"]')).toBeNull()
+      expect(document.body.querySelector('[data-testid="entry-link-close"]')).not.toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('closes on the footer cancel while the form is showing', async () => {
+      const wrapper = await openInvite()
+
+      const cancel = document.body.querySelector<HTMLButtonElement>(
+        '[data-testid="form-drawer-cancel"]'
+      )
+      cancel!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+      cancel!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      expect((wrapper.vm as unknown as { inviteTarget: unknown }).inviteTarget).toBeNull()
+
+      wrapper.unmount()
+    })
+  })
 })

@@ -9,8 +9,14 @@ import { useAuth } from '../../app/composables/useAuth'
 
 const tMock = (key: string) => key
 
+const NuxtLinkStub = { props: ['to'], template: '<a :href="to"><slot /></a>' }
+
 describe('LoginPage', () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      'useLocalePath',
+      vi.fn(() => (path: string) => path)
+    )
     // useAuth's session is a MODULE-scoped ref (D2) — this file statically
     // imports LoginPage (required for @vue/test-utils' mount()), so
     // vi.resetModules() cannot be used to isolate it between tests here
@@ -31,11 +37,32 @@ describe('LoginPage', () => {
       'useRuntimeConfig',
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
-    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
 
     expect(wrapper.find('[data-testid="login-email"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="login-password"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="login-submit"]').exists()).toBe(true)
+  })
+
+  // self-service-password-reset: the API half shipped in v0.36.0 with no
+  // entry point anywhere in the UI, so an admin who forgot their password had
+  // no path forward at all. This link IS the entry point — its absence is the
+  // whole defect, which makes it worth an assertion rather than a glance.
+  it('offers a route into password recovery', () => {
+    vi.stubGlobal(
+      'useRuntimeConfig',
+      vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
+    )
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
+
+    const link = wrapper.find('[data-testid="login-forgot-password"]')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('href')).toBe('/forgot-password')
+    expect(link.text()).toBe('login.forgotPassword')
   })
 
   it('on successful login, stores the session IN MEMORY (never sessionStorage/localStorage) and navigates to /', async () => {
@@ -51,7 +78,9 @@ describe('LoginPage', () => {
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
-    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
     await wrapper.find('[data-testid="login-email"]').setValue('admin@example.com')
     await wrapper.find('[data-testid="login-password"]').setValue('secret')
     await wrapper.find('[data-testid="login-form"]').trigger('submit')
@@ -89,7 +118,9 @@ describe('LoginPage', () => {
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
-    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
     await wrapper.find('[data-testid="login-email"]').setValue('admin@example.com')
     await wrapper.find('[data-testid="login-password"]').setValue('wrong')
     await wrapper.find('[data-testid="login-form"]').trigger('submit')
@@ -114,7 +145,7 @@ describe('LoginPage', () => {
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
-    mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    mount(LoginPage, { global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } } })
 
     const head = useHeadMock.mock.calls[0]?.[0] as { title?: () => string }
     expect(typeof head?.title).toBe('function')
@@ -131,7 +162,9 @@ describe('LoginPage', () => {
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
-    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
     await wrapper.find('[data-testid="login-form"]').trigger('submit')
 
     const emailError = wrapper.find('[data-testid="login-email-error"]')
@@ -163,7 +196,9 @@ describe('LoginPage', () => {
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
-    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
     await wrapper.find('[data-testid="login-email"]').setValue('not-an-email')
     await wrapper.find('[data-testid="login-password"]').setValue('secret')
     await wrapper.find('[data-testid="login-form"]').trigger('submit')
@@ -188,7 +223,9 @@ describe('LoginPage', () => {
       vi.fn(() => ({ public: { apiBase: 'https://api.test/api' } }))
     )
 
-    const wrapper = mount(LoginPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(LoginPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
+    })
     await wrapper.find('[data-testid="login-email"]').setValue('admin@example.com')
     await wrapper.find('[data-testid="login-password"]').setValue('wrong')
     await wrapper.find('[data-testid="login-form"]').trigger('submit')

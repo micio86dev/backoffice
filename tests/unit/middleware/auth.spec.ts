@@ -93,4 +93,43 @@ describe('02.auth.global.ts', () => {
 
     expect(navigateToMock).not.toHaveBeenCalled()
   })
+
+  /**
+   * self-service-password-reset. Both recovery pages are reached by someone
+   * who by definition has no session — a guard that bounces them to /login is
+   * a recovery flow that cannot be entered.
+   *
+   * `/reset-password/{token}` is the case the pre-existing `endsWith` match
+   * could not express: the token is a PATH SEGMENT
+   * (`SendPasswordResetLinkJob.php:135`), so the path ends with the token, not
+   * with the route.
+   */
+  it.each([
+    '/forgot-password',
+    '/en/forgot-password',
+    '/reset-password',
+    '/en/reset-password',
+    '/reset-password/a-live-single-use-token',
+    '/en/reset-password/a-live-single-use-token',
+  ])('never redirects on %s, which is only ever reached without a session', async (path) => {
+    const navigateToMock = vi.fn()
+    vi.stubGlobal('navigateTo', navigateToMock)
+
+    const middleware = (await import('../../../app/middleware/02.auth.global')).default
+    middleware({ path } as never, {} as never)
+
+    expect(navigateToMock).not.toHaveBeenCalled()
+  })
+
+  it('still guards a route that merely CONTAINS a public path name', async () => {
+    // The exemption is segment-scoped, not a substring match — otherwise a
+    // future `/projects/reset-password-settings` would be silently public.
+    const navigateToMock = vi.fn()
+    vi.stubGlobal('navigateTo', navigateToMock)
+
+    const middleware = (await import('../../../app/middleware/02.auth.global')).default
+    middleware({ path: '/projects/reset-password-settings' } as never, {} as never)
+
+    expect(navigateToMock).toHaveBeenCalledWith('/login')
+  })
 })

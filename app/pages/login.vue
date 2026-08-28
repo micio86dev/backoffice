@@ -64,6 +64,25 @@
             <Button type="submit" :disabled="submitting" data-testid="login-submit">
               {{ submitting ? $t('login.submitting') : $t('login.submit') }}
             </Button>
+            <!--
+              The entry point into self-service password recovery. The API half
+              shipped in api v0.36.0 and was live in production with nothing in
+              this app linking to it, so an admin who forgot their password had
+              no path forward at all.
+
+              Below the CTA rather than beside the password label: the primary
+              action stays the first thing reached by keyboard, and this is a
+              way OUT of the form, not a step within it.
+            -->
+            <FieldDescription class="text-center">
+              <NuxtLink
+                :to="localePath('/forgot-password')"
+                data-testid="login-forgot-password"
+                class="hover:text-primary underline underline-offset-4"
+              >
+                {{ $t('login.forgotPassword') }}
+              </NuxtLink>
+            </FieldDescription>
           </FieldGroup>
         </form>
       </CardContent>
@@ -74,7 +93,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -87,6 +106,11 @@ definePageMeta({
 })
 
 const { t } = useI18n()
+// Keeps an English-speaking operator on /en/* when they follow the recovery
+// link. Plain `<NuxtLink to="/forgot-password">` is NOT locale-aware under
+// `strategy: 'prefix_except_default'` — it would drop them onto the Italian
+// page mid-recovery.
+const localePath = useLocalePath()
 
 useHead({
   // WCAG 2.4.2 (Page Titled): non-empty <title> required — and the title is

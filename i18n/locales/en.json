@@ -297,6 +297,8 @@
       "pauseEveryNCompetencies": "Pause every N competencies",
       "nudgeMinChars": "Minimum characters before a nudge",
       "exitRedirectUrl": "Exit redirect URL",
+      "avatarTemplate": "Avatar template",
+      "avatarTemplateNone": "Organization default (active template)",
       "webhookUrl": "Webhook URL",
       "webhookSecret": "Webhook secret",
       "nameRequired": "Enter a project name.",
@@ -315,6 +317,7 @@
         "pauseEveryN": "Gives the candidate a short break after this many competencies. Leave empty for no breaks.",
         "nudgeMinChars": "If an answer is shorter than this many characters, the candidate is asked to expand on it.",
         "exitRedirectUrl": "Where the candidate is sent after finishing the interview. Leave empty to show the standard closing page.",
+        "avatarTemplate": "Which avatar template this project uses. It also decides the provider. Leave on the default to use the organization's active template.",
         "webhookUrl": "BEAI posts progress and evaluation events to this address. Leave empty to use the organization default.",
         "competencies": "The competencies this interview covers. More competencies means a longer interview for the candidate."
       }

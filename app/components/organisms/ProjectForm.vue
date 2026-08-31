@@ -235,6 +235,46 @@
         </FieldError>
       </Field>
 
+      <!--
+        Which avatar template THIS project runs on.
+
+        A plain <select>, not the richer LlmModelPicker: there are no disabled
+        groups to express here. Every template an organization owns is a legal
+        choice, including an inactive one — `is_active` decides the ORG-WIDE
+        fallback, and pinning is precisely how a project opts out of it. Hiding
+        inactive templates would make two projects on the same provider
+        impossible again, since only one per provider can be active.
+      -->
+      <Field>
+        <FieldLabel for="project-form-avatar-template">
+          {{ $t('projects.form.avatarTemplate') }}
+        </FieldLabel>
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+        <select
+          id="project-form-avatar-template"
+          data-testid="project-form-avatar-template"
+          autocomplete="off"
+          :class="formControlClass"
+          :value="avatarTemplateId === null ? '' : String(avatarTemplateId)"
+          :aria-describedby="'project-form-avatar-template-help'"
+          @change="onAvatarTemplateChange"
+        >
+          <!--
+            Absent is a real, supported configuration — not a missing setting —
+            so it is labelled as the organization default rather than as an
+            empty choice. Without a way back to it, pinning would be a one-way
+            door.
+          -->
+          <option value="">{{ $t('projects.form.avatarTemplateNone') }}</option>
+          <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
+            {{ template.name }} ({{ template.provider }})
+          </option>
+        </select>
+        <FieldDescription id="project-form-avatar-template-help">
+          {{ $t('projects.form.help.avatarTemplate') }}
+        </FieldDescription>
+      </Field>
+
       <Field :data-invalid="Boolean(errors.exitRedirectUrl)">
         <FieldLabel for="project-form-exit-redirect-url">
           {{ $t('projects.form.exitRedirectUrl') }}
@@ -386,6 +426,9 @@ import CompetencyPicker, {
 } from '@/components/molecules/CompetencyPicker.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
+import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
+import { formControlClass } from '@/components/ui/form-control'
+import type { AvatarTemplate } from '@/types/avatar-template'
 import {
   isNudgeMinCharsValid,
   isProjectUrlValid,
@@ -428,8 +471,17 @@ const emit = defineEmits<{
   (e: 'update:pending', value: boolean): void
 }>()
 
+/**
+ * Only what the picker renders and submits. Deliberately narrower than
+ * `AvatarTemplate`: this control needs an id, a label and the provider to
+ * disambiguate two similarly-named templates, and nothing else. Widening it to
+ * the full model would couple this form to fields it never reads.
+ */
+type AvatarTemplateOption = Pick<AvatarTemplate, 'id' | 'name' | 'provider'>
+
 const { createProject, updateProject } = useProjects()
 const { fetchRoleCompetencies } = useFrameworkRoles()
+const { listTemplates } = useAvatarTemplates()
 
 const isEditing = computed(() => props.project !== null)
 
@@ -447,6 +499,10 @@ const competencyIds = ref<number[]>((props.project?.competencies ?? []).map((c) 
 const pauseEveryNCompetencies = ref(props.project?.pause_every_n_competencies ?? '')
 const nudgeMinChars = ref(props.project?.nudge_min_chars ?? '')
 const exitRedirectUrl = ref(props.project?.exit_redirect_url ?? '')
+// `?? null`, not `?? ''`: this is a nullable FK, and null is the meaningful
+// value ("use the organization's active template"), not an empty string.
+const avatarTemplateId = ref<number | null>(props.project?.avatar_template_id ?? null)
+const avatarTemplates = ref<AvatarTemplateOption[]>([])
 const webhookUrl = ref(props.project?.webhook_url ?? '')
 const webhookSecret = ref<string | undefined>(undefined)
 
@@ -690,6 +746,10 @@ async function onSubmit(): Promise<void> {
           : null,
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
+        // Sent unconditionally, including as null. Omitting it when unset
+        // would make unpinning impossible: `sometimes` on the server means an
+        // absent key leaves the existing pin exactly where it was.
+        avatar_template_id: avatarTemplateId.value,
         webhook_url: webhookUrl.value || null,
         competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
@@ -707,6 +767,10 @@ async function onSubmit(): Promise<void> {
           : null,
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
+        // Sent unconditionally, including as null. Omitting it when unset
+        // would make unpinning impossible: `sometimes` on the server means an
+        // absent key leaves the existing pin exactly where it was.
+        avatar_template_id: avatarTemplateId.value,
         webhook_url: webhookUrl.value || null,
         competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
@@ -744,7 +808,35 @@ async function onArchiveConfirmed(): Promise<void> {
 
 onMounted(() => {
   void loadCompetencyOptions()
+  void loadAvatarTemplates()
 })
+
+/**
+ * The organization's avatar templates, for the per-project pin.
+ *
+ * A rejected load leaves the list empty and the control rendered with only the
+ * organization-default option — never blocks the form. This is one optional
+ * setting among many, and an operator must still be able to save a name change
+ * when the template endpoint is having a bad day. That is also why nothing
+ * here writes to `errors`: a background read failing is not a validation
+ * problem with anything the operator typed.
+ */
+async function loadAvatarTemplates(): Promise<void> {
+  try {
+    const response = await listTemplates()
+    avatarTemplates.value = response.data
+  } catch {
+    avatarTemplates.value = []
+  }
+}
+
+function onAvatarTemplateChange(event: Event): void {
+  const select = event.target as HTMLSelectElement
+  // '' is the organization-default option, and must reach the server as an
+  // explicit null — never be dropped as "unchanged", or unpinning would be
+  // impossible once a template had been pinned.
+  avatarTemplateId.value = select.value === '' ? null : Number(select.value)
+}
 
 // Reloading on change is what makes the picker usable at all, not a
 // refinement. `onMounted` alone meant the options were fetched once, for

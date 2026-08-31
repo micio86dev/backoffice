@@ -35,7 +35,7 @@
       <AlertDescription>{{ $t('avatar_templates.error.load_body') }}</AlertDescription>
     </Alert>
 
-    <Alert v-if="warning" data-testid="template-warning">
+    <Alert v-if="warning" variant="warning" data-testid="template-warning">
       <AlertTitle>{{ $t('avatar_templates.warning.title') }}</AlertTitle>
       <!--
         The save SUCCEEDED. This says a persona-level knob has not reached the

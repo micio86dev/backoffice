@@ -270,6 +270,87 @@ describe('invalid ScoreChip contrast (D2, DESIGN.md §9.1)', () => {
   })
 })
 
+/**
+ * Feedback alert surfaces.
+ *
+ * `alertVariants` shipped with two variants — `default` (card background, body
+ * text) and `destructive` (red TEXT on that same card background). Neither
+ * tints its surface, so a save that succeeded and a save that failed were the
+ * same white box with differently-coloured words, and success had no colour of
+ * its own at all.
+ *
+ * The tokens these variants need were already defined in DESIGN.md §3.1 and
+ * already present in `main.css` — they were simply never wired into the
+ * component. So this is not a new palette; it is the documented one, applied.
+ *
+ * Every pairing is asserted NUMERICALLY, per §9.1's own rule ("verify with a
+ * real contrast calculation, never by eye") and following the ScoreChip
+ * precedent directly above.
+ */
+describe('feedback alert surfaces (DESIGN.md §3.1 semantic tokens, §9.1 contrast)', () => {
+  // The text-safe `-dark` variants, NOT `--color-success`/`--color-warning`:
+  // §3.1 marks those two as "non-text: icons/fills only", and #22c55e on its
+  // own tint would fail AA outright.
+  it('--color-success-dark (#166534) on --color-success-light (#dcfce7) passes AA', () => {
+    expect(contrastRatio('#166534', '#dcfce7')).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('--color-warning-dark (#92400e) on --color-warning-light (#fef3c7) passes AA', () => {
+    expect(contrastRatio('#92400e', '#fef3c7')).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('the full-saturation fills would NOT have passed as text — which is why the -dark tokens exist', () => {
+    // Asserted as a FAILURE, deliberately. Without this, a later edit could
+    // swap `-dark` for the plain token, still look green, and silently drop
+    // below AA with no test objecting.
+    expect(contrastRatio('#22c55e', '#dcfce7')).toBeLessThan(4.5)
+    expect(contrastRatio('#f59e0b', '#fef3c7')).toBeLessThan(4.5)
+  })
+
+  it('every semantic surface token resolves to its DESIGN.md §3.1 value', async () => {
+    const compiled = await compileForCandidates([
+      'bg-success-light',
+      'bg-warning-light',
+      'bg-error-light',
+    ])
+
+    expect(computedBackgroundColor(compiled, 'bg-success-light')).toBe('#dcfce7')
+    expect(computedBackgroundColor(compiled, 'bg-warning-light')).toBe('#fef3c7')
+    expect(computedBackgroundColor(compiled, 'bg-error-light')).toBe('#fee2e2')
+  })
+
+  it('alertVariants defines a distinct surface for success, warning and error', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../app/components/ui/alert/index.ts'),
+      'utf-8'
+    )
+
+    for (const variant of ['success', 'warning', 'destructive']) {
+      expect(source).toContain(`${variant}:`)
+    }
+
+    // The defect being fixed: `destructive` used to colour only the text and
+    // leave the surface identical to `default`. A tinted background is what
+    // makes an outcome readable at a glance rather than on inspection.
+    expect(source).toContain('bg-success-light')
+    expect(source).toContain('bg-warning-light')
+    expect(source).toContain('bg-error-light')
+  })
+
+  it('no variant uses a side-stripe accent border', () => {
+    // A thick `border-l` accent is the reflex decoration for status callouts
+    // and reads as template output. Full border plus tinted surface carries
+    // the same signal without it.
+    const source = readFileSync(
+      resolve(__dirname, '../../app/components/ui/alert/index.ts'),
+      'utf-8'
+    )
+
+    expect(source).not.toMatch(/border-l-\d/)
+    expect(source).not.toMatch(/border-l-\[/)
+  })
+})
+
 // task 13.3 — snapshot over the full token block, as a regression guard for
 // future edits. Snapshots the AUTHORED source (not Tailwind's compiled output,
 // which would also include unrelated framework defaults), so a diff here means

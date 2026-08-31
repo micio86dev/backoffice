@@ -297,6 +297,8 @@
       "pauseEveryNCompetencies": "Pausa ogni N competenze",
       "nudgeMinChars": "Caratteri minimi prima di un sollecito",
       "exitRedirectUrl": "URL di reindirizzamento in uscita",
+      "avatarTemplate": "Template avatar",
+      "avatarTemplateNone": "Predefinito dell'organizzazione (template attivo)",
       "webhookUrl": "URL webhook",
       "webhookSecret": "Segreto webhook",
       "nameRequired": "Inserisci il nome del progetto.",
@@ -315,6 +317,7 @@
         "pauseEveryN": "Concede al candidato una breve pausa ogni tot competenze. Lascia vuoto per non inserire pause.",
         "nudgeMinChars": "Se una risposta è più breve di questo numero di caratteri, al candidato viene chiesto di approfondire.",
         "exitRedirectUrl": "Dove viene indirizzato il candidato al termine del colloquio. Lascia vuoto per mostrare la pagina di chiusura standard.",
+        "avatarTemplate": "Quale template avatar usa questo progetto. Determina anche il fornitore. Lascia sul predefinito per usare il template attivo dell'organizzazione.",
         "webhookUrl": "BEAI invia a questo indirizzo gli eventi di avanzamento e di valutazione. Lascia vuoto per usare l'impostazione predefinita dell'organizzazione.",
         "competencies": "Le competenze valutate in questo colloquio. Più competenze significano un colloquio più lungo per il candidato."
       }

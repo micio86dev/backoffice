@@ -17,7 +17,12 @@
           here would be a control that lies.
         -->
         <div v-if="succeeded" class="flex flex-col gap-4">
-          <Alert role="status" aria-live="polite" data-testid="reset-password-success">
+          <Alert
+            variant="success"
+            role="status"
+            aria-live="polite"
+            data-testid="reset-password-success"
+          >
             <AlertDescription>{{ $t('resetPassword.success') }}</AlertDescription>
           </Alert>
           <Button as-child data-testid="reset-password-signin">

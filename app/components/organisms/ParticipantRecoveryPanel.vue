@@ -73,7 +73,7 @@
     </template>
 
     <template v-else-if="result">
-      <Alert data-testid="participant-recover-success">
+      <Alert variant="success" data-testid="participant-recover-success">
         <AlertTitle>{{ $t('participantRecovery.success.title') }}</AlertTitle>
         <AlertDescription>
           {{ $t('participantRecovery.success.body', { count: result.competencies_reset.length }) }}

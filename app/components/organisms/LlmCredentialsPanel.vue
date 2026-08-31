@@ -198,6 +198,7 @@
 
     <Alert
       v-if="rotateSuccessMessage"
+      variant="success"
       role="status"
       aria-live="polite"
       data-testid="llm-credential-rotate-success"

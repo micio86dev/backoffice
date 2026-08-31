@@ -6,7 +6,12 @@
       order, so the operator reads the caveat BEFORE the evidence — a badge
       near the heading would be a label, not a reason read first.
     -->
-    <Alert v-if="isPartial" data-testid="transcript-partial">
+    <!--
+      A partial transcript is a CAVEAT, not an outcome: it warns the reader not
+      to treat what follows as the whole record. Left on the neutral surface it
+      read as a heading rather than a limitation.
+    -->
+    <Alert v-if="isPartial" variant="warning" data-testid="transcript-partial">
       <AlertTitle>{{ $t('participants.detail.transcript.partial.title') }}</AlertTitle>
       <AlertDescription>{{
         $t('participants.detail.transcript.partial.message')

@@ -63,8 +63,8 @@ const PARTICIPANT_DETAIL = {
   },
 }
 
-// SLF fixture per esempio-report-valutazione.json / admin-backoffice spec
-// "SLF fixture renders per esempio-report-valutazione.json" scenario: [5,3,-1]
+// SLF fixture per evaluation-report-example.json / admin-backoffice spec
+// "SLF fixture renders per evaluation-report-example.json" scenario: [5,3,-1]
 // (API-mapped to null) -> mean 4.0, reliability "67%". COM added as a second,
 // fully-assessed competency for a more representative report screenshot.
 /**

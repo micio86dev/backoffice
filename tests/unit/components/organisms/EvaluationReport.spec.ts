@@ -7,8 +7,8 @@
  * page/container fetches the data and handles 409/403/404 (D4); this
  * organism only ever receives already-loaded evaluation data.
  *
- * SLF fixture per esempio-report-valutazione.json / admin-backoffice spec
- * "SLF fixture renders per esempio-report-valutazione.json" scenario:
+ * SLF fixture per evaluation-report-example.json / admin-backoffice spec
+ * "SLF fixture renders per evaluation-report-example.json" scenario:
  * indicator scores [5, 3, -1] -> mean 4.0, reliability "67%".
  *
  * D7: a provenance footnote between the table and the excerpts block renders
@@ -95,7 +95,7 @@ describe('EvaluationReport', () => {
     expect(wrapper.find('caption').exists()).toBe(true)
   })
 
-  it('renders the SLF fixture per esempio-report-valutazione.json: mean 4.0, reliability 67%', () => {
+  it('renders the SLF fixture per evaluation-report-example.json: mean 4.0, reliability 67%', () => {
     const wrapper = mountReport(SLF_FIXTURE)
     expect(wrapper.text()).toContain('SLF')
     expect(wrapper.text()).toContain('4.0')

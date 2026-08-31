@@ -8,7 +8,7 @@
  * levels — legal only when the evidence matches neither bounding anchor —
  * and render as their own distinct, non-neutral chip state, never
  * `unassessable`. `-1` is the reference-fixture sentinel for "unassessable"
- * (esempio-report-valutazione.json); the live admin API pre-maps `-1` to
+ * (evaluation-report-example.json); the live admin API pre-maps `-1` to
  * `null` (`AdminEvaluationSerializer::serializeCompetencyResult()`). Both are
  * treated identically here so callers never special-case which shape they
  * received — `number | null` already covers `-1` as a plain number.

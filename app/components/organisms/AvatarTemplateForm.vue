@@ -241,8 +241,13 @@
     >
       <legend class="sr-only">{{ $t('avatar_templates.llm.section') }}</legend>
 
+      <!--
+        Reads `effectiveModelId`, not the picker's key: a template whose
+        binding the catalogue could not resolve IS bound, and calling it
+        unbound would be the badge stating the opposite of the truth.
+      -->
       <p
-        v-if="draft.llmModelKey === null"
+        v-if="effectiveModelId === null"
         data-testid="template-llm-unbound-badge"
         class="text-sm text-muted-foreground"
       >
@@ -390,6 +395,28 @@ const llmCredentialError = ref<string | undefined>(undefined)
 const models = ref<LlmModel[]>([])
 const credentials = ref<LlmCredential[]>([])
 
+// The `llm_model_id` this template ARRIVED bound to, when the catalogue could
+// not be resolved into a picker key for it (empty registry, failed load).
+// Distinct from `llmModelKey === null`, which means UNBOUND: the binding is
+// live server-side and must survive an edit made while the catalogue was
+// unavailable, or opening a template to rename it would silently unbind its
+// model. Cleared the moment the operator takes over the picker.
+const unresolvedBoundModelId = ref<number | null>(null)
+
+/**
+ * The `llm_model_id` a submit would carry: the picker's choice once the
+ * operator has one, otherwise the unresolved binding carried across.
+ * `resolveModelId` maps the picker's `key` to the API's `id` — `null` maps to
+ * `null` unconditionally, because an unbind must reach the server as an
+ * explicit `null` and never be silently dropped as "unchanged" (see
+ * `useAvatarTemplates.ts`'s docblock on the same point).
+ */
+const effectiveModelId = computed(() =>
+  draft.value.llmModelKey === null
+    ? unresolvedBoundModelId.value
+    : resolveModelId(draft.value.llmModelKey)
+)
+
 const { listModels } = useLlmModels()
 const { listCredentials } = useLlmCredentials()
 
@@ -415,10 +442,25 @@ onMounted(async () => {
     // all.
     const boundModel = models.value.find((model) => model.id === props.template.llm_model_id)
     draft.value.llmModelKey = boundModel?.key ?? null
+
+    // "Never deletes" makes the lookup above reliable against WITHDRAWAL, and
+    // against nothing else. A catalogue that resolved EMPTY — the state a
+    // deploy leaves behind until `beai:sync-llm-registry` runs — resolves no
+    // binding at all, and the `?? null` above would then read as an operator
+    // unbinding a model they never touched.
+    // `?? null` is not decoration: a NEW template carries no `llm_model_id`
+    // at all, and letting `undefined` through would make `effectiveModelId`
+    // neither an id nor a null — enough to read as "bound" and demand a
+    // credential for a model that does not exist.
+    unresolvedBoundModelId.value =
+      boundModel === undefined ? (props.template.llm_model_id ?? null) : null
+  } else {
+    // A rejected load leaves `models` empty: the picker renders only the
+    // "provider default" option, which is honest — better than pretending a
+    // catalogue exists. What it must NOT do is let that emptiness be read as
+    // an unbind, so an existing binding is carried across the edit untouched.
+    unresolvedBoundModelId.value = props.template.llm_model_id ?? null
   }
-  // A rejected load leaves `models`/`credentials` empty: the picker renders
-  // only the "provider default" option, which is honest — better than
-  // pretending a catalogue exists.
 
   if (credentialsOutcome.status === 'fulfilled') {
     credentials.value = credentialsOutcome.value.data
@@ -431,13 +473,24 @@ onMounted(async () => {
 watch(
   () => draft.value.llmModelKey,
   (key) => {
+    // The operator has taken over the picker: whatever the catalogue could
+    // not resolve is now superseded by an explicit choice, INCLUDING the
+    // choice to unbind.
+    unresolvedBoundModelId.value = null
+
     if (key === null) draft.value.llmCredentialId = null
   }
 )
 watch(
   () => draft.value.llmCredentialId,
   (id) => {
-    if (id === null) draft.value.llmModelKey = null
+    if (id === null) {
+      // Clearing the credential is an explicit unbind of the pair — it must
+      // drop an unresolved binding too, or I1 would be satisfied by a model
+      // the operator can no longer see.
+      unresolvedBoundModelId.value = null
+      draft.value.llmModelKey = null
+    }
   }
 )
 
@@ -573,6 +626,44 @@ function validateDescription(): boolean {
 }
 
 /**
+ * Invariant I1 (both-or-neither) as a client-side REFUSAL, not a translation
+ * of the server's answer.
+ *
+ * The two watchers above only cover the CLEARING direction — emptying one half
+ * empties the other. Choosing one half fires nothing, because the OTHER
+ * watched value never changed, so the draft reached the server half-bound and
+ * `AvatarTemplate::booted()` answered with a 422 the operator did not cause on
+ * purpose: `model_not_found` (a credential with no model, because
+ * `LlmModel::find(null)` is null) or `credential_not_found` (a model with no
+ * credential, by the same route through I3).
+ *
+ * Auto-completing the pair is not an option — neither half has a defensible
+ * default — so the only honest move is to stop the submit and say WHICH half
+ * is missing, on the field that is missing it.
+ */
+function validateLlmBinding(): boolean {
+  const modelId = effectiveModelId.value
+  const { llmCredentialId } = draft.value
+
+  // Read through `effectiveModelId`, not the picker's key: a binding the
+  // catalogue could not resolve is still a binding, and flagging it as a
+  // missing model would tell the operator to choose from an empty list.
+  //
+  // Both set or both null are the two legal states; `booted()` returns early
+  // on the second one, so an operator who never touched this section is never
+  // flagged.
+  const modelMissing = modelId === null && llmCredentialId !== null
+  const credentialMissing = modelId !== null && llmCredentialId === null
+
+  llmModelError.value = modelMissing ? t('avatar_templates.error.llm.model_required') : undefined
+  llmCredentialError.value = credentialMissing
+    ? t('avatar_templates.error.llm.credential_required')
+    : undefined
+
+  return !modelMissing && !credentialMissing
+}
+
+/**
  * `step` is deliberately NOT checked here (D3): float steps (0.01 on
  * `voiceSpeed`) make a JS modulo check produce false negatives, and the
  * server is authoritative on this one constraint.
@@ -700,11 +791,14 @@ watch(
 )
 
 function submit(): void {
+  // Every validator runs before the early return — never short-circuited —
+  // so an operator with two problems is shown both, not one per submit.
   const nameOk = validateName()
   const descriptionOk = validateDescription()
   const configOk = validateAllConfigFields()
+  const llmBindingOk = validateLlmBinding()
 
-  if (!nameOk || !descriptionOk || !configOk) return
+  if (!nameOk || !descriptionOk || !configOk || !llmBindingOk) return
 
   emit('submit', {
     ...(props.template.id === undefined ? {} : { id: props.template.id }),
@@ -712,7 +806,7 @@ function submit(): void {
     description: draft.value.description === '' ? null : draft.value.description,
     provider: draft.value.provider,
     config: draft.value.config,
-    llm_model_id: resolveModelId(draft.value.llmModelKey),
+    llm_model_id: effectiveModelId.value,
     llm_credential_id: draft.value.llmCredentialId,
   })
 }

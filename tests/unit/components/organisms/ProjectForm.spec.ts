@@ -16,6 +16,7 @@ const tMock = (key: string) => key
 const createProjectMock = vi.fn()
 const updateProjectMock = vi.fn()
 const fetchRoleCompetenciesMock = vi.fn()
+const listTemplatesMock = vi.fn()
 
 vi.mock('../../../../app/composables/useProjects', () => ({
   useProjects: () => ({ createProject: createProjectMock, updateProject: updateProjectMock }),
@@ -23,6 +24,10 @@ vi.mock('../../../../app/composables/useProjects', () => ({
 
 vi.mock('../../../../app/composables/useFrameworkRoles', () => ({
   useFrameworkRoles: () => ({ fetchRoleCompetencies: fetchRoleCompetenciesMock }),
+}))
+
+vi.mock('../../../../app/composables/useAvatarTemplates', () => ({
+  useAvatarTemplates: () => ({ listTemplates: listTemplatesMock }),
 }))
 
 const ProjectForm = (await import('../../../../app/components/organisms/ProjectForm.vue')).default
@@ -59,6 +64,7 @@ describe('ProjectForm', () => {
     createProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     updateProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     fetchRoleCompetenciesMock.mockReset().mockResolvedValue({ data: [] })
+    listTemplatesMock.mockReset().mockResolvedValue({ data: [] })
   })
 
   // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
@@ -839,5 +845,115 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
     expect(picker.props('persistedIds')).toEqual([])
 
     wrapper.unmount()
+  })
+
+  /**
+   * Per-project avatar template.
+   *
+   * Before this control existed a project had no say in which template it ran
+   * on: the provider came from `provider_override` (never exposed in this
+   * backoffice) or the `INTERVIEW_PROVIDER` env default, and the API returned
+   * the organization's ONE active template for that provider. An operator
+   * holding one active HeyGen template and one active Tavus template — a legal
+   * state, since activation is scoped per provider — watched the env default
+   * silently choose for them.
+   */
+  describe('avatar template selection', () => {
+    it('offers every template, and pre-selects the one the project pinned', async () => {
+      listTemplatesMock.mockResolvedValue({
+        data: [
+          { id: 7, name: 'Recruiter HeyGen', provider: 'heygen', is_active: true },
+          { id: 9, name: 'Recruiter Tavus', provider: 'tavus', is_active: false },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ avatar_template_id: 9 }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      const select = wrapper.get('[data-testid="project-form-avatar-template"]')
+      expect((select.element as HTMLSelectElement).value).toBe('9')
+      expect(select.findAll('option')).toHaveLength(3) // the two templates + "use the org default"
+    })
+
+    it('sends the pinned template on save', async () => {
+      listTemplatesMock.mockResolvedValue({
+        data: [{ id: 7, name: 'Recruiter HeyGen', provider: 'heygen', is_active: true }],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ avatar_template_id: null }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-avatar-template"]').setValue('7')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(updateProjectMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ avatar_template_id: 7 })
+      )
+    })
+
+    it('sends null when the operator returns the project to the organization default', async () => {
+      // Unpinning must reach the server as an explicit null. Dropped as
+      // "unchanged" it would be a one-way door — an operator could never get
+      // back to the org-wide default they started from.
+      listTemplatesMock.mockResolvedValue({
+        data: [{ id: 7, name: 'Recruiter HeyGen', provider: 'heygen', is_active: true }],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ avatar_template_id: 7 }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-avatar-template"]').setValue('')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(updateProjectMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ avatar_template_id: null })
+      )
+    })
+
+    it('still renders the control when no template exists yet', async () => {
+      // An organization with no templates is the starting state of every new
+      // tenant. Hiding the control there would read as "this product has no
+      // such setting" rather than "you have not created one yet".
+      listTemplatesMock.mockResolvedValue({ data: [] })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject() },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="project-form-avatar-template"]').exists()).toBe(true)
+    })
+
+    it('survives a failed template load rather than breaking the whole form', async () => {
+      // The template list is one optional control on a form that configures
+      // far more important things. A rejected background load must not stop an
+      // operator saving a name change.
+      listTemplatesMock.mockRejectedValue(new Error('unreachable'))
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject() },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(updateProjectMock).toHaveBeenCalled()
+    })
   })
 })

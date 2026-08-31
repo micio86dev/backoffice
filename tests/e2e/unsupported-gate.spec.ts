@@ -35,6 +35,13 @@ test.describe('SA-11 — Unsupported experience gate', () => {
 
   test('unsupported page passes WCAG 2.1 AA accessibility check', async ({ page }) => {
     await page.goto('/unsupported')
+    // Wait for hydration before auditing, exactly as every other checkA11y
+    // call site in this suite does. The backoffice is an SPA, so `useHead`'s
+    // title is written by Vue on hydration — auditing straight after `goto`
+    // raced it and failed on "Document does not have a non-empty <title>",
+    // reporting a page defect that does not exist. The gate being visible is
+    // the same signal the sibling tests above already wait on.
+    await expect(page.getByTestId('unsupported-gate')).toBeVisible()
     await checkA11y(page)
   })
 

@@ -35,7 +35,7 @@
 
     <Alert
       v-if="message"
-      :variant="message.kind === 'error' ? 'destructive' : 'default'"
+      :variant="message.kind === 'error' ? 'destructive' : 'success'"
       data-testid="portability-result"
     >
       <AlertDescription>{{ message.text }}</AlertDescription>

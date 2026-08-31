@@ -82,7 +82,7 @@
 
     <Alert
       v-if="formMessage"
-      :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
+      :variant="formMessage.kind === 'error' ? 'destructive' : 'success'"
       role="alert"
       aria-live="polite"
       data-testid="profile-photo-banner"

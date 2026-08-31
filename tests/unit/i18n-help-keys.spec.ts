@@ -79,6 +79,51 @@ const LLM_COST_KEY_PATHS = [
   'settings.sectionDescription.llmCredentials',
 ] as const
 
+// Conversation-LLM binding errors (pluggable-conversation-llm, P8.10 follow-up).
+// P8.10 authored three of these and missed two, so `AvatarTemplate::booted()`
+// could throw a code the form had no copy for — and the operator read the raw
+// `model_not_found` / `vendor_mismatch` in red. This list is derived from the
+// THROW SITES, not from what the locale happens to contain: every
+// `InvalidLlmBindingException` reason plus `UnsupportedLlmModeException`'s
+// `mode_unsupported`, so adding a server code without copy fails here.
+//
+// The last two have no throw site: they are client-side refusals. I1 is a
+// database CHECK (both-or-neither), so a half-bound draft must be stopped in
+// the form rather than sent to be rejected — an operator who picked one half
+// caused no server error and must not be shown one.
+const LLM_BINDING_ERROR_KEY_PATHS = [
+  'avatar_templates.error.llm.model_not_found',
+  'avatar_templates.error.llm.model_unavailable',
+  'avatar_templates.error.llm.mode_unsupported',
+  'avatar_templates.error.llm.credential_not_found',
+  'avatar_templates.error.llm.vendor_mismatch',
+  'avatar_templates.error.llm.model_required',
+  'avatar_templates.error.llm.credential_required',
+] as const
+
+// Post-save warnings. `pages/avatar-templates/index.vue` renders these with a
+// BARE `$t()` — no `te()` gate, unlike the 422 mapper — so a code with no copy
+// is shown to the operator as the i18n key itself. That is what production did
+// on every HeyGen save: `avatar_templates.warning.llm_secret_failed`, verbatim,
+// in the alert.
+//
+// The namespace was authored for the Tavus path only (`pal_*`,
+// `tavus_key_missing`); the whole `llm_*` family `HeygenLlmRegistrar` emits was
+// never given copy in either locale. Derived from the EMIT sites — every
+// `['status' => 'warning', 'message' => …]` in `HeygenLlmRegistrar` and
+// `TavusPalSync` — so a new warning code without copy fails here.
+const WARNING_KEY_PATHS = [
+  'avatar_templates.warning.title',
+  'avatar_templates.warning.pal_sync_failed',
+  'avatar_templates.warning.pal_sync_unreachable',
+  'avatar_templates.warning.tavus_key_missing',
+  'avatar_templates.warning.pal_id_missing',
+  'avatar_templates.warning.llm_provider_unreachable',
+  'avatar_templates.warning.llm_credential_missing',
+  'avatar_templates.warning.llm_secret_failed',
+  'avatar_templates.warning.llm_config_failed',
+] as const
+
 function get(obj: unknown, path: string): unknown {
   return path
     .split('.')
@@ -138,6 +183,34 @@ describe('form help text — locale key parity', () => {
     expect(get(IT, path)).not.toBe('')
     expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
     expect(get(EN, path)).not.toBe('')
+  })
+
+  it.each(WARNING_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
+  })
+
+  it.each(LLM_BINDING_ERROR_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
+  })
+
+  // The form falls back to the RAW server code when a key is missing
+  // (AvatarTemplateForm.vue's `te()` gate). That fallback is a safety net, not
+  // a delivery mechanism: copy that is only the code itself would satisfy the
+  // parity assertion above while showing the operator exactly what they saw
+  // before. So the copy must not BE the code.
+  it.each(LLM_BINDING_ERROR_KEY_PATHS)('the copy at %s is prose, not the bare code', (path) => {
+    const code = path.split('.').pop()!
+
+    for (const locale of [IT, EN]) {
+      expect(String(get(locale, path))).not.toBe(code)
+      expect(String(get(locale, path)).length).toBeGreaterThan(code.length)
+    }
   })
 })
 

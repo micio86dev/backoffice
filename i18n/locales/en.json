@@ -761,8 +761,11 @@
       "llm": {
         "mode_unsupported": "This model does not support managed mode yet.",
         "model_unavailable": "This model is no longer available. Choose a different one.",
+        "model_not_found": "This model is not in the catalogue. Reload the page and choose one.",
         "credential_not_found": "This credential could not be used. Choose a different one.",
-        "vendor_mismatch": "This credential does not match the selected model's provider."
+        "vendor_mismatch": "This credential does not match the selected model's provider.",
+        "model_required": "Choose a model: the model and the credential must be set together.",
+        "credential_required": "Choose a credential: the model and the credential must be set together."
       }
     },
     "warning": {
@@ -770,7 +773,11 @@
       "pal_sync_failed": "Some advanced settings have not reached the service yet. Save again to retry.",
       "pal_sync_unreachable": "The service is unreachable: advanced settings are not live yet. Save again to retry.",
       "tavus_key_missing": "The service access key is missing: advanced settings cannot be applied.",
-      "pal_id_missing": "The persona ID is missing: advanced settings cannot be applied."
+      "pal_id_missing": "The persona ID is missing: advanced settings cannot be applied.",
+      "llm_provider_unreachable": "The service is not configured: the conversation model cannot be activated. Contact support.",
+      "llm_credential_missing": "The model or the credential is no longer available: the conversation model was not activated. Check the binding.",
+      "llm_secret_failed": "The service did not accept the credential: the conversation model is not live yet. Check the API key and save again.",
+      "llm_config_failed": "The conversation model has not reached the service yet. Save again to retry."
     },
     "field": {
       "avatarId": "Avatar ID",

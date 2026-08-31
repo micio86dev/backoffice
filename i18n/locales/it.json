@@ -761,8 +761,11 @@
       "llm": {
         "mode_unsupported": "Questo modello non supporta ancora la modalità gestita.",
         "model_unavailable": "Questo modello non è più disponibile. Selezionane un altro.",
+        "model_not_found": "Questo modello non è presente nel catalogo. Ricarica la pagina e selezionane uno.",
         "credential_not_found": "Questa credenziale non può essere utilizzata. Selezionane un'altra.",
-        "vendor_mismatch": "Questa credenziale non corrisponde al fornitore del modello selezionato."
+        "vendor_mismatch": "Questa credenziale non corrisponde al fornitore del modello selezionato.",
+        "model_required": "Seleziona un modello: modello e credenziale vanno impostati insieme.",
+        "credential_required": "Seleziona una credenziale: modello e credenziale vanno impostati insieme."
       }
     },
     "warning": {
@@ -770,7 +773,11 @@
       "pal_sync_failed": "Alcune impostazioni avanzate non sono ancora arrivate al servizio. Salva di nuovo per riprovare.",
       "pal_sync_unreachable": "Il servizio non è raggiungibile: le impostazioni avanzate non sono ancora attive. Salva di nuovo per riprovare.",
       "tavus_key_missing": "Manca la chiave di accesso al servizio: le impostazioni avanzate non possono essere applicate.",
-      "pal_id_missing": "Manca l'ID persona: le impostazioni avanzate non possono essere applicate."
+      "pal_id_missing": "Manca l'ID persona: le impostazioni avanzate non possono essere applicate.",
+      "llm_provider_unreachable": "Il servizio non è configurato: il modello di conversazione non può essere attivato. Contatta l'assistenza.",
+      "llm_credential_missing": "Il modello o la credenziale non sono più disponibili: il modello di conversazione non è stato attivato. Verifica l'associazione.",
+      "llm_secret_failed": "Il servizio non ha accettato la credenziale: il modello di conversazione non è ancora attivo. Verifica la chiave API e salva di nuovo.",
+      "llm_config_failed": "Il modello di conversazione non è ancora arrivato al servizio. Salva di nuovo per riprovare."
     },
     "field": {
       "avatarId": "ID avatar",

@@ -31,6 +31,7 @@ function detailResponse(
     data: {
       id: 42,
       candidate_ref: 'ref-042',
+      email: 'jane@example.test',
       display_name: 'Jane Doe',
       role_code: 'FLL',
       language: 'it',
@@ -659,8 +660,14 @@ describe('pages/participants/[id].vue', () => {
         project_id: 1,
         candidate_ref: 'ref-042',
         display_name: 'Jane Doe',
+        email: 'jane@example.test',
         role_code: 'FLL',
         lang: 'it',
+        // NOT sent from here. This button says "generate entry link": the
+        // operator wants a link to hand over themselves, usually because the
+        // first invitation did not reach the candidate. Silently mailing the
+        // address that already failed is the least useful thing it could do.
+        send_email: false,
       })
       expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(false)
       expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(

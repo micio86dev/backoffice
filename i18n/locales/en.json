@@ -222,7 +222,14 @@
       "displayNameRequired": "Enter a display name.",
       "tooLong": "Enter no more than {max} characters.",
       "submit": "Generate link",
-      "saveError": "This entry link could not be generated. Please review the highlighted fields."
+      "saveError": "This entry link could not be generated. Please review the highlighted fields.",
+      "email": "Candidate email",
+      "emailRequired": "Enter the candidate's email address.",
+      "emailInvalid": "That does not look like an email address.",
+      "sendEmail": "Email the invitation to the candidate",
+      "help": {
+        "email": "Also identifies the candidate: inviting the same address to another project keeps it the same person."
+      }
     }
   },
   "participantRecovery": {

@@ -30,6 +30,33 @@
           </FieldError>
         </Field>
 
+        <Field :data-invalid="Boolean(errors.email)">
+          <FieldLabel for="entry-link-form-email">
+            {{ $t('entryLink.form.email') }}
+          </FieldLabel>
+          <Input
+            id="entry-link-form-email"
+            v-model="email"
+            type="email"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.email)"
+            :aria-describedby="
+              errors.email ? 'entry-link-form-email-error' : 'entry-link-form-email-help'
+            "
+            data-testid="entry-link-form-email"
+          />
+          <FieldDescription id="entry-link-form-email-help">
+            {{ $t('entryLink.form.help.email') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.email"
+            id="entry-link-form-email-error"
+            data-testid="entry-link-form-email-error"
+          >
+            {{ errors.email }}
+          </FieldError>
+        </Field>
+
         <Field :data-invalid="Boolean(errors.displayName)">
           <FieldLabel for="entry-link-form-display-name">
             {{ $t('entryLink.form.displayName') }}
@@ -51,6 +78,24 @@
           >
             {{ errors.displayName }}
           </FieldError>
+        </Field>
+
+        <!--
+          Checked by DEFAULT. The operator opened "invite a candidate";
+          producing a link and quietly not sending it is the behaviour that
+          made this feature necessary. Unchecking it is how an operator who
+          delivers links some other way opts out — the link is returned either
+          way.
+        -->
+        <Field orientation="horizontal">
+          <Checkbox
+            id="entry-link-form-send-email"
+            v-model="sendEmail"
+            data-testid="entry-link-form-send-email"
+          />
+          <FieldLabel for="entry-link-form-send-email">
+            {{ $t('entryLink.form.sendEmail') }}
+          </FieldLabel>
         </Field>
 
         <Alert
@@ -78,7 +123,8 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 // display_name only. project_id is known from context (the project row the
 // operator opened the dialog from), never a third field to pick.
 import { ref, watch } from 'vue'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useEntryLinks, type GenerateEntryLinkResponse } from '@/composables/useEntryLinks'
@@ -106,7 +152,12 @@ const { t } = useI18n()
 
 const candidateRef = ref('')
 const displayName = ref('')
-const errors = ref<{ candidateRef?: string; displayName?: string }>({})
+// Required, and it is the candidate's IDENTITY as well as their address: the
+// same person invited to another project — or by another organization — is the
+// same email (CLAUDE.md ruling 8, reversed 2026-09-01).
+const email = ref('')
+const sendEmail = ref(true)
+const errors = ref<{ candidateRef?: string; displayName?: string; email?: string }>({})
 const formMessage = ref<string | null>(null)
 const submitting = ref(false)
 
@@ -132,12 +183,34 @@ function validate(): boolean {
     'entryLink.form.tooLong'
   )
 
-  return !errors.value.candidateRef && !errors.value.displayName
+  errors.value.email = validateEmail()
+
+  return !errors.value.candidateRef && !errors.value.displayName && !errors.value.email
+}
+
+/**
+ * Presence and a single `@`, nothing more.
+ *
+ * The server validates properly and is the authority. A client-side regex that
+ * tries to be thorough rejects addresses that are perfectly valid — plus
+ * addressing, new TLDs, quoted locals — and the person it turns away is a
+ * candidate who then never gets invited at all. Catching the empty field and
+ * the obvious typo is the whole job here.
+ */
+function validateEmail(): string | undefined {
+  const value = email.value.trim()
+
+  if (value === '') return t('entryLink.form.emailRequired')
+  if (!value.includes('@')) return t('entryLink.form.emailInvalid')
+  if (value.length > MAX_LENGTH) return t('entryLink.form.tooLong', { max: MAX_LENGTH })
+
+  return undefined
 }
 
 const SERVER_FIELD_TO_ERROR_KEY = {
   candidate_ref: 'candidateRef',
   display_name: 'displayName',
+  email: 'email',
 } as const satisfies Record<string, keyof typeof errors.value>
 
 async function onSubmit(): Promise<void> {
@@ -150,6 +223,8 @@ async function onSubmit(): Promise<void> {
       project_id: props.projectId,
       candidate_ref: candidateRef.value,
       display_name: displayName.value,
+      email: email.value.trim(),
+      send_email: sendEmail.value,
     })
     emit('success', response)
   } catch (error) {

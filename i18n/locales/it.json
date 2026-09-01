@@ -222,7 +222,14 @@
       "displayNameRequired": "Inserisci un nome visualizzato.",
       "tooLong": "Inserisci al massimo {max} caratteri.",
       "submit": "Genera link",
-      "saveError": "Non è stato possibile generare questo link di accesso. Controlla i campi evidenziati."
+      "saveError": "Non è stato possibile generare questo link di accesso. Controlla i campi evidenziati.",
+      "email": "Email del candidato",
+      "emailRequired": "Inserisci l'indirizzo email del candidato.",
+      "emailInvalid": "Non sembra un indirizzo email.",
+      "sendEmail": "Invia l'invito al candidato via email",
+      "help": {
+        "email": "Identifica anche il candidato: invitare lo stesso indirizzo su un altro progetto significa la stessa persona."
+      }
     }
   },
   "participantRecovery": {

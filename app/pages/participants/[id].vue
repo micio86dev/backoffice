@@ -578,8 +578,15 @@ async function onGenerateEntryLink(): Promise<void> {
       project_id: participant.value.project.id,
       candidate_ref: participant.value.candidate_ref,
       display_name: participant.value.display_name,
+      email: participant.value.email,
       role_code: participant.value.role_code,
       lang: participant.value.language,
+      // NOT sent from here. This button says "generate entry link", and the
+      // operator pressing it is asking for a link to hand over themselves —
+      // usually because the first invitation did not reach the candidate.
+      // Mailing again silently, to the address that already failed, would be
+      // the least useful thing this button could do.
+      send_email: false,
     })
     entryLink.value = response
   } catch {

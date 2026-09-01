@@ -1426,6 +1426,10 @@ export interface components {
             started_at: string | null;
             completed_at: string | null;
             created_at: string | null;
+            branding: {
+                primary_color: string | null;
+                logo_url: string | null;
+            };
             project: {
                 id: number;
                 role_code: string | null;
@@ -1598,6 +1602,7 @@ export interface components {
             id: number;
             candidate_ref: string;
             display_name: string;
+            email: string;
             role_code: string | null;
             language: string | null;
             /** @enum {string} */
@@ -1651,6 +1656,7 @@ export interface components {
             id: number;
             candidate_ref: string;
             display_name: string;
+            email: string;
             role_code: string | null;
             language: string | null;
             /** @enum {string} */
@@ -2870,9 +2876,18 @@ export interface operations {
                 "application/json": {
                     project_id: number;
                     candidate_ref: string;
+                    /** Format: email */
+                    email: string;
                     display_name: string;
                     role_code?: string | null;
                     lang?: string | null;
+                    /**
+                     * @description Defaults to TRUE. The operator pressed "invite a candidate";
+                     *     producing a link and silently not sending it is the behaviour
+                     *     that made this feature necessary in the first place. An operator
+                     *     who wants to deliver the link some other way opts out explicitly.
+                     */
+                    send_email?: boolean;
                 };
             };
         };
@@ -2885,6 +2900,11 @@ export interface operations {
                     "application/json": {
                         entry_url: string;
                         expires_at: string;
+                        /**
+                         * @description Reported back so the UI can say "sent to grace@example.test"
+                         *     rather than leaving the operator to guess whether it went.
+                         */
+                        email_sent: boolean;
                     };
                 };
             };
@@ -3733,6 +3753,14 @@ export interface operations {
                 "application/json": {
                     project_id: number;
                     candidate_ref: string;
+                    /**
+                     * Format: email
+                     * @description Required: the email IS the candidate's identity across projects
+                     *     and organizations (CLAUDE.md ruling 8, reversed 2026-09-01), and
+                     *     the column is NOT NULL. There is no legacy contract to keep —
+                     *     this product is greenfield by ruling.
+                     */
+                    email: string;
                     display_name: string;
                     role_code?: string | null;
                     language?: string | null;
@@ -4403,6 +4431,8 @@ export interface operations {
                 "application/json": {
                     project_id: number;
                     candidate_ref: string;
+                    /** Format: email */
+                    email: string;
                     display_name: string;
                     role_code?: string | null;
                     lang?: string | null;

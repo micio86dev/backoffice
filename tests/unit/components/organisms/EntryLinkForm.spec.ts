@@ -76,6 +76,7 @@ describe('EntryLinkForm', () => {
     const wrapper = mountForm()
 
     await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('x'.repeat(256))
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
     await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Someone')
     await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
     await flushPromises()
@@ -84,10 +85,11 @@ describe('EntryLinkForm', () => {
     expect(generateEntryLinkMock).not.toHaveBeenCalled()
   })
 
-  it('submits project_id + candidate_ref + display_name and emits success', async () => {
+  it('submits project_id + candidate_ref + email + display_name and emits success', async () => {
     const wrapper = mountForm()
 
     await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
     await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
     await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
     await flushPromises()
@@ -96,6 +98,11 @@ describe('EntryLinkForm', () => {
       project_id: 42,
       candidate_ref: 'cand-1',
       display_name: 'Mario Rossi',
+      email: 'mario@example.test',
+      // Checked by default: the operator opened "invite a candidate", and
+      // producing a link while quietly not sending it is the behaviour this
+      // whole feature exists to end.
+      send_email: true,
     })
     expect(wrapper.emitted('success')).toBeTruthy()
     expect(wrapper.emitted('success')?.[0]?.[0]).toEqual({
@@ -114,6 +121,7 @@ describe('EntryLinkForm', () => {
 
     const wrapper = mountForm()
     await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
     await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
     await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
     await flushPromises()
@@ -133,6 +141,7 @@ describe('EntryLinkForm', () => {
 
     const wrapper = mountForm()
     await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
     await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
     await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
     await flushPromises()
@@ -140,5 +149,69 @@ describe('EntryLinkForm', () => {
     const banner = wrapper.get('[data-testid="entry-link-form-banner"]')
     expect(banner.attributes('role')).toBe('alert')
     expect(banner.text()).toContain('role_code does not match the project role.')
+  })
+})
+
+describe('EntryLinkForm — the email is required, because it is the identity', () => {
+  beforeEach(() => {
+    generateEntryLinkMock.mockReset().mockResolvedValue({
+      entry_url: 'https://interview.example.com/interview/tok',
+      expires_at: '2026-08-17T15:32:00.000000Z',
+    })
+  })
+
+  function mountForm() {
+    return mount(EntryLinkForm, {
+      props: { projectId: 42 },
+      global: { mocks: { $t: tMock } },
+    })
+  }
+
+  it('refuses a submit with no email, on the control rather than in the banner', async () => {
+    // Required at the server too. Checked here so the operator is told WHICH
+    // field is missing instead of receiving the form-level "could not save"
+    // an unmapped 422 produces.
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="entry-link-form-email-error"]').exists()).toBe(true)
+    expect(generateEntryLinkMock).not.toHaveBeenCalled()
+  })
+
+  it('catches the obvious typo and nothing cleverer', async () => {
+    // Presence and a single `@`. A thorough client-side regex rejects
+    // addresses that are perfectly valid — plus addressing, new TLDs, quoted
+    // locals — and the person it turns away is a candidate who then never gets
+    // invited at all. The server is the authority.
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('not-an-address')
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="entry-link-form-email-error"]').exists()).toBe(true)
+    expect(generateEntryLinkMock).not.toHaveBeenCalled()
+  })
+
+  it('accepts an address a stricter regex would have rejected', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+    await wrapper
+      .get('[data-testid="entry-link-form-email"]')
+      .setValue('mario+recruiting@sub.example.engineering')
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(generateEntryLinkMock).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'mario+recruiting@sub.example.engineering' })
+    )
   })
 })

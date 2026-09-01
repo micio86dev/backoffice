@@ -875,7 +875,10 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
 
       const select = wrapper.get('[data-testid="project-form-avatar-template"]')
       expect((select.element as HTMLSelectElement).value).toBe('9')
-      expect(select.findAll('option')).toHaveLength(3) // the two templates + "use the org default"
+      // The two templates and nothing else. The "use the organization default"
+      // option is gone: the column is NOT NULL and the API rejects an explicit
+      // null, so offering it would be offering a choice that can only 422.
+      expect(select.findAll('option')).toHaveLength(2)
     })
 
     it('sends the pinned template on save', async () => {
@@ -921,6 +924,88 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
         1,
         expect.objectContaining({ avatar_template_id: null })
       )
+    })
+
+    it('offers no "organization default" option — the field is required', async () => {
+      // `projects.avatar_template_id` is NOT NULL and the API rejects an
+      // explicit null. Leaving the empty option in place would offer an
+      // operator a choice that can only ever come back as a 422.
+      listTemplatesMock.mockResolvedValue({
+        data: [{ id: 7, name: 'Recruiter HeyGen', provider: 'heygen', is_active: true }],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ avatar_template_id: 7 }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      const options = wrapper.get('[data-testid="project-form-avatar-template"]').findAll('option')
+      expect(options).toHaveLength(1)
+      expect(options.every((o) => o.attributes('value') !== '')).toBe(true)
+    })
+
+    it('defaults a NEW project to the most recently used template', async () => {
+      // "Most recently used" rather than "first": an operator creating several
+      // projects in a row is almost always continuing with the same template,
+      // and making them re-pick it every time is the kind of friction that
+      // turns a required field into an annoyance.
+      listTemplatesMock.mockResolvedValue({
+        data: [
+          { id: 3, name: 'Older', provider: 'heygen', is_active: false },
+          { id: 9, name: 'Most recent', provider: 'tavus', is_active: true },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: {} },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
+          .value
+      ).toBe('9')
+    })
+
+    it('falls back to the first template when none has been used yet', async () => {
+      listTemplatesMock.mockResolvedValue({
+        data: [{ id: 3, name: 'The only one', provider: 'heygen', is_active: false }],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: {} },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
+          .value
+      ).toBe('3')
+    })
+
+    it('never overwrites the template an existing project already pinned', async () => {
+      // The default is for a project that has made no choice. Applying it to
+      // one that has would silently re-point a live project on every edit.
+      listTemplatesMock.mockResolvedValue({
+        data: [
+          { id: 3, name: 'Pinned', provider: 'heygen', is_active: false },
+          { id: 9, name: 'Most recent', provider: 'tavus', is_active: true },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ avatar_template_id: 3 }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
+          .value
+      ).toBe('3')
     })
 
     it('still renders the control when no template exists yet', async () => {

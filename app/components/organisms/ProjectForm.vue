@@ -265,7 +265,6 @@
             empty choice. Without a way back to it, pinning would be a one-way
             door.
           -->
-          <option value="">{{ $t('projects.form.avatarTemplateNone') }}</option>
           <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
             {{ template.name }} ({{ template.provider }})
           </option>
@@ -477,7 +476,7 @@ const emit = defineEmits<{
  * disambiguate two similarly-named templates, and nothing else. Widening it to
  * the full model would couple this form to fields it never reads.
  */
-type AvatarTemplateOption = Pick<AvatarTemplate, 'id' | 'name' | 'provider'>
+type AvatarTemplateOption = Pick<AvatarTemplate, 'id' | 'name' | 'provider' | 'is_active'>
 
 const { createProject, updateProject } = useProjects()
 const { fetchRoleCompetencies } = useFrameworkRoles()
@@ -825,9 +824,37 @@ async function loadAvatarTemplates(): Promise<void> {
   try {
     const response = await listTemplates()
     avatarTemplates.value = response.data
+    applyDefaultTemplate()
   } catch {
     avatarTemplates.value = []
   }
+}
+
+/**
+ * Pre-select a template for a project that has not chosen one.
+ *
+ * `projects.avatar_template_id` is required, so an empty select would be a form
+ * that cannot be submitted until the operator notices a field they did not know
+ * was mandatory. Choosing for them is only defensible while they can still
+ * change it, which they can.
+ *
+ * "The one the organization is using" is the ACTIVE template — the closest
+ * available reading of "the last one used", and an honest one: there is no
+ * last-used timestamp on this endpoint, and inventing one from list order would
+ * be a guess dressed as a fact. Falls back to the first template when none is
+ * active.
+ *
+ * NEVER overwrites an existing pin. The default is for a project that has made
+ * no choice; applying it to one that has would silently re-point a live project
+ * every time somebody opened the form to rename it.
+ */
+function applyDefaultTemplate(): void {
+  if (avatarTemplateId.value !== null) return
+
+  const preferred =
+    avatarTemplates.value.find((template) => template.is_active) ?? avatarTemplates.value[0]
+
+  avatarTemplateId.value = preferred?.id ?? null
 }
 
 function onAvatarTemplateChange(event: Event): void {

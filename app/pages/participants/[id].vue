@@ -323,6 +323,8 @@
 // rendered as three-plus distinct, meaningful states, never collapsed into
 // one generic error toast.
 import SessionList from '@/components/organisms/SessionList.vue'
+import { translateServerCode } from '@/utils/server-message'
+import { serverMessageCode } from '@/utils/http-error'
 import { ref, computed, onMounted } from 'vue'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -365,7 +367,7 @@ definePageMeta({
 })
 
 const route = useRoute()
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 
 useHead({
   // A <title> is user-facing (browser tab, bookmark, window switcher, and the
@@ -589,8 +591,18 @@ async function onGenerateEntryLink(): Promise<void> {
       send_email: false,
     })
     entryLink.value = response
-  } catch {
-    entryLinkError.value = t('entryLink.mintError')
+  } catch (error) {
+    // The API answers with a CODE (`entry_link_participant_completed`,
+    // `entry_link_project_closed`, ...) precisely so this layer — the only one
+    // that knows the operator's locale — renders it in their language. The
+    // generic "could not mint" is the fallback for a failure that carries no
+    // code at all, such as the network being down.
+    const code = serverMessageCode(error)
+
+    entryLinkError.value =
+      code === null
+        ? t('entryLink.mintError')
+        : translateServerCode({ t, te }, 'entryLink.serverError', code)
   } finally {
     generatingEntryLink.value = false
   }

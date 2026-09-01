@@ -230,6 +230,11 @@
       "help": {
         "email": "Identifica anche il candidato: invitare lo stesso indirizzo su un altro progetto significa la stessa persona."
       }
+    },
+    "serverError": {
+      "entry_link_participant_completed": "Questo candidato ha già completato la valutazione. Non è possibile generare un nuovo link.",
+      "entry_link_participant_failed": "La valutazione di questo candidato è fallita. Riaprila prima di generare un nuovo link.",
+      "entry_link_project_closed": "Questo progetto al momento non accetta colloqui."
     }
   },
   "participantRecovery": {
@@ -557,6 +562,9 @@
         "key": "Chiave",
         "status": "Stato",
         "actions": "Azioni"
+      },
+      "serverError": {
+        "credential_in_use": "Scollega tutti i template che usano questa credenziale prima di eliminarla."
       }
     },
     "branding": {

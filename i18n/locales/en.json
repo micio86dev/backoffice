@@ -230,6 +230,11 @@
       "help": {
         "email": "Also identifies the candidate: inviting the same address to another project keeps it the same person."
       }
+    },
+    "serverError": {
+      "entry_link_participant_completed": "This candidate has already completed the assessment. A new link cannot be issued.",
+      "entry_link_participant_failed": "This candidate's assessment failed. Re-open it before issuing a new link.",
+      "entry_link_project_closed": "This project is not open for interviews right now."
     }
   },
   "participantRecovery": {
@@ -557,6 +562,9 @@
         "key": "Key",
         "status": "Status",
         "actions": "Actions"
+      },
+      "serverError": {
+        "credential_in_use": "Unbind every template using this credential before deleting it."
       }
     },
     "branding": {

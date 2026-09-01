@@ -2917,12 +2917,12 @@ export interface operations {
                 content: {
                     "application/json": {
                         /** @constant */
-                        message: "Conflict: participant has already completed this assessment.";
+                        message: "entry_link_participant_completed";
                         /** @constant */
                         reason: "completed";
                     } | {
                         /** @constant */
-                        message: "Conflict: this participant's assessment failed and must be re-opened by an operator before a new link can be issued.";
+                        message: "entry_link_participant_failed";
                         /** @constant */
                         reason: "failed";
                     };
@@ -3389,8 +3389,13 @@ export interface operations {
                     "application/json": {
                         /** @constant */
                         error: "credential_in_use";
-                        /** @constant */
-                        message: "Unbind every template using this credential before deleting it.";
+                        /**
+                         * @description A code, not a sentence: the API has no idea what language
+                         *     the operator reads, and `templates` below already names the
+                         *     ones blocking the delete.
+                         * @constant
+                         */
+                        message: "credential_in_use";
                         templates: {
                             [key: string]: unknown;
                         };

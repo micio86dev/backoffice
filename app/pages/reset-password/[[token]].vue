@@ -228,6 +228,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { applyServerFieldErrors, getErrorStatus } from '@/utils/http-error'
+import { translateServerCodes } from '@/utils/server-message'
 
 definePageMeta({
   name: 'reset-password',
@@ -235,7 +236,7 @@ definePageMeta({
   layout: false,
 })
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const localePath = useLocalePath()
 
 useHead({
@@ -397,7 +398,16 @@ async function onSubmit(): Promise<void> {
       if (unmapped === null) {
         formMessage.value = t('resetPassword.error')
       } else if (unmapped.length > 0) {
-        formMessage.value = unmapped.join(' ')
+        // Translated, not joined raw. The server sends a CODE
+        // (`reset_link_invalid`) precisely so this layer — the only one that
+        // knows the operator's locale — can render it in their language.
+        // Joining the raw values is what put an English sentence in front of
+        // an Italian operator.
+        formMessage.value = translateServerCodes(
+          { t, te },
+          'resetPassword.serverError',
+          unmapped
+        ).join(' ')
       }
     }
   } finally {

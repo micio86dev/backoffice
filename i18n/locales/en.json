@@ -57,7 +57,10 @@
     "invalidLink": "The reset link is missing or malformed. Request a new one and open it directly from the email.",
     "requestNew": "Request a new link",
     "signIn": "Go to sign in",
-    "back": "Back to sign in"
+    "back": "Back to sign in",
+    "serverError": {
+      "reset_link_invalid": "This password reset link is invalid or has expired. Request a new one."
+    }
   },
   "head": {
     "title": {

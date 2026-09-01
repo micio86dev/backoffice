@@ -428,14 +428,16 @@
       "apiKeys": "Chiavi API",
       "webhooks": "Valori predefiniti webhook",
       "users": "Utenti e ruoli",
-      "llmCredentials": "Credenziali LLM di conversazione"
+      "llmCredentials": "Credenziali LLM di conversazione",
+      "branding": "Aspetto"
     },
     "sectionDescription": {
       "organization": "Nome e identificatore del tenant",
       "apiKeys": "Credenziali per l'accesso machine-to-machine",
       "webhooks": "Dove BEAI recapita gli eventi di avanzamento e valutazione",
       "users": "Chi può accedere e cosa può fare",
-      "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista"
+      "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista",
+      "branding": "Logo e colore del cliente, applicati a questo pannello e all'app del candidato."
     },
     "organization": {
       "name": "Nome",
@@ -544,6 +546,29 @@
         "key": "Chiave",
         "status": "Stato",
         "actions": "Azioni"
+      }
+    },
+    "branding": {
+      "logo": "Logo",
+      "logoAlt": "Logo dell'organizzazione",
+      "logoEmpty": "Nessun logo: viene usato quello BEAI.",
+      "logoRemove": "Rimuovi",
+      "primaryColor": "Colore primario",
+      "colorClear": "Azzera",
+      "invalidColor": "Inserisci un colore in formato #rrggbb, ad esempio #771AAF.",
+      "saveError": "Non è stato possibile salvare. Riprova.",
+      "help": {
+        "logo": "JPEG o PNG, massimo 1 MB. Non accettiamo SVG: può contenere codice eseguibile. Lascia vuoto per usare il logo BEAI.",
+        "primaryColor": "Formato #rrggbb. Lascia vuoto per usare la palette BEAI."
+      },
+      "serverError": {
+        "logo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
+        "logo_too_large": "Il file supera la dimensione massima consentita.",
+        "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito."
+      },
+      "confirm": {
+        "removeLogoTitle": "Rimuovere il logo?",
+        "removeLogoBody": "Il file verrà eliminato definitivamente. Se non hai più l'originale non potrai ripristinarlo. Fino a un nuovo caricamento verrà usato il logo BEAI."
       }
     }
   },

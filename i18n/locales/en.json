@@ -428,14 +428,16 @@
       "apiKeys": "API keys",
       "webhooks": "Webhook defaults",
       "users": "Users & roles",
-      "llmCredentials": "Conversation LLM credentials"
+      "llmCredentials": "Conversation LLM credentials",
+      "branding": "Appearance"
     },
     "sectionDescription": {
       "organization": "Name and tenancy identifier",
       "apiKeys": "Credentials for machine-to-machine access",
       "webhooks": "Where BEAI delivers progress and evaluation events",
       "users": "Who can sign in, and what they are allowed to do",
-      "llmCredentials": "The vendor API key the interview model runs on"
+      "llmCredentials": "The vendor API key the interview model runs on",
+      "branding": "The client's logo and colour, applied to this panel and to the candidate app."
     },
     "organization": {
       "name": "Name",
@@ -544,6 +546,29 @@
         "key": "Key",
         "status": "Status",
         "actions": "Actions"
+      }
+    },
+    "branding": {
+      "logo": "Logo",
+      "logoAlt": "Organization logo",
+      "logoEmpty": "No logo set: the BEAI one is used.",
+      "logoRemove": "Remove",
+      "primaryColor": "Primary colour",
+      "colorClear": "Clear",
+      "invalidColor": "Enter a colour in #rrggbb format, for example #771AAF.",
+      "saveError": "Could not save. Please try again.",
+      "help": {
+        "logo": "JPEG or PNG, 1 MB maximum. SVG is not accepted: it can carry executable code. Leave empty to use the BEAI logo.",
+        "primaryColor": "Format #rrggbb. Leave empty to use the BEAI palette."
+      },
+      "serverError": {
+        "logo_invalid_image": "The file is not a valid JPEG or PNG image.",
+        "logo_too_large": "The file exceeds the maximum allowed size.",
+        "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed."
+      },
+      "confirm": {
+        "removeLogoTitle": "Remove the logo?",
+        "removeLogoBody": "The file will be permanently deleted. If you no longer have the original you will not be able to restore it. Until a new one is uploaded, the BEAI logo is used."
       }
     }
   },

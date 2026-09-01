@@ -84,6 +84,7 @@ import {
   BoltIcon,
   UserGroupIcon,
   CpuChipIcon,
+  SwatchIcon,
 } from '@heroicons/vue/24/outline'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
@@ -107,6 +108,7 @@ const UsersPanel = defineAsyncComponent(() => import('@/components/organisms/Use
 const LlmCredentialsPanel = defineAsyncComponent(
   () => import('@/components/organisms/LlmCredentialsPanel.vue')
 )
+const BrandingForm = defineAsyncComponent(() => import('@/components/organisms/BrandingForm.vue'))
 
 // The rail and the panel headers read from the same source, so a section can
 // never show one label in the nav and another above its content.
@@ -119,6 +121,18 @@ const SECTIONS = [
     component: OrganizationProfileForm,
     needsOrganization: true,
     adminOnly: false,
+  },
+  {
+    // Admin-only. What every candidate of an organization sees is not an
+    // operator-level decision, and the API enforces the same boundary — the
+    // rail hiding it is a courtesy, never the control.
+    value: 'branding',
+    labelKey: 'settings.tabs.branding',
+    descriptionKey: 'settings.sectionDescription.branding',
+    icon: SwatchIcon,
+    component: BrandingForm,
+    needsOrganization: true,
+    adminOnly: true,
   },
   {
     value: 'apiKeys',

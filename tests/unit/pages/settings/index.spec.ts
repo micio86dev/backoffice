@@ -139,15 +139,33 @@ describe('pages/settings/index.vue', () => {
 
   // The panel exists, is tested, and until now no route mounted it — an
   // operator could not reach the vault at all. Reachability is the assertion.
-  it('gives an admin a fifth section for the conversation-LLM credentials', async () => {
+  it('gives an admin the credential vault and the branding section', async () => {
+    // Counted rather than merely present, because the number is the guard: a
+    // section silently dropped from the registry would still leave every
+    // `toContain` below passing on the sections that remain.
     mockOrganization()
     mockCurrentUser(['admin'])
 
     const wrapper = await mountSettings()
 
-    expect(wrapper.findAll('[role="tab"]')).toHaveLength(5)
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(6)
     expect(wrapper.text()).toContain('settings.tabs.llmCredentials')
     expect(wrapper.text()).toContain('settings.sectionDescription.llmCredentials')
+    // Branding is admin-only for the same reason the vault is: what every
+    // candidate of an organization sees is not an operator-level decision.
+    expect(wrapper.text()).toContain('settings.tabs.branding')
+  })
+
+  it('hides branding from a non-admin', async () => {
+    mockOrganization()
+    mockCurrentUser(['operator'])
+
+    const wrapper = await mountSettings()
+
+    // The rail hiding it is a COURTESY — the API enforces the same boundary and
+    // is the actual control. Asserted here so the courtesy does not quietly
+    // disappear and leave an operator staring at a section that 403s.
+    expect(wrapper.text()).not.toContain('settings.tabs.branding')
   })
 
   it('does not render the credential vault for a non-admin at all', async () => {

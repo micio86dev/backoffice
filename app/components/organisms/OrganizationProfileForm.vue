@@ -1,59 +1,61 @@
 <template>
   <form data-testid="organization-profile-form" novalidate @submit.prevent="onSubmit">
-    <FieldGroup>
-      <Field>
-        <FieldLabel for="organization-profile-slug">{{
-          $t('settings.organization.slug')
-        }}</FieldLabel>
-        <p
-          id="organization-profile-slug"
-          class="text-muted-foreground text-sm"
-          data-testid="organization-profile-slug"
+    <FormFieldset :disabled="saving">
+      <FieldGroup>
+        <Field>
+          <FieldLabel for="organization-profile-slug">{{
+            $t('settings.organization.slug')
+          }}</FieldLabel>
+          <p
+            id="organization-profile-slug"
+            class="text-muted-foreground text-sm"
+            data-testid="organization-profile-slug"
+          >
+            {{ organization.slug }}
+          </p>
+          <FieldDescription>{{ $t('settings.organization.slugReadOnly') }}</FieldDescription>
+        </Field>
+
+        <Field :data-invalid="Boolean(error)">
+          <FieldLabel for="organization-profile-name">{{
+            $t('settings.organization.name')
+          }}</FieldLabel>
+          <Input
+            id="organization-profile-name"
+            v-model="name"
+            autocomplete="off"
+            :aria-invalid="Boolean(error)"
+            :aria-describedby="describedBy"
+            data-testid="organization-profile-name"
+            @blur="validateName"
+          />
+          <FieldDescription id="organization-profile-name-help">
+            {{ $t('settings.organization.help.name') }}
+          </FieldDescription>
+          <FieldError
+            v-if="error"
+            id="organization-profile-name-error"
+            data-testid="organization-profile-name-error"
+          >
+            {{ error }}
+          </FieldError>
+        </Field>
+
+        <Alert
+          v-if="formMessage"
+          :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
+          role="alert"
+          aria-live="polite"
+          data-testid="organization-profile-banner"
         >
-          {{ organization.slug }}
-        </p>
-        <FieldDescription>{{ $t('settings.organization.slugReadOnly') }}</FieldDescription>
-      </Field>
+          <AlertDescription>{{ formMessage.text }}</AlertDescription>
+        </Alert>
 
-      <Field :data-invalid="Boolean(error)">
-        <FieldLabel for="organization-profile-name">{{
-          $t('settings.organization.name')
-        }}</FieldLabel>
-        <Input
-          id="organization-profile-name"
-          v-model="name"
-          autocomplete="off"
-          :aria-invalid="Boolean(error)"
-          :aria-describedby="describedBy"
-          data-testid="organization-profile-name"
-          @blur="validateName"
-        />
-        <FieldDescription id="organization-profile-name-help">
-          {{ $t('settings.organization.help.name') }}
-        </FieldDescription>
-        <FieldError
-          v-if="error"
-          id="organization-profile-name-error"
-          data-testid="organization-profile-name-error"
-        >
-          {{ error }}
-        </FieldError>
-      </Field>
-
-      <Alert
-        v-if="formMessage"
-        :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-        role="alert"
-        aria-live="polite"
-        data-testid="organization-profile-banner"
-      >
-        <AlertDescription>{{ formMessage.text }}</AlertDescription>
-      </Alert>
-
-      <Button type="submit" :disabled="saving" data-testid="organization-profile-submit">
-        {{ $t('projects.action.save') }}
-      </Button>
-    </FieldGroup>
+        <Button type="submit" :loading="saving" data-testid="organization-profile-submit">
+          {{ $t('projects.action.save') }}
+        </Button>
+      </FieldGroup>
+    </FormFieldset>
   </form>
 </template>
 
@@ -65,6 +67,7 @@ import { computed, ref } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
 import { applyServerFieldErrors } from '@/utils/http-error'

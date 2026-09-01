@@ -1,119 +1,123 @@
 <template>
   <form data-testid="branding-form" novalidate @submit.prevent="onSubmit">
-    <FieldGroup>
-      <!--
+    <FormFieldset :disabled="saving">
+      <FieldGroup>
+        <!--
         The LOGO. Absent is a supported, permanent state — the product ships
         with a mark of its own — so the empty case shows the Quint logo rather
         than a placeholder that reads as broken.
       -->
-      <Field>
-        <FieldLabel for="branding-logo">{{ $t('settings.branding.logo') }}</FieldLabel>
+        <Field>
+          <FieldLabel for="branding-logo">{{ $t('settings.branding.logo') }}</FieldLabel>
 
-        <div class="flex items-center gap-4">
-          <img
-            v-if="logoUrl"
-            :src="logoUrl"
-            :alt="$t('settings.branding.logoAlt')"
-            data-testid="branding-logo-preview"
-            class="h-12 w-auto max-w-40 rounded border border-border bg-card object-contain p-1"
-          />
-          <p v-else class="text-sm text-muted-foreground" data-testid="branding-logo-empty">
-            {{ $t('settings.branding.logoEmpty') }}
-          </p>
+          <div class="flex items-center gap-4">
+            <img
+              v-if="logoUrl"
+              :src="logoUrl"
+              :alt="$t('settings.branding.logoAlt')"
+              data-testid="branding-logo-preview"
+              class="h-12 w-auto max-w-40 rounded border border-border bg-card object-contain p-1"
+            />
+            <p v-else class="text-sm text-muted-foreground" data-testid="branding-logo-empty">
+              {{ $t('settings.branding.logoEmpty') }}
+            </p>
 
-          <input
-            id="branding-logo"
-            ref="fileInput"
-            type="file"
-            accept="image/jpeg,image/png"
-            data-testid="branding-logo-input"
-            class="text-sm"
-            @change="onFileChosen"
-          />
+            <input
+              id="branding-logo"
+              ref="fileInput"
+              type="file"
+              accept="image/jpeg,image/png"
+              data-testid="branding-logo-input"
+              class="text-sm"
+              @change="onFileChosen"
+            />
 
-          <Button
-            v-if="logoUrl"
-            type="button"
-            variant="outline"
-            data-testid="branding-logo-remove"
-            @click="confirmingRemoval = true"
-          >
-            {{ $t('settings.branding.logoRemove') }}
-          </Button>
-        </div>
+            <Button
+              v-if="logoUrl"
+              type="button"
+              variant="outline"
+              data-testid="branding-logo-remove"
+              @click="confirmingRemoval = true"
+            >
+              {{ $t('settings.branding.logoRemove') }}
+            </Button>
+          </div>
 
-        <!--
+          <!--
           `accept` on the input is a CONVENIENCE, never the check: it filters the
           file picker and is trivially bypassed. The server decides on the file's
           magic bytes. Saying so here stops a future reader treating the attribute
           as the guarantee.
         -->
-        <FieldDescription>{{ $t('settings.branding.help.logo') }}</FieldDescription>
+          <FieldDescription>{{ $t('settings.branding.help.logo') }}</FieldDescription>
 
-        <FieldError v-if="logoError" data-testid="branding-logo-error">{{ logoError }}</FieldError>
-      </Field>
+          <FieldError v-if="logoError" data-testid="branding-logo-error">{{
+            logoError
+          }}</FieldError>
+        </Field>
 
-      <!-- The PRIMARY COLOUR. -->
-      <Field :data-invalid="Boolean(colorError)">
-        <FieldLabel for="branding-color">{{ $t('settings.branding.primaryColor') }}</FieldLabel>
+        <!-- The PRIMARY COLOUR. -->
+        <Field :data-invalid="Boolean(colorError)">
+          <FieldLabel for="branding-color">{{ $t('settings.branding.primaryColor') }}</FieldLabel>
 
-        <div class="flex items-center gap-3">
-          <!--
+          <div class="flex items-center gap-3">
+            <!--
             A native colour picker AND a text field over the same value. The
             picker cannot express "no colour", and the text field is how an
             operator pastes an exact hex from a brand document — neither alone
             covers both, and a brand colour pasted wrong is worse than one
             picked approximately.
           -->
-          <input
-            id="branding-color"
-            type="color"
-            :value="color || '#771AAF'"
-            data-testid="branding-color-picker"
-            class="h-9 w-12 cursor-pointer rounded border border-border bg-card"
-            @input="onColorPicked"
-          />
-          <Input
-            v-model="color"
-            autocomplete="off"
-            placeholder="#771AAF"
-            :aria-invalid="Boolean(colorError)"
-            data-testid="branding-color-text"
-            class="max-w-40"
-            @blur="validateColor"
-          />
-          <Button
-            v-if="color"
-            type="button"
-            variant="outline"
-            data-testid="branding-color-clear"
-            @click="color = ''"
-          >
-            {{ $t('settings.branding.colorClear') }}
-          </Button>
-        </div>
+            <input
+              id="branding-color"
+              type="color"
+              :value="color || '#771AAF'"
+              data-testid="branding-color-picker"
+              class="h-9 w-12 cursor-pointer rounded border border-border bg-card"
+              @input="onColorPicked"
+            />
+            <Input
+              v-model="color"
+              autocomplete="off"
+              placeholder="#771AAF"
+              :aria-invalid="Boolean(colorError)"
+              data-testid="branding-color-text"
+              class="max-w-40"
+              @blur="validateColor"
+            />
+            <Button
+              v-if="color"
+              type="button"
+              variant="outline"
+              data-testid="branding-color-clear"
+              @click="color = ''"
+            >
+              {{ $t('settings.branding.colorClear') }}
+            </Button>
+          </div>
 
-        <FieldDescription>{{ $t('settings.branding.help.primaryColor') }}</FieldDescription>
+          <FieldDescription>{{ $t('settings.branding.help.primaryColor') }}</FieldDescription>
 
-        <FieldError v-if="colorError" data-testid="branding-color-error">{{
-          colorError
-        }}</FieldError>
-      </Field>
+          <FieldError v-if="colorError" data-testid="branding-color-error">{{
+            colorError
+          }}</FieldError>
+        </Field>
 
-      <Alert
-        v-if="formMessage"
-        variant="destructive"
-        role="alert"
-        aria-live="polite"
-        data-testid="branding-banner"
-      >
-        <AlertDescription>{{ formMessage }}</AlertDescription>
-      </Alert>
+        <Alert
+          v-if="formMessage"
+          variant="destructive"
+          role="alert"
+          aria-live="polite"
+          data-testid="branding-banner"
+        >
+          <AlertDescription>{{ formMessage }}</AlertDescription>
+        </Alert>
 
-      <Button type="submit" :disabled="saving" data-testid="branding-submit">
-        {{ $t('projects.action.save') }}
-      </Button>
-    </FieldGroup>
+        <Button type="submit" :loading="saving" data-testid="branding-submit">
+          {{ $t('projects.action.save') }}
+        </Button>
+      </FieldGroup>
+    </FormFieldset>
 
     <!--
       Removing the logo DELETES the stored file. Reversible only if the operator
@@ -147,6 +151,7 @@ import { ref } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'

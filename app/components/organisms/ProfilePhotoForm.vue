@@ -5,7 +5,7 @@
     :aria-busy="uploading ? 'true' : 'false'"
     @submit.prevent
   >
-    <div class="flex items-center gap-4">
+    <FormFieldset :disabled="uploading" class="flex items-center gap-4">
       <!--
         `:key` forces a fresh AvatarRoot (and its internally-provided
         imageLoadingStatus ref) across a null <-> non-null photoUrl
@@ -57,7 +57,7 @@
           variant="outline"
           size="sm"
           data-testid="profile-photo-change"
-          :disabled="uploading"
+          :loading="uploading"
           @click="inputEl?.click()"
         >
           {{ $t('profile.photo.change') }}
@@ -74,7 +74,7 @@
           {{ $t('profile.photo.remove') }}
         </Button>
       </div>
-    </div>
+    </FormFieldset>
 
     <FieldError v-if="photoError" id="profile-photo-error" data-testid="profile-photo-error">{{
       photoError
@@ -103,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import { FormFieldset } from '@/components/ui/form-fieldset'
 // ProfilePhotoForm (user-avatar-image, design D6): upload/replace/remove,
 // satisfying all three arch guards from commit one — novalidate,
 // FieldError import, and applyServerFieldErrors in the upload catch (form-

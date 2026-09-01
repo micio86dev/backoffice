@@ -5,70 +5,75 @@
     and `<button form="entry-link-form">` is what connects the two.
   -->
   <form id="entry-link-form" data-testid="entry-link-form" novalidate @submit.prevent="onSubmit">
-    <FieldGroup>
-      <Field :data-invalid="Boolean(errors.candidateRef)">
-        <FieldLabel for="entry-link-form-candidate-ref">
-          {{ $t('entryLink.form.candidateRef') }}
-        </FieldLabel>
-        <Input
-          id="entry-link-form-candidate-ref"
-          v-model="candidateRef"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.candidateRef)"
-          :aria-describedby="
-            errors.candidateRef ? 'entry-link-form-candidate-ref-error' : undefined
-          "
-          data-testid="entry-link-form-candidate-ref"
-        />
-        <FieldError
-          v-if="errors.candidateRef"
-          id="entry-link-form-candidate-ref-error"
-          data-testid="entry-link-form-candidate-ref-error"
+    <FormFieldset :disabled="submitting">
+      <FieldGroup>
+        <Field :data-invalid="Boolean(errors.candidateRef)">
+          <FieldLabel for="entry-link-form-candidate-ref">
+            {{ $t('entryLink.form.candidateRef') }}
+          </FieldLabel>
+          <Input
+            id="entry-link-form-candidate-ref"
+            v-model="candidateRef"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.candidateRef)"
+            :aria-describedby="
+              errors.candidateRef ? 'entry-link-form-candidate-ref-error' : undefined
+            "
+            data-testid="entry-link-form-candidate-ref"
+          />
+          <FieldError
+            v-if="errors.candidateRef"
+            id="entry-link-form-candidate-ref-error"
+            data-testid="entry-link-form-candidate-ref-error"
+          >
+            {{ errors.candidateRef }}
+          </FieldError>
+        </Field>
+
+        <Field :data-invalid="Boolean(errors.displayName)">
+          <FieldLabel for="entry-link-form-display-name">
+            {{ $t('entryLink.form.displayName') }}
+          </FieldLabel>
+          <Input
+            id="entry-link-form-display-name"
+            v-model="displayName"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.displayName)"
+            :aria-describedby="
+              errors.displayName ? 'entry-link-form-display-name-error' : undefined
+            "
+            data-testid="entry-link-form-display-name"
+          />
+          <FieldError
+            v-if="errors.displayName"
+            id="entry-link-form-display-name-error"
+            data-testid="entry-link-form-display-name-error"
+          >
+            {{ errors.displayName }}
+          </FieldError>
+        </Field>
+
+        <Alert
+          v-if="formMessage"
+          variant="destructive"
+          role="alert"
+          aria-live="polite"
+          data-testid="entry-link-form-banner"
         >
-          {{ errors.candidateRef }}
-        </FieldError>
-      </Field>
+          <AlertDescription>{{ formMessage }}</AlertDescription>
+        </Alert>
 
-      <Field :data-invalid="Boolean(errors.displayName)">
-        <FieldLabel for="entry-link-form-display-name">
-          {{ $t('entryLink.form.displayName') }}
-        </FieldLabel>
-        <Input
-          id="entry-link-form-display-name"
-          v-model="displayName"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.displayName)"
-          :aria-describedby="errors.displayName ? 'entry-link-form-display-name-error' : undefined"
-          data-testid="entry-link-form-display-name"
-        />
-        <FieldError
-          v-if="errors.displayName"
-          id="entry-link-form-display-name-error"
-          data-testid="entry-link-form-display-name-error"
-        >
-          {{ errors.displayName }}
-        </FieldError>
-      </Field>
-
-      <Alert
-        v-if="formMessage"
-        variant="destructive"
-        role="alert"
-        aria-live="polite"
-        data-testid="entry-link-form-banner"
-      >
-        <AlertDescription>{{ formMessage }}</AlertDescription>
-      </Alert>
-
-      <!--
+        <!--
         No submit control here — it lives in FormDrawer's non-scrolling footer
         (feature/form-drawer), wired back to this form by its `id`.
       -->
-    </FieldGroup>
+      </FieldGroup>
+    </FormFieldset>
   </form>
 </template>
 
 <script setup lang="ts">
+import { FormFieldset } from '@/components/ui/form-fieldset'
 // EntryLinkForm — "Invite candidate" surface (design D4): candidate_ref +
 // display_name only. project_id is known from context (the project row the
 // operator opened the dialog from), never a third field to pick.

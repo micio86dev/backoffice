@@ -7,29 +7,32 @@
       </CardHeader>
       <CardContent>
         <form data-testid="forgot-password-form" novalidate @submit.prevent="onSubmit">
-          <FieldGroup>
-            <Field :data-invalid="Boolean(emailError)">
-              <FieldLabel for="forgot-password-email">{{ $t('forgotPassword.email') }}</FieldLabel>
-              <Input
-                id="forgot-password-email"
-                v-model="email"
-                type="email"
-                autocomplete="username"
-                :aria-invalid="Boolean(emailError)"
-                :aria-describedby="emailError ? 'forgot-password-email-error' : undefined"
-                data-testid="forgot-password-email"
-                @blur="validateEmail"
-              />
-              <FieldError
-                v-if="emailError"
-                id="forgot-password-email-error"
-                data-testid="forgot-password-email-error"
-              >
-                {{ emailError }}
-              </FieldError>
-            </Field>
+          <FormFieldset :disabled="submitting">
+            <FieldGroup>
+              <Field :data-invalid="Boolean(emailError)">
+                <FieldLabel for="forgot-password-email">{{
+                  $t('forgotPassword.email')
+                }}</FieldLabel>
+                <Input
+                  id="forgot-password-email"
+                  v-model="email"
+                  type="email"
+                  autocomplete="username"
+                  :aria-invalid="Boolean(emailError)"
+                  :aria-describedby="emailError ? 'forgot-password-email-error' : undefined"
+                  data-testid="forgot-password-email"
+                  @blur="validateEmail"
+                />
+                <FieldError
+                  v-if="emailError"
+                  id="forgot-password-email-error"
+                  data-testid="forgot-password-email-error"
+                >
+                  {{ emailError }}
+                </FieldError>
+              </Field>
 
-            <!--
+              <!--
               Form-level outcome next to the CTA (DESIGN.md §16 rule 5).
 
               The SUCCESS case is the one that matters here, and it is
@@ -46,32 +49,33 @@
               said "check your inbox" would confirm the account, in the UI,
               for an oracle the API refuses to be.
             -->
-            <Alert
-              v-if="formMessage"
-              ref="bannerRef"
-              :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-              role="alert"
-              aria-live="polite"
-              tabindex="-1"
-              data-testid="forgot-password-banner"
-            >
-              <AlertDescription>{{ formMessage.text }}</AlertDescription>
-            </Alert>
-
-            <Button type="submit" :disabled="submitting" data-testid="forgot-password-submit">
-              {{ submitting ? $t('forgotPassword.submitting') : $t('forgotPassword.submit') }}
-            </Button>
-
-            <FieldDescription class="text-center">
-              <NuxtLink
-                :to="localePath('/login')"
-                data-testid="forgot-password-back"
-                class="hover:text-primary underline underline-offset-4"
+              <Alert
+                v-if="formMessage"
+                ref="bannerRef"
+                :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
+                role="alert"
+                aria-live="polite"
+                tabindex="-1"
+                data-testid="forgot-password-banner"
               >
-                {{ $t('forgotPassword.back') }}
-              </NuxtLink>
-            </FieldDescription>
-          </FieldGroup>
+                <AlertDescription>{{ formMessage.text }}</AlertDescription>
+              </Alert>
+
+              <Button type="submit" :loading="submitting" data-testid="forgot-password-submit">
+                {{ $t('forgotPassword.submit') }}
+              </Button>
+
+              <FieldDescription class="text-center">
+                <NuxtLink
+                  :to="localePath('/login')"
+                  data-testid="forgot-password-back"
+                  class="hover:text-primary underline underline-offset-4"
+                >
+                  {{ $t('forgotPassword.back') }}
+                </NuxtLink>
+              </FieldDescription>
+            </FieldGroup>
+          </FormFieldset>
         </form>
       </CardContent>
     </Card>
@@ -101,6 +105,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { applyServerFieldErrors, getErrorStatus } from '@/utils/http-error'
 

@@ -7,44 +7,49 @@
       </CardHeader>
       <CardContent>
         <form data-testid="login-form" novalidate @submit.prevent="onSubmit">
-          <FieldGroup>
-            <Field :data-invalid="Boolean(emailError)">
-              <FieldLabel for="login-email">{{ $t('login.email') }}</FieldLabel>
-              <Input
-                id="login-email"
-                v-model="email"
-                type="email"
-                autocomplete="username"
-                :aria-invalid="Boolean(emailError)"
-                :aria-describedby="emailError ? 'login-email-error' : undefined"
-                data-testid="login-email"
-                @blur="validateEmail"
-              />
-              <FieldError v-if="emailError" id="login-email-error" data-testid="login-email-error">
-                {{ emailError }}
-              </FieldError>
-            </Field>
-            <Field :data-invalid="Boolean(passwordError)">
-              <FieldLabel for="login-password">{{ $t('login.password') }}</FieldLabel>
-              <Input
-                id="login-password"
-                v-model="password"
-                type="password"
-                autocomplete="current-password"
-                :aria-invalid="Boolean(passwordError)"
-                :aria-describedby="passwordError ? 'login-password-error' : undefined"
-                data-testid="login-password"
-                @blur="validatePassword"
-              />
-              <FieldError
-                v-if="passwordError"
-                id="login-password-error"
-                data-testid="login-password-error"
-              >
-                {{ passwordError }}
-              </FieldError>
-            </Field>
-            <!--
+          <FormFieldset :disabled="submitting">
+            <FieldGroup>
+              <Field :data-invalid="Boolean(emailError)">
+                <FieldLabel for="login-email">{{ $t('login.email') }}</FieldLabel>
+                <Input
+                  id="login-email"
+                  v-model="email"
+                  type="email"
+                  autocomplete="username"
+                  :aria-invalid="Boolean(emailError)"
+                  :aria-describedby="emailError ? 'login-email-error' : undefined"
+                  data-testid="login-email"
+                  @blur="validateEmail"
+                />
+                <FieldError
+                  v-if="emailError"
+                  id="login-email-error"
+                  data-testid="login-email-error"
+                >
+                  {{ emailError }}
+                </FieldError>
+              </Field>
+              <Field :data-invalid="Boolean(passwordError)">
+                <FieldLabel for="login-password">{{ $t('login.password') }}</FieldLabel>
+                <Input
+                  id="login-password"
+                  v-model="password"
+                  type="password"
+                  autocomplete="current-password"
+                  :aria-invalid="Boolean(passwordError)"
+                  :aria-describedby="passwordError ? 'login-password-error' : undefined"
+                  data-testid="login-password"
+                  @blur="validatePassword"
+                />
+                <FieldError
+                  v-if="passwordError"
+                  id="login-password-error"
+                  data-testid="login-password-error"
+                >
+                  {{ passwordError }}
+                </FieldError>
+              </Field>
+              <!--
               Form-level outcome, deliberately adjacent to the submit control
               rather than at the top of the card. "Invalid credentials" cannot be
               attributed to the email field or to the password field — saying
@@ -52,19 +57,19 @@
               must not leak — so it is not a field error and must not render as
               one. It sits where the eye already is after pressing the button.
             -->
-            <Alert
-              v-if="formMessage"
-              :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-              role="alert"
-              aria-live="polite"
-              data-testid="login-error"
-            >
-              <AlertDescription>{{ formMessage.text }}</AlertDescription>
-            </Alert>
-            <Button type="submit" :disabled="submitting" data-testid="login-submit">
-              {{ submitting ? $t('login.submitting') : $t('login.submit') }}
-            </Button>
-            <!--
+              <Alert
+                v-if="formMessage"
+                :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
+                role="alert"
+                aria-live="polite"
+                data-testid="login-error"
+              >
+                <AlertDescription>{{ formMessage.text }}</AlertDescription>
+              </Alert>
+              <Button type="submit" :loading="submitting" data-testid="login-submit">
+                {{ $t('login.submit') }}
+              </Button>
+              <!--
               The entry point into self-service password recovery. The API half
               shipped in api v0.36.0 and was live in production with nothing in
               this app linking to it, so an admin who forgot their password had
@@ -74,16 +79,17 @@
               action stays the first thing reached by keyboard, and this is a
               way OUT of the form, not a step within it.
             -->
-            <FieldDescription class="text-center">
-              <NuxtLink
-                :to="localePath('/forgot-password')"
-                data-testid="login-forgot-password"
-                class="hover:text-primary underline underline-offset-4"
-              >
-                {{ $t('login.forgotPassword') }}
-              </NuxtLink>
-            </FieldDescription>
-          </FieldGroup>
+              <FieldDescription class="text-center">
+                <NuxtLink
+                  :to="localePath('/forgot-password')"
+                  data-testid="login-forgot-password"
+                  class="hover:text-primary underline underline-offset-4"
+                >
+                  {{ $t('login.forgotPassword') }}
+                </NuxtLink>
+              </FieldDescription>
+            </FieldGroup>
+          </FormFieldset>
         </form>
       </CardContent>
     </Card>
@@ -96,6 +102,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/composables/useAuth'
 

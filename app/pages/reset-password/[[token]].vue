@@ -58,85 +58,86 @@
         </div>
 
         <form v-else data-testid="reset-password-form" novalidate @submit.prevent="onSubmit">
-          <FieldGroup>
-            <Field :data-invalid="Boolean(errors.email)">
-              <FieldLabel for="reset-password-email">{{ $t('resetPassword.email') }}</FieldLabel>
-              <Input
-                id="reset-password-email"
-                v-model="email"
-                type="email"
-                autocomplete="username"
-                :aria-invalid="Boolean(errors.email)"
-                :aria-describedby="errors.email ? 'reset-password-email-error' : undefined"
-                data-testid="reset-password-email"
-                @blur="validateEmail"
-              />
-              <!--
+          <FormFieldset :disabled="submitting">
+            <FieldGroup>
+              <Field :data-invalid="Boolean(errors.email)">
+                <FieldLabel for="reset-password-email">{{ $t('resetPassword.email') }}</FieldLabel>
+                <Input
+                  id="reset-password-email"
+                  v-model="email"
+                  type="email"
+                  autocomplete="username"
+                  :aria-invalid="Boolean(errors.email)"
+                  :aria-describedby="errors.email ? 'reset-password-email-error' : undefined"
+                  data-testid="reset-password-email"
+                  @blur="validateEmail"
+                />
+                <!--
                 Shown, and editable, rather than hidden. Shown because the
                 operator has to be able to see WHICH account this link resets —
                 a link forwarded to the wrong person is otherwise silent.
                 Editable because a mail client that mangles the `?email=`
                 parameter must not turn a valid token into a dead end.
               -->
-              <FieldDescription>{{ $t('resetPassword.emailHint') }}</FieldDescription>
-              <FieldError
-                v-if="errors.email"
-                id="reset-password-email-error"
-                data-testid="reset-password-email-error"
-              >
-                {{ errors.email }}
-              </FieldError>
-            </Field>
+                <FieldDescription>{{ $t('resetPassword.emailHint') }}</FieldDescription>
+                <FieldError
+                  v-if="errors.email"
+                  id="reset-password-email-error"
+                  data-testid="reset-password-email-error"
+                >
+                  {{ errors.email }}
+                </FieldError>
+              </Field>
 
-            <Field :data-invalid="Boolean(errors.password)">
-              <FieldLabel for="reset-password-password">{{
-                $t('resetPassword.password')
-              }}</FieldLabel>
-              <Input
-                id="reset-password-password"
-                v-model="password"
-                type="password"
-                autocomplete="new-password"
-                :aria-invalid="Boolean(errors.password)"
-                :aria-describedby="errors.password ? 'reset-password-password-error' : undefined"
-                data-testid="reset-password-password"
-                @blur="validatePassword"
-              />
-              <FieldError
-                v-if="errors.password"
-                id="reset-password-password-error"
-                data-testid="reset-password-password-error"
-              >
-                {{ errors.password }}
-              </FieldError>
-            </Field>
+              <Field :data-invalid="Boolean(errors.password)">
+                <FieldLabel for="reset-password-password">{{
+                  $t('resetPassword.password')
+                }}</FieldLabel>
+                <Input
+                  id="reset-password-password"
+                  v-model="password"
+                  type="password"
+                  autocomplete="new-password"
+                  :aria-invalid="Boolean(errors.password)"
+                  :aria-describedby="errors.password ? 'reset-password-password-error' : undefined"
+                  data-testid="reset-password-password"
+                  @blur="validatePassword"
+                />
+                <FieldError
+                  v-if="errors.password"
+                  id="reset-password-password-error"
+                  data-testid="reset-password-password-error"
+                >
+                  {{ errors.password }}
+                </FieldError>
+              </Field>
 
-            <Field :data-invalid="Boolean(errors.confirmation)">
-              <FieldLabel for="reset-password-confirmation">{{
-                $t('resetPassword.confirmation')
-              }}</FieldLabel>
-              <Input
-                id="reset-password-confirmation"
-                v-model="confirmation"
-                type="password"
-                autocomplete="new-password"
-                :aria-invalid="Boolean(errors.confirmation)"
-                :aria-describedby="
-                  errors.confirmation ? 'reset-password-confirmation-error' : undefined
-                "
-                data-testid="reset-password-confirmation"
-                @blur="validateConfirmation"
-              />
-              <FieldError
-                v-if="errors.confirmation"
-                id="reset-password-confirmation-error"
-                data-testid="reset-password-confirmation-error"
-              >
-                {{ errors.confirmation }}
-              </FieldError>
-            </Field>
+              <Field :data-invalid="Boolean(errors.confirmation)">
+                <FieldLabel for="reset-password-confirmation">{{
+                  $t('resetPassword.confirmation')
+                }}</FieldLabel>
+                <Input
+                  id="reset-password-confirmation"
+                  v-model="confirmation"
+                  type="password"
+                  autocomplete="new-password"
+                  :aria-invalid="Boolean(errors.confirmation)"
+                  :aria-describedby="
+                    errors.confirmation ? 'reset-password-confirmation-error' : undefined
+                  "
+                  data-testid="reset-password-confirmation"
+                  @blur="validateConfirmation"
+                />
+                <FieldError
+                  v-if="errors.confirmation"
+                  id="reset-password-confirmation-error"
+                  data-testid="reset-password-confirmation-error"
+                >
+                  {{ errors.confirmation }}
+                </FieldError>
+              </Field>
 
-            <!--
+              <!--
               Form-level outcome adjacent to the CTA (DESIGN.md §16 rule 5).
 
               This is where the API's generic refusal lands.
@@ -148,47 +149,48 @@
               message can only reach the operator through the mapper's RETURN
               value.
             -->
-            <Alert
-              v-if="formMessage"
-              ref="bannerRef"
-              variant="destructive"
-              role="alert"
-              aria-live="polite"
-              tabindex="-1"
-              data-testid="reset-password-banner"
-            >
-              <AlertDescription>{{ formMessage }}</AlertDescription>
-            </Alert>
+              <Alert
+                v-if="formMessage"
+                ref="bannerRef"
+                variant="destructive"
+                role="alert"
+                aria-live="polite"
+                tabindex="-1"
+                data-testid="reset-password-banner"
+              >
+                <AlertDescription>{{ formMessage }}</AlertDescription>
+              </Alert>
 
-            <Button type="submit" :disabled="submitting" data-testid="reset-password-submit">
-              {{ submitting ? $t('resetPassword.submitting') : $t('resetPassword.submit') }}
-            </Button>
+              <Button type="submit" :loading="submitting" data-testid="reset-password-submit">
+                {{ $t('resetPassword.submit') }}
+              </Button>
 
-            <FieldDescription class="text-center">
-              <!--
+              <FieldDescription class="text-center">
+                <!--
                 Only rendered once a submit has failed: an expired or spent
                 link cannot be recovered from this form, and the way out is a
                 new one. Offering it before anything has gone wrong would
                 invite the user to abandon a link that still works.
               -->
-              <NuxtLink
-                v-if="formMessage"
-                :to="localePath('/forgot-password')"
-                data-testid="reset-password-request-new"
-                class="hover:text-primary underline underline-offset-4"
-              >
-                {{ $t('resetPassword.requestNew') }}
-              </NuxtLink>
-              <NuxtLink
-                v-else
-                :to="localePath('/login')"
-                data-testid="reset-password-back"
-                class="hover:text-primary underline underline-offset-4"
-              >
-                {{ $t('resetPassword.back') }}
-              </NuxtLink>
-            </FieldDescription>
-          </FieldGroup>
+                <NuxtLink
+                  v-if="formMessage"
+                  :to="localePath('/forgot-password')"
+                  data-testid="reset-password-request-new"
+                  class="hover:text-primary underline underline-offset-4"
+                >
+                  {{ $t('resetPassword.requestNew') }}
+                </NuxtLink>
+                <NuxtLink
+                  v-else
+                  :to="localePath('/login')"
+                  data-testid="reset-password-back"
+                  class="hover:text-primary underline underline-offset-4"
+                >
+                  {{ $t('resetPassword.back') }}
+                </NuxtLink>
+              </FieldDescription>
+            </FieldGroup>
+          </FormFieldset>
         </form>
       </CardContent>
     </Card>
@@ -226,6 +228,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { applyServerFieldErrors, getErrorStatus } from '@/utils/http-error'
 import { translateServerCodes } from '@/utils/server-message'

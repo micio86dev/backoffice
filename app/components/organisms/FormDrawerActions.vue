@@ -1,11 +1,5 @@
 <template>
-  <Button
-    type="submit"
-    :form="formId"
-    data-testid="form-drawer-save"
-    :disabled="pending"
-    :aria-busy="pending ? 'true' : undefined"
-  >
+  <Button type="submit" :form="formId" data-testid="form-drawer-save" :loading="pending">
     {{ submitLabel ?? $t('common.action.save') }}
   </Button>
   <!--

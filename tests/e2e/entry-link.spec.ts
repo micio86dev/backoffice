@@ -232,6 +232,10 @@ test.describe('Entry link mint (operator-interview-link)', () => {
 
     await page.getByLabel('Riferimento candidato').fill('e2e-candidate')
     await page.getByLabel('Nome visualizzato').fill('E2E Candidate')
+    // Required now, and it is the candidate's IDENTITY as well as their
+    // address: the same address invited to another project, or by another
+    // organization, is the same person.
+    await page.getByTestId('entry-link-form-email').fill('e2e-candidate@example.test')
     await page.getByRole('button', { name: 'Genera link' }).click()
 
     // Disclosure (single-use + expiry) MUST be visible before the Copy

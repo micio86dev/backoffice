@@ -443,7 +443,7 @@ import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { formControlClass } from '@/components/ui/form-control'
-import type { AvatarTemplate } from '@/types/avatar-template'
+import type { TemplateOption } from '@/types/avatar-template'
 import {
   isNudgeMinCharsValid,
   isProjectUrlValid,
@@ -492,11 +492,16 @@ const emit = defineEmits<{
  * disambiguate two similarly-named templates, and nothing else. Widening it to
  * the full model would couple this form to fields it never reads.
  */
-type AvatarTemplateOption = Pick<AvatarTemplate, 'id' | 'name' | 'provider' | 'is_active'>
+// The picker endpoint's own shape, taken from the generated client rather
+// than narrowed from `AvatarTemplate`. That endpoint returns `provider` as a
+// plain string because it is the ONE thing about a template a non-admin may
+// read, and pinning it to the admin resource's `ProviderName` union here would
+// couple this form to a type it has no business depending on.
+type AvatarTemplateOption = TemplateOption
 
 const { createProject, updateProject } = useProjects()
 const { fetchRoleCompetencies } = useFrameworkRoles()
-const { listTemplates } = useAvatarTemplates()
+const { listTemplateOptions } = useAvatarTemplates()
 
 const isEditing = computed(() => props.project !== null)
 
@@ -868,7 +873,7 @@ onMounted(() => {
  */
 async function loadAvatarTemplates(): Promise<void> {
   try {
-    const response = await listTemplates()
+    const response = await listTemplateOptions()
     avatarTemplates.value = response.data
     applyDefaultTemplate()
   } catch {

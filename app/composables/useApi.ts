@@ -44,11 +44,42 @@ function isAccountDeactivated(error: unknown): boolean {
   return (data as { error?: unknown }).error === 'account_deactivated'
 }
 
+/**
+ * The UI's current locale, from anywhere — setup context or not.
+ *
+ * `$i18n` is installed on the Nuxt app by `@nuxtjs/i18n`, so it is reachable
+ * from lifecycle hooks, middleware and plugins alike. Wrapped in a try/catch
+ * because `useNuxtApp()` itself throws outside a Nuxt context (a bare unit
+ * test), and an API client that cannot be constructed in a test is a worse
+ * problem than a header defaulting to English.
+ */
+function resolveLocale(): string {
+  try {
+    const i18n = useNuxtApp().$i18n as { locale?: { value?: string } } | undefined
+    const value = i18n?.locale?.value
+
+    return typeof value === 'string' && value !== '' ? value : 'en'
+  } catch {
+    return 'en'
+  }
+}
+
 export function useApi() {
   async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
     const { accessToken, refresh } = useAuth()
     const apiBase = useRuntimeConfig().public.apiBase
-    const { locale } = useI18n()
+    // Read through the Nuxt app, NOT `useI18n()`.
+    //
+    // `useI18n()` needs an active setup context, and `apiFetch` is called from
+    // lifecycle hooks, route middleware and plugins — none of which have one.
+    // It threw there, the request never went out, and the page rendered empty
+    // with no error anyone would connect to a header. The unit tests missed it
+    // because they stub `useI18n` globally, which is exactly the shape of a
+    // test that proves the mock works.
+    //
+    // Falls back to the default locale rather than throwing: a missing locale
+    // must never be the reason a request fails.
+    const locale = resolveLocale()
 
     async function attempt(token: string): Promise<T> {
       return $fetch<T>(`${apiBase}${path}`, {
@@ -63,7 +94,7 @@ export function useApi() {
           //
           // Set BEFORE the caller's own headers are spread, so an explicit
           // per-call override still wins.
-          'Accept-Language': locale.value,
+          'Accept-Language': locale,
           ...(options.headers as Record<string, string> | undefined),
           Authorization: `Bearer ${token}`,
         },

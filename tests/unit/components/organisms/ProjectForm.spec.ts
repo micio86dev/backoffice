@@ -27,7 +27,7 @@ vi.mock('../../../../app/composables/useFrameworkRoles', () => ({
 }))
 
 vi.mock('../../../../app/composables/useAvatarTemplates', () => ({
-  useAvatarTemplates: () => ({ listTemplates: listTemplatesMock }),
+  useAvatarTemplates: () => ({ listTemplateOptions: listTemplatesMock }),
 }))
 
 const ProjectForm = (await import('../../../../app/components/organisms/ProjectForm.vue')).default

@@ -82,6 +82,19 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: import('@playwright/test').Page): Promise<void> {
+  // The project form needs the picker list — `projects.avatar_template_id` is
+  // NOT NULL, so a form with an empty select correctly refuses its own submit.
+  // Unmocked, that reads as "the page is broken" when it is the form doing its
+  // job.
+  await page.route(
+    (url) => url.pathname === '/avatar-templates/options',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
+          })
+        : route.continue()
+  )
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>

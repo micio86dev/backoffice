@@ -9,6 +9,7 @@ import type {
   AvatarTemplate,
   FieldSpecsResponse,
   TemplateListResponse,
+  TemplateOptionsResponse,
   TemplateResponse,
 } from '../types/avatar-template'
 import { useApi } from './useApi'
@@ -18,6 +19,22 @@ export function useAvatarTemplates() {
 
   async function listTemplates(): Promise<TemplateListResponse> {
     return apiFetch<TemplateListResponse>('/avatar-templates')
+  }
+
+  /**
+   * The PICKER list — id, name, provider — readable by every role.
+   *
+   * `listTemplates` above returns the full record and is admin-only, because
+   * that record carries `config` and `config` holds provider-side identifiers
+   * closer to credentials than to settings. A project form needs none of that:
+   * `projects.avatar_template_id` is NOT NULL, so every operator creating a
+   * project must choose a template, and choosing needs a name.
+   *
+   * Using the admin list here left an operator with an empty select on a form
+   * that then refused its own submit, with nothing they could do about it.
+   */
+  async function listTemplateOptions(): Promise<TemplateOptionsResponse> {
+    return apiFetch<TemplateOptionsResponse>('/avatar-templates/options')
   }
 
   async function fetchFieldSpecs(): Promise<FieldSpecsResponse> {
@@ -105,6 +122,7 @@ export function useAvatarTemplates() {
     exportTemplates,
     importTemplates,
     listTemplates,
+    listTemplateOptions,
     fetchFieldSpecs,
     createTemplate,
     updateTemplate,

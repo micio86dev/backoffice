@@ -68,7 +68,7 @@ describe('pages/projects/index.vue', () => {
     // a reason that has nothing to do with what it is testing.
     vi.doMock('../../../../app/composables/useAvatarTemplates', () => ({
       useAvatarTemplates: () => ({
-        listTemplates: vi.fn().mockResolvedValue({
+        listTemplateOptions: vi.fn().mockResolvedValue({
           data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
         }),
       }),

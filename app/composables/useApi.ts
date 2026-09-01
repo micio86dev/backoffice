@@ -48,11 +48,22 @@ export function useApi() {
   async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
     const { accessToken, refresh } = useAuth()
     const apiBase = useRuntimeConfig().public.apiBase
+    const { locale } = useI18n()
 
     async function attempt(token: string): Promise<T> {
       return $fetch<T>(`${apiBase}${path}`, {
         ...options,
         headers: {
+          // The UI's language, on every request. The API localizes what is
+          // ours to localize — validation messages, error copy, framework
+          // catalogue text — and it can only do that if it is told what the
+          // reader is reading in. The browser's own Accept-Language is the
+          // wrong answer: someone can run a Italian browser and switch this
+          // app to English, and the API should follow the app.
+          //
+          // Set BEFORE the caller's own headers are spread, so an explicit
+          // per-call override still wins.
+          'Accept-Language': locale.value,
           ...(options.headers as Record<string, string> | undefined),
           Authorization: `Bearer ${token}`,
         },

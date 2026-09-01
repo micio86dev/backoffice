@@ -3,6 +3,12 @@
     <CardHeader>
       <CardDescription>{{ label }}</CardDescription>
       <CardTitle class="text-2xl">{{ value }}</CardTitle>
+      <!--
+        A second line for the figures that are a sum of parts. The headline
+        answers "how much", and without the breakdown the next question — "on
+        what" — has no answer on this page at all.
+      -->
+      <CardDescription v-if="detail" data-testid="metric-card-detail">{{ detail }}</CardDescription>
     </CardHeader>
   </Card>
 </template>
@@ -17,5 +23,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 defineProps<{
   label: string
   value: string
+  /** Optional second line, for a headline figure that is a sum of parts. */
+  detail?: string
 }>()
 </script>

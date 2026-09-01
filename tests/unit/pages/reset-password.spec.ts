@@ -247,15 +247,16 @@ describe('ResetPasswordPage', () => {
   // user, bad token and expired token. It is keyed on `token`, and this page
   // has no token control — so it can only reach the operator through the
   // mapper's return value.
-  it('surfaces the generic token 422 at form level instead of discarding it', async () => {
+  it('surfaces the generic token 422 at form level, TRANSLATED, instead of discarding it', async () => {
+    // The server now sends a CODE. It used to send the English sentence "This
+    // password reset link is invalid or has expired. Request a new one." and
+    // this page rendered it verbatim, so an Italian operator on an Italian page
+    // read English. A response body is machine-facing; only this layer knows
+    // the reader's locale.
     vi.stubGlobal(
       '$fetch',
       vi.fn(async () => {
-        throw httpError(422, {
-          errors: {
-            token: ['This password reset link is invalid or has expired. Request a new one.'],
-          },
-        })
+        throw httpError(422, { errors: { token: ['reset_link_invalid'] } })
       })
     )
 
@@ -263,10 +264,41 @@ describe('ResetPasswordPage', () => {
     await fillAndSubmit(wrapper)
 
     expect(wrapper.find('[data-testid="reset-password-banner"]').text()).toBe(
-      'This password reset link is invalid or has expired. Request a new one.'
+      'resetPassword.serverError.reset_link_invalid'
     )
     // An expired link is unrecoverable from here; the way out is a new one.
     expect(wrapper.find('[data-testid="reset-password-request-new"]').exists()).toBe(true)
+  })
+
+  it('falls back to the raw code rather than hiding an untranslated one', async () => {
+    // A code with no copy yet must stay READABLE and specific. Swallowing it
+    // into a generic "something went wrong" would hide which of several
+    // failures happened, and would make the missing translation invisible —
+    // the locale-parity tests are what catch that, and they only work if the
+    // gap is visible when they are not run.
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(async () => {
+        throw httpError(422, { errors: { token: ['some_future_code'] } })
+      })
+    )
+
+    // `tests/unit/setup.ts` stubs `te` as always-true so an identity `t` stays
+    // the observed value everywhere else. Its own docblock says a spec testing
+    // the MISSING-key branch must re-stub it, which is exactly this one.
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({
+        t: (key: string) => key,
+        te: (key: string) => !key.endsWith('.some_future_code'),
+        locale: ref('it'),
+      }))
+    )
+
+    const wrapper = mountPage()
+    await fillAndSubmit(wrapper)
+
+    expect(wrapper.find('[data-testid="reset-password-banner"]').text()).toBe('some_future_code')
   })
 
   it('maps a 422 on a rendered field onto that field', async () => {

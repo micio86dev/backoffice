@@ -1,63 +1,65 @@
 <template>
   <form data-testid="webhook-defaults-form" novalidate @submit.prevent="onSubmit">
-    <FieldGroup>
-      <!--
+    <FormFieldset :disabled="saving">
+      <FieldGroup>
+        <!--
         form-clarity-and-console-warnings, D6: `settings.webhooks.note`
         describes the URL AND the secret as a PAIR ("copied onto a new project
         only at the moment it is created"), so it belongs to this FieldSet, not
         to either control alone — it previously sat as a bare sibling inside
         FieldGroup, orphaned from both. The ApiKeysPanel.vue:76-83 pattern.
       -->
-      <FieldSet>
-        <FieldLegend variant="label" class="sr-only">{{
-          $t('settings.tabs.webhooks')
-        }}</FieldLegend>
-        <Field :data-invalid="Boolean(error)">
-          <FieldLabel for="webhook-defaults-url">{{ $t('settings.webhooks.url') }}</FieldLabel>
-          <Input
-            id="webhook-defaults-url"
-            v-model="url"
-            type="url"
-            autocomplete="off"
-            :aria-invalid="Boolean(error)"
-            :aria-describedby="describedBy"
-            data-testid="webhook-defaults-url"
+        <FieldSet>
+          <FieldLegend variant="label" class="sr-only">{{
+            $t('settings.tabs.webhooks')
+          }}</FieldLegend>
+          <Field :data-invalid="Boolean(error)">
+            <FieldLabel for="webhook-defaults-url">{{ $t('settings.webhooks.url') }}</FieldLabel>
+            <Input
+              id="webhook-defaults-url"
+              v-model="url"
+              type="url"
+              autocomplete="off"
+              :aria-invalid="Boolean(error)"
+              :aria-describedby="describedBy"
+              data-testid="webhook-defaults-url"
+            />
+            <FieldDescription id="webhook-defaults-url-help">
+              {{ $t('settings.webhooks.help.url') }}
+            </FieldDescription>
+            <FieldError
+              v-if="error"
+              id="webhook-defaults-url-error"
+              data-testid="webhook-defaults-url-error"
+              >{{ error }}</FieldError
+            >
+          </Field>
+
+          <WriteOnlySecretField
+            id="webhook-defaults-secret"
+            :label="$t('settings.webhooks.secret')"
+            :configured="organization.has_default_webhook_secret"
+            @update:value="(value) => (secret = value)"
           />
-          <FieldDescription id="webhook-defaults-url-help">
-            {{ $t('settings.webhooks.help.url') }}
-          </FieldDescription>
-          <FieldError
-            v-if="error"
-            id="webhook-defaults-url-error"
-            data-testid="webhook-defaults-url-error"
-            >{{ error }}</FieldError
-          >
-        </Field>
 
-        <WriteOnlySecretField
-          id="webhook-defaults-secret"
-          :label="$t('settings.webhooks.secret')"
-          :configured="organization.has_default_webhook_secret"
-          @update:value="(value) => (secret = value)"
-        />
+          <FieldDescription>{{ $t('settings.webhooks.note') }}</FieldDescription>
+        </FieldSet>
 
-        <FieldDescription>{{ $t('settings.webhooks.note') }}</FieldDescription>
-      </FieldSet>
+        <Alert
+          v-if="formMessage"
+          variant="destructive"
+          role="alert"
+          aria-live="polite"
+          data-testid="webhook-defaults-banner"
+        >
+          <AlertDescription>{{ formMessage }}</AlertDescription>
+        </Alert>
 
-      <Alert
-        v-if="formMessage"
-        variant="destructive"
-        role="alert"
-        aria-live="polite"
-        data-testid="webhook-defaults-banner"
-      >
-        <AlertDescription>{{ formMessage }}</AlertDescription>
-      </Alert>
-
-      <Button type="submit" :disabled="saving" data-testid="webhook-defaults-submit">
-        {{ $t('projects.action.save') }}
-      </Button>
-    </FieldGroup>
+        <Button type="submit" :loading="saving" data-testid="webhook-defaults-submit">
+          {{ $t('projects.action.save') }}
+        </Button>
+      </FieldGroup>
+    </FormFieldset>
   </form>
 </template>
 
@@ -77,6 +79,7 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import WriteOnlySecretField from '@/components/molecules/WriteOnlySecretField.vue'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'

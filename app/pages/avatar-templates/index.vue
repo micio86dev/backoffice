@@ -104,6 +104,18 @@
           >
             {{ $t('avatar_templates.action.edit') }}
           </button>
+          <!--
+            Activate / deactivate, and the two must stay ADJACENT: `v-else`
+            requires the immediately preceding sibling to carry the `v-if`, so a
+            comment placed between them silently breaks the pair and neither
+            branch renders. This comment sits above both for that reason.
+
+            Deactivation needs no confirmation dialog, unlike activation.
+            Activating swaps which template every NEW project defaults to and is
+            the change worth pausing over; withdrawing one only removes it from
+            that choice. Nothing live moves — the projects pinning it keep
+            running on it — and the action is one click to undo.
+          -->
           <button
             v-if="!template.is_active"
             type="button"
@@ -112,6 +124,15 @@
             @click="activateTarget = template"
           >
             {{ $t('avatar_templates.action.activate') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            :data-testid="`template-deactivate-${template.id}`"
+            class="rounded-md border border-border px-3 py-1.5 text-sm"
+            @click="onDeactivate(template)"
+          >
+            {{ $t('avatar_templates.action.deactivate') }}
           </button>
           <!--
             No delete button on the active template at all. The API answers 409,
@@ -244,6 +265,7 @@ const {
   createTemplate,
   updateTemplate,
   activateTemplate,
+  deactivateTemplate,
   deleteTemplate,
 } = useAvatarTemplates()
 
@@ -303,18 +325,23 @@ async function load(): Promise<void> {
   }
 }
 
-const isAdmin = ref(false)
+// Resolved by the server's policies, not by reading a role name here: a
+// `roles.includes('admin')` check is a second copy of an authorization rule
+// written in a second language, and the copy drifts the moment the policy
+// changes. `can()` fails closed, so a transient `/auth/me` error hides the
+// import/export controls rather than offering ones that come back 403.
+// Affordance only — the endpoints enforce.
+const { can } = useCurrentUser()
+const isAdmin = computed(() => can('avatarTemplates.create'))
 
 onMounted(async () => {
   await load()
 
-  try {
-    // Affordance only — the server enforces. Failing closed keeps a transient
-    // error from handing an operator controls they cannot use.
-    isAdmin.value = (await useCurrentUser().ensureLoaded()).roles.includes('admin')
-  } catch {
-    isAdmin.value = false
-  }
+  // Fills the shared identity cache `can()` reads. Swallowed: `can()` already
+  // answers false without it.
+  await useCurrentUser()
+    .ensureLoaded()
+    .catch(() => undefined)
 })
 
 function startCreate(): void {
@@ -382,6 +409,27 @@ async function onActivateConfirmed(): Promise<void> {
   // Reloaded rather than patched locally: the server deactivates the previous
   // template in the same transaction, and guessing which row that was is a
   // guess about what candidates see next.
+  await load()
+}
+
+/**
+ * Withdraw a template from the default choice, without deleting it.
+ *
+ * No confirmation dialog, deliberately. Activation gets one because it changes
+ * which template every new project starts from; this only removes one from that
+ * list. Nothing running moves — projects pin their own template and keep it —
+ * and reactivating is one click.
+ */
+async function onDeactivate(template: AvatarTemplate): Promise<void> {
+  warning.value = null
+
+  try {
+    const response = await deactivateTemplate(template.id)
+    warning.value = response.warning ?? null
+  } catch {
+    loadError.value = true
+  }
+
   await load()
 }
 

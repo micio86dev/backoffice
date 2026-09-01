@@ -17,8 +17,14 @@ const tMock = (key: string) => key
 // the real network-fetch path; each identity test below sets its own value.
 const ensureLoadedMock = vi.fn()
 
+// The nav filters gated items through `can()`, which reads the ability map the
+// SERVER resolves from its own policies. Defaults to permissive so the tests
+// below — which are about routing and labels, not authorization — see the
+// full nav; the authorization tests at the bottom set it explicitly.
+const canMock = vi.fn<(ability: string) => boolean>(() => true)
+
 vi.mock('../../../../app/composables/useCurrentUser', () => ({
-  useCurrentUser: () => ({ ensureLoaded: ensureLoadedMock }),
+  useCurrentUser: () => ({ ensureLoaded: ensureLoadedMock, can: canMock }),
 }))
 
 const NuxtLinkStub = {
@@ -49,6 +55,7 @@ function mountSidebarNav(currentPath: string) {
 describe('SidebarNav', () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
+    canMock.mockReset().mockReturnValue(true)
     ensureLoadedMock.mockReset().mockResolvedValue({
       user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.test', locale: 'en' },
       organization: null,
@@ -262,5 +269,57 @@ describe('SidebarNav — broken photo URL falls back to initials (design D6)', (
 
     const avatar = wrapper.get('[data-testid="sidebar-footer-avatar"]')
     expect(avatar.text()).toBe('AL')
+  })
+})
+
+describe('SidebarNav — pages the user may not use are not offered', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    canMock.mockReset().mockReturnValue(true)
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.test', locale: 'en' },
+      organization: null,
+      roles: ['operator'],
+    })
+  })
+
+  it('drops Settings and Avatar Templates when the server says the user may not reach them', async () => {
+    // An operator: every request behind those two pages comes back 403.
+    // Offering a door that is locked is worse than not showing it — the user
+    // clicks, waits, and is told no with nothing they can do about it.
+    canMock.mockReset().mockImplementation(() => false)
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
+
+    expect(hrefs).toContain('/')
+    expect(hrefs).toContain('/projects')
+    expect(hrefs).not.toContain('/settings')
+    expect(hrefs).not.toContain('/avatar-templates')
+  })
+
+  it('asks about the ABILITY the server publishes, never a role name', async () => {
+    // The point of the whole mechanism: the nav and the route guard consult
+    // the same server-resolved map, so they cannot disagree about who may go
+    // where — and neither of them re-derives the answer from `roles`.
+    mountSidebarNav('/')
+    await flushPromises()
+
+    expect(canMock).toHaveBeenCalledWith('users.viewAny')
+    expect(canMock).toHaveBeenCalledWith('avatarTemplates.viewAny')
+  })
+
+  it('shows both when the server allows them', async () => {
+    canMock.mockReset().mockImplementation(() => true)
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
+
+    expect(hrefs).toContain('/settings')
+    expect(hrefs).toContain('/avatar-templates')
   })
 })

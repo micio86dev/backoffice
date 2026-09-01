@@ -28,6 +28,12 @@
         :value="formatNumber(totalTokens, locale)"
       />
       <MetricCard :label="$t('dashboard.kpi.latency')" :value="latencyLabel" />
+      <MetricCard
+        :label="$t('dashboard.kpi.cost')"
+        :value="costLabel"
+        :detail="costBreakdown"
+        data-testid="dashboard-cost"
+      />
     </div>
 
     <RecentActivity v-if="!loadError" :rows="activity" :locale="locale" />
@@ -47,7 +53,7 @@ import {
   type DashboardMetrics,
   type DashboardActivityRow,
 } from '@/composables/useDashboardMetrics'
-import { formatNumber, formatPercent } from '@/utils/format'
+import { formatNumber, formatPercent, formatUsdAmount } from '@/utils/format'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -98,6 +104,42 @@ const latencyLabel = computed(() => {
   // The unit and the separator are user-facing copy, not machine-readable
   // values — they belong in the locale files, not in a template literal.
   return t('dashboard.kpi.latencyValue', { p50, p95 })
+})
+
+/**
+ * What the organization has spent, in USD.
+ *
+ * The currency comes from the API rather than from a symbol hardcoded here.
+ * It is USD everywhere today because that is what every provider bills in, and
+ * nothing converts it: putting a conversion in front of a figure an operator
+ * may reconcile against an invoice would mean choosing an exchange rate on
+ * their behalf.
+ *
+ * `formatUsdAmount` widens precision below a cent. One interview's
+ * conversation spend is routinely a fraction of one, and two fixed decimals
+ * would round a real charge to `0.00` — which reads as free.
+ */
+const costLabel = computed(() => {
+  if (!metrics.value) return '–'
+
+  return t('dashboard.kpi.costValue', {
+    usd: formatUsdAmount(metrics.value.costs.total_usd, locale.value),
+  })
+})
+
+/**
+ * The headline answers "how much"; without this line the next question — "on
+ * what" — has no answer anywhere on the page. The two halves behave
+ * differently: scoring is per completed evaluation and predictable,
+ * conversation is per minute of interview and is the one that moves.
+ */
+const costBreakdown = computed(() => {
+  if (!metrics.value) return undefined
+
+  return t('dashboard.kpi.costBreakdown', {
+    scoring: formatUsdAmount(metrics.value.costs.scoring_usd, locale.value),
+    conversation: formatUsdAmount(metrics.value.costs.conversation_usd, locale.value),
+  })
 })
 
 onMounted(async () => {

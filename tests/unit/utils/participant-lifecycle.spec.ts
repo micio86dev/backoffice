@@ -109,25 +109,44 @@ describe('statusBadgeVariant', () => {
   // custom-class version failing "color-contrast" (text-success ~1.96:1 on
   // a transparent/white background, nowhere near the 4.5:1 floor) — see
   // the mutation-test note in the docblock above statusBadgeVariant.
-  it('returns secondary (neutral) for the not-yet-started status', () => {
-    expect(statusBadgeVariant('in_attesa')).toBe('secondary')
+  //
+  // The variants are now SEMANTIC, and that constraint is honoured rather than
+  // repealed: `success`/`warning`/`info`/`neutral` each pair a `-light` fill
+  // with its `-dark` foreground, measured numerically in theme.spec.ts
+  // (6.49:1, 6.37:1, 7.15:1). None of them is the raw `text-success`-on-white
+  // combination axe-core rejected — which is precisely why they use the
+  // `-dark` tokens.
+  //
+  // What changed is the MAPPING. `completato` was `default`, i.e. `bg-primary`
+  // — the Quint purple. Every terminal state looked like the brand rather than
+  // like an outcome, so the badge said a state existed without saying whether
+  // it was good, and spent the brand's loudest colour doing it.
+  it('returns neutral for the not-yet-started status', () => {
+    expect(statusBadgeVariant('in_attesa')).toBe('neutral')
   })
 
-  it('returns outline for in-progress statuses', () => {
-    expect(statusBadgeVariant('in_corso')).toBe('outline')
-    expect(statusBadgeVariant('in_valutazione')).toBe('outline')
+  it('distinguishes running from being-processed, which used to look identical', () => {
+    // Both were `outline`. They are different states — one needs the candidate,
+    // the other needs only time — and an operator scanning a list could not
+    // tell them apart.
+    expect(statusBadgeVariant('in_corso')).toBe('info')
+    expect(statusBadgeVariant('in_valutazione')).toBe('warning')
   })
 
-  it('returns default (brand-colored, pre-verified 8.2:1 contrast per D10) for completato', () => {
-    expect(statusBadgeVariant('completato')).toBe('default')
+  it('returns success for completato, never the brand colour', () => {
+    expect(statusBadgeVariant('completato')).toBe('success')
+    expect(statusBadgeVariant('completato')).not.toBe('default')
   })
 
   it('returns destructive (pre-verified contrast, existing codebase pattern) for errore', () => {
     expect(statusBadgeVariant('errore')).toBe('destructive')
   })
 
-  it('returns secondary for an unrecognized status (never throws, never falsely destructive/default)', () => {
-    expect(statusBadgeVariant('some_future_status')).toBe('secondary')
+  it('returns neutral for an unrecognized status (never throws, never falsely destructive/success)', () => {
+    // An unknown status must not be dressed as an outcome in either direction:
+    // green would claim a success that was never reported, red an error that
+    // never happened.
+    expect(statusBadgeVariant('some_future_status')).toBe('neutral')
   })
 })
 

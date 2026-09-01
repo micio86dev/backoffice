@@ -21,6 +21,12 @@ function metricsResponse() {
         latency_ms_p50: 500,
         latency_ms_p95: 900,
       },
+      costs: {
+        scoring_usd: 1.25,
+        conversation_usd: 0.5,
+        total_usd: 1.75,
+        currency: 'USD',
+      },
     },
   }
 }
@@ -85,6 +91,7 @@ describe('IndexPage (dashboard)', () => {
         evaluations_by_status: {},
         completion_rate: 0,
         ai_usage: { input_tokens: 0, output_tokens: 0, latency_ms_p50: null, latency_ms_p95: null },
+        costs: { scoring_usd: 0, conversation_usd: 0, total_usd: 0, currency: 'USD' },
       },
     })
     vi.doMock('../../app/composables/useDashboardMetrics', () => ({
@@ -250,6 +257,7 @@ describe('IndexPage (dashboard)', () => {
         fetchActivity: vi.fn().mockResolvedValue({
           data: [
             {
+              id: 42,
               candidate_ref: 'ref-1',
               display_name: 'Mario Rossi',
               status: 'in_corso',
@@ -273,3 +281,70 @@ describe('IndexPage (dashboard)', () => {
 function flushPromises(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
+
+describe('IndexPage — cost KPI', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, locale: ref('en') }))
+    )
+  })
+
+  it('shows the total spend AND what it is made of', async () => {
+    // An operator asking what their assessments cost was being answered in
+    // tokens, which is not the question. The breakdown is not decoration: the
+    // two halves behave differently — scoring is per completed evaluation and
+    // predictable, conversation is per minute of interview and is the one that
+    // moves when candidates talk longer.
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('dashboard.kpi.cost')
+    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', { usd: '1.75' })
+    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costBreakdown', {
+      scoring: '1.25',
+      conversation: '0.50',
+    })
+  })
+
+  it('reports zero as a number, never as a blank', async () => {
+    // A blank where a figure belongs reads as "we do not know". Zero is a
+    // fact, and the right one for a tenant that has run nothing.
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue({
+          data: {
+            participants_by_status: {},
+            evaluations_by_status: {},
+            completion_rate: 0,
+            ai_usage: {
+              input_tokens: 0,
+              output_tokens: 0,
+              latency_ms_p50: null,
+              latency_ms_p95: null,
+            },
+            costs: { scoring_usd: 0, conversation_usd: 0, total_usd: 0, currency: 'USD' },
+          },
+        }),
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', { usd: '0.00' })
+  })
+})

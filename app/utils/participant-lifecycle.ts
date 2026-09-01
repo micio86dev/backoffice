@@ -74,7 +74,8 @@ export function isParticipantResourceReady(
   return reaches(status, rule.minimum) || rule.offProgression.includes(status)
 }
 
-export type StatusBadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline'
+export type StatusBadgeVariant =
+  'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info' | 'neutral'
 
 /**
  * Maps a participant status to one of Badge's OWN pre-verified-contrast
@@ -88,19 +89,41 @@ export type StatusBadgeVariant = 'default' | 'secondary' | 'destructive' | 'outl
  * unlike `--destructive`, which IS pre-verified and is exactly what Badge's
  * own `destructive` variant already uses). Reusing Badge's existing
  * variants keeps every status badge on an already-audited contrast pair.
+ *
+ * That constraint is UNCHANGED by the semantic variants below — it is honoured,
+ * not repealed. `success`/`warning`/`info`/`neutral` are Badge variants pairing
+ * a `-light` fill with its `-dark` foreground, each measured numerically in
+ * `theme.spec.ts` (6.49:1, 6.37:1, 7.15:1). They are not the raw
+ * `text-success`-on-near-white combination axe-core rejected at 1.96:1; that
+ * pairing remains forbidden, and the reason it failed is exactly why these
+ * variants use the `-dark` tokens rather than the plain ones.
+ *
+ * What DID change is the mapping. `completato` used to be `default`, i.e.
+ * `bg-primary` — the Quint purple. Every terminal state looked like the brand
+ * rather than like an outcome, so the badge announced that a state existed
+ * without saying whether it was good, and spent the brand's loudest colour
+ * doing it. The lifecycle is a progression and the colours now track it:
+ * nothing yet (grey), running (blue), being processed (amber), done (green),
+ * failed (red).
+ *
+ * `in_valutazione` is blue-then-amber rather than the orange it might suggest:
+ * DESIGN.md's only orange is `--color-accent`, the Quint institutional orange,
+ * and putting a BRAND colour back on a status is the exact problem this fixes.
+ * Amber and orange are also barely separable at badge size.
  */
 export function statusBadgeVariant(status: string): StatusBadgeVariant {
   switch (status) {
     case 'completato':
-      return 'default'
+      return 'success'
     case 'errore':
       return 'destructive'
     case 'in_corso':
+      return 'info'
     case 'in_valutazione':
-      return 'outline'
+      return 'warning'
     case 'in_attesa':
-      return 'secondary'
+      return 'neutral'
     default:
-      return 'secondary'
+      return 'neutral'
   }
 }

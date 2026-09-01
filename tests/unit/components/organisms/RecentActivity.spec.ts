@@ -12,8 +12,9 @@ import RecentActivity from '../../../../app/components/organisms/RecentActivity.
 
 const tMock = (key: string) => key
 
-function row(over: Partial<Record<string, string>> = {}) {
+function row(over: Partial<Record<string, string | number>> = {}) {
   return {
+    id: 1,
     candidate_ref: 'ref-1',
     display_name: 'Mario Rossi',
     status: 'in_corso',
@@ -23,10 +24,15 @@ function row(over: Partial<Record<string, string>> = {}) {
   }
 }
 
+const NuxtLinkStub = {
+  props: ['to'],
+  template: '<a :href="to"><slot /></a>',
+}
+
 function mountFeed(rows: ReturnType<typeof row>[]) {
   return mount(RecentActivity, {
     props: { rows, locale: 'it' },
-    global: { mocks: { $t: tMock } },
+    global: { mocks: { $t: tMock }, stubs: { NuxtLink: NuxtLinkStub } },
   })
 }
 
@@ -87,5 +93,34 @@ describe('RecentActivity', () => {
     const labelledBy = wrapper.get('section').attributes('aria-labelledby')
 
     expect(wrapper.get(`#${labelledBy}`).element.tagName).toBe('H2')
+  })
+})
+
+describe('RecentActivity — the rows go somewhere', () => {
+  it('links each candidate to their own detail page', () => {
+    // The feed answers "is anything moving?". A row that names a candidate and
+    // gives no way to go and look sends the reader to the search box on
+    // another page — which is the trip this panel was added to remove.
+    const wrapper = mountFeed([
+      row({ id: 42, display_name: 'Anna' }),
+      row({ id: 43, display_name: 'Bruno' }),
+    ])
+
+    const links = wrapper.findAll('[data-testid="activity-candidate-link"]')
+
+    expect(links).toHaveLength(2)
+    expect(links[0]?.attributes('href')).toBe('/participants/42')
+    expect(links[1]?.attributes('href')).toBe('/participants/43')
+  })
+
+  it("links on the row id, never on the calling system's reference", () => {
+    // `candidate_ref` is opaque and owned by the calling system; it addresses
+    // nothing in this product, and a link built from it would 404.
+    const wrapper = mountFeed([row({ id: 7, candidate_ref: 'ext-abc-999' })])
+
+    const href = wrapper.get('[data-testid="activity-candidate-link"]').attributes('href')
+
+    expect(href).toBe('/participants/7')
+    expect(href).not.toContain('ext-abc-999')
   })
 })

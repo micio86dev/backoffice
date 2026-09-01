@@ -1,74 +1,75 @@
 <template>
-  <form id="template-form" novalidate class="flex flex-col gap-6" @submit.prevent="submit">
-    <!--
+  <form id="template-form" novalidate @submit.prevent="submit">
+    <FormFieldset :disabled="saving" class="flex flex-col gap-6">
+      <!--
       The title itself lives on FormDrawer's SheetTitle now (the page sets
       it from `editing?.id`), not here — this form is layout-only and a
       second, duplicate heading would fight the drawer's own for attention.
     -->
-    <!--
+      <!--
       D4: kept as the form-level banner, fed ONLY by messages the per-field
       parsing below could not place — a config message naming a knob the
       current provider does not expose, a top-level field with no control, or
       anything unparseable. Removing this would make those invisible, which is
       the exact defect this change exists to remove.
     -->
-    <ul
-      v-if="unmappedErrors.length > 0"
-      data-testid="template-form-errors"
-      role="alert"
-      class="flex flex-col gap-1 text-sm text-destructive"
-    >
-      <li v-for="error in unmappedErrors" :key="error">{{ error }}</li>
-    </ul>
-
-    <Field :data-invalid="Boolean(nameError)">
-      <FieldLabel for="template-name">{{ $t('avatar_templates.form.name') }}</FieldLabel>
-      <input
-        id="template-name"
-        v-model="draft.name"
-        data-testid="template-field-name"
-        type="text"
-        autocomplete="off"
-        :aria-invalid="Boolean(nameError)"
-        :aria-describedby="nameDescribedBy"
-        :class="formControlClass"
-        @blur="validateName"
-      />
-      <FieldDescription id="template-name-help">
-        {{ $t('avatar_templates.form.help.name') }}
-      </FieldDescription>
-      <FieldError v-if="nameError" id="template-name-error" data-testid="template-name-error">
-        {{ nameError }}
-      </FieldError>
-    </Field>
-
-    <Field :data-invalid="Boolean(descriptionError)">
-      <FieldLabel for="template-description">{{
-        $t('avatar_templates.form.description')
-      }}</FieldLabel>
-      <input
-        id="template-description"
-        v-model="draft.description"
-        data-testid="template-field-description"
-        type="text"
-        autocomplete="off"
-        :aria-invalid="Boolean(descriptionError)"
-        :aria-describedby="descriptionError ? 'template-description-error' : undefined"
-        :class="formControlClass"
-        @blur="validateDescription"
-      />
-      <FieldError
-        v-if="descriptionError"
-        id="template-description-error"
-        data-testid="template-description-error"
+      <ul
+        v-if="unmappedErrors.length > 0"
+        data-testid="template-form-errors"
+        role="alert"
+        class="flex flex-col gap-1 text-sm text-destructive"
       >
-        {{ descriptionError }}
-      </FieldError>
-    </Field>
+        <li v-for="error in unmappedErrors" :key="error">{{ error }}</li>
+      </ul>
 
-    <Field>
-      <FieldLabel for="template-provider">{{ $t('avatar_templates.form.provider') }}</FieldLabel>
-      <!--
+      <Field :data-invalid="Boolean(nameError)">
+        <FieldLabel for="template-name">{{ $t('avatar_templates.form.name') }}</FieldLabel>
+        <input
+          id="template-name"
+          v-model="draft.name"
+          data-testid="template-field-name"
+          type="text"
+          autocomplete="off"
+          :aria-invalid="Boolean(nameError)"
+          :aria-describedby="nameDescribedBy"
+          :class="formControlClass"
+          @blur="validateName"
+        />
+        <FieldDescription id="template-name-help">
+          {{ $t('avatar_templates.form.help.name') }}
+        </FieldDescription>
+        <FieldError v-if="nameError" id="template-name-error" data-testid="template-name-error">
+          {{ nameError }}
+        </FieldError>
+      </Field>
+
+      <Field :data-invalid="Boolean(descriptionError)">
+        <FieldLabel for="template-description">{{
+          $t('avatar_templates.form.description')
+        }}</FieldLabel>
+        <input
+          id="template-description"
+          v-model="draft.description"
+          data-testid="template-field-description"
+          type="text"
+          autocomplete="off"
+          :aria-invalid="Boolean(descriptionError)"
+          :aria-describedby="descriptionError ? 'template-description-error' : undefined"
+          :class="formControlClass"
+          @blur="validateDescription"
+        />
+        <FieldError
+          v-if="descriptionError"
+          id="template-description-error"
+          data-testid="template-description-error"
+        >
+          {{ descriptionError }}
+        </FieldError>
+      </Field>
+
+      <Field>
+        <FieldLabel for="template-provider">{{ $t('avatar_templates.form.provider') }}</FieldLabel>
+        <!--
         Disabled once the template exists. The API refuses to change it, because
         every knob in the config belongs to one provider and none of them
         overlap — a switched provider would validate as empty and silently fall
@@ -82,23 +83,23 @@
         cannot see through `FieldLabel`'s `<label>`-via-slot indirection at
         the time this was written.
       -->
-      <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-      <select
-        id="template-provider"
-        v-model="draft.provider"
-        data-testid="template-field-provider"
-        :disabled="!isNew"
-        autocomplete="off"
-        :class="formControlClass"
-      >
-        <option v-for="name in providers" :key="name" :value="name">
-          {{ $t(`avatar_templates.provider.${name}`) }}
-        </option>
-      </select>
-      <span v-if="!isNew" class="text-xs text-muted-foreground">
-        {{ $t('avatar_templates.form.provider_locked') }}
-      </span>
-      <!--
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+        <select
+          id="template-provider"
+          v-model="draft.provider"
+          data-testid="template-field-provider"
+          :disabled="!isNew"
+          autocomplete="off"
+          :class="formControlClass"
+        >
+          <option v-for="name in providers" :key="name" :value="name">
+            {{ $t(`avatar_templates.provider.${name}`) }}
+          </option>
+        </select>
+        <span v-if="!isNew" class="text-xs text-muted-foreground">
+          {{ $t('avatar_templates.form.provider_locked') }}
+        </span>
+        <!--
         The vendor IS named here, deliberately. Provider anonymity is a promise
         to the CANDIDATE, not to the operator — and an operator who cannot tell
         which service a template targets cannot know which dashboard to copy an
@@ -108,16 +109,16 @@
         Converges onto FieldDescription (D5/D6) — same string, no copy change,
         just no longer a raw <span> a Field-conversion could orphan.
       -->
-      <FieldDescription>
-        {{ $t('avatar_templates.form.provider_hint') }}
-      </FieldDescription>
-    </Field>
+        <FieldDescription>
+          {{ $t('avatar_templates.form.provider_hint') }}
+        </FieldDescription>
+      </Field>
 
-    <fieldset class="border-t border-border pt-4">
-      <legend class="sr-only">{{ $t('avatar_templates.form.settings') }}</legend>
+      <fieldset class="border-t border-border pt-4">
+        <legend class="sr-only">{{ $t('avatar_templates.form.settings') }}</legend>
 
-      <div data-testid="template-config-fields" :class="configFieldsClass">
-        <!--
+        <div data-testid="template-config-fields" :class="configFieldsClass">
+          <!--
         A checkbox lays out horizontally, everything else vertically, and that
         is a layout fact rather than taste. `fieldVariants`' vertical
         orientation carries `*:w-full`, which stretches EVERY direct child to
@@ -129,59 +130,59 @@
         items-center`, which is also what a checkbox beside its label should
         look like.
       -->
-        <Field
-          v-for="field in activeFields"
-          :key="field.key"
-          :orientation="field.type === 'checkbox' ? 'horizontal' : 'vertical'"
-          :data-invalid="Boolean(configErrors[field.key])"
-        >
-          <FieldLabel :for="`template-config-${field.key}`">
-            {{ $t(field.label_key) }}
-            <abbr
-              v-if="field.required"
-              :title="$t('avatar_templates.form.required')"
-              class="no-underline"
-              >*</abbr
-            >
-          </FieldLabel>
-
-          <select
-            v-if="field.type === 'select'"
-            :id="`template-config-${field.key}`"
-            :data-testid="`template-config-${field.key}`"
-            :value="stringValue(field.key)"
-            autocomplete="off"
-            :aria-invalid="Boolean(configErrors[field.key])"
-            :aria-required="field.required ? 'true' : undefined"
-            :aria-describedby="describedBy(field)"
-            :class="formControlClass"
-            @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
+          <Field
+            v-for="field in activeFields"
+            :key="field.key"
+            :orientation="field.type === 'checkbox' ? 'horizontal' : 'vertical'"
+            :data-invalid="Boolean(configErrors[field.key])"
           >
-            <!--
+            <FieldLabel :for="`template-config-${field.key}`">
+              {{ $t(field.label_key) }}
+              <abbr
+                v-if="field.required"
+                :title="$t('avatar_templates.form.required')"
+                class="no-underline"
+                >*</abbr
+              >
+            </FieldLabel>
+
+            <select
+              v-if="field.type === 'select'"
+              :id="`template-config-${field.key}`"
+              :data-testid="`template-config-${field.key}`"
+              :value="stringValue(field.key)"
+              autocomplete="off"
+              :aria-invalid="Boolean(configErrors[field.key])"
+              :aria-required="field.required ? 'true' : undefined"
+              :aria-describedby="describedBy(field)"
+              :class="formControlClass"
+              @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
+            >
+              <!--
             An empty option is essential, not decoration: absent means "use the
             provider's default", and without a way back to absent an operator
             who opens a select can never unset it again.
           -->
-            <option value="">{{ $t('avatar_templates.form.default') }}</option>
-            <option v-for="option in field.options ?? []" :key="option" :value="option">
-              {{ option }}
-            </option>
-          </select>
+              <option value="">{{ $t('avatar_templates.form.default') }}</option>
+              <option v-for="option in field.options ?? []" :key="option" :value="option">
+                {{ option }}
+              </option>
+            </select>
 
-          <input
-            v-else-if="field.type === 'checkbox'"
-            :id="`template-config-${field.key}`"
-            :data-testid="`template-config-${field.key}`"
-            type="checkbox"
-            :checked="draft.config[field.key] === true"
-            :aria-invalid="Boolean(configErrors[field.key])"
-            :aria-required="field.required ? 'true' : undefined"
-            :aria-describedby="describedBy(field)"
-            class="size-4 self-start accent-primary"
-            @change="onFieldChange(field, ($event.target as HTMLInputElement).checked)"
-          />
+            <input
+              v-else-if="field.type === 'checkbox'"
+              :id="`template-config-${field.key}`"
+              :data-testid="`template-config-${field.key}`"
+              type="checkbox"
+              :checked="draft.config[field.key] === true"
+              :aria-invalid="Boolean(configErrors[field.key])"
+              :aria-required="field.required ? 'true' : undefined"
+              :aria-describedby="describedBy(field)"
+              class="size-4 self-start accent-primary"
+              @change="onFieldChange(field, ($event.target as HTMLInputElement).checked)"
+            />
 
-          <!--
+            <!--
           min/max/step come from the server FieldSpec and used to be dropped on
           the floor: the API has serialised all three since FieldSpec.php:60,
           and this input rendered none of them. A browser then defaults to
@@ -198,102 +199,104 @@
           unvalidated. These attributes drive the spinner increment and the
           mobile numeric keypad, nothing more.
         -->
-          <input
-            v-else
-            :id="`template-config-${field.key}`"
-            :data-testid="`template-config-${field.key}`"
-            :type="field.type === 'number' ? 'number' : 'text'"
-            :value="stringValue(field.key)"
-            autocomplete="off"
-            :min="field.type === 'number' ? field.min : undefined"
-            :max="field.type === 'number' ? field.max : undefined"
-            :step="field.type === 'number' ? (field.step ?? undefined) : undefined"
-            :aria-invalid="Boolean(configErrors[field.key])"
-            :aria-required="field.required ? 'true' : undefined"
-            :aria-describedby="describedBy(field)"
-            :class="formControlClass"
-            @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
-            @blur="validateConfigField(field)"
-          />
-          <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
-            {{ $t(field.hint_key) }}
-          </FieldDescription>
-          <FieldError
-            v-if="configErrors[field.key]"
-            :id="`template-config-${field.key}-error`"
-            :data-testid="`template-config-${field.key}-error`"
-          >
-            {{ configErrors[field.key] }}
-          </FieldError>
-        </Field>
-      </div>
-    </fieldset>
+            <input
+              v-else
+              :id="`template-config-${field.key}`"
+              :data-testid="`template-config-${field.key}`"
+              :type="field.type === 'number' ? 'number' : 'text'"
+              :value="stringValue(field.key)"
+              autocomplete="off"
+              :min="field.type === 'number' ? field.min : undefined"
+              :max="field.type === 'number' ? field.max : undefined"
+              :step="field.type === 'number' ? (field.step ?? undefined) : undefined"
+              :aria-invalid="Boolean(configErrors[field.key])"
+              :aria-required="field.required ? 'true' : undefined"
+              :aria-describedby="describedBy(field)"
+              :class="formControlClass"
+              @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
+              @blur="validateConfigField(field)"
+            />
+            <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
+              {{ $t(field.hint_key) }}
+            </FieldDescription>
+            <FieldError
+              v-if="configErrors[field.key]"
+              :id="`template-config-${field.key}-error`"
+              :data-testid="`template-config-${field.key}-error`"
+            >
+              {{ configErrors[field.key] }}
+            </FieldError>
+          </Field>
+        </div>
+      </fieldset>
 
-    <!--
+      <!--
       pluggable-conversation-llm PR P8. A separate fieldset from the
       provider's own settings above: the binding is provider-agnostic
       (I2/I5 gate on the MODEL, not on `provider`), so it does not belong
       inside `activeFields`'s provider-keyed loop.
     -->
-    <fieldset
-      class="flex flex-col gap-3 border-t border-border pt-4"
-      data-testid="template-llm-section"
-    >
-      <legend class="sr-only">{{ $t('avatar_templates.llm.section') }}</legend>
+      <fieldset
+        class="flex flex-col gap-3 border-t border-border pt-4"
+        data-testid="template-llm-section"
+      >
+        <legend class="sr-only">{{ $t('avatar_templates.llm.section') }}</legend>
 
-      <!--
+        <!--
         Reads `effectiveModelId`, not the picker's key: a template whose
         binding the catalogue could not resolve IS bound, and calling it
         unbound would be the badge stating the opposite of the truth.
       -->
-      <p
-        v-if="effectiveModelId === null"
-        data-testid="template-llm-unbound-badge"
-        class="text-sm text-muted-foreground"
-      >
-        {{ $t('avatar_templates.llm.badge.unbound') }}
-      </p>
-
-      <LlmModelPicker
-        id="template-llm-model"
-        v-model="draft.llmModelKey"
-        :label="$t('avatar_templates.llm.picker.label')"
-        :models="models"
-      />
-      <FieldError v-if="llmModelError" data-testid="template-llm-model-error">
-        {{ llmModelError }}
-      </FieldError>
-
-      <Field :data-invalid="Boolean(llmCredentialError)">
-        <FieldLabel for="template-llm-credential">
-          {{ $t('avatar_templates.llm.credential.label') }}
-        </FieldLabel>
-        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-        <select
-          id="template-llm-credential"
-          data-testid="template-llm-credential"
-          autocomplete="off"
-          :aria-invalid="Boolean(llmCredentialError)"
-          :class="formControlClass"
-          :value="draft.llmCredentialId === null ? '' : String(draft.llmCredentialId)"
-          @change="onCredentialChange"
+        <p
+          v-if="effectiveModelId === null"
+          data-testid="template-llm-unbound-badge"
+          class="text-sm text-muted-foreground"
         >
-          <option value="">{{ $t('avatar_templates.llm.credential.none') }}</option>
-          <option v-for="credential in credentials" :key="credential.id" :value="credential.id">
-            {{ credential.name }}
-          </option>
-        </select>
-        <FieldError v-if="llmCredentialError" data-testid="template-llm-credential-error">
-          {{ llmCredentialError }}
-        </FieldError>
-      </Field>
+          {{ $t('avatar_templates.llm.badge.unbound') }}
+        </p>
 
-      <LlmModeExplainer />
-    </fieldset>
+        <LlmModelPicker
+          id="template-llm-model"
+          v-model="draft.llmModelKey"
+          :label="$t('avatar_templates.llm.picker.label')"
+          :models="models"
+        />
+        <FieldError v-if="llmModelError" data-testid="template-llm-model-error">
+          {{ llmModelError }}
+        </FieldError>
+
+        <Field :data-invalid="Boolean(llmCredentialError)">
+          <FieldLabel for="template-llm-credential">
+            {{ $t('avatar_templates.llm.credential.label') }}
+          </FieldLabel>
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <select
+            id="template-llm-credential"
+            data-testid="template-llm-credential"
+            autocomplete="off"
+            :aria-invalid="Boolean(llmCredentialError)"
+            :class="formControlClass"
+            :value="draft.llmCredentialId === null ? '' : String(draft.llmCredentialId)"
+            @change="onCredentialChange"
+          >
+            <option value="">{{ $t('avatar_templates.llm.credential.none') }}</option>
+            <option v-for="credential in credentials" :key="credential.id" :value="credential.id">
+              {{ credential.name }}
+            </option>
+          </select>
+          <FieldError v-if="llmCredentialError" data-testid="template-llm-credential-error">
+            {{ llmCredentialError }}
+          </FieldError>
+        </Field>
+
+        <LlmModeExplainer />
+      </fieldset>
+    </FormFieldset>
   </form>
 </template>
 
 <script setup lang="ts">
+import { FormFieldset } from '@/components/ui/form-fieldset'
 /**
  * The template form, BUILT from the server's field specs (C14 PR6).
  *

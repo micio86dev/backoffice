@@ -64,7 +64,13 @@ describe('ProjectForm', () => {
     createProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     updateProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     fetchRoleCompetenciesMock.mockReset().mockResolvedValue({ data: [] })
-    listTemplatesMock.mockReset().mockResolvedValue({ data: [] })
+    // At least one template, ALWAYS. A project cannot exist without one —
+    // the column is NOT NULL and the form refuses a submit with nothing
+    // selected — so an empty list is not a state any of these tests are about;
+    // it would just make every submit assertion fail for an unrelated reason.
+    listTemplatesMock.mockReset().mockResolvedValue({
+      data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
+    })
   })
 
   // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
@@ -875,7 +881,10 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
 
       const select = wrapper.get('[data-testid="project-form-avatar-template"]')
       expect((select.element as HTMLSelectElement).value).toBe('9')
-      expect(select.findAll('option')).toHaveLength(3) // the two templates + "use the org default"
+      // The two templates and nothing else. The "use the organization default"
+      // option is gone: the column is NOT NULL and the API rejects an explicit
+      // null, so offering it would be offering a choice that can only 422.
+      expect(select.findAll('option')).toHaveLength(2)
     })
 
     it('sends the pinned template on save', async () => {
@@ -899,10 +908,44 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       )
     })
 
-    it('sends null when the operator returns the project to the organization default', async () => {
-      // Unpinning must reach the server as an explicit null. Dropped as
-      // "unchanged" it would be a one-way door — an operator could never get
-      // back to the org-wide default they started from.
+    it('refuses a submit when the organization has no templates at all', async () => {
+      // REPLACES a test that asserted the opposite — that clearing the select
+      // sent an explicit null, so an operator could return to an
+      // organization-wide default. That default no longer exists: the column
+      // is NOT NULL and the API rejects a null, which the test immediately
+      // below has asserted since. The two contradicted each other, and this
+      // one was the stale half.
+      //
+      // Clearing the select is no longer even reachable — there is no empty
+      // option to choose. What IS reachable is this: an organization that has
+      // not configured a template yet, where the default cannot resolve to
+      // anything. The submit is refused HERE, with the error on the control,
+      // rather than sent and bounced back as an unmapped 422 the operator
+      // reads as "could not save".
+      listTemplatesMock.mockResolvedValue({ data: [] })
+      // This describe has no beforeEach of its own, so the create spy carries
+      // calls from earlier tests in the block. Cleared, not reset: the
+      // resolved value it was given at module level still has to stand.
+      createProjectMock.mockClear()
+
+      const wrapper = mount(ProjectForm, { global: { mocks: { $t: tMock } } })
+      await flushPromises()
+
+      await wrapper.get('#project-form-name').setValue('New project')
+      await wrapper.get('#project-form-slug').setValue('new-project')
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(createProjectMock).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="project-form-avatar-template-error"]').text()).toContain(
+        'projects.form.avatarTemplateRequired'
+      )
+    })
+
+    it('offers no "organization default" option — the field is required', async () => {
+      // `projects.avatar_template_id` is NOT NULL and the API rejects an
+      // explicit null. Leaving the empty option in place would offer an
+      // operator a choice that can only ever come back as a 422.
       listTemplatesMock.mockResolvedValue({
         data: [{ id: 7, name: 'Recruiter HeyGen', provider: 'heygen', is_active: true }],
       })
@@ -913,14 +956,72 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       })
       await flushPromises()
 
-      await wrapper.get('[data-testid="project-form-avatar-template"]').setValue('')
-      await wrapper.get('form').trigger('submit')
+      const options = wrapper.get('[data-testid="project-form-avatar-template"]').findAll('option')
+      expect(options).toHaveLength(1)
+      expect(options.every((o) => o.attributes('value') !== '')).toBe(true)
+    })
+
+    it('defaults a NEW project to the most recently used template', async () => {
+      // "Most recently used" rather than "first": an operator creating several
+      // projects in a row is almost always continuing with the same template,
+      // and making them re-pick it every time is the kind of friction that
+      // turns a required field into an annoyance.
+      listTemplatesMock.mockResolvedValue({
+        data: [
+          { id: 3, name: 'Older', provider: 'heygen', is_active: false },
+          { id: 9, name: 'Most recent', provider: 'tavus', is_active: true },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: {} },
+        global: { mocks: { $t: tMock } },
+      })
       await flushPromises()
 
-      expect(updateProjectMock).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ avatar_template_id: null })
-      )
+      expect(
+        (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
+          .value
+      ).toBe('9')
+    })
+
+    it('falls back to the first template when none has been used yet', async () => {
+      listTemplatesMock.mockResolvedValue({
+        data: [{ id: 3, name: 'The only one', provider: 'heygen', is_active: false }],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: {} },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
+          .value
+      ).toBe('3')
+    })
+
+    it('never overwrites the template an existing project already pinned', async () => {
+      // The default is for a project that has made no choice. Applying it to
+      // one that has would silently re-point a live project on every edit.
+      listTemplatesMock.mockResolvedValue({
+        data: [
+          { id: 3, name: 'Pinned', provider: 'heygen', is_active: false },
+          { id: 9, name: 'Most recent', provider: 'tavus', is_active: true },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ avatar_template_id: 3 }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
+          .value
+      ).toBe('3')
     })
 
     it('still renders the control when no template exists yet', async () => {

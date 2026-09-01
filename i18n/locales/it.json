@@ -118,6 +118,9 @@
       "tokensUsed": "Token AI utilizzati",
       "latency": "Latenza AI (p50 / p95)",
       "latencyValue": "{p50} / {p95} ms",
+      "cost": "Spesa AI e avatar",
+      "costValue": "$ {usd}",
+      "costBreakdown": "Valutazione $ {scoring} · Colloquio $ {conversation}",
       "noData": "Nessun dato disponibile"
     },
     "activity": {

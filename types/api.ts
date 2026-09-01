@@ -1480,6 +1480,14 @@ export interface components {
         };
         /** DashboardActivityResource */
         DashboardActivityResource: {
+            /**
+             * @description The row's own id, so the feed can LINK to the candidate instead
+             *     of naming them. `candidate_ref` below is the calling system's
+             *     opaque identifier and addresses nothing in this product — a feed
+             *     that says who just moved and gives no way to go and look is a
+             *     page you read and then leave to use the search box.
+             */
+            id: number;
             candidate_ref: string;
             display_name: string;
             status: string;

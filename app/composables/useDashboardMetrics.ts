@@ -22,6 +22,23 @@ export interface DashboardMetrics {
     latency_ms_p50: number | null
     latency_ms_p95: number | null
   }
+  /**
+   * What this organization's assessments have cost, in USD.
+   *
+   * Reported apart as well as summed because the two answer different
+   * questions: scoring is per completed evaluation and predictable,
+   * conversation is per minute of interview and is the one that moves when
+   * candidates talk longer.
+   *
+   * `currency` is carried rather than assumed — a bare number on a dashboard
+   * is read in whatever currency the reader happens to think in.
+   */
+  costs: {
+    scoring_usd: number
+    conversation_usd: number
+    total_usd: number
+    currency: string
+  }
 }
 
 export interface DashboardMetricsResponse {
@@ -36,6 +53,12 @@ export interface DashboardMetricsResponse {
  * `api/app/Http/Resources/Admin/DashboardActivityResource.php`.
  */
 export interface DashboardActivityRow {
+  /**
+   * Addresses the candidate inside this product, and is what the feed links
+   * on. `candidate_ref` below is the CALLING SYSTEM's opaque identifier and
+   * addresses nothing here.
+   */
+  id: number
   candidate_ref: string
   display_name: string
   status: string

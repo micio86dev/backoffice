@@ -67,6 +67,19 @@ export function useAvatarTemplates() {
     return apiFetch<TemplateResponse>(`/avatar-templates/${id}/activate`, { method: 'POST' })
   }
 
+  /**
+   * Take a template out of service without deleting it.
+   *
+   * Safe in a way it would not have been before every project pinned its own
+   * template: `is_active` used to be the organization-wide fallback, so
+   * switching it off changed what unpinned projects ran on. It now only decides
+   * which template is offered as the default for NEW projects, and the projects
+   * already pinning this one keep running on it.
+   */
+  async function deactivateTemplate(id: number | string): Promise<TemplateResponse> {
+    return apiFetch<TemplateResponse>(`/avatar-templates/${id}/deactivate`, { method: 'POST' })
+  }
+
   async function deleteTemplate(id: number | string): Promise<void> {
     // <null>, not <void>: the endpoint answers 204 with no body, and `void` is
     // not a valid type argument — it describes a return position, not a value.
@@ -96,6 +109,7 @@ export function useAvatarTemplates() {
     createTemplate,
     updateTemplate,
     activateTemplate,
+    deactivateTemplate,
     deleteTemplate,
   }
 }

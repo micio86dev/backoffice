@@ -83,6 +83,7 @@ type Handlers = Partial<{
   createTemplate: ReturnType<typeof vi.fn>
   updateTemplate: ReturnType<typeof vi.fn>
   activateTemplate: ReturnType<typeof vi.fn>
+  deactivateTemplate: ReturnType<typeof vi.fn>
   deleteTemplate: ReturnType<typeof vi.fn>
 }>
 
@@ -93,6 +94,7 @@ async function mountPage(handlers: Handlers = {}) {
     createTemplate: vi.fn().mockResolvedValue({ data: template() }),
     updateTemplate: vi.fn().mockResolvedValue({ data: template() }),
     activateTemplate: vi.fn().mockResolvedValue({ data: template({ is_active: true }) }),
+    deactivateTemplate: vi.fn().mockResolvedValue({ data: template({ is_active: false }) }),
     deleteTemplate: vi.fn().mockResolvedValue(undefined),
     ...handlers,
   }
@@ -559,5 +561,68 @@ describe('AvatarTemplatesPage — conversation-LLM forecast', () => {
     const { wrapper } = await mountPage()
 
     expect(wrapper.text()).toContain('help.glossary.llmCost.definition')
+  })
+})
+
+describe('AvatarTemplatesPage — deactivation', () => {
+  // Same setup as the suite above, and `vi.resetModules()` is the load-bearing
+  // line: `mountPage` registers its mock with `vi.doMock`, which only takes
+  // effect on a FRESH module graph. Without the reset this describe inherits
+  // the cached page module from an earlier one, the mock never applies, and the
+  // symptom is a button that simply does not render — with no error to explain
+  // why.
+  beforeEach(() => {
+    vi.resetModules()
+    tMock.mockClear()
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, locale: ref('it') }))
+    )
+  })
+
+  /**
+   * An admin can withdraw a template without deleting it.
+   *
+   * Only activation existed, so the only ways to stop offering a template were
+   * to activate a different one — which needs one to exist — or to delete it,
+   * which is destructive and is refused outright while any project pins it.
+   *
+   * Safe now in a way it would not have been: `is_active` used to be the
+   * organization-wide fallback, so switching it off changed what unpinned
+   * projects ran on. Every project pins its own template, so this only decides
+   * which one new projects start from.
+   */
+  it('offers deactivate on the active template, and activate on the others', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [template({ id: 1, is_active: true }), template({ id: 2, is_active: false })],
+      }),
+    })
+
+    expect(wrapper.find('[data-testid="template-deactivate-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="template-activate-1"]').exists()).toBe(false)
+
+    // The mirror image on an inactive one — the two controls never both show.
+    expect(wrapper.find('[data-testid="template-activate-2"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="template-deactivate-2"]').exists()).toBe(false)
+  })
+
+  it('deactivates without a confirmation dialog, and reloads', async () => {
+    // No dialog on purpose. Activation gets one because it changes what every
+    // NEW project starts from; withdrawing only removes a choice, moves nothing
+    // live, and is one click to undo.
+    const { wrapper, api } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: true })] }),
+    })
+
+    await wrapper.find('[data-testid="template-deactivate-1"]').trigger('click')
+    await flushPromises()
+
+    expect(api.deactivateTemplate).toHaveBeenCalledWith(1)
+    // Reloaded rather than patched locally, same reason as activation: the
+    // server owns which template is active and guessing is guessing.
+    expect(api.listTemplates).toHaveBeenCalledTimes(2)
   })
 })

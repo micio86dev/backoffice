@@ -699,7 +699,8 @@
       "activate": "Attiva",
       "delete": "Elimina",
       "save": "Salva",
-      "cancel": "Annulla"
+      "cancel": "Annulla",
+      "deactivate": "Disattiva"
     },
     "confirm": {
       "activateTitle": "Attivare questo template?",

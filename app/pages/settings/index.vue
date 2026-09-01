@@ -120,7 +120,7 @@ const SECTIONS = [
     icon: BuildingOffice2Icon,
     component: OrganizationProfileForm,
     needsOrganization: true,
-    adminOnly: false,
+    requires: 'organization.view',
   },
   {
     // Admin-only. What every candidate of an organization sees is not an
@@ -132,7 +132,7 @@ const SECTIONS = [
     icon: SwatchIcon,
     component: BrandingForm,
     needsOrganization: true,
-    adminOnly: true,
+    requires: 'organization.update',
   },
   {
     value: 'apiKeys',
@@ -141,7 +141,7 @@ const SECTIONS = [
     icon: KeyIcon,
     component: ApiKeysPanel,
     needsOrganization: false,
-    adminOnly: false,
+    requires: 'apiClients.viewAny',
   },
   {
     value: 'webhooks',
@@ -150,7 +150,7 @@ const SECTIONS = [
     icon: BoltIcon,
     component: WebhookDefaultsForm,
     needsOrganization: true,
-    adminOnly: false,
+    requires: 'organization.update',
   },
   {
     value: 'users',
@@ -159,7 +159,7 @@ const SECTIONS = [
     icon: UserGroupIcon,
     component: UsersPanel,
     needsOrganization: false,
-    adminOnly: false,
+    requires: 'users.viewAny',
   },
   {
     value: 'llmCredentials',
@@ -168,11 +168,9 @@ const SECTIONS = [
     icon: CpuChipIcon,
     component: LlmCredentialsPanel,
     needsOrganization: false,
-    // The ONLY gated section on this page. `/llm-credentials` is admin-only
-    // server-side (`LlmCredentialPolicy`), and what it manages is a
-    // decryptable vendor API key — so the client-side gate is tighter than
-    // the four ungated sections above, never looser.
-    adminOnly: true,
+    // What this manages is a decryptable vendor API key, so it is the last
+    // section anyone should be shown speculatively.
+    requires: 'llmCredentials.viewAny',
   },
 ] as const
 
@@ -192,15 +190,20 @@ const { fetchOrganization } = useOrganization()
 const organization = ref<OrganizationResponse['data'] | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
 
-// Affordance only — the server enforces (`LlmCredentialPolicy`). Starts
-// `false` and stays `false` on any failure, so a transient `/auth/me` error
-// can never hand an operator a section they are not entitled to. Same
-// fail-closed shape as `avatar-templates/index.vue`'s admin gate.
-const isAdmin = ref(false)
+// Each section names the ABILITY it needs, and `can()` answers from the map
+// the server resolves through its own policies — never from `roles.includes
+// ('admin')`, which is a second copy of an authorization rule that drifts the
+// moment the policy changes.
+//
+// `can()` fails closed, so a transient `/auth/me` error hides sections rather
+// than offering ones whose every request would come back 403. Affordance only:
+// the endpoints behind each section authorize independently.
+const { can } = useCurrentUser()
 
-const visibleSections = computed(() =>
-  SECTIONS.filter((section) => !section.adminOnly || isAdmin.value)
-)
+// EVERY section names an ability — none is unconditional. A section with no
+// gate stays on screen when `/auth/me` fails, which is the one moment the page
+// knows least about who is looking at it.
+const visibleSections = computed(() => SECTIONS.filter((section) => can(section.requires)))
 
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))
@@ -221,14 +224,11 @@ async function onSaved(): Promise<void> {
 
 onMounted(() => {
   void load()
-  void loadRoles()
+  // Fills the shared identity cache `can()` reads. Swallowed on failure for
+  // the same reason it always was: `can()` already answers false without it,
+  // so a failed identity narrows the page rather than breaking it.
+  void useCurrentUser()
+    .ensureLoaded()
+    .catch(() => undefined)
 })
-
-async function loadRoles(): Promise<void> {
-  try {
-    isAdmin.value = (await useCurrentUser().ensureLoaded()).roles.includes('admin')
-  } catch {
-    isAdmin.value = false
-  }
-}
 </script>

@@ -306,6 +306,7 @@
       "nameRequired": "Enter a project name.",
       "slugRequired": "Enter a slug.",
       "roleCodeRequired": "Select a role.",
+      "avatarTemplateRequired": "Select an avatar template.",
       "invalidUrl": "Enter a full address starting with http:// or https://",
       "outOfRange": "Enter a value between {min} and {max}.",
       "saveError": "This project could not be saved. Please review the highlighted fields.",

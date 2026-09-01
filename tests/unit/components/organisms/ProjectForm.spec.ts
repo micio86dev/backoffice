@@ -64,7 +64,13 @@ describe('ProjectForm', () => {
     createProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     updateProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     fetchRoleCompetenciesMock.mockReset().mockResolvedValue({ data: [] })
-    listTemplatesMock.mockReset().mockResolvedValue({ data: [] })
+    // At least one template, ALWAYS. A project cannot exist without one —
+    // the column is NOT NULL and the form refuses a submit with nothing
+    // selected — so an empty list is not a state any of these tests are about;
+    // it would just make every submit assertion fail for an unrelated reason.
+    listTemplatesMock.mockReset().mockResolvedValue({
+      data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
+    })
   })
 
   // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
@@ -902,27 +908,37 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       )
     })
 
-    it('sends null when the operator returns the project to the organization default', async () => {
-      // Unpinning must reach the server as an explicit null. Dropped as
-      // "unchanged" it would be a one-way door — an operator could never get
-      // back to the org-wide default they started from.
-      listTemplatesMock.mockResolvedValue({
-        data: [{ id: 7, name: 'Recruiter HeyGen', provider: 'heygen', is_active: true }],
-      })
+    it('refuses a submit when the organization has no templates at all', async () => {
+      // REPLACES a test that asserted the opposite — that clearing the select
+      // sent an explicit null, so an operator could return to an
+      // organization-wide default. That default no longer exists: the column
+      // is NOT NULL and the API rejects a null, which the test immediately
+      // below has asserted since. The two contradicted each other, and this
+      // one was the stale half.
+      //
+      // Clearing the select is no longer even reachable — there is no empty
+      // option to choose. What IS reachable is this: an organization that has
+      // not configured a template yet, where the default cannot resolve to
+      // anything. The submit is refused HERE, with the error on the control,
+      // rather than sent and bounced back as an unmapped 422 the operator
+      // reads as "could not save".
+      listTemplatesMock.mockResolvedValue({ data: [] })
+      // This describe has no beforeEach of its own, so the create spy carries
+      // calls from earlier tests in the block. Cleared, not reset: the
+      // resolved value it was given at module level still has to stand.
+      createProjectMock.mockClear()
 
-      const wrapper = mount(ProjectForm, {
-        props: { project: activeProject({ avatar_template_id: 7 }) },
-        global: { mocks: { $t: tMock } },
-      })
+      const wrapper = mount(ProjectForm, { global: { mocks: { $t: tMock } } })
       await flushPromises()
 
-      await wrapper.get('[data-testid="project-form-avatar-template"]').setValue('')
+      await wrapper.get('#project-form-name').setValue('New project')
+      await wrapper.get('#project-form-slug').setValue('new-project')
       await wrapper.get('form').trigger('submit')
       await flushPromises()
 
-      expect(updateProjectMock).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ avatar_template_id: null })
+      expect(createProjectMock).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="project-form-avatar-template-error"]').text()).toContain(
+        'projects.form.avatarTemplateRequired'
       )
     })
 

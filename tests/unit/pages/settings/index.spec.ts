@@ -59,14 +59,31 @@ function mockOrganization() {
   }))
 }
 
-/** `roles: null` stands for `/auth/me` rejecting outright. */
-function mockCurrentUser(roles: string[] | null) {
+/**
+ * The page filters its sections through `can()`, which reads the ability map
+ * the SERVER resolves from its own policies — never a role name in the client,
+ * which would be a second copy of the rule that drifts as soon as the policy
+ * changes.
+ *
+ * `role: null` stands for `/auth/me` rejecting outright, and the mock then
+ * answers `false` to everything: fail-closed, the same way the real composable
+ * does when it has no identity to read.
+ */
+const ADMIN_ONLY = new Set([
+  'organization.update',
+  'users.viewAny',
+  'llmCredentials.viewAny',
+  'apiClients.viewAny',
+])
+
+function mockCurrentUser(role: 'admin' | 'operator' | null) {
   vi.doMock('../../../../app/composables/useCurrentUser', () => ({
     useCurrentUser: () => ({
       ensureLoaded:
-        roles === null
+        role === null
           ? vi.fn().mockRejectedValue(new Error('unauthenticated'))
-          : vi.fn().mockResolvedValue({ roles }),
+          : vi.fn().mockResolvedValue({ roles: [role] }),
+      can: (ability: string) => role !== null && (role === 'admin' || !ADMIN_ONLY.has(ability)),
     }),
   }))
 }
@@ -97,9 +114,14 @@ describe('pages/settings/index.vue', () => {
     )
   })
 
-  it('renders the four ungated tabs inside a TabsList', async () => {
+  it('renders every tab an admin may use inside a TabsList', async () => {
+    // Was asserted with an operator, back when four of the six sections were
+    // ungated in the client and the server refused them only on save. Every
+    // section is now gated by the ability the SERVER publishes for it, and an
+    // operator may reach none of these four — so the test that says "these
+    // tabs render" has to be the one that says who they render for.
     mockOrganization()
-    mockCurrentUser(['operator'])
+    mockCurrentUser('admin')
 
     const wrapper = await mountSettings()
 
@@ -111,7 +133,7 @@ describe('pages/settings/index.vue', () => {
 
   it('mounts only the active tab panel (organization profile by default)', async () => {
     mockOrganization()
-    mockCurrentUser(['admin'])
+    mockCurrentUser('admin')
 
     const SettingsPage = (await import('../../../../app/pages/settings/index.vue')).default
     const wrapper = mount(SettingsPage, { global: { mocks: { $t: tMock } } })
@@ -127,7 +149,7 @@ describe('pages/settings/index.vue', () => {
 
   it('routes the <title> through i18n instead of a hardcoded English literal', async () => {
     mockOrganization()
-    mockCurrentUser(['admin'])
+    mockCurrentUser('admin')
 
     const SettingsPage = (await import('../../../../app/pages/settings/index.vue')).default
     mount(SettingsPage, { global: { mocks: { $t: tMock } } })
@@ -144,7 +166,7 @@ describe('pages/settings/index.vue', () => {
     // section silently dropped from the registry would still leave every
     // `toContain` below passing on the sections that remain.
     mockOrganization()
-    mockCurrentUser(['admin'])
+    mockCurrentUser('admin')
 
     const wrapper = await mountSettings()
 
@@ -158,7 +180,7 @@ describe('pages/settings/index.vue', () => {
 
   it('hides branding from a non-admin', async () => {
     mockOrganization()
-    mockCurrentUser(['operator'])
+    mockCurrentUser('operator')
 
     const wrapper = await mountSettings()
 
@@ -170,23 +192,29 @@ describe('pages/settings/index.vue', () => {
 
   it('does not render the credential vault for a non-admin at all', async () => {
     mockOrganization()
-    mockCurrentUser(['operator'])
+    mockCurrentUser('operator')
 
     const wrapper = await mountSettings()
 
-    expect(wrapper.findAll('[role="tab"]')).toHaveLength(4)
+    // Only the organization profile survives: every other section on this page
+    // writes something an operator may not write, or reads something they may
+    // not read. The whole PAGE is admin-only at the route guard too — this
+    // mounts the component directly, so it asserts the second layer.
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(1)
     expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+    expect(wrapper.text()).not.toContain('settings.tabs.apiKeys')
   })
 
-  // Affordance only — the server enforces. A transient `/auth/me` failure
-  // must not hand an operator a section they may not be entitled to.
-  it('fails closed when the identity fetch rejects', async () => {
+  // A transient `/auth/me` failure must not hand anyone a section. EVERY
+  // section names an ability, so an identity that failed to load leaves the
+  // page with nothing on it rather than with whatever happened to be ungated.
+  it('fails closed to NOTHING when the identity fetch rejects', async () => {
     mockOrganization()
     mockCurrentUser(null)
 
     const wrapper = await mountSettings()
 
-    expect(wrapper.findAll('[role="tab"]')).toHaveLength(4)
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(0)
     expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
   })
 })

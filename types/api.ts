@@ -170,9 +170,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Return the authenticated user, their organization, and their roles
+         * Return the authenticated user, their organization, their roles, and
+         *     what they may do
          * @description GET /api/auth/me
          *     Protected: auth:api
+         *
+         *     The `abilities` shape is spelled out for Scramble. Inferred, it comes
+         *     out as a bare `string` — `app(UserAbilities::class)->for()` is a
+         *     container call it cannot follow — and a wrong type in the spec is worse
+         *     than no type: both Nuxt apps generate their client from this file, so a
+         *     `string` there makes every `abilities.users.viewAny` read a compile
+         *     error in the two repositories that consume it.
          */
         get: operations["auth.me"];
         put?: never;
@@ -1569,6 +1577,8 @@ export interface components {
             id: number;
             name: string;
             slug: string;
+            primary_color: string | null;
+            logo_url: string | null;
             default_webhook_url: string | null;
             default_webhook_events: string[] | null;
             has_default_webhook_secret: boolean;
@@ -1692,6 +1702,10 @@ export interface components {
                 type: string;
                 position: number;
             }[];
+            can: {
+                update: boolean;
+                delete: boolean;
+            };
         };
         /**
          * ResetPasswordRequest
@@ -2420,24 +2434,40 @@ export interface operations {
                             id: number;
                             name: string;
                             email: string;
-                            /**
-                             * @description user-profile-self-service: previously the column and
-                             *     $fillable entry existed but /auth/me never returned it.
-                             */
-                            locale: string | null;
-                            /**
-                             * @description user-avatar-image (design D4): the SAME signer ProfileResource
-                             *     uses — /auth/me is the shell-identity contract useCurrentUser
-                             *     caches once per page load, so this is the second (and only
-                             *     other) caller of ProfilePhotoUrlSigner.
-                             */
-                            photo_url: string;
+                            locale: string;
+                            photo_url: string | null;
                         };
                         organization: {
                             id: number;
                             name: string;
                         } | null;
-                        roles: unknown[];
+                        roles: string[];
+                        abilities: {
+                            organization: {
+                                view: boolean;
+                                update: boolean;
+                            };
+                            apiClients: {
+                                viewAny: boolean;
+                                create: boolean;
+                            };
+                            users: {
+                                viewAny: boolean;
+                                create: boolean;
+                            };
+                            llmCredentials: {
+                                viewAny: boolean;
+                                create: boolean;
+                            };
+                            avatarTemplates: {
+                                viewAny: boolean;
+                                create: boolean;
+                            };
+                            projects: {
+                                viewAny: boolean;
+                                create: boolean;
+                            };
+                        };
                     };
                 };
             };

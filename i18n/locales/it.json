@@ -306,6 +306,7 @@
       "nameRequired": "Inserisci il nome del progetto.",
       "slugRequired": "Inserisci uno slug.",
       "roleCodeRequired": "Seleziona un ruolo.",
+      "avatarTemplateRequired": "Seleziona un template avatar.",
       "invalidUrl": "Inserisci un indirizzo completo che inizi con http:// o https://",
       "outOfRange": "Inserisci un valore tra {min} e {max}.",
       "saveError": "Non è stato possibile salvare questo progetto. Controlla i campi evidenziati.",

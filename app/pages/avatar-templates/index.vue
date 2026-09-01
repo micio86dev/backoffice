@@ -325,18 +325,23 @@ async function load(): Promise<void> {
   }
 }
 
-const isAdmin = ref(false)
+// Resolved by the server's policies, not by reading a role name here: a
+// `roles.includes('admin')` check is a second copy of an authorization rule
+// written in a second language, and the copy drifts the moment the policy
+// changes. `can()` fails closed, so a transient `/auth/me` error hides the
+// import/export controls rather than offering ones that come back 403.
+// Affordance only — the endpoints enforce.
+const { can } = useCurrentUser()
+const isAdmin = computed(() => can('avatarTemplates.create'))
 
 onMounted(async () => {
   await load()
 
-  try {
-    // Affordance only — the server enforces. Failing closed keeps a transient
-    // error from handing an operator controls they cannot use.
-    isAdmin.value = (await useCurrentUser().ensureLoaded()).roles.includes('admin')
-  } catch {
-    isAdmin.value = false
-  }
+  // Fills the shared identity cache `can()` reads. Swallowed: `can()` already
+  // answers false without it.
+  await useCurrentUser()
+    .ensureLoaded()
+    .catch(() => undefined)
 })
 
 function startCreate(): void {

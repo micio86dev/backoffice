@@ -24,22 +24,35 @@
  * contracts and must not become two sources of truth for the same fields.
  */
 import { computed, ref, watch } from 'vue'
+import type { paths } from '../../types/api'
 import { useApi } from './useApi'
 import { useAuth } from './useAuth'
 
-export interface CurrentUser {
-  user: {
-    id: number
-    name: string
-    email: string
-    locale: string
-    // user-avatar-image (design D4): null when the user has no photo, or the
-    // presigned URL minted by the SAME signer ProfileResource uses.
-    photo_url: string | null
-  }
-  organization: { id: number; name: string } | null
-  roles: string[]
-}
+/**
+ * DERIVED FROM THE GENERATED CLIENT, never hand-written.
+ *
+ * `/auth/me` is a contract owned by the API repository; a hand-maintained copy
+ * of its shape here is a second source of truth across three repositories,
+ * which CLAUDE.md forbids by design. `bun run codegen` regenerates
+ * `types/api.ts` from the committed `openapi.json`, so a field that changes
+ * server-side becomes a type error here rather than an `undefined` at runtime.
+ */
+export type CurrentUser =
+  paths['/auth/me']['get']['responses']['200']['content']['application/json']
+
+/**
+ * What this user may do, RESOLVED BY THE SERVER'S POLICIES — the same ones
+ * that guard the endpoints. Read this instead of the `roles` array:
+ * `roles.includes('admin')` is a second copy of an authorization rule written
+ * in a second language, and the copy drifts the moment the policy changes,
+ * silently and in the permissive direction.
+ */
+export type Abilities = CurrentUser['abilities']
+
+/** Every ability the server publishes, as `group.action`. */
+export type AbilityKey = {
+  [G in keyof Abilities]: `${G & string}.${keyof Abilities[G] & string}`
+}[keyof Abilities]
 
 // Module-scoped state — intentionally NOT inside the useCurrentUser()
 // function body, so every call site shares the same cached identity and the
@@ -91,6 +104,19 @@ export function useCurrentUser() {
 
   const user = computed(() => current.value?.user ?? null)
   const roles = computed(() => current.value?.roles ?? [])
+  const abilities = computed(() => current.value?.abilities ?? null)
 
-  return { ensureLoaded, refresh, user, roles }
+  /**
+   * FAILS CLOSED. An unloaded identity, a failed `/auth/me`, or an ability
+   * the server did not publish all answer `false` — so a transient error
+   * hides an action rather than offering one that will come back 403.
+   */
+  function can(ability: AbilityKey): boolean {
+    const [group, action] = ability.split('.') as [keyof Abilities, string]
+    const group_ = abilities.value?.[group] as Record<string, boolean> | undefined
+
+    return group_?.[action] === true
+  }
+
+  return { ensureLoaded, refresh, user, roles, abilities, can }
 }

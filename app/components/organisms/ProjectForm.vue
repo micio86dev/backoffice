@@ -245,7 +245,7 @@
         inactive templates would make two projects on the same provider
         impossible again, since only one per provider can be active.
       -->
-      <Field>
+      <Field :data-invalid="Boolean(errors.avatarTemplateId)">
         <FieldLabel for="project-form-avatar-template">
           {{ $t('projects.form.avatarTemplate') }}
         </FieldLabel>
@@ -256,14 +256,18 @@
           autocomplete="off"
           :class="formControlClass"
           :value="avatarTemplateId === null ? '' : String(avatarTemplateId)"
-          :aria-describedby="'project-form-avatar-template-help'"
+          :aria-invalid="Boolean(errors.avatarTemplateId)"
+          :aria-describedby="
+            describedBy('project-form-avatar-template', Boolean(errors.avatarTemplateId))
+          "
           @change="onAvatarTemplateChange"
         >
           <!--
-            Absent is a real, supported configuration — not a missing setting —
-            so it is labelled as the organization default rather than as an
-            empty choice. Without a way back to it, pinning would be a one-way
-            door.
+            There is NO empty option. Every project must name a template — the
+            interview cannot run without a face and a voice — so "none" is not
+            a configuration the operator can choose. The empty `value` above is
+            reachable only in the moment before the default resolves, and the
+            validator below refuses a submit made in it.
           -->
           <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
             {{ template.name }} ({{ template.provider }})
@@ -272,6 +276,13 @@
         <FieldDescription id="project-form-avatar-template-help">
           {{ $t('projects.form.help.avatarTemplate') }}
         </FieldDescription>
+        <FieldError
+          v-if="errors.avatarTemplateId"
+          id="project-form-avatar-template-error"
+          data-testid="project-form-avatar-template-error"
+        >
+          {{ errors.avatarTemplateId }}
+        </FieldError>
       </Field>
 
       <Field :data-invalid="Boolean(errors.exitRedirectUrl)">
@@ -498,8 +509,10 @@ const competencyIds = ref<number[]>((props.project?.competencies ?? []).map((c) 
 const pauseEveryNCompetencies = ref(props.project?.pause_every_n_competencies ?? '')
 const nudgeMinChars = ref(props.project?.nudge_min_chars ?? '')
 const exitRedirectUrl = ref(props.project?.exit_redirect_url ?? '')
-// `?? null`, not `?? ''`: this is a nullable FK, and null is the meaningful
-// value ("use the organization's active template"), not an empty string.
+// Null only until the default resolves. The column is NOT NULL server-side —
+// every project names a template — so null here means "not chosen yet", never
+// "deliberately none", and `validateAvatarTemplate` refuses a submit in that
+// state rather than sending a value the API would reject with a generic error.
 const avatarTemplateId = ref<number | null>(props.project?.avatar_template_id ?? null)
 const avatarTemplates = ref<AvatarTemplateOption[]>([])
 const webhookUrl = ref(props.project?.webhook_url ?? '')
@@ -525,6 +538,7 @@ const errors = ref<{
   nudgeMinChars?: string
   exitRedirectUrl?: string
   webhookUrl?: string
+  avatarTemplateId?: string
 }>({})
 
 const competencyOptions = ref<CompetencyOption[]>([])
@@ -620,6 +634,17 @@ function validateRoleCode(): boolean {
   }
   errors.value.roleCode = roleCode.value === '' ? missingKey('roleCodeRequired') : undefined
   return !errors.value.roleCode
+}
+
+function validateAvatarTemplate(): boolean {
+  // Enforced server-side too (the column is NOT NULL with a restricting
+  // foreign key). Checked here so the operator is told WHICH control is
+  // missing, instead of getting the form-level "could not save" banner that an
+  // unmapped server error produces.
+  errors.value.avatarTemplateId =
+    avatarTemplateId.value === null ? missingKey('avatarTemplateRequired') : undefined
+
+  return !errors.value.avatarTemplateId
 }
 
 // useI18n() is a Nuxt auto-import, same convention as CandidateTable.vue.
@@ -728,8 +753,24 @@ async function onSubmit(): Promise<void> {
   const nudgeOk = validateNudgeMinChars()
   const exitUrlOk = validateExitRedirectUrl()
   const webhookUrlOk = validateWebhookUrl()
+  const templateOk = validateAvatarTemplate()
 
-  if (!nameOk || !slugOk || !roleOk || !pauseOk || !nudgeOk || !exitUrlOk || !webhookUrlOk) return
+  if (
+    !nameOk ||
+    !slugOk ||
+    !roleOk ||
+    !pauseOk ||
+    !nudgeOk ||
+    !exitUrlOk ||
+    !webhookUrlOk ||
+    !templateOk
+  ) {
+    return
+  }
+
+  // Narrowed by `templateOk` above — the payload type says `number`, and it is
+  // one by the time we get here.
+  const avatarTemplate = avatarTemplateId.value as number
 
   saving.value = true
   try {
@@ -745,10 +786,10 @@ async function onSubmit(): Promise<void> {
           : null,
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
-        // Sent unconditionally, including as null. Omitting it when unset
-        // would make unpinning impossible: `sometimes` on the server means an
-        // absent key leaves the existing pin exactly where it was.
-        avatar_template_id: avatarTemplateId.value,
+        // Sent unconditionally. `sometimes` on the server means an absent key
+        // leaves the existing template where it was, so a change of template
+        // that arrived as "unset" would silently not apply.
+        avatar_template_id: avatarTemplate,
         webhook_url: webhookUrl.value || null,
         competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
@@ -766,10 +807,10 @@ async function onSubmit(): Promise<void> {
           : null,
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
-        // Sent unconditionally, including as null. Omitting it when unset
-        // would make unpinning impossible: `sometimes` on the server means an
-        // absent key leaves the existing pin exactly where it was.
-        avatar_template_id: avatarTemplateId.value,
+        // Sent unconditionally. `sometimes` on the server means an absent key
+        // leaves the existing template where it was, so a change of template
+        // that arrived as "unset" would silently not apply.
+        avatar_template_id: avatarTemplate,
         webhook_url: webhookUrl.value || null,
         competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),

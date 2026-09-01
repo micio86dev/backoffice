@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * profile.spec.ts (user-profile-self-service, design D8, task 8.1).
@@ -24,6 +25,7 @@ const ME = {
   user: { id: 1, name: 'Ada Lovelace', email: 'ada@example.com', locale: 'en', photo_url: null },
   organization: { id: 1, name: 'Acme' },
   roles: ['operator'],
+  abilities: abilitiesFor(['operator']),
 }
 
 function profileData(overrides: Partial<(typeof PROFILE)['data']> = {}) {

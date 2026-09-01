@@ -26,5 +26,29 @@ export function useOrganization() {
     return apiFetch<OrganizationResponse>('/organization', { method: 'PATCH', body: payload })
   }
 
-  return { fetchOrganization, updateOrganization }
+  /**
+   * Upload a logo.
+   *
+   * A separate endpoint from the settings PATCH, and that separation is a
+   * security property rather than REST tidiness: `logo_path` is written only
+   * where a file was actually stored, so a client that could send it as a
+   * settings field could point the logo at any path on the disk.
+   *
+   * `FormData` with no explicit Content-Type — the browser must set the
+   * multipart boundary itself, and naming the header here overwrites it with
+   * one that has none, producing a body the server cannot parse.
+   */
+  async function uploadLogo(file: File): Promise<OrganizationResponse> {
+    const body = new FormData()
+    body.append('logo', file)
+
+    return apiFetch<OrganizationResponse>('/organization/logo', { method: 'POST', body })
+  }
+
+  /** Remove the logo, returning the organization to the product's own mark. */
+  async function removeLogo(): Promise<OrganizationResponse> {
+    return apiFetch<OrganizationResponse>('/organization/logo', { method: 'DELETE' })
+  }
+
+  return { fetchOrganization, updateOrganization, uploadLogo, removeLogo }
 }

@@ -13,6 +13,7 @@ import {
   getErrorFields,
   getConflictTemplates,
   applyServerFieldErrors,
+  serverMessageCode,
 } from '../../../app/utils/http-error'
 
 describe('getErrorStatus', () => {
@@ -165,5 +166,33 @@ describe('applyServerFieldErrors', () => {
     const unmapped = applyServerFieldErrors(error, {}, () => {})
 
     expect(unmapped).toBeNull()
+  })
+})
+
+describe('serverMessageCode', () => {
+  it('extracts a machine-facing code from the body', () => {
+    // The API answers refusals with a stable snake_case code in `message`, so
+    // the layer that knows the operator's locale can render it in their
+    // language rather than printing whatever English the server happened to
+    // have compiled in.
+    expect(serverMessageCode({ data: { message: 'entry_link_participant_completed' } })).toBe(
+      'entry_link_participant_completed'
+    )
+  })
+
+  it('refuses a prose message, which is NOT a code', () => {
+    // The framework's own 422 puts the English sentence "The given data was
+    // invalid." in `message`. Handing that to a translator prints it verbatim
+    // under a lookup miss — an English sentence in front of an Italian
+    // operator, which is the exact failure this whole mechanism exists to end.
+    expect(serverMessageCode({ data: { message: 'The given data was invalid.' } })).toBeNull()
+  })
+
+  it('returns null for a failure that carries no body at all', () => {
+    // A network error. The caller falls back to its own generic copy.
+    expect(serverMessageCode(new Error('offline'))).toBeNull()
+    expect(serverMessageCode(null)).toBeNull()
+    expect(serverMessageCode({ data: null })).toBeNull()
+    expect(serverMessageCode({ data: { message: 42 } })).toBeNull()
   })
 })

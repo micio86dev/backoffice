@@ -96,65 +96,67 @@
         novalidate
         @submit.prevent="onCreate"
       >
-        <FieldGroup>
-          <Field :data-invalid="Boolean(errors.name)">
-            <FieldLabel for="llm-credential-form-name">{{
-              $t('settings.llmCredentials.name')
-            }}</FieldLabel>
-            <Input
-              id="llm-credential-form-name"
-              v-model="name"
-              autocomplete="off"
-              :aria-invalid="Boolean(errors.name)"
-              :aria-describedby="errors.name ? 'llm-credential-form-name-error' : undefined"
-              data-testid="llm-credential-form-name"
-            />
-            <FieldError
-              v-if="errors.name"
-              id="llm-credential-form-name-error"
-              data-testid="llm-credential-form-name-error"
-              >{{ errors.name }}</FieldError
-            >
-          </Field>
-          <!-- Only one vendor exists server-side (`in:google`) — a picker
+        <FormFieldset :disabled="creatingBusy">
+          <FieldGroup>
+            <Field :data-invalid="Boolean(errors.name)">
+              <FieldLabel for="llm-credential-form-name">{{
+                $t('settings.llmCredentials.name')
+              }}</FieldLabel>
+              <Input
+                id="llm-credential-form-name"
+                v-model="name"
+                autocomplete="off"
+                :aria-invalid="Boolean(errors.name)"
+                :aria-describedby="errors.name ? 'llm-credential-form-name-error' : undefined"
+                data-testid="llm-credential-form-name"
+              />
+              <FieldError
+                v-if="errors.name"
+                id="llm-credential-form-name-error"
+                data-testid="llm-credential-form-name-error"
+                >{{ errors.name }}</FieldError
+              >
+            </Field>
+            <!-- Only one vendor exists server-side (`in:google`) — a picker
                  with a single, unremovable option is a control whose only
                  outcome is itself, so this states the fact instead. -->
-          <FieldDescription data-testid="llm-credential-form-vendor-note">
-            {{ $t('settings.llmCredentials.vendorNote') }}
-          </FieldDescription>
-          <!--
+            <FieldDescription data-testid="llm-credential-form-vendor-note">
+              {{ $t('settings.llmCredentials.vendorNote') }}
+            </FieldDescription>
+            <!--
               No outer `<Field>` wrapper here — WriteOnlySecretField already
               renders its OWN `<Field>` internally (its own template root),
               so wrapping it again would nest two. `FieldError` needs no
               Field ancestor (it is a standalone, styled paragraph), so it is
               a plain sibling instead.
             -->
-          <WriteOnlySecretField
-            id="llm-credential-form-api-key"
-            :label="$t('settings.llmCredentials.apiKey')"
-            :configured="false"
-            @update:value="(value) => (apiKeyDraft = value)"
-          />
-          <FieldError
-            v-if="errors.apiKey"
-            id="llm-credential-form-api-key-error"
-            data-testid="llm-credential-form-api-key-error"
-            >{{ errors.apiKey }}</FieldError
-          >
-          <Alert
-            v-if="formMessage"
-            variant="destructive"
-            role="alert"
-            aria-live="polite"
-            data-testid="llm-credential-form-banner"
-          >
-            <AlertDescription>{{ formMessage }}</AlertDescription>
-          </Alert>
-          <!--
+            <WriteOnlySecretField
+              id="llm-credential-form-api-key"
+              :label="$t('settings.llmCredentials.apiKey')"
+              :configured="false"
+              @update:value="(value) => (apiKeyDraft = value)"
+            />
+            <FieldError
+              v-if="errors.apiKey"
+              id="llm-credential-form-api-key-error"
+              data-testid="llm-credential-form-api-key-error"
+              >{{ errors.apiKey }}</FieldError
+            >
+            <Alert
+              v-if="formMessage"
+              variant="destructive"
+              role="alert"
+              aria-live="polite"
+              data-testid="llm-credential-form-banner"
+            >
+              <AlertDescription>{{ formMessage }}</AlertDescription>
+            </Alert>
+            <!--
               No submit control here — it lives in FormDrawer's non-scrolling
               footer, wired back by this form's `id`.
             -->
-        </FieldGroup>
+          </FieldGroup>
+        </FormFieldset>
       </form>
     </FormDrawer>
 
@@ -179,20 +181,22 @@
         novalidate
         @submit.prevent="onRotate"
       >
-        <FieldGroup>
-          <WriteOnlySecretField
-            id="llm-credential-rotate-api-key"
-            :label="$t('settings.llmCredentials.rotateNewKey')"
-            :configured="true"
-            @update:value="(value) => (rotateApiKeyDraft = value)"
-          />
-          <FieldError
-            v-if="rotateError"
-            id="llm-credential-rotate-error"
-            data-testid="llm-credential-rotate-error"
-            >{{ rotateError }}</FieldError
-          >
-        </FieldGroup>
+        <FormFieldset :disabled="rotateBusy">
+          <FieldGroup>
+            <WriteOnlySecretField
+              id="llm-credential-rotate-api-key"
+              :label="$t('settings.llmCredentials.rotateNewKey')"
+              :configured="true"
+              @update:value="(value) => (rotateApiKeyDraft = value)"
+            />
+            <FieldError
+              v-if="rotateError"
+              id="llm-credential-rotate-error"
+              data-testid="llm-credential-rotate-error"
+              >{{ rotateError }}</FieldError
+            >
+          </FieldGroup>
+        </FormFieldset>
       </form>
     </FormDrawer>
 
@@ -219,6 +223,7 @@
 </template>
 
 <script setup lang="ts">
+import { FormFieldset } from '@/components/ui/form-fieldset'
 // LLM credentials panel (pluggable-conversation-llm PR P7, design D2/D9).
 //
 // `key_last_four` IS the masking — the API never returns `api_key` at all

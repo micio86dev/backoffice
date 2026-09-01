@@ -5,101 +5,102 @@
     and `<button form="project-form">` is what connects the two.
   -->
   <form id="project-form" data-testid="project-form" novalidate @submit.prevent="onSubmit">
-    <FieldGroup>
-      <Field :data-invalid="Boolean(errors.name)">
-        <FieldLabel for="project-form-name">{{ $t('projects.form.name') }}</FieldLabel>
-        <Input
-          id="project-form-name"
-          v-model="name"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.name)"
-          :aria-describedby="describedBy('project-form-name', Boolean(errors.name))"
-          data-testid="project-form-name"
-          @blur="validateName"
-        />
-        <FieldDescription id="project-form-name-help">
-          {{ $t('projects.form.help.name') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.name"
-          id="project-form-name-error"
-          data-testid="project-form-name-error"
-        >
-          {{ errors.name }}
-        </FieldError>
-      </Field>
+    <FormFieldset :disabled="saving">
+      <FieldGroup>
+        <Field :data-invalid="Boolean(errors.name)">
+          <FieldLabel for="project-form-name">{{ $t('projects.form.name') }}</FieldLabel>
+          <Input
+            id="project-form-name"
+            v-model="name"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.name)"
+            :aria-describedby="describedBy('project-form-name', Boolean(errors.name))"
+            data-testid="project-form-name"
+            @blur="validateName"
+          />
+          <FieldDescription id="project-form-name-help">
+            {{ $t('projects.form.help.name') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.name"
+            id="project-form-name-error"
+            data-testid="project-form-name-error"
+          >
+            {{ errors.name }}
+          </FieldError>
+        </Field>
 
-      <Field :data-invalid="Boolean(errors.slug)">
-        <FieldLabel for="project-form-slug">{{ $t('projects.form.slug') }}</FieldLabel>
-        <Input
-          id="project-form-slug"
-          v-model="slug"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.slug)"
-          :aria-describedby="describedBy('project-form-slug', Boolean(errors.slug))"
-          data-testid="project-form-slug"
-          @blur="validateSlug"
-        />
-        <FieldDescription id="project-form-slug-help">
-          {{ $t('projects.form.help.slug') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.slug"
-          id="project-form-slug-error"
-          data-testid="project-form-slug-error"
-        >
-          {{ errors.slug }}
-        </FieldError>
-      </Field>
+        <Field :data-invalid="Boolean(errors.slug)">
+          <FieldLabel for="project-form-slug">{{ $t('projects.form.slug') }}</FieldLabel>
+          <Input
+            id="project-form-slug"
+            v-model="slug"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.slug)"
+            :aria-describedby="describedBy('project-form-slug', Boolean(errors.slug))"
+            data-testid="project-form-slug"
+            @blur="validateSlug"
+          />
+          <FieldDescription id="project-form-slug-help">
+            {{ $t('projects.form.help.slug') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.slug"
+            id="project-form-slug-error"
+            data-testid="project-form-slug-error"
+          >
+            {{ errors.slug }}
+          </FieldError>
+        </Field>
 
-      <Field>
-        <FieldLabel for="project-form-language">{{ $t('projects.form.language') }}</FieldLabel>
-        <!--
+        <Field>
+          <FieldLabel for="project-form-language">{{ $t('projects.form.language') }}</FieldLabel>
+          <!--
           Same false positive documented in eslint.config.mjs for the vendored
           ui/** primitives: the rule cannot see through the Select/SelectTrigger
           component boundary to the for/id association wired above.
         -->
-        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-        <Select v-model="language">
-          <SelectTrigger
-            id="project-form-language"
-            data-testid="project-form-language"
-            aria-describedby="project-form-language-help"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="en">EN</SelectItem>
-              <SelectItem value="it">IT</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <FieldDescription id="project-form-language-help">
-          {{ $t('projects.form.help.language') }}
-        </FieldDescription>
-      </Field>
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <Select v-model="language">
+            <SelectTrigger
+              id="project-form-language"
+              data-testid="project-form-language"
+              aria-describedby="project-form-language-help"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="en">EN</SelectItem>
+                <SelectItem value="it">IT</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <FieldDescription id="project-form-language-help">
+            {{ $t('projects.form.help.language') }}
+          </FieldDescription>
+        </Field>
 
-      <Field>
-        <FieldLabel for="project-form-assessment-type">
-          {{ $t('projects.form.assessmentType') }}
-        </FieldLabel>
-        <ToggleGroup
-          id="project-form-assessment-type"
-          type="single"
-          :model-value="assessmentType"
-          :disabled="lockedWhenLive"
-          data-testid="project-form-assessment-type"
-          @update:model-value="onAssessmentTypeChange"
-        >
-          <ToggleGroupItem value="standard">
-            {{ $t('projects.assessmentType.standard') }}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="potential">
-            {{ $t('projects.assessmentType.potential') }}
-          </ToggleGroupItem>
-        </ToggleGroup>
-        <!--
+        <Field>
+          <FieldLabel for="project-form-assessment-type">
+            {{ $t('projects.form.assessmentType') }}
+          </FieldLabel>
+          <ToggleGroup
+            id="project-form-assessment-type"
+            type="single"
+            :model-value="assessmentType"
+            :disabled="lockedWhenLive"
+            data-testid="project-form-assessment-type"
+            @update:model-value="onAssessmentTypeChange"
+          >
+            <ToggleGroupItem value="standard">
+              {{ $t('projects.assessmentType.standard') }}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="potential">
+              {{ $t('projects.assessmentType.potential') }}
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <!--
           Renders ALWAYS, not gated on `lockedWhenLive` — D6's inversion fix.
           The previous version of this description only appeared AFTER the
           project went live, i.e. after the choice was already frozen, which
@@ -107,33 +108,33 @@
           scenario). `immutableWhenLive` below keeps its own gate: it is a
           DIFFERENT statement ("this is now locked"), not a duplicate.
         -->
-        <FieldDescription>{{ $t('projects.form.help.assessmentTypeFreezes') }}</FieldDescription>
-        <FieldDescription v-if="lockedWhenLive">
-          {{ $t('projects.form.immutableWhenLive') }}
-        </FieldDescription>
-      </Field>
+          <FieldDescription>{{ $t('projects.form.help.assessmentTypeFreezes') }}</FieldDescription>
+          <FieldDescription v-if="lockedWhenLive">
+            {{ $t('projects.form.immutableWhenLive') }}
+          </FieldDescription>
+        </Field>
 
-      <Field v-if="assessmentType === 'standard'" :data-invalid="Boolean(errors.roleCode)">
-        <FieldLabel for="project-form-role-code">{{ $t('projects.form.roleCode') }}</FieldLabel>
-        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-        <Select v-model="roleCode" :disabled="lockedWhenLive">
-          <SelectTrigger
-            id="project-form-role-code"
-            data-testid="project-form-role-code"
-            :aria-invalid="Boolean(errors.roleCode)"
-            :aria-describedby="describedBy('project-form-role-code', Boolean(errors.roleCode))"
-          >
-            <SelectValue :placeholder="$t('projects.form.roleCode')" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="code in ROLE_CODES" :key="code" :value="code">
-                {{ $t(`projects.roleCode.${code}`) }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <!--
+        <Field v-if="assessmentType === 'standard'" :data-invalid="Boolean(errors.roleCode)">
+          <FieldLabel for="project-form-role-code">{{ $t('projects.form.roleCode') }}</FieldLabel>
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <Select v-model="roleCode" :disabled="lockedWhenLive">
+            <SelectTrigger
+              id="project-form-role-code"
+              data-testid="project-form-role-code"
+              :aria-invalid="Boolean(errors.roleCode)"
+              :aria-describedby="describedBy('project-form-role-code', Boolean(errors.roleCode))"
+            >
+              <SelectValue :placeholder="$t('projects.form.roleCode')" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem v-for="code in ROLE_CODES" :key="code" :value="code">
+                  {{ $t(`projects.roleCode.${code}`) }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <!--
           Extended (not a new key) to also state permanence — the flagged
           spec.md/design.md gap: spec's Permanence scenario requires
           role_code's FieldDescription to state it alongside assessment_type;
@@ -142,100 +143,100 @@
           extending it is the smaller, non-duplicative fix. Recorded in
           tasks.md 3.4.
         -->
-        <FieldDescription id="project-form-role-code-help">
-          {{ $t('projects.form.roleCodeRequiredForStandard') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.roleCode"
-          id="project-form-role-code-error"
-          data-testid="project-form-role-code-error"
-        >
-          {{ errors.roleCode }}
-        </FieldError>
-        <FieldDescription v-if="lockedWhenLive">
-          {{ $t('projects.form.immutableWhenLive') }}
-        </FieldDescription>
-      </Field>
+          <FieldDescription id="project-form-role-code-help">
+            {{ $t('projects.form.roleCodeRequiredForStandard') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.roleCode"
+            id="project-form-role-code-error"
+            data-testid="project-form-role-code-error"
+          >
+            {{ errors.roleCode }}
+          </FieldError>
+          <FieldDescription v-if="lockedWhenLive">
+            {{ $t('projects.form.immutableWhenLive') }}
+          </FieldDescription>
+        </Field>
 
-      <Field>
-        <FieldLabel for="project-form-framework-version">
-          {{ $t('projects.form.frameworkVersion') }}
-        </FieldLabel>
-        <Input
-          id="project-form-framework-version"
-          v-model="frameworkVersionId"
-          type="number"
-          min="1"
-          autocomplete="off"
-          :disabled="isEditing"
-          data-testid="project-form-framework-version"
+        <Field>
+          <FieldLabel for="project-form-framework-version">
+            {{ $t('projects.form.frameworkVersion') }}
+          </FieldLabel>
+          <Input
+            id="project-form-framework-version"
+            v-model="frameworkVersionId"
+            type="number"
+            min="1"
+            autocomplete="off"
+            :disabled="isEditing"
+            data-testid="project-form-framework-version"
+          />
+          <FieldDescription>{{ $t('projects.form.frameworkVersionImmutable') }}</FieldDescription>
+        </Field>
+
+        <CompetencyPicker
+          v-model="competencyIds"
+          :options="competencyOptions"
+          :persisted-ids="persistedIds"
         />
-        <FieldDescription>{{ $t('projects.form.frameworkVersionImmutable') }}</FieldDescription>
-      </Field>
 
-      <CompetencyPicker
-        v-model="competencyIds"
-        :options="competencyOptions"
-        :persisted-ids="persistedIds"
-      />
+        <Field :data-invalid="Boolean(errors.pauseEveryNCompetencies)">
+          <FieldLabel for="project-form-pause-every-n">
+            {{ $t('projects.form.pauseEveryNCompetencies') }}
+          </FieldLabel>
+          <Input
+            id="project-form-pause-every-n"
+            v-model="pauseEveryNCompetencies"
+            type="number"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.pauseEveryNCompetencies)"
+            :aria-describedby="
+              describedBy('project-form-pause-every-n', Boolean(errors.pauseEveryNCompetencies))
+            "
+            data-testid="project-form-pause-every-n"
+            @blur="validatePauseEveryNCompetencies"
+          />
+          <FieldDescription id="project-form-pause-every-n-help">
+            {{ $t('projects.form.help.pauseEveryN') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.pauseEveryNCompetencies"
+            id="project-form-pause-every-n-error"
+            data-testid="project-form-pause-every-n-error"
+          >
+            {{ errors.pauseEveryNCompetencies }}
+          </FieldError>
+        </Field>
 
-      <Field :data-invalid="Boolean(errors.pauseEveryNCompetencies)">
-        <FieldLabel for="project-form-pause-every-n">
-          {{ $t('projects.form.pauseEveryNCompetencies') }}
-        </FieldLabel>
-        <Input
-          id="project-form-pause-every-n"
-          v-model="pauseEveryNCompetencies"
-          type="number"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.pauseEveryNCompetencies)"
-          :aria-describedby="
-            describedBy('project-form-pause-every-n', Boolean(errors.pauseEveryNCompetencies))
-          "
-          data-testid="project-form-pause-every-n"
-          @blur="validatePauseEveryNCompetencies"
-        />
-        <FieldDescription id="project-form-pause-every-n-help">
-          {{ $t('projects.form.help.pauseEveryN') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.pauseEveryNCompetencies"
-          id="project-form-pause-every-n-error"
-          data-testid="project-form-pause-every-n-error"
-        >
-          {{ errors.pauseEveryNCompetencies }}
-        </FieldError>
-      </Field>
+        <Field :data-invalid="Boolean(errors.nudgeMinChars)">
+          <FieldLabel for="project-form-nudge-min-chars">
+            {{ $t('projects.form.nudgeMinChars') }}
+          </FieldLabel>
+          <Input
+            id="project-form-nudge-min-chars"
+            v-model="nudgeMinChars"
+            type="number"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.nudgeMinChars)"
+            :aria-describedby="
+              describedBy('project-form-nudge-min-chars', Boolean(errors.nudgeMinChars))
+            "
+            data-testid="project-form-nudge-min-chars"
+            @blur="validateNudgeMinChars"
+          />
+          <FieldDescription id="project-form-nudge-min-chars-help">
+            {{ $t('projects.form.help.nudgeMinChars') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.nudgeMinChars"
+            id="project-form-nudge-min-chars-error"
+            data-testid="project-form-nudge-min-chars-error"
+          >
+            {{ errors.nudgeMinChars }}
+          </FieldError>
+        </Field>
 
-      <Field :data-invalid="Boolean(errors.nudgeMinChars)">
-        <FieldLabel for="project-form-nudge-min-chars">
-          {{ $t('projects.form.nudgeMinChars') }}
-        </FieldLabel>
-        <Input
-          id="project-form-nudge-min-chars"
-          v-model="nudgeMinChars"
-          type="number"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.nudgeMinChars)"
-          :aria-describedby="
-            describedBy('project-form-nudge-min-chars', Boolean(errors.nudgeMinChars))
-          "
-          data-testid="project-form-nudge-min-chars"
-          @blur="validateNudgeMinChars"
-        />
-        <FieldDescription id="project-form-nudge-min-chars-help">
-          {{ $t('projects.form.help.nudgeMinChars') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.nudgeMinChars"
-          id="project-form-nudge-min-chars-error"
-          data-testid="project-form-nudge-min-chars-error"
-        >
-          {{ errors.nudgeMinChars }}
-        </FieldError>
-      </Field>
-
-      <!--
+        <!--
         Which avatar template THIS project runs on.
 
         A plain <select>, not the richer LlmModelPicker: there are no disabled
@@ -245,89 +246,101 @@
         inactive templates would make two projects on the same provider
         impossible again, since only one per provider can be active.
       -->
-      <Field>
-        <FieldLabel for="project-form-avatar-template">
-          {{ $t('projects.form.avatarTemplate') }}
-        </FieldLabel>
-        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-        <select
-          id="project-form-avatar-template"
-          data-testid="project-form-avatar-template"
-          autocomplete="off"
-          :class="formControlClass"
-          :value="avatarTemplateId === null ? '' : String(avatarTemplateId)"
-          :aria-describedby="'project-form-avatar-template-help'"
-          @change="onAvatarTemplateChange"
-        >
-          <!--
-            Absent is a real, supported configuration — not a missing setting —
-            so it is labelled as the organization default rather than as an
-            empty choice. Without a way back to it, pinning would be a one-way
-            door.
+        <Field :data-invalid="Boolean(errors.avatarTemplateId)">
+          <FieldLabel for="project-form-avatar-template">
+            {{ $t('projects.form.avatarTemplate') }}
+          </FieldLabel>
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <select
+            id="project-form-avatar-template"
+            data-testid="project-form-avatar-template"
+            autocomplete="off"
+            :class="formControlClass"
+            :value="avatarTemplateId === null ? '' : String(avatarTemplateId)"
+            :aria-invalid="Boolean(errors.avatarTemplateId)"
+            :aria-describedby="
+              describedBy('project-form-avatar-template', Boolean(errors.avatarTemplateId))
+            "
+            @change="onAvatarTemplateChange"
+          >
+            <!--
+            There is NO empty option. Every project must name a template — the
+            interview cannot run without a face and a voice — so "none" is not
+            a configuration the operator can choose. The empty `value` above is
+            reachable only in the moment before the default resolves, and the
+            validator below refuses a submit made in it.
           -->
-          <option value="">{{ $t('projects.form.avatarTemplateNone') }}</option>
-          <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
-            {{ template.name }} ({{ template.provider }})
-          </option>
-        </select>
-        <FieldDescription id="project-form-avatar-template-help">
-          {{ $t('projects.form.help.avatarTemplate') }}
-        </FieldDescription>
-      </Field>
+            <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
+              {{ template.name }} ({{ template.provider }})
+            </option>
+          </select>
+          <FieldDescription id="project-form-avatar-template-help">
+            {{ $t('projects.form.help.avatarTemplate') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.avatarTemplateId"
+            id="project-form-avatar-template-error"
+            data-testid="project-form-avatar-template-error"
+          >
+            {{ errors.avatarTemplateId }}
+          </FieldError>
+        </Field>
 
-      <Field :data-invalid="Boolean(errors.exitRedirectUrl)">
-        <FieldLabel for="project-form-exit-redirect-url">
-          {{ $t('projects.form.exitRedirectUrl') }}
-        </FieldLabel>
-        <Input
-          id="project-form-exit-redirect-url"
-          v-model="exitRedirectUrl"
-          type="url"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.exitRedirectUrl)"
-          :aria-describedby="
-            describedBy('project-form-exit-redirect-url', Boolean(errors.exitRedirectUrl))
-          "
-          data-testid="project-form-exit-redirect-url"
-          @blur="validateExitRedirectUrl"
-        />
-        <FieldDescription id="project-form-exit-redirect-url-help">
-          {{ $t('projects.form.help.exitRedirectUrl') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.exitRedirectUrl"
-          id="project-form-exit-redirect-url-error"
-          data-testid="project-form-exit-redirect-url-error"
-        >
-          {{ errors.exitRedirectUrl }}
-        </FieldError>
-      </Field>
+        <Field :data-invalid="Boolean(errors.exitRedirectUrl)">
+          <FieldLabel for="project-form-exit-redirect-url">
+            {{ $t('projects.form.exitRedirectUrl') }}
+          </FieldLabel>
+          <Input
+            id="project-form-exit-redirect-url"
+            v-model="exitRedirectUrl"
+            type="url"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.exitRedirectUrl)"
+            :aria-describedby="
+              describedBy('project-form-exit-redirect-url', Boolean(errors.exitRedirectUrl))
+            "
+            data-testid="project-form-exit-redirect-url"
+            @blur="validateExitRedirectUrl"
+          />
+          <FieldDescription id="project-form-exit-redirect-url-help">
+            {{ $t('projects.form.help.exitRedirectUrl') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.exitRedirectUrl"
+            id="project-form-exit-redirect-url-error"
+            data-testid="project-form-exit-redirect-url-error"
+          >
+            {{ errors.exitRedirectUrl }}
+          </FieldError>
+        </Field>
 
-      <Field :data-invalid="Boolean(errors.webhookUrl)">
-        <FieldLabel for="project-form-webhook-url">{{ $t('projects.form.webhookUrl') }}</FieldLabel>
-        <Input
-          id="project-form-webhook-url"
-          v-model="webhookUrl"
-          type="url"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.webhookUrl)"
-          :aria-describedby="describedBy('project-form-webhook-url', Boolean(errors.webhookUrl))"
-          data-testid="project-form-webhook-url"
-          @blur="validateWebhookUrl"
-        />
-        <FieldDescription id="project-form-webhook-url-help">
-          {{ $t('projects.form.help.webhookUrl') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.webhookUrl"
-          id="project-form-webhook-url-error"
-          data-testid="project-form-webhook-url-error"
-        >
-          {{ errors.webhookUrl }}
-        </FieldError>
-      </Field>
+        <Field :data-invalid="Boolean(errors.webhookUrl)">
+          <FieldLabel for="project-form-webhook-url">{{
+            $t('projects.form.webhookUrl')
+          }}</FieldLabel>
+          <Input
+            id="project-form-webhook-url"
+            v-model="webhookUrl"
+            type="url"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.webhookUrl)"
+            :aria-describedby="describedBy('project-form-webhook-url', Boolean(errors.webhookUrl))"
+            data-testid="project-form-webhook-url"
+            @blur="validateWebhookUrl"
+          />
+          <FieldDescription id="project-form-webhook-url-help">
+            {{ $t('projects.form.help.webhookUrl') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.webhookUrl"
+            id="project-form-webhook-url-error"
+            data-testid="project-form-webhook-url-error"
+          >
+            {{ errors.webhookUrl }}
+          </FieldError>
+        </Field>
 
-      <!--
+        <!--
         `configured` reports whether a secret already exists — it is NOT the
         secret, which is write-only and never leaves the server. This was
         hardcoded to false, so editing a project that already had a webhook
@@ -335,24 +348,24 @@
         that is a lie, not a rough edge: it invites someone to conclude their
         webhooks are unsigned and to go set a secret that was already there.
       -->
-      <WriteOnlySecretField
-        id="project-form-webhook-secret"
-        :label="$t('projects.form.webhookSecret')"
-        :configured="project?.has_webhook_secret ?? false"
-        @update:value="(value) => (webhookSecret = value)"
-      />
+        <WriteOnlySecretField
+          id="project-form-webhook-secret"
+          :label="$t('projects.form.webhookSecret')"
+          :configured="project?.has_webhook_secret ?? false"
+          @update:value="(value) => (webhookSecret = value)"
+        />
 
-      <Alert
-        v-if="formMessage"
-        :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-        role="alert"
-        aria-live="polite"
-        data-testid="project-form-banner"
-      >
-        <AlertDescription>{{ formMessage.text }}</AlertDescription>
-      </Alert>
+        <Alert
+          v-if="formMessage"
+          :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
+          role="alert"
+          aria-live="polite"
+          data-testid="project-form-banner"
+        >
+          <AlertDescription>{{ formMessage.text }}</AlertDescription>
+        </Alert>
 
-      <!--
+        <!--
         Save and Cancel are NOT here — they live in FormDrawer's footer, where
         a form this long cannot scroll them out of reach (feature/form-drawer).
         Activate and Archive stay: they are lifecycle transitions on the
@@ -360,27 +373,28 @@
         this form has been saved, so grouping them with the form's own submit
         would misrepresent what they do.
       -->
-      <div v-if="nextTransition !== null" class="flex items-center gap-2">
-        <Button
-          v-if="nextTransition === 'active'"
-          type="button"
-          variant="secondary"
-          data-testid="project-form-transition-activate"
-          @click="onTransition('active')"
-        >
-          {{ $t('projects.action.activate') }}
-        </Button>
-        <Button
-          v-if="nextTransition === 'archived'"
-          type="button"
-          variant="secondary"
-          data-testid="project-form-transition-archive"
-          @click="archiveConfirm = true"
-        >
-          {{ $t('projects.action.archive') }}
-        </Button>
-      </div>
-    </FieldGroup>
+        <div v-if="nextTransition !== null" class="flex items-center gap-2">
+          <Button
+            v-if="nextTransition === 'active'"
+            type="button"
+            variant="secondary"
+            data-testid="project-form-transition-activate"
+            @click="onTransition('active')"
+          >
+            {{ $t('projects.action.activate') }}
+          </Button>
+          <Button
+            v-if="nextTransition === 'archived'"
+            type="button"
+            variant="secondary"
+            data-testid="project-form-transition-archive"
+            @click="archiveConfirm = true"
+          >
+            {{ $t('projects.action.archive') }}
+          </Button>
+        </div>
+      </FieldGroup>
+    </FormFieldset>
 
     <!--
       D7: the archive button no longer calls onTransition directly — it sets
@@ -409,6 +423,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select,
@@ -428,7 +443,7 @@ import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { formControlClass } from '@/components/ui/form-control'
-import type { AvatarTemplate } from '@/types/avatar-template'
+import type { TemplateOption } from '@/types/avatar-template'
 import {
   isNudgeMinCharsValid,
   isProjectUrlValid,
@@ -477,11 +492,16 @@ const emit = defineEmits<{
  * disambiguate two similarly-named templates, and nothing else. Widening it to
  * the full model would couple this form to fields it never reads.
  */
-type AvatarTemplateOption = Pick<AvatarTemplate, 'id' | 'name' | 'provider'>
+// The picker endpoint's own shape, taken from the generated client rather
+// than narrowed from `AvatarTemplate`. That endpoint returns `provider` as a
+// plain string because it is the ONE thing about a template a non-admin may
+// read, and pinning it to the admin resource's `ProviderName` union here would
+// couple this form to a type it has no business depending on.
+type AvatarTemplateOption = TemplateOption
 
 const { createProject, updateProject } = useProjects()
 const { fetchRoleCompetencies } = useFrameworkRoles()
-const { listTemplates } = useAvatarTemplates()
+const { listTemplateOptions } = useAvatarTemplates()
 
 const isEditing = computed(() => props.project !== null)
 
@@ -499,8 +519,10 @@ const competencyIds = ref<number[]>((props.project?.competencies ?? []).map((c) 
 const pauseEveryNCompetencies = ref(props.project?.pause_every_n_competencies ?? '')
 const nudgeMinChars = ref(props.project?.nudge_min_chars ?? '')
 const exitRedirectUrl = ref(props.project?.exit_redirect_url ?? '')
-// `?? null`, not `?? ''`: this is a nullable FK, and null is the meaningful
-// value ("use the organization's active template"), not an empty string.
+// Null only until the default resolves. The column is NOT NULL server-side —
+// every project names a template — so null here means "not chosen yet", never
+// "deliberately none", and `validateAvatarTemplate` refuses a submit in that
+// state rather than sending a value the API would reject with a generic error.
 const avatarTemplateId = ref<number | null>(props.project?.avatar_template_id ?? null)
 const avatarTemplates = ref<AvatarTemplateOption[]>([])
 const webhookUrl = ref(props.project?.webhook_url ?? '')
@@ -526,6 +548,7 @@ const errors = ref<{
   nudgeMinChars?: string
   exitRedirectUrl?: string
   webhookUrl?: string
+  avatarTemplateId?: string
 }>({})
 
 const competencyOptions = ref<CompetencyOption[]>([])
@@ -621,6 +644,17 @@ function validateRoleCode(): boolean {
   }
   errors.value.roleCode = roleCode.value === '' ? missingKey('roleCodeRequired') : undefined
   return !errors.value.roleCode
+}
+
+function validateAvatarTemplate(): boolean {
+  // Enforced server-side too (the column is NOT NULL with a restricting
+  // foreign key). Checked here so the operator is told WHICH control is
+  // missing, instead of getting the form-level "could not save" banner that an
+  // unmapped server error produces.
+  errors.value.avatarTemplateId =
+    avatarTemplateId.value === null ? missingKey('avatarTemplateRequired') : undefined
+
+  return !errors.value.avatarTemplateId
 }
 
 // useI18n() is a Nuxt auto-import, same convention as CandidateTable.vue.
@@ -729,8 +763,24 @@ async function onSubmit(): Promise<void> {
   const nudgeOk = validateNudgeMinChars()
   const exitUrlOk = validateExitRedirectUrl()
   const webhookUrlOk = validateWebhookUrl()
+  const templateOk = validateAvatarTemplate()
 
-  if (!nameOk || !slugOk || !roleOk || !pauseOk || !nudgeOk || !exitUrlOk || !webhookUrlOk) return
+  if (
+    !nameOk ||
+    !slugOk ||
+    !roleOk ||
+    !pauseOk ||
+    !nudgeOk ||
+    !exitUrlOk ||
+    !webhookUrlOk ||
+    !templateOk
+  ) {
+    return
+  }
+
+  // Narrowed by `templateOk` above — the payload type says `number`, and it is
+  // one by the time we get here.
+  const avatarTemplate = avatarTemplateId.value as number
 
   saving.value = true
   try {
@@ -746,10 +796,10 @@ async function onSubmit(): Promise<void> {
           : null,
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
-        // Sent unconditionally, including as null. Omitting it when unset
-        // would make unpinning impossible: `sometimes` on the server means an
-        // absent key leaves the existing pin exactly where it was.
-        avatar_template_id: avatarTemplateId.value,
+        // Sent unconditionally. `sometimes` on the server means an absent key
+        // leaves the existing template where it was, so a change of template
+        // that arrived as "unset" would silently not apply.
+        avatar_template_id: avatarTemplate,
         webhook_url: webhookUrl.value || null,
         competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
@@ -767,10 +817,10 @@ async function onSubmit(): Promise<void> {
           : null,
         nudge_min_chars: nudgeMinChars.value ? Number(nudgeMinChars.value) : null,
         exit_redirect_url: exitRedirectUrl.value || null,
-        // Sent unconditionally, including as null. Omitting it when unset
-        // would make unpinning impossible: `sometimes` on the server means an
-        // absent key leaves the existing pin exactly where it was.
-        avatar_template_id: avatarTemplateId.value,
+        // Sent unconditionally. `sometimes` on the server means an absent key
+        // leaves the existing template where it was, so a change of template
+        // that arrived as "unset" would silently not apply.
+        avatar_template_id: avatarTemplate,
         webhook_url: webhookUrl.value || null,
         competency_ids: competencyIds.value,
         ...(webhookSecret.value !== undefined ? { webhook_secret: webhookSecret.value } : {}),
@@ -823,11 +873,39 @@ onMounted(() => {
  */
 async function loadAvatarTemplates(): Promise<void> {
   try {
-    const response = await listTemplates()
+    const response = await listTemplateOptions()
     avatarTemplates.value = response.data
+    applyDefaultTemplate()
   } catch {
     avatarTemplates.value = []
   }
+}
+
+/**
+ * Pre-select a template for a project that has not chosen one.
+ *
+ * `projects.avatar_template_id` is required, so an empty select would be a form
+ * that cannot be submitted until the operator notices a field they did not know
+ * was mandatory. Choosing for them is only defensible while they can still
+ * change it, which they can.
+ *
+ * "The one the organization is using" is the ACTIVE template — the closest
+ * available reading of "the last one used", and an honest one: there is no
+ * last-used timestamp on this endpoint, and inventing one from list order would
+ * be a guess dressed as a fact. Falls back to the first template when none is
+ * active.
+ *
+ * NEVER overwrites an existing pin. The default is for a project that has made
+ * no choice; applying it to one that has would silently re-point a live project
+ * every time somebody opened the form to rename it.
+ */
+function applyDefaultTemplate(): void {
+  if (avatarTemplateId.value !== null) return
+
+  const preferred =
+    avatarTemplates.value.find((template) => template.is_active) ?? avatarTemplates.value[0]
+
+  avatarTemplateId.value = preferred?.id ?? null
 }
 
 function onAvatarTemplateChange(event: Event): void {

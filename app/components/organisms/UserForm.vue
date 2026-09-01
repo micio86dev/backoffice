@@ -5,118 +5,121 @@
     and `<button form="user-form">` is what connects the two.
   -->
   <form id="user-form" data-testid="user-form" novalidate @submit.prevent="onSubmit">
-    <FieldGroup>
-      <Field :data-invalid="Boolean(errors.name)">
-        <FieldLabel for="user-form-name">{{ $t('users.name') }}</FieldLabel>
-        <Input
-          id="user-form-name"
-          v-model="name"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.name)"
-          :aria-describedby="errors.name ? 'user-form-name-error' : undefined"
-          data-testid="user-form-name"
-          @blur="validateName"
-        />
-        <FieldError
-          v-if="errors.name"
-          id="user-form-name-error"
-          data-testid="user-form-name-error"
-          >{{ errors.name }}</FieldError
-        >
-      </Field>
-
-      <Field :data-invalid="Boolean(errors.email)">
-        <FieldLabel for="user-form-email">{{ $t('users.email') }}</FieldLabel>
-        <Input
-          id="user-form-email"
-          v-model="email"
-          type="email"
-          autocomplete="off"
-          :aria-invalid="Boolean(errors.email)"
-          :aria-describedby="describedBy('user-form-email', Boolean(errors.email))"
-          data-testid="user-form-email"
-          @blur="validateEmail"
-        />
-        <FieldDescription id="user-form-email-help">{{
-          $t('users.form.help.email')
-        }}</FieldDescription>
-        <FieldError
-          v-if="errors.email"
-          id="user-form-email-error"
-          data-testid="user-form-email-error"
-        >
-          {{ errors.email }}
-        </FieldError>
-      </Field>
-
-      <Field v-if="!isEditing" :data-invalid="Boolean(errors.password)">
-        <FieldLabel for="user-form-password">{{ $t('users.password') }}</FieldLabel>
-        <Input
-          id="user-form-password"
-          v-model="password"
-          type="password"
-          autocomplete="new-password"
-          :aria-invalid="Boolean(errors.password)"
-          :aria-describedby="describedBy('user-form-password', Boolean(errors.password))"
-          data-testid="user-form-password"
-          @blur="validatePassword"
-        />
-        <FieldDescription id="user-form-password-help">
-          {{ $t('users.form.help.password') }}
-        </FieldDescription>
-        <FieldError
-          v-if="errors.password"
-          id="user-form-password-error"
-          data-testid="user-form-password-error"
-          >{{ errors.password }}</FieldError
-        >
-      </Field>
-
-      <Field>
-        <FieldLabel for="user-form-role">{{ $t('users.accessLevel') }}</FieldLabel>
-        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
-        <Select v-model="role">
-          <SelectTrigger
-            id="user-form-role"
-            data-testid="user-form-role"
-            aria-describedby="user-form-role-help"
+    <FormFieldset :disabled="saving">
+      <FieldGroup>
+        <Field :data-invalid="Boolean(errors.name)">
+          <FieldLabel for="user-form-name">{{ $t('users.name') }}</FieldLabel>
+          <Input
+            id="user-form-name"
+            v-model="name"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.name)"
+            :aria-describedby="errors.name ? 'user-form-name-error' : undefined"
+            data-testid="user-form-name"
+            @blur="validateName"
+          />
+          <FieldError
+            v-if="errors.name"
+            id="user-form-name-error"
+            data-testid="user-form-name-error"
+            >{{ errors.name }}</FieldError
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="value in ACCESS_LEVELS" :key="value" :value="value">
-                {{ $t(`users.role.${value}`) }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <FieldDescription id="user-form-role-help">{{
-          $t('users.form.help.role')
-        }}</FieldDescription>
-      </Field>
+        </Field>
 
-      <Alert
-        v-if="formMessage"
-        variant="destructive"
-        role="alert"
-        aria-live="polite"
-        data-testid="user-form-banner"
-      >
-        <AlertDescription>{{ formMessage }}</AlertDescription>
-      </Alert>
+        <Field :data-invalid="Boolean(errors.email)">
+          <FieldLabel for="user-form-email">{{ $t('users.email') }}</FieldLabel>
+          <Input
+            id="user-form-email"
+            v-model="email"
+            type="email"
+            autocomplete="off"
+            :aria-invalid="Boolean(errors.email)"
+            :aria-describedby="describedBy('user-form-email', Boolean(errors.email))"
+            data-testid="user-form-email"
+            @blur="validateEmail"
+          />
+          <FieldDescription id="user-form-email-help">{{
+            $t('users.form.help.email')
+          }}</FieldDescription>
+          <FieldError
+            v-if="errors.email"
+            id="user-form-email-error"
+            data-testid="user-form-email-error"
+          >
+            {{ errors.email }}
+          </FieldError>
+        </Field>
 
-      <!--
+        <Field v-if="!isEditing" :data-invalid="Boolean(errors.password)">
+          <FieldLabel for="user-form-password">{{ $t('users.password') }}</FieldLabel>
+          <Input
+            id="user-form-password"
+            v-model="password"
+            type="password"
+            autocomplete="new-password"
+            :aria-invalid="Boolean(errors.password)"
+            :aria-describedby="describedBy('user-form-password', Boolean(errors.password))"
+            data-testid="user-form-password"
+            @blur="validatePassword"
+          />
+          <FieldDescription id="user-form-password-help">
+            {{ $t('users.form.help.password') }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.password"
+            id="user-form-password-error"
+            data-testid="user-form-password-error"
+            >{{ errors.password }}</FieldError
+          >
+        </Field>
+
+        <Field>
+          <FieldLabel for="user-form-role">{{ $t('users.accessLevel') }}</FieldLabel>
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <Select v-model="role">
+            <SelectTrigger
+              id="user-form-role"
+              data-testid="user-form-role"
+              aria-describedby="user-form-role-help"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem v-for="value in ACCESS_LEVELS" :key="value" :value="value">
+                  {{ $t(`users.role.${value}`) }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <FieldDescription id="user-form-role-help">{{
+            $t('users.form.help.role')
+          }}</FieldDescription>
+        </Field>
+
+        <Alert
+          v-if="formMessage"
+          variant="destructive"
+          role="alert"
+          aria-live="polite"
+          data-testid="user-form-banner"
+        >
+          <AlertDescription>{{ formMessage }}</AlertDescription>
+        </Alert>
+
+        <!--
         No submit control here — it lives in FormDrawer's non-scrolling footer
         (feature/form-drawer), wired back to this form by its `id`. The banner
         above is the last thing in the drawer's scrolling body, so it and the
         submit control are visible together however far the form is scrolled.
       -->
-    </FieldGroup>
+      </FieldGroup>
+    </FormFieldset>
   </form>
 </template>
 
 <script setup lang="ts">
+import { FormFieldset } from '@/components/ui/form-fieldset'
 // User create/edit form (D4/D8): the role Select is constrained to EXACTLY
 // admin/operator/viewer (the code-level allow-list, mirrored client-side —
 // never free text, never a BEAI role_code value). Password is admin-set

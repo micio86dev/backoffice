@@ -337,6 +337,57 @@ describe('feedback alert surfaces (DESIGN.md §3.1 semantic tokens, §9.1 contra
     expect(source).toContain('bg-error-light')
   })
 
+  // Status badges (same tokens, same rule). A lifecycle status used to render
+  // as `bg-primary` — the Quint purple — so it carried no meaning at all.
+  it('--color-info-dark (#1e40af) on --color-info-light (#dbeafe) passes AA', () => {
+    expect(contrastRatio('#1e40af', '#dbeafe')).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('--color-info would NOT have passed as text on its own tint', () => {
+    // 3.01:1. The same trap as success and warning, which is why this token
+    // had to be added rather than reusing `--color-info` for badge text.
+    expect(contrastRatio('#3b82f6', '#dbeafe')).toBeLessThan(4.5)
+  })
+
+  it('the badge status variants pair a -light fill with its -dark foreground', () => {
+    const source = readFileSync(
+      resolve(__dirname, '../../app/components/ui/badge/index.ts'),
+      'utf-8'
+    )
+
+    for (const [fill, text] of [
+      ['bg-success-light', 'text-success-dark'],
+      ['bg-warning-light', 'text-warning-dark'],
+      ['bg-info-light', 'text-info-dark'],
+    ]) {
+      expect(source).toContain(fill)
+      expect(source).toContain(text)
+    }
+
+    // The pairing axe-core rejected at 1.96:1 — raw `text-success` on a
+    // near-white ground — must not come back. Scoped to LIGHT mode with a
+    // `(?<!dark:)` guard: `dark:text-success` is the saturated hue on a dark
+    // ground, which is the correct pairing there and must stay allowed. The
+    // first version of this assertion forbade both and failed on our own
+    // dark-mode classes.
+    expect(source).not.toMatch(/(?<!dark:)text-success(?!-dark)\b/)
+    expect(source).not.toMatch(/(?<!dark:)text-warning(?!-dark)\b/)
+    expect(source).not.toMatch(/(?<!dark:)text-info(?!-dark)\b/)
+  })
+
+  it('no lifecycle status is rendered in the brand colour', () => {
+    // `bg-primary` on a status badge is what this change removes: it says a
+    // state exists without saying anything about it.
+    for (const file of [
+      '../../app/components/atoms/ProjectStatusBadge.vue',
+      '../../app/utils/participant-lifecycle.ts',
+    ]) {
+      const source = readFileSync(resolve(__dirname, file), 'utf-8')
+      expect(source).not.toMatch(/return 'default'/)
+      expect(source).not.toMatch(/: 'default'/)
+    }
+  })
+
   it('no variant uses a side-stripe accent border', () => {
     // A thick `border-l` accent is the reflex decoration for status callouts
     // and reads as template output. Full border plus tinted surface carries

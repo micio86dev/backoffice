@@ -9,6 +9,7 @@ import type {
   AvatarTemplate,
   FieldSpecsResponse,
   TemplateListResponse,
+  TemplateOptionsResponse,
   TemplateResponse,
 } from '../types/avatar-template'
 import { useApi } from './useApi'
@@ -18,6 +19,22 @@ export function useAvatarTemplates() {
 
   async function listTemplates(): Promise<TemplateListResponse> {
     return apiFetch<TemplateListResponse>('/avatar-templates')
+  }
+
+  /**
+   * The PICKER list — id, name, provider — readable by every role.
+   *
+   * `listTemplates` above returns the full record and is admin-only, because
+   * that record carries `config` and `config` holds provider-side identifiers
+   * closer to credentials than to settings. A project form needs none of that:
+   * `projects.avatar_template_id` is NOT NULL, so every operator creating a
+   * project must choose a template, and choosing needs a name.
+   *
+   * Using the admin list here left an operator with an empty select on a form
+   * that then refused its own submit, with nothing they could do about it.
+   */
+  async function listTemplateOptions(): Promise<TemplateOptionsResponse> {
+    return apiFetch<TemplateOptionsResponse>('/avatar-templates/options')
   }
 
   async function fetchFieldSpecs(): Promise<FieldSpecsResponse> {
@@ -67,6 +84,19 @@ export function useAvatarTemplates() {
     return apiFetch<TemplateResponse>(`/avatar-templates/${id}/activate`, { method: 'POST' })
   }
 
+  /**
+   * Take a template out of service without deleting it.
+   *
+   * Safe in a way it would not have been before every project pinned its own
+   * template: `is_active` used to be the organization-wide fallback, so
+   * switching it off changed what unpinned projects ran on. It now only decides
+   * which template is offered as the default for NEW projects, and the projects
+   * already pinning this one keep running on it.
+   */
+  async function deactivateTemplate(id: number | string): Promise<TemplateResponse> {
+    return apiFetch<TemplateResponse>(`/avatar-templates/${id}/deactivate`, { method: 'POST' })
+  }
+
   async function deleteTemplate(id: number | string): Promise<void> {
     // <null>, not <void>: the endpoint answers 204 with no body, and `void` is
     // not a valid type argument — it describes a return position, not a value.
@@ -92,10 +122,12 @@ export function useAvatarTemplates() {
     exportTemplates,
     importTemplates,
     listTemplates,
+    listTemplateOptions,
     fetchFieldSpecs,
     createTemplate,
     updateTemplate,
     activateTemplate,
+    deactivateTemplate,
     deleteTemplate,
   }
 }

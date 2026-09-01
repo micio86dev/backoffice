@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
 import { checkA11y } from './fixtures/a11y'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * Per-template conversation-LLM forecast (pluggable-conversation-llm P9,
@@ -75,6 +76,7 @@ async function mockApi(page: Page, templates: unknown[]): Promise<void> {
             },
             organization: { id: 1, name: 'Acme' },
             roles: ['admin'],
+            abilities: abilitiesFor(['admin']),
           })
         : route.continue()
   )

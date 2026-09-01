@@ -12,10 +12,15 @@ const props = defineProps<{
   status: string
 }>()
 
+// `active` was `default`, i.e. `bg-primary` — the Quint purple. A lifecycle
+// status rendered in the brand colour tells you a state exists without telling
+// you anything about it, and spends the brand's most emphatic colour saying
+// nothing. These map onto MEANING instead: live is good, archived is inert,
+// draft is not yet anything.
 const VARIANT_BY_STATUS: Record<string, NonNullable<BadgeVariants['variant']>> = {
   draft: 'outline',
-  active: 'default',
-  archived: 'secondary',
+  active: 'success',
+  archived: 'neutral',
 }
 
 const variant = computed<NonNullable<BadgeVariants['variant']>>(

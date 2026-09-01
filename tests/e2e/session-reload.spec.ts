@@ -42,6 +42,7 @@ async function mockAuthenticatedSession(page: import('@playwright/test').Page): 
             evaluations_by_status: {},
             completion_rate: 0,
             ai_usage: { input_tokens: 0, output_tokens: 0, latency_ms_p50: 0, latency_ms_p95: 0 },
+            costs: { scoring_usd: 0, conversation_usd: 0, total_usd: 0, currency: 'USD' },
           },
         }),
       })

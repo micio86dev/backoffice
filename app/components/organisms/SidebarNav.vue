@@ -16,7 +16,7 @@
     <SidebarContent>
       <SidebarGroup>
         <SidebarMenu>
-          <SidebarMenuItem v-for="item in navItems" :key="item.to">
+          <SidebarMenuItem v-for="item in visibleNavItems" :key="item.to">
             <SidebarMenuButton as-child :is-active="isCurrent(item.to)">
               <NuxtLink :to="item.to" :aria-current="isCurrent(item.to) ? 'page' : undefined">
                 <component :is="item.icon" aria-hidden="true" />
@@ -83,7 +83,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   Sidebar,
   SidebarContent,
@@ -95,6 +95,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import type { AbilityKey } from '@/composables/useCurrentUser'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { initials } from '@/utils/initials'
 
@@ -109,9 +110,45 @@ const navItems = [
   { to: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon },
   // C14. Configuration rather than a record, so it sits beside Settings and
   // after the pages an operator opens daily.
-  { to: '/avatar-templates', labelKey: 'nav.avatarTemplates', icon: Cog6ToothIcon },
-  { to: '/settings', labelKey: 'nav.settings', icon: Cog6ToothIcon },
-] as const
+  //
+  // The last two carry a `requires`: an operator and an observer cannot use
+  // either page, and every request behind them comes back 403. Offering a
+  // door that is locked is worse than not showing it — the user clicks,
+  // waits, and is told no, with nothing they can do about it.
+  {
+    to: '/avatar-templates',
+    labelKey: 'nav.avatarTemplates',
+    icon: Cog6ToothIcon,
+    requires: 'avatarTemplates.viewAny',
+  },
+  { to: '/settings', labelKey: 'nav.settings', icon: Cog6ToothIcon, requires: 'users.viewAny' },
+] as const satisfies readonly NavItem[]
+
+/**
+ * `requires` is the ability the SERVER publishes for that page, not a role
+ * name — same map `03.abilities.global.ts` guards the route with, so the link
+ * and the guard cannot disagree about who may go there.
+ */
+interface NavItem {
+  to: string
+  labelKey: string
+  icon: unknown
+  requires?: AbilityKey
+}
+
+/**
+ * Items with no `requires` are always shown. `can()` fails closed, so on a
+ * cold load — before `/auth/me` settles — the gated items are simply absent
+ * and appear once the identity arrives, rather than flashing into view and
+ * out again for the users who may not have them.
+ */
+const visibleNavItems = computed(() =>
+  navItems.filter((item) => {
+    const requires = 'requires' in item ? item.requires : undefined
+
+    return requires === undefined || can(requires)
+  })
+)
 
 const route = useRoute()
 
@@ -138,6 +175,12 @@ const currentUserName = ref<string | null>(null)
 // — the /auth/me contract — never the /profile resource's own photo_url,
 // which pages/profile.vue reads independently (two contracts, never conflated).
 const currentUserPhotoUrl = ref<string | null>(null)
+
+// `can` is reactive: it reads the module-scoped identity `ensureLoaded()`
+// below fills in, so `visibleNavItems` recomputes on its own once /auth/me
+// settles. Destructured here rather than called inline in the filter so the
+// computed has a stable dependency.
+const { can } = useCurrentUser()
 
 onMounted(async () => {
   try {

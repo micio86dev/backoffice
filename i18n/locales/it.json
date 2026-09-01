@@ -57,7 +57,10 @@
     "invalidLink": "Il link di reimpostazione è mancante o non valido. Richiedine uno nuovo e aprilo direttamente dall'email.",
     "requestNew": "Richiedi un nuovo link",
     "signIn": "Vai all'accesso",
-    "back": "Torna all'accesso"
+    "back": "Torna all'accesso",
+    "serverError": {
+      "reset_link_invalid": "Questo link di reimpostazione non è valido o è scaduto. Richiedine uno nuovo."
+    }
   },
   "head": {
     "title": {
@@ -115,6 +118,9 @@
       "tokensUsed": "Token AI utilizzati",
       "latency": "Latenza AI (p50 / p95)",
       "latencyValue": "{p50} / {p95} ms",
+      "cost": "Spesa AI e avatar",
+      "costValue": "$ {usd}",
+      "costBreakdown": "Valutazione $ {scoring} · Colloquio $ {conversation}",
       "noData": "Nessun dato disponibile"
     },
     "activity": {
@@ -216,7 +222,19 @@
       "displayNameRequired": "Inserisci un nome visualizzato.",
       "tooLong": "Inserisci al massimo {max} caratteri.",
       "submit": "Genera link",
-      "saveError": "Non è stato possibile generare questo link di accesso. Controlla i campi evidenziati."
+      "saveError": "Non è stato possibile generare questo link di accesso. Controlla i campi evidenziati.",
+      "email": "Email del candidato",
+      "emailRequired": "Inserisci l'indirizzo email del candidato.",
+      "emailInvalid": "Non sembra un indirizzo email.",
+      "sendEmail": "Invia l'invito al candidato via email",
+      "help": {
+        "email": "Identifica anche il candidato: invitare lo stesso indirizzo su un altro progetto significa la stessa persona."
+      }
+    },
+    "serverError": {
+      "entry_link_participant_completed": "Questo candidato ha già completato la valutazione. Non è possibile generare un nuovo link.",
+      "entry_link_participant_failed": "La valutazione di questo candidato è fallita. Riaprila prima di generare un nuovo link.",
+      "entry_link_project_closed": "Questo progetto al momento non accetta colloqui."
     }
   },
   "participantRecovery": {
@@ -298,12 +316,12 @@
       "nudgeMinChars": "Caratteri minimi prima di un sollecito",
       "exitRedirectUrl": "URL di reindirizzamento in uscita",
       "avatarTemplate": "Template avatar",
-      "avatarTemplateNone": "Predefinito dell'organizzazione (template attivo)",
       "webhookUrl": "URL webhook",
       "webhookSecret": "Segreto webhook",
       "nameRequired": "Inserisci il nome del progetto.",
       "slugRequired": "Inserisci uno slug.",
       "roleCodeRequired": "Seleziona un ruolo.",
+      "avatarTemplateRequired": "Seleziona un template avatar.",
       "invalidUrl": "Inserisci un indirizzo completo che inizi con http:// o https://",
       "outOfRange": "Inserisci un valore tra {min} e {max}.",
       "saveError": "Non è stato possibile salvare questo progetto. Controlla i campi evidenziati.",
@@ -317,7 +335,7 @@
         "pauseEveryN": "Concede al candidato una breve pausa ogni tot competenze. Lascia vuoto per non inserire pause.",
         "nudgeMinChars": "Se una risposta è più breve di questo numero di caratteri, al candidato viene chiesto di approfondire.",
         "exitRedirectUrl": "Dove viene indirizzato il candidato al termine del colloquio. Lascia vuoto per mostrare la pagina di chiusura standard.",
-        "avatarTemplate": "Quale template avatar usa questo progetto. Determina anche il fornitore. Lascia sul predefinito per usare il template attivo dell'organizzazione.",
+        "avatarTemplate": "Quale template avatar usa questo progetto. Determina anche il fornitore ed è obbligatorio: se non ne hai ancora creato uno, crealo prima di creare il progetto.",
         "webhookUrl": "BEAI invia a questo indirizzo gli eventi di avanzamento e di valutazione. Lascia vuoto per usare l'impostazione predefinita dell'organizzazione.",
         "competencies": "Le competenze valutate in questo colloquio. Più competenze significano un colloquio più lungo per il candidato."
       }
@@ -426,14 +444,16 @@
       "apiKeys": "Chiavi API",
       "webhooks": "Valori predefiniti webhook",
       "users": "Utenti e ruoli",
-      "llmCredentials": "Credenziali LLM di conversazione"
+      "llmCredentials": "Credenziali LLM di conversazione",
+      "branding": "Aspetto"
     },
     "sectionDescription": {
       "organization": "Nome e identificatore del tenant",
       "apiKeys": "Credenziali per l'accesso machine-to-machine",
       "webhooks": "Dove BEAI recapita gli eventi di avanzamento e valutazione",
       "users": "Chi può accedere e cosa può fare",
-      "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista"
+      "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista",
+      "branding": "Logo e colore del cliente, applicati a questo pannello e all'app del candidato."
     },
     "organization": {
       "name": "Nome",
@@ -542,6 +562,32 @@
         "key": "Chiave",
         "status": "Stato",
         "actions": "Azioni"
+      },
+      "serverError": {
+        "credential_in_use": "Scollega tutti i template che usano questa credenziale prima di eliminarla."
+      }
+    },
+    "branding": {
+      "logo": "Logo",
+      "logoAlt": "Logo dell'organizzazione",
+      "logoEmpty": "Nessun logo: viene usato quello BEAI.",
+      "logoRemove": "Rimuovi",
+      "primaryColor": "Colore primario",
+      "colorClear": "Azzera",
+      "invalidColor": "Inserisci un colore in formato #rrggbb, ad esempio #771AAF.",
+      "saveError": "Non è stato possibile salvare. Riprova.",
+      "help": {
+        "logo": "JPEG o PNG, massimo 1 MB. Non accettiamo SVG: può contenere codice eseguibile. Lascia vuoto per usare il logo BEAI.",
+        "primaryColor": "Formato #rrggbb. Lascia vuoto per usare la palette BEAI."
+      },
+      "serverError": {
+        "logo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
+        "logo_too_large": "Il file supera la dimensione massima consentita.",
+        "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito."
+      },
+      "confirm": {
+        "removeLogoTitle": "Rimuovere il logo?",
+        "removeLogoBody": "Il file verrà eliminato definitivamente. Se non hai più l'originale non potrai ripristinarlo. Fino a un nuovo caricamento verrà usato il logo BEAI."
       }
     }
   },
@@ -697,7 +743,8 @@
       "activate": "Attiva",
       "delete": "Elimina",
       "save": "Salva",
-      "cancel": "Annulla"
+      "cancel": "Annulla",
+      "deactivate": "Disattiva"
     },
     "confirm": {
       "activateTitle": "Attivare questo template?",

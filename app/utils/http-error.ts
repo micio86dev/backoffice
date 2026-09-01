@@ -122,3 +122,28 @@ export function applyServerFieldErrors<K extends string>(
 
   return unmapped
 }
+
+/**
+ * Extracts a machine-facing code from a `{data:{message: string}}` body.
+ *
+ * The API answers refusals with a stable snake_case code in `message` — a
+ * response body is machine-facing, and the API has no idea what language the
+ * reader speaks. Callers pair this with `translateServerCode` to render it.
+ *
+ * Returns null for anything that is NOT a bare code — a network failure with no
+ * body, or a framework 422 whose `message` is the English sentence "The given
+ * data was invalid." That sentence is a real message rather than a code, and
+ * passing it to a translator would print it verbatim under a lookup miss. The
+ * snake_case shape is what distinguishes the two, so it is what is checked.
+ */
+export function serverMessageCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+
+  const data = (error as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return null
+
+  const message = (data as { message?: unknown }).message
+  if (typeof message !== 'string') return null
+
+  return /^[a-z][a-z0-9_]*$/.test(message) ? message : null
+}

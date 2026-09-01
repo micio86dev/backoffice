@@ -96,3 +96,14 @@ export type TemplateListResponse = Omit<
   paths['/avatar-templates']['get']['responses']['200']['content']['application/json'],
   'data'
 > & { data: AvatarTemplate[] }
+
+/**
+ * The picker list. DERIVED from the generated client, not hand-written — the
+ * point of this endpoint is that its shape cannot quietly grow, and a
+ * hand-written copy here would be free to.
+ */
+export type TemplateOption =
+  paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']['data'][number]
+
+export type TemplateOptionsResponse =
+  paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']

@@ -57,7 +57,10 @@
     "invalidLink": "The reset link is missing or malformed. Request a new one and open it directly from the email.",
     "requestNew": "Request a new link",
     "signIn": "Go to sign in",
-    "back": "Back to sign in"
+    "back": "Back to sign in",
+    "serverError": {
+      "reset_link_invalid": "This password reset link is invalid or has expired. Request a new one."
+    }
   },
   "head": {
     "title": {
@@ -115,6 +118,9 @@
       "tokensUsed": "AI tokens used",
       "latency": "AI latency (p50 / p95)",
       "latencyValue": "{p50} / {p95} ms",
+      "cost": "AI & avatar spend",
+      "costValue": "$ {usd}",
+      "costBreakdown": "Scoring $ {scoring} · Interview $ {conversation}",
       "noData": "No data yet"
     },
     "activity": {
@@ -216,7 +222,19 @@
       "displayNameRequired": "Enter a display name.",
       "tooLong": "Enter no more than {max} characters.",
       "submit": "Generate link",
-      "saveError": "This entry link could not be generated. Please review the highlighted fields."
+      "saveError": "This entry link could not be generated. Please review the highlighted fields.",
+      "email": "Candidate email",
+      "emailRequired": "Enter the candidate's email address.",
+      "emailInvalid": "That does not look like an email address.",
+      "sendEmail": "Email the invitation to the candidate",
+      "help": {
+        "email": "Also identifies the candidate: inviting the same address to another project keeps it the same person."
+      }
+    },
+    "serverError": {
+      "entry_link_participant_completed": "This candidate has already completed the assessment. A new link cannot be issued.",
+      "entry_link_participant_failed": "This candidate's assessment failed. Re-open it before issuing a new link.",
+      "entry_link_project_closed": "This project is not open for interviews right now."
     }
   },
   "participantRecovery": {
@@ -298,12 +316,12 @@
       "nudgeMinChars": "Minimum characters before a nudge",
       "exitRedirectUrl": "Exit redirect URL",
       "avatarTemplate": "Avatar template",
-      "avatarTemplateNone": "Organization default (active template)",
       "webhookUrl": "Webhook URL",
       "webhookSecret": "Webhook secret",
       "nameRequired": "Enter a project name.",
       "slugRequired": "Enter a slug.",
       "roleCodeRequired": "Select a role.",
+      "avatarTemplateRequired": "Select an avatar template.",
       "invalidUrl": "Enter a full address starting with http:// or https://",
       "outOfRange": "Enter a value between {min} and {max}.",
       "saveError": "This project could not be saved. Please review the highlighted fields.",
@@ -317,7 +335,7 @@
         "pauseEveryN": "Gives the candidate a short break after this many competencies. Leave empty for no breaks.",
         "nudgeMinChars": "If an answer is shorter than this many characters, the candidate is asked to expand on it.",
         "exitRedirectUrl": "Where the candidate is sent after finishing the interview. Leave empty to show the standard closing page.",
-        "avatarTemplate": "Which avatar template this project uses. It also decides the provider. Leave on the default to use the organization's active template.",
+        "avatarTemplate": "Which avatar template this project uses. It also decides the provider, and is required: if you have not created one yet, create it before the project.",
         "webhookUrl": "BEAI posts progress and evaluation events to this address. Leave empty to use the organization default.",
         "competencies": "The competencies this interview covers. More competencies means a longer interview for the candidate."
       }
@@ -426,14 +444,16 @@
       "apiKeys": "API keys",
       "webhooks": "Webhook defaults",
       "users": "Users & roles",
-      "llmCredentials": "Conversation LLM credentials"
+      "llmCredentials": "Conversation LLM credentials",
+      "branding": "Appearance"
     },
     "sectionDescription": {
       "organization": "Name and tenancy identifier",
       "apiKeys": "Credentials for machine-to-machine access",
       "webhooks": "Where BEAI delivers progress and evaluation events",
       "users": "Who can sign in, and what they are allowed to do",
-      "llmCredentials": "The vendor API key the interview model runs on"
+      "llmCredentials": "The vendor API key the interview model runs on",
+      "branding": "The client's logo and colour, applied to this panel and to the candidate app."
     },
     "organization": {
       "name": "Name",
@@ -542,6 +562,32 @@
         "key": "Key",
         "status": "Status",
         "actions": "Actions"
+      },
+      "serverError": {
+        "credential_in_use": "Unbind every template using this credential before deleting it."
+      }
+    },
+    "branding": {
+      "logo": "Logo",
+      "logoAlt": "Organization logo",
+      "logoEmpty": "No logo set: the BEAI one is used.",
+      "logoRemove": "Remove",
+      "primaryColor": "Primary colour",
+      "colorClear": "Clear",
+      "invalidColor": "Enter a colour in #rrggbb format, for example #771AAF.",
+      "saveError": "Could not save. Please try again.",
+      "help": {
+        "logo": "JPEG or PNG, 1 MB maximum. SVG is not accepted: it can carry executable code. Leave empty to use the BEAI logo.",
+        "primaryColor": "Format #rrggbb. Leave empty to use the BEAI palette."
+      },
+      "serverError": {
+        "logo_invalid_image": "The file is not a valid JPEG or PNG image.",
+        "logo_too_large": "The file exceeds the maximum allowed size.",
+        "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed."
+      },
+      "confirm": {
+        "removeLogoTitle": "Remove the logo?",
+        "removeLogoBody": "The file will be permanently deleted. If you no longer have the original you will not be able to restore it. Until a new one is uploaded, the BEAI logo is used."
       }
     }
   },
@@ -697,7 +743,8 @@
       "activate": "Activate",
       "delete": "Delete",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "deactivate": "Deactivate"
     },
     "confirm": {
       "activateTitle": "Activate this template?",

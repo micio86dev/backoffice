@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * Sidebar navigation (Phase 30, task 30.1): iterate every `SidebarNav.vue`
@@ -51,6 +52,31 @@ async function mockBaselineApi(page: import('@playwright/test').Page): Promise<v
     body: JSON.stringify({ data }),
   })
 
+  // `/settings` and `/avatar-templates` are ability-gated at the route, and
+  // the gate reads what `/auth/me` publishes. This spec asserts that every
+  // sidebar link reaches its own page — which is a statement about an ADMIN,
+  // since those two are the links an admin has.
+  await page.route(
+    (url) => url.pathname === '/auth/me',
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          user: {
+            id: 1,
+            name: 'Ada Lovelace',
+            email: 'ada@example.com',
+            locale: 'it',
+            photo_url: null,
+          },
+          organization: { id: 1, name: 'Acme' },
+          roles: ['admin'],
+          abilities: abilitiesFor(['admin']),
+        }),
+      })
+  )
+
   await page.route(
     (url) => url.pathname === '/dashboard/metrics',
     (route) =>
@@ -63,6 +89,7 @@ async function mockBaselineApi(page: import('@playwright/test').Page): Promise<v
             evaluations_by_status: {},
             completion_rate: 0,
             ai_usage: { input_tokens: 0, output_tokens: 0, latency_ms_p50: 0, latency_ms_p95: 0 },
+            costs: { scoring_usd: 0, conversation_usd: 0, total_usd: 0, currency: 'USD' },
           },
         }),
       })

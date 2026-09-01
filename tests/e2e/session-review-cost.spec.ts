@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
 import { checkA11y } from './fixtures/a11y'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * Per-session cost on the interview session review
@@ -121,6 +122,7 @@ async function mockApi(page: Page, cost: unknown): Promise<void> {
             },
             organization: { id: 1, name: 'Acme' },
             roles: ['admin'],
+            abilities: abilitiesFor(['admin']),
           })
         : route.continue()
   )

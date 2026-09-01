@@ -21,7 +21,18 @@
         class="flex items-center gap-4 border-b border-border py-3 last:border-b-0"
       >
         <div class="flex min-w-0 flex-1 flex-col">
-          <span class="truncate text-sm font-medium text-foreground">{{ row.display_name }}</span>
+          <!--
+            A LINK, not a label. The feed exists to answer "is anything
+            moving?", and a row that names a candidate without a way to go and
+            look sends the reader to the search box on another page — which is
+            the trip this panel was added to remove.
+          -->
+          <NuxtLink
+            :to="`/participants/${row.id}`"
+            class="truncate text-sm font-medium text-foreground hover:underline"
+            data-testid="activity-candidate-link"
+            >{{ row.display_name }}</NuxtLink
+          >
           <span class="truncate text-xs text-muted-foreground">{{
             row.project_name ?? $t('dashboard.activity.noProject')
           }}</span>

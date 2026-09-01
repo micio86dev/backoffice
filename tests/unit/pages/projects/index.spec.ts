@@ -61,6 +61,18 @@ let useHeadMock: ReturnType<typeof vi.fn>
 describe('pages/projects/index.vue', () => {
   beforeEach(() => {
     vi.resetModules()
+    // The drawer mounts the REAL ProjectForm, and a project cannot be saved
+    // without an avatar template — the column is NOT NULL and the form refuses
+    // a submit with nothing selected. Unmocked, the composable reaches for the
+    // network, the list stays empty, and every save assertion below fails for
+    // a reason that has nothing to do with what it is testing.
+    vi.doMock('../../../../app/composables/useAvatarTemplates', () => ({
+      useAvatarTemplates: () => ({
+        listTemplateOptions: vi.fn().mockResolvedValue({
+          data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
+        }),
+      }),
+    }))
     useHeadMock = vi.fn()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', useHeadMock)

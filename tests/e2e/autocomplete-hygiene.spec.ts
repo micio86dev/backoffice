@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * form-clarity-and-console-warnings, D7 — "Password Field Autofill Hygiene"
@@ -53,6 +54,28 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: Page): Promise<void> {
+  // `/settings` is admin-gated at the route, and the gate reads the ability map
+  // `/auth/me` publishes. Without this the page redirects to the dashboard and
+  // every assertion below fails on a missing control that was never meant to
+  // render.
+  await page.route(
+    (url) => url.pathname === '/auth/me',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            user: {
+              id: 1,
+              name: 'Ada Lovelace',
+              email: 'ada@example.com',
+              locale: 'it',
+              photo_url: null,
+            },
+            organization: { id: 1, name: 'Acme' },
+            roles: ['admin'],
+            abilities: abilitiesFor(['admin']),
+          })
+        : route.continue()
+  )
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>

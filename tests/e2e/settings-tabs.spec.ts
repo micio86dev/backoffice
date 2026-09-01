@@ -1,5 +1,6 @@
 import { test, expect, type Route } from '@playwright/test'
 import { checkA11y } from './fixtures/a11y'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * Settings tabs (Unit 6, task 24.9/26.1): role-based locators, network
@@ -52,7 +53,20 @@ function isDataRequest(route: Route): boolean {
   return route.request().resourceType() !== 'document'
 }
 
+/**
+ * The whole admin API, INCLUDING `/auth/me`.
+ *
+ * `/settings` is admin-gated at the route now, and the gate reads the ability
+ * map `/auth/me` publishes. A test that mocked every other endpoint and not
+ * that one used to render four ungated tabs; it now renders nothing and
+ * redirects, which is correct behaviour and a useless test.
+ *
+ * Identity is registered FIRST so a later `mockIdentity` call — Playwright
+ * tries the last-registered route first — still overrides it.
+ */
 async function mockAdminApi(page: import('@playwright/test').Page): Promise<void> {
+  await mockIdentity(page, ['admin'])
+
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -231,6 +245,7 @@ async function mockIdentity(page: import('@playwright/test').Page, roles: string
             },
             organization: { id: 1, name: 'Acme' },
             roles,
+            abilities: abilitiesFor(roles),
           })
         : route.continue()
   )
@@ -256,15 +271,22 @@ test.describe('Settings — conversation-LLM credentials', () => {
     await expect(page.getByTestId('llm-credentials-new')).toBeVisible()
   })
 
-  test('a non-admin is not offered the section at all', async ({ page }) => {
+  test('a non-admin does not reach /settings AT ALL, not even by typing it', async ({ page }) => {
+    // REPLACES a test asserting that an operator saw the page with one section
+    // hidden. That was the old behaviour and it was the weaker one: every
+    // endpoint behind every section on this page refuses a non-admin, so the
+    // page an operator got was a page of things that 403 on save.
+    //
+    // The route guard now sends them to the dashboard. It is not the access
+    // control — the API refuses each endpoint independently, asserted in
+    // `api/tests/Feature/Authorization/SettingsSurfaceTest.php` — it is the
+    // product decision not to show someone a door that is locked.
     await mockAdminApi(page)
     await mockIdentity(page, ['operator'])
     await login(page)
     await page.goto('/settings')
 
-    // The four ungated sections are still there — this is a gate on one
-    // section, not a broken page.
-    await expect(page.getByRole('tab', { name: 'Profilo organizzazione' })).toBeVisible()
+    await expect(page).toHaveURL('/')
     await expect(page.getByRole('tab', { name: 'Credenziali LLM di conversazione' })).toHaveCount(0)
   })
 

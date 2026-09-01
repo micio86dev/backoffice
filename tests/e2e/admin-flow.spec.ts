@@ -187,6 +187,7 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
             latency_ms_p50: 500,
             latency_ms_p95: 900,
           },
+          costs: { scoring_usd: 0, conversation_usd: 0, total_usd: 0, currency: 'USD' },
         },
       })
   )

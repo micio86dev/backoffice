@@ -440,6 +440,9 @@
                                                         "string",
                                                         "null"
                                                     ]
+                                                },
+                                                "is_superadmin": {
+                                                    "type": "boolean"
                                                 }
                                             },
                                             "required": [
@@ -447,7 +450,8 @@
                                                 "name",
                                                 "email",
                                                 "locale",
-                                                "photo_url"
+                                                "photo_url",
+                                                "is_superadmin"
                                             ]
                                         },
                                         "organization": {
@@ -4857,6 +4861,118 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/organizations": {
+            "get": {
+                "operationId": "superadmin.organizations",
+                "summary": "The shape is declared for Scramble, and not as documentation for its own\nsake: both Nuxt apps generate their typed client from this spec, so an\nundeclared `response()->json()` produced `data: string` and the switcher\nfailed to compile against its own API",
+                "tags": [
+                    "Superadmin"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "name"
+                                                ]
+                                            }
+                                        },
+                                        "acting_organization_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "acting_organization_id"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/admin/acting-organization": {
+            "put": {
+                "operationId": "superadmin.setActingOrganization",
+                "tags": [
+                    "Superadmin"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "organization_id": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "organization_id"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "acting_organization_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "acting_organization_id"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"

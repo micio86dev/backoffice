@@ -1129,5 +1129,10 @@
     "noCompetencies": "This project has no competencies yet: choose them before writing questions.",
     "confirmRemoveTitle": "Delete this question?",
     "confirmRemoveBody": "It will no longer be asked in future interviews. Interviews already conducted are unchanged."
+  },
+  "superadmin": {
+    "switchClient": "Viewing client",
+    "allClients": "All clients",
+    "switchError": "Could not switch client."
   }
 }

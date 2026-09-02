@@ -1129,5 +1129,10 @@
     "noCompetencies": "Questo progetto non ha ancora competenze: selezionale prima di scrivere le domande.",
     "confirmRemoveTitle": "Eliminare questa domanda?",
     "confirmRemoveBody": "La domanda non verrà più posta nei prossimi colloqui. Quelli già svolti restano invariati."
+  },
+  "superadmin": {
+    "switchClient": "Cliente visualizzato",
+    "allClients": "Tutti i clienti",
+    "switchError": "Non è stato possibile cambiare cliente."
   }
 }

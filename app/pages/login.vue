@@ -57,15 +57,12 @@
               must not leak — so it is not a field error and must not render as
               one. It sits where the eye already is after pressing the button.
             -->
-              <Alert
+              <FormMessage
                 v-if="formMessage"
-                :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-                role="alert"
-                aria-live="polite"
-                data-testid="login-error"
-              >
-                <AlertDescription>{{ formMessage.text }}</AlertDescription>
-              </Alert>
+                :kind="formMessage.kind"
+                :text="formMessage.text"
+                test-id="login-error"
+              />
               <Button type="submit" :loading="submitting" data-testid="login-submit">
                 {{ $t('login.submit') }}
               </Button>
@@ -103,7 +100,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { useAuth } from '@/composables/useAuth'
 
 definePageMeta({
@@ -137,7 +134,7 @@ const password = ref('')
 const submitting = ref(false)
 const emailError = ref('')
 const passwordError = ref('')
-const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
+const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 // `novalidate` on the form hands validation to us on purpose: the browser's
 // native bubble is unstyled, untranslated, and vanishes on the next click,

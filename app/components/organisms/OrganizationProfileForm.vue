@@ -41,15 +41,12 @@
           </FieldError>
         </Field>
 
-        <Alert
+        <FormMessage
           v-if="formMessage"
-          :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-          role="alert"
-          aria-live="polite"
-          data-testid="organization-profile-banner"
-        >
-          <AlertDescription>{{ formMessage.text }}</AlertDescription>
-        </Alert>
+          :kind="formMessage.kind"
+          :text="formMessage.text"
+          test-id="organization-profile-banner"
+        />
 
         <Button type="submit" :loading="saving" data-testid="organization-profile-submit">
           {{ $t('projects.action.save') }}
@@ -68,7 +65,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
 import { applyServerFieldErrors } from '@/utils/http-error'
 
@@ -86,7 +83,7 @@ const { t } = useI18n()
 const name = ref(props.organization.name)
 const error = ref<string | undefined>(undefined)
 const saving = ref(false)
-const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
+const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 const describedBy = computed(() =>
   [error.value ? 'organization-profile-name-error' : null, 'organization-profile-name-help']

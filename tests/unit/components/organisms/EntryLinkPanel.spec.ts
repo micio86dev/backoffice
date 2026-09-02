@@ -136,3 +136,31 @@ describe('EntryLinkPanel — Generate new link', () => {
     expect(wrapper.emitted('generate')).toHaveLength(1)
   })
 })
+
+/**
+ * The disclosure is a CAUTION, not a failure.
+ *
+ * It rendered `destructive` — the same red the app uses when something has
+ * gone wrong — while nothing has: the link was minted successfully and this
+ * explains how to handle it. Red for a successful outcome trains an operator
+ * to read red as decoration, which is exactly what makes a real error
+ * invisible later.
+ *
+ * Deliberately NOT migrated to `FormMessage`. That component sets
+ * `role="alert"` and `aria-live="polite"` because it announces an outcome that
+ * just happened; this text is static and always present, and a live region
+ * that never changes is noise in a screen reader rather than help.
+ */
+describe('EntryLinkPanel — the disclosure is a warning, not an error', () => {
+  it('uses the warning variant', () => {
+    const wrapper = mount(EntryLinkPanel, {
+      props: { link: LINK, locale: 'en' },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const classes = wrapper.get('[data-testid="entry-link-disclosure"]').classes().join(' ')
+
+    expect(classes).toContain('warning')
+    expect(classes).not.toContain('destructive')
+  })
+})

@@ -553,8 +553,8 @@
       },
       "error": {
         "invalidKey": "This key was rejected by the provider. Check it and try again.",
-        "rateLimited": "Stored, but the provider is currently rate-limiting verification. It will be retried automatically on next use.",
-        "unreachable": "Stored, but the provider could not be reached to verify it. It will be retried automatically on next use."
+        "rateLimited": "Stored, but the provider is currently rate-limiting verification. Save again in a minute to retry.",
+        "unreachable": "Stored, but the provider could not be reached to verify it. Save again to retry."
       },
       "table": {
         "name": "Name",

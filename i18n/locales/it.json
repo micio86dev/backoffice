@@ -553,8 +553,8 @@
       },
       "error": {
         "invalidKey": "Questa chiave è stata rifiutata dal fornitore. Controllala e riprova.",
-        "rateLimited": "Salvata, ma al momento il fornitore sta limitando le verifiche. Verrà ritentata automaticamente al prossimo utilizzo.",
-        "unreachable": "Salvata, ma non è stato possibile raggiungere il fornitore per verificarla. Verrà ritentata automaticamente al prossimo utilizzo."
+        "rateLimited": "Salvata, ma al momento il fornitore sta limitando le verifiche. Salva di nuovo tra un minuto per riprovare.",
+        "unreachable": "Salvata, ma non è stato possibile raggiungere il fornitore per verificarla. Salva di nuovo per riprovare."
       },
       "table": {
         "name": "Nome",

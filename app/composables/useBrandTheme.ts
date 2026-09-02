@@ -52,6 +52,37 @@ const HEX = /^#[0-9a-f]{6}$/i
 export const BRAND_COLOR_TOKENS = ['--color-primary', '--sidebar', '--sidebar-primary'] as const
 
 /**
+ * Tokens painted with a shade DERIVED from the brand colour rather than the
+ * colour itself.
+ *
+ * `--sidebar-accent` is the sidebar's hover state, and it carried its own
+ * hardcoded oklch copy of the product's `#4f1aaf` — so an organization that
+ * configured its colour got a branded sidebar that snapped back to Quint
+ * purple the moment a pointer touched it. The most visible half-applied brand
+ * in the app, and the reason this file previously said deriving a darker shade
+ * was "a colour-space problem this function has no business solving inline".
+ *
+ * That was right about the problem and wrong about the conclusion: the
+ * BROWSER has a colour space. `color-mix(in oklab, …)` does the darkening at
+ * paint time, in the same perceptual space the rest of the theme is authored
+ * in, with no conversion code shipped and nothing to get subtly wrong for
+ * every colour that is not purple.
+ *
+ * Buttons need no entry here — `[a]:hover:bg-primary/80` is an alpha on
+ * `--color-primary`, so they already followed the brand.
+ */
+export const BRAND_DERIVED_TOKENS = ['--sidebar-accent'] as const
+
+/**
+ * How much of the brand colour survives the darkening.
+ *
+ * 78% against black reproduces roughly the relationship the product's own
+ * palette has between `#771aaf` and its `#4f1aaf` hover, so a tenant colour
+ * gets a hover of the same *character* rather than an arbitrary one.
+ */
+const HOVER_MIX = 'color-mix(in oklab, COLOR 78%, black)'
+
+/**
  * A plain hex is a valid CSS colour in every browser this product supports
  * (DESIGN.md §2), so the override does not need converting to the OKLCH the
  * stylesheet's own values happen to use. Contrast against the foreground is
@@ -66,7 +97,7 @@ export function applyBrandColor(color: string | null | undefined): void {
   if (!color || !HEX.test(color)) {
     // Remove rather than reset: removing restores the stylesheet's own value,
     // while writing one here would hardcode a second copy of the brand colour.
-    for (const token of BRAND_COLOR_TOKENS) {
+    for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
       root.style.removeProperty(token)
     }
 
@@ -75,5 +106,12 @@ export function applyBrandColor(color: string | null | undefined): void {
 
   for (const token of BRAND_COLOR_TOKENS) {
     root.style.setProperty(token, color)
+  }
+
+  // Interpolated only AFTER the hex has passed the regex above — the value
+  // reaches a stylesheet either way, and a `color-mix()` wrapper would hide a
+  // malformed payload rather than stop it.
+  for (const token of BRAND_DERIVED_TOKENS) {
+    root.style.setProperty(token, HOVER_MIX.replace('COLOR', color))
   }
 }

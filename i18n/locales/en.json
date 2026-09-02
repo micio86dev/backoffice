@@ -1125,6 +1125,9 @@
     "textIt": "Text (Italian)",
     "saveError": "Could not save the question.",
     "reorderError": "Could not reorder the questions. The previous order was kept.",
-    "dragHandle": "Drag to reorder"
+    "dragHandle": "Drag to reorder",
+    "noCompetencies": "This project has no competencies yet: choose them before writing questions.",
+    "confirmRemoveTitle": "Delete this question?",
+    "confirmRemoveBody": "It will no longer be asked in future interviews. Interviews already conducted are unchanged."
   }
 }

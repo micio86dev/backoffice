@@ -49,6 +49,20 @@
         @update:pending="(value) => (saving = value)"
         @saved="onFormSaved"
       />
+
+      <!--
+        Only for a SAVED project. A question needs a `project_id`, so offering
+        the editor while one is being created would collect input with nowhere
+        to put it — and the competencies it groups by are not chosen yet either.
+      -->
+      <template v-if="editingProject">
+        <Separator class="my-6" />
+        <ProjectQuestionsPanel
+          :project-id="editingProject.id"
+          :competencies="editingProject.competencies ?? []"
+          :locale="editingProject.language"
+        />
+      </template>
     </FormDrawer>
   </div>
 </template>
@@ -59,6 +73,7 @@ import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
+import { Separator } from '@/components/ui/separator'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useBarsCoverage } from '@/composables/useBarsCoverage'
@@ -72,6 +87,11 @@ import {
 // The form organism is code-split (D10): only needed once an operator opens
 // create/edit, never on the list's initial route chunk.
 const ProjectForm = defineAsyncComponent(() => import('@/components/organisms/ProjectForm.vue'))
+// Async like ProjectForm: neither is needed until the drawer opens, and the
+// panel drags the question editor and its composable in with it.
+const ProjectQuestionsPanel = defineAsyncComponent(
+  () => import('@/components/organisms/ProjectQuestionsPanel.vue')
+)
 
 definePageMeta({
   name: 'projects',

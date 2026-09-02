@@ -1125,6 +1125,9 @@
     "textIt": "Testo (italiano)",
     "saveError": "Non è stato possibile salvare la domanda.",
     "reorderError": "Non è stato possibile riordinare le domande. L'ordine precedente è stato mantenuto.",
-    "dragHandle": "Trascina per riordinare"
+    "dragHandle": "Trascina per riordinare",
+    "noCompetencies": "Questo progetto non ha ancora competenze: selezionale prima di scrivere le domande.",
+    "confirmRemoveTitle": "Eliminare questa domanda?",
+    "confirmRemoveBody": "La domanda non verrà più posta nei prossimi colloqui. Quelli già svolti restano invariati."
   }
 }

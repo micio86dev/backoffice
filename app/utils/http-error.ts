@@ -147,3 +147,36 @@ export function serverMessageCode(error: unknown): string | null {
 
   return /^[a-z][a-z0-9_]*$/.test(message) ? message : null
 }
+
+/**
+ * Extracts a `{data:{code}}` machine code from an ofetch/$fetch rejection.
+ *
+ * A 422 does not always mean "a field is wrong". `POST /api/projects` refuses a
+ * `potential` project against an unseeded catalogue with
+ * `{message, code: 'POTENTIAL_CATALOG_INCOMPLETE'}` and NO `errors` object, and
+ * a form that only maps per-field errors then fell back to its generic "check
+ * the highlighted fields" banner while highlighting nothing — sending the
+ * operator to hunt for a bad field when no field could have fixed it.
+ *
+ * Separate from `serverMessageCode`, not an extension of it: that one reads
+ * `data.message` and accepts only lowercase snake_case, whereas this contract
+ * puts an UPPERCASE code in `data.code` alongside human prose in
+ * `data.message`. Folding both into one matcher would make either shape able
+ * to satisfy the other's callers.
+ *
+ * The shape is enforced rather than assumed. Callers feed the result to
+ * `translateServerCode`, which falls back to rendering the code verbatim when
+ * no copy exists — so accepting prose here would print an English sentence at
+ * an Italian operator, which is the exact failure that helper was built to end.
+ */
+export function serverErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+
+  const data = (error as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return null
+
+  const code = (data as { code?: unknown }).code
+  if (typeof code !== 'string') return null
+
+  return /^[A-Z][A-Z0-9_]*$/.test(code) ? code : null
+}

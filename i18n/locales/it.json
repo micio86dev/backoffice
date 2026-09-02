@@ -338,6 +338,9 @@
         "avatarTemplate": "Quale template avatar usa questo progetto. Determina anche il fornitore ed è obbligatorio: se non ne hai ancora creato uno, crealo prima di creare il progetto.",
         "webhookUrl": "BEAI invia a questo indirizzo gli eventi di avanzamento e di valutazione. Lascia vuoto per usare l'impostazione predefinita dell'organizzazione.",
         "competencies": "Le competenze valutate in questo colloquio. Più competenze significano un colloquio più lungo per il candidato."
+      },
+      "serverError": {
+        "POTENTIAL_CATALOG_INCOMPLETE": "Il catalogo per la valutazione di tipo «potential» non è completo: le competenze MTG e LAT non sono presenti. Un progetto «potential» non può essere creato finché non vengono caricate."
       }
     },
     "secret": {

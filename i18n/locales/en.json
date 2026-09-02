@@ -338,6 +338,9 @@
         "avatarTemplate": "Which avatar template this project uses. It also decides the provider, and is required: if you have not created one yet, create it before the project.",
         "webhookUrl": "BEAI posts progress and evaluation events to this address. Leave empty to use the organization default.",
         "competencies": "The competencies this interview covers. More competencies means a longer interview for the candidate."
+      },
+      "serverError": {
+        "POTENTIAL_CATALOG_INCOMPLETE": "The catalogue for a potential assessment is incomplete: the MTG and LAT competencies are missing. A potential project cannot be created until they are loaded."
       }
     },
     "secret": {

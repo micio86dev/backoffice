@@ -269,7 +269,9 @@
       "status": "Status",
       "actions": "Actions",
       "empty": "No projects yet.",
-      "uncoveredCompetencies": "{count} without anchors"
+      "uncoveredCompetencies": "{count} without anchors",
+      "avatarProvider": "Avatar service",
+      "avatarTemplate": "Template"
     },
     "action": {
       "new": "New project",
@@ -355,6 +357,10 @@
       "noBars": "No behavioural anchors for this role yet — it cannot be assessed, so it cannot be selected.",
       "attachedNoBars": "Already in this project but has no behavioural anchors for this role — it will not be scored. Remove it to fix the report.",
       "coverageSummary": "{missing} of {total} competencies have no behavioural anchors for this role yet."
+    },
+    "avatarProvider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
     }
   },
   "report": {

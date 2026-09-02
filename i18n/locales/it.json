@@ -269,7 +269,9 @@
       "status": "Stato",
       "actions": "Azioni",
       "empty": "Nessun progetto ancora presente.",
-      "uncoveredCompetencies": "{count} senza ancore"
+      "uncoveredCompetencies": "{count} senza ancore",
+      "avatarProvider": "Servizio avatar",
+      "avatarTemplate": "Template"
     },
     "action": {
       "new": "Nuovo progetto",
@@ -355,6 +357,10 @@
       "noBars": "Nessuna ancora comportamentale per questo ruolo — non è valutabile, quindi non è selezionabile.",
       "attachedNoBars": "Già presente in questo progetto ma senza ancore comportamentali per questo ruolo — non verrà valutata. Rimuovila per correggere il report.",
       "coverageSummary": "{missing} competenze su {total} non hanno ancora ancore comportamentali per questo ruolo."
+    },
+    "avatarProvider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
     }
   },
   "report": {

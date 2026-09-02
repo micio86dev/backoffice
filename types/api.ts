@@ -296,7 +296,7 @@ export interface paths {
          *     better. `is_active` used to be the organization-wide fallback, so
          *     switching it off silently changed which template every unpinned project
          *     ran on. Every project now names its own, so `is_active` is only "the one
-         *          offered as the default for new projects" — turning it off is reversible
+         *          * offered as the default for new projects" — turning it off is reversible
          *     bookkeeping, not a live reconfiguration.
          *
          *     NO config revalidation, unlike `activate()`. That check exists to catch a
@@ -1733,6 +1733,11 @@ export interface components {
             nudge_min_chars: number | null;
             exit_redirect_url: string | null;
             avatar_template_id: number | null;
+            avatar_template: {
+                id: number;
+                name: string;
+                provider: string;
+            } | null;
             webhook_url: string | null;
             webhook_events: string[];
             has_webhook_secret: boolean;

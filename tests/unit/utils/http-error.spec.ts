@@ -14,6 +14,7 @@ import {
   getConflictTemplates,
   applyServerFieldErrors,
   serverMessageCode,
+  serverErrorCode,
 } from '../../../app/utils/http-error'
 
 describe('getErrorStatus', () => {
@@ -194,5 +195,40 @@ describe('serverMessageCode', () => {
     expect(serverMessageCode(null)).toBeNull()
     expect(serverMessageCode({ data: null })).toBeNull()
     expect(serverMessageCode({ data: { message: 42 } })).toBeNull()
+  })
+})
+
+/**
+ * A 422 can refuse for a reason no FIELD can fix. `POST /api/projects` answers
+ * a `potential` project against an unseeded catalogue with
+ * `{message: "Potential catalog incomplete: ...", code: "POTENTIAL_CATALOG_INCOMPLETE"}`
+ * and NO `errors` object — so every form that only maps field errors fell back
+ * to "could not save, check the highlighted fields" while highlighting nothing,
+ * telling the operator to fix fields that were never the problem.
+ *
+ * `serverMessageCode` cannot carry this: it reads `data.message` and only
+ * accepts lowercase snake_case, while this contract puts an UPPERCASE code in
+ * `data.code` beside human prose in `data.message`.
+ */
+describe('serverErrorCode', () => {
+  it('reads an uppercase machine code from data.code', () => {
+    expect(
+      serverErrorCode({
+        data: {
+          message: 'Potential catalog incomplete: MTG/LAT competencies are not seeded.',
+          code: 'POTENTIAL_CATALOG_INCOMPLETE',
+        },
+      })
+    ).toBe('POTENTIAL_CATALOG_INCOMPLETE')
+  })
+
+  it('refuses prose, so a sentence can never be rendered as a translation key', () => {
+    expect(serverErrorCode({ data: { code: 'Something went badly wrong.' } })).toBeNull()
+  })
+
+  it('returns null when there is no code', () => {
+    expect(serverErrorCode({ data: { message: 'nope' } })).toBeNull()
+    expect(serverErrorCode({})).toBeNull()
+    expect(serverErrorCode(null)).toBeNull()
   })
 })

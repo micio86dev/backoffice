@@ -48,3 +48,19 @@ export default createConfigForNuxt({
       'vuejs-accessibility/form-control-has-label': 'off',
     },
   })
+  // GENERATED FILES ARE NOT SOURCE.
+  //
+  // `types/api.ts` is produced by `openapi-typescript` from `openapi.json`, and
+  // `scripts/check-client-drift.sh` regenerates it in CI and diffs byte for
+  // byte. Any tool that rewrites it makes a correctly-synced client report as
+  // drifted — which is precisely what happened: `eslint --fix` runs on it
+  // through lint-staged, a rule reflowed one JSDoc line by a single `*`, and
+  // the `Client drift check` step failed on develop for the v0.24.0 release
+  // merge-back and again on the next one.
+  //
+  // `.prettierignore` already covers both files, and prettier honours it even
+  // for explicitly-passed paths, so prettier was never the culprit. ESLint had
+  // no matching entry at all — this is that entry.
+  .append({
+    ignores: ['types/api.ts', 'openapi.json'],
+  })

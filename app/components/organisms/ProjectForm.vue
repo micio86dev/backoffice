@@ -450,7 +450,8 @@ import {
   isPauseEveryNCompetenciesValid,
   PROJECT_FIELD_BOUNDS,
 } from '@/utils/project-field-specs'
-import { applyServerFieldErrors } from '@/utils/http-error'
+import { applyServerFieldErrors, serverErrorCode } from '@/utils/http-error'
+import { translateServerCode } from '@/utils/server-message'
 
 const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
 
@@ -658,7 +659,7 @@ function validateAvatarTemplate(): boolean {
 }
 
 // useI18n() is a Nuxt auto-import, same convention as CandidateTable.vue.
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 function missingKey(key: string): string {
   return t(`projects.form.${key}`)
@@ -740,7 +741,22 @@ function applyServerErrors(error: unknown): void {
   })
 
   if (unmapped === null) {
-    formMessage.value = { kind: 'error', text: t('projects.form.saveError') }
+    // No field errors at all. That is not always "the payload was fine" — a
+    // 422 can also refuse for a reason no control on this form can fix, and
+    // it says so with a machine `code` beside its prose (e.g.
+    // POTENTIAL_CATALOG_INCOMPLETE, when a `potential` project is created
+    // against a catalogue with no MTG/LAT seeded). Sending the operator to
+    // "check the highlighted fields" then points them at fields that were
+    // never the problem, with nothing highlighted to check.
+    const code = serverErrorCode(error)
+
+    formMessage.value = {
+      kind: 'error',
+      text: code
+        ? translateServerCode({ t, te }, 'projects.form.serverError', code)
+        : t('projects.form.saveError'),
+    }
+
     return
   }
 

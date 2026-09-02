@@ -4,6 +4,8 @@
       <TableRow>
         <TableHead>{{ $t('projects.table.name') }}</TableHead>
         <TableHead>{{ $t('projects.table.assessmentType') }}</TableHead>
+        <TableHead>{{ $t('projects.table.avatarProvider') }}</TableHead>
+        <TableHead>{{ $t('projects.table.avatarTemplate') }}</TableHead>
         <TableHead>{{ $t('projects.table.status') }}</TableHead>
         <TableHead>
           <span class="sr-only">{{ $t('projects.table.actions') }}</span>
@@ -11,7 +13,7 @@
       </TableRow>
     </TableHeader>
     <TableBody>
-      <TableEmpty v-if="projects.length === 0" :colspan="4">
+      <TableEmpty v-if="projects.length === 0" :colspan="6">
         {{ $t('projects.table.empty') }}
       </TableEmpty>
       <TableRow v-for="project in projects" :key="project.id">
@@ -27,6 +29,25 @@
           </div>
         </TableCell>
         <TableCell>{{ $t(`projects.assessmentType.${project.assessment_type}`) }}</TableCell>
+        <!--
+          The avatar SERVICE, and the template that selects it. Together they
+          are the one fact deciding how an interview actually runs, and the
+          table used to make it readable only by opening each project.
+
+          The provider goes through a translation key rather than being echoed
+          raw: `heygen` is a machine value, `HeyGen` is how it is spelled to a
+          person. A dash rather than an empty cell when the relation was not
+          sent — blank reads as a project that runs on nothing.
+        -->
+        <TableCell :data-testid="`project-row-provider-${project.id}`">
+          <template v-if="project.avatar_template">{{
+            $t(`projects.avatarProvider.${project.avatar_template.provider}`)
+          }}</template>
+          <template v-else>–</template>
+        </TableCell>
+        <TableCell :data-testid="`project-row-template-${project.id}`">
+          {{ project.avatar_template?.name ?? '–' }}
+        </TableCell>
         <TableCell>
           <ProjectStatusBadge :status="project.status" />
         </TableCell>

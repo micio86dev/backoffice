@@ -218,3 +218,59 @@ describe('ProjectTable — Invite candidate (operator-interview-link)', () => {
     })
   })
 })
+
+/**
+ * The avatar service and the template that selects it.
+ *
+ * The table listed name, type and status, so the one fact that decides HOW an
+ * interview actually runs — which provider, via which template — was readable
+ * only by opening each project in turn. The API now sends both on
+ * `avatar_template`; these render them.
+ *
+ * The provider is rendered through a translation key rather than echoed raw:
+ * `heygen` is a machine value, and `HeyGen` is how it is spelled to a person.
+ */
+describe('ProjectTable avatar columns', () => {
+  it('shows the provider and the template name', () => {
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [
+          project({
+            avatar_template: { id: 7, name: 'Ada Warm', provider: 'tavus' },
+          }),
+        ],
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const html = wrapper.html()
+
+    expect(html).toContain('projects.avatarProvider.tavus')
+    expect(html).toContain('Ada Warm')
+  })
+
+  it('falls back to a dash when the relation was not sent', () => {
+    // Never an empty cell and never "null": the column has to read as "not
+    // available here" rather than as a project that runs on nothing.
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ avatar_template: null })] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-provider-1"]').text()).toBe('–')
+    expect(wrapper.find('[data-testid="project-row-template-1"]').text()).toBe('–')
+  })
+
+  it('keeps the empty row spanning every column', () => {
+    // A colspan left behind when a column is added is the classic way an empty
+    // table starts rendering a ragged row nobody notices in review.
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const headers = wrapper.findAll('thead th').length
+
+    expect(wrapper.find('tbody td').attributes('colspan')).toBe(String(headers))
+  })
+})

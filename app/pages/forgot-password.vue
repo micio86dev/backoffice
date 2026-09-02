@@ -49,17 +49,14 @@
               said "check your inbox" would confirm the account, in the UI,
               for an oracle the API refuses to be.
             -->
-              <Alert
+              <FormMessage
                 v-if="formMessage"
                 ref="bannerRef"
-                :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-                role="alert"
-                aria-live="polite"
-                tabindex="-1"
-                data-testid="forgot-password-banner"
-              >
-                <AlertDescription>{{ formMessage.text }}</AlertDescription>
-              </Alert>
+                :kind="formMessage.kind"
+                :text="formMessage.text"
+                test-id="forgot-password-banner"
+                focusable
+              />
 
               <Button type="submit" :loading="submitting" data-testid="forgot-password-submit">
                 {{ $t('forgotPassword.submit') }}
@@ -106,7 +103,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { applyServerFieldErrors, getErrorStatus } from '@/utils/http-error'
 
 definePageMeta({
@@ -126,7 +123,7 @@ useHead({
 const email = ref('')
 const submitting = ref(false)
 const emailError = ref('')
-const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
+const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 const bannerRef = useTemplateRef<{ $el: HTMLElement } | HTMLElement>('bannerRef')
 
 // Same expression as login.vue's, and deliberately the same: domain labels

@@ -355,15 +355,12 @@
           @update:value="(value) => (webhookSecret = value)"
         />
 
-        <Alert
+        <FormMessage
           v-if="formMessage"
-          :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-          role="alert"
-          aria-live="polite"
-          data-testid="project-form-banner"
-        >
-          <AlertDescription>{{ formMessage.text }}</AlertDescription>
-        </Alert>
+          :kind="formMessage.kind"
+          :text="formMessage.text"
+          test-id="project-form-banner"
+        />
 
         <!--
         Save and Cancel are NOT here — they live in FormDrawer's footer, where
@@ -424,7 +421,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import {
   Select,
   SelectContent,
@@ -540,7 +537,7 @@ watch(saving, (value) => emit('update:pending', value), { immediate: true })
 // for row-scoped targets elsewhere) — archive acts on `props.project`
 // itself, there is no "which row" to carry.
 const archiveConfirm = ref(false)
-const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
+const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 const errors = ref<{
   name?: string
   slug?: string

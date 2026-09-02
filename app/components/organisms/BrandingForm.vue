@@ -155,6 +155,7 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
+import { applyBrandColor } from '@/composables/useBrandTheme'
 import { applyServerFieldErrors } from '@/utils/http-error'
 import { translateServerCodes } from '@/utils/server-message'
 
@@ -239,6 +240,18 @@ async function onSubmit(): Promise<void> {
     // written only where a file was actually stored — so a failed upload must
     // not silently discard a colour the operator also changed.
     await updateOrganization({ primary_color: color.value || null })
+
+    // Paint it NOW. `applyBrandColor` ran only in `layouts/default.vue` on
+    // mount, so an admin who picked a colour kept seeing the old one until
+    // they reloaded — the value was stored correctly and the UI simply did not
+    // agree with it, which reads as a save that did not work.
+    //
+    // Applied from what we just sent rather than by making the layout
+    // re-fetch: this form already knows the answer, and a round trip to learn
+    // what it itself submitted would be slower and no more correct. Clearing
+    // removes the override, so the product palette returns without a reload
+    // either.
+    applyBrandColor(color.value || null)
 
     if (pendingFile.value !== null) {
       const response = await uploadLogo(pendingFile.value)

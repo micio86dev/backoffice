@@ -17,14 +17,18 @@
  * painting `--color-primary` alone leaves it purple and the fix looks broken.
  */
 import { describe, it, expect, afterEach } from 'vitest'
-import { applyBrandColor, BRAND_COLOR_TOKENS } from '../../../app/composables/useBrandTheme'
+import {
+  applyBrandColor,
+  BRAND_COLOR_TOKENS,
+  BRAND_DERIVED_TOKENS,
+} from '../../../app/composables/useBrandTheme'
 
 function read(token: string): string {
   return document.documentElement.style.getPropertyValue(token)
 }
 
 afterEach(() => {
-  for (const token of BRAND_COLOR_TOKENS) {
+  for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
     document.documentElement.style.removeProperty(token)
   }
 })
@@ -43,6 +47,24 @@ describe('applyBrandColor', () => {
     expect(read('--sidebar-primary')).toBe('#7C3AED')
   })
 
+  it('DERIVES the hover shade instead of leaving it the product purple', () => {
+    // The sidebar hover carried its own hardcoded oklch copy of #4f1aaf, so an
+    // organization that set its colour got a branded sidebar that turned Quint
+    // purple the moment a pointer touched it — the most visible half-applied
+    // brand in the app.
+    //
+    // Derived in CSS with `color-mix` rather than computed here: turning a hex
+    // into a darker shade means a colour space, and the browser has one.
+    // Doing it in JS would mean shipping a conversion this product does not
+    // otherwise need, and getting it subtly wrong for every colour but purple.
+    applyBrandColor('#2563EB')
+
+    const hover = read('--sidebar-accent')
+
+    expect(hover).toContain('color-mix')
+    expect(hover).toContain('#2563EB')
+  })
+
   it('REMOVES every token when the organization has no colour', () => {
     // Removal, not a written default. An unset custom property falls through to
     // the stylesheet's own value — the Quint purple DESIGN.md defines — and
@@ -51,7 +73,7 @@ describe('applyBrandColor', () => {
     applyBrandColor('#7C3AED')
     applyBrandColor(null)
 
-    for (const token of BRAND_COLOR_TOKENS) {
+    for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
       expect(read(token)).toBe('')
     }
   })
@@ -63,7 +85,7 @@ describe('applyBrandColor', () => {
     applyBrandColor('#7C3AED')
     applyBrandColor('red; } body { display: none } .x{')
 
-    for (const token of BRAND_COLOR_TOKENS) {
+    for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
       expect(read(token)).toBe('')
     }
   })

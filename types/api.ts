@@ -1146,6 +1146,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{project}/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["projectQuestion.index"];
+        put?: never;
+        post: operations["projectQuestion.store"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/questions/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder, taking the WHOLE ordered list
+         * @description Drag-and-drop knows the final order, and sending it in full is what
+         *     makes the partial unique index satisfiable: moving rows one at a time
+         *     would collide with the position each is moving into. Positions are
+         *     rewritten from scratch inside one transaction, so a failure halfway
+         *     leaves the previous order rather than a half-applied one.
+         */
+        put: operations["projectQuestion.reorder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{project}/questions/{questionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["projectQuestion.destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["projectQuestion.update"];
+        trace?: never;
+    };
     "/health/queue": {
         parameters: {
             query?: never;
@@ -1717,6 +1773,19 @@ export interface components {
             } | null;
             photo_url: string | null;
         };
+        /** ProjectQuestionResource */
+        ProjectQuestionResource: {
+            id: number;
+            project_id: number;
+            competency_id: number;
+            competency_code: string | null;
+            text: {
+                [key: string]: string;
+            };
+            position: number;
+            created_at: string;
+            updated_at: string;
+        };
         /** ProjectResource */
         ProjectResource: {
             id: number;
@@ -1914,6 +1983,43 @@ export interface components {
              *     resolved unbound/degraded).
              */
             llm_cost_usd: number | null;
+        };
+        /**
+         * StoreProjectQuestionRequest
+         * @description Validates a predefined question
+         *     (potential-competencies-and-authored-questions, AD-4).
+         *
+         *     HOW MANY questions are allowed is a function of the project's assessment
+         *     type, and that rule lives HERE rather than in the model or the table: it is
+         *     the same kind of invariant as `competencies ⊆ {MTG, LAT}` and `role_code
+         *     must be null`, which already live in the project FormRequests.
+         *
+         *       standard  — at most ONE per competency
+         *                   ("the first question per competency may be predefined")
+         *       potential — at most FOUR per competency
+         *                   ("4 predefined questions per competency", SA-08)
+         *
+         *     The cap is a maximum, never a minimum. A `standard` project with no authored
+         *     question is the normal case — the AI opens the competency itself, exactly as
+         *     it does today — and a half-configured `potential` project must be savable
+         *     while the operator is still writing the other three.
+         */
+        StoreProjectQuestionRequest: {
+            /**
+             * @description Scoped to the catalogue, not to the project's own competencies:
+             *     the cross-check that the competency actually belongs to this
+             *     project's type happens below, where the reason can be stated.
+             */
+            competency_id: number;
+            text: {
+                /**
+                 * @description `en` is required and `it` is not, matching the catalogue: an
+                 *     English fallback always exists, and a missing Italian degrades
+                 *     to it rather than to an empty question.
+                 */
+                en: string;
+                it?: string | null;
+            };
         };
         /**
          * StoreProjectRequest
@@ -4246,6 +4352,156 @@ export interface operations {
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "projectQuestion.index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of `ProjectQuestionResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProjectQuestionResource"][];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "projectQuestion.store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoreProjectQuestionRequest"];
+            };
+        };
+        responses: {
+            /** @description `ProjectQuestionResource` */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProjectQuestionResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "projectQuestion.reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    ids: number[];
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "Reordered.";
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "projectQuestion.destroy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                questionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "projectQuestion.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: number;
+                questionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    text: {
+                        en: string;
+                        it?: string | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description `ProjectQuestionResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ProjectQuestionResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
         };
     };
     queueHealth: {

@@ -211,3 +211,34 @@ describe('redactUrl', () => {
     expect(JSON.stringify(scrubbed)).not.toContain('a-live-token')
   })
 })
+
+/**
+ * `enabled: false` was trusted to make the SDK inert. It does not.
+ *
+ * Verified in a real browser on 2026-09-02: with `sentryDsn: ""` the page
+ * still ends up with a populated `window.__SENTRY__` carrier — the SDK is
+ * constructed, registers globals, and brings its vendored web-vitals along.
+ * That is where `Uncaught TypeError: Cannot read properties of undefined
+ * (reading 'startTime') at et.reportAllChanges` comes from: nothing in this
+ * app's own code observes web vitals, and Sentry is the only dependency that
+ * bundles a copy.
+ *
+ * `sentry-init.ts`'s own docblock says it exists so "does an empty DSN
+ * actually turn Sentry off" is a one-line assertion rather than something
+ * inferred from reading a plugin and trusting it. This is that assertion —
+ * and the answer it was written to protect turned out to be no.
+ */
+describe('shouldInitSentry', () => {
+  it('refuses to initialise without a DSN', async () => {
+    const { shouldInitSentry } = await import('~/utils/sentry-init')
+
+    expect(shouldInitSentry('')).toBe(false)
+    expect(shouldInitSentry('   ')).toBe(false)
+  })
+
+  it('initialises when a DSN is configured', async () => {
+    const { shouldInitSentry } = await import('~/utils/sentry-init')
+
+    expect(shouldInitSentry('https://abc@o1.ingest.sentry.io/2')).toBe(true)
+  })
+})

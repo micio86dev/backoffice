@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nuxt'
-import { sentryPosture } from './app/utils/sentry-init'
+import { sentryPosture, shouldInitSentry } from './app/utils/sentry-init'
 import {
   scrubBreadcrumb,
   scrubSentryEvent,
@@ -40,15 +40,24 @@ import {
  */
 
 const config = useRuntimeConfig()
-const posture = sentryPosture(
-  String(config.public.sentryDsn ?? ''),
-  String(config.public.sentryEnvironment ?? '')
-)
+const dsn = String(config.public.sentryDsn ?? '')
 
-Sentry.init({
-  ...posture,
-  beforeSend: (event) =>
-    scrubSentryEvent(event as unknown as ScrubbableEvent) as unknown as typeof event,
-  beforeBreadcrumb: (breadcrumb) =>
-    scrubBreadcrumb(breadcrumb as unknown as ScrubbableBreadcrumb) as unknown as typeof breadcrumb,
-})
+const posture = sentryPosture(dsn, String(config.public.sentryEnvironment ?? ''))
+
+// NOT initialised at all without a DSN, rather than initialised-and-disabled.
+// `enabled: false` was assumed to make the SDK inert and does not: verified in
+// a browser, the page still gets a populated `window.__SENTRY__` carrier, and
+// the SDK brings its vendored web-vitals with it — the source of the recurring
+// `reportAllChanges` TypeError in the console of an app that observes no web
+// vitals of its own. See shouldInitSentry().
+if (shouldInitSentry(dsn)) {
+  Sentry.init({
+    ...posture,
+    beforeSend: (event) =>
+      scrubSentryEvent(event as unknown as ScrubbableEvent) as unknown as typeof event,
+    beforeBreadcrumb: (breadcrumb) =>
+      scrubBreadcrumb(
+        breadcrumb as unknown as ScrubbableBreadcrumb
+      ) as unknown as typeof breadcrumb,
+  })
+}

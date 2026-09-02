@@ -98,16 +98,24 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import type { AbilityKey } from '@/composables/useCurrentUser'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { initials } from '@/utils/initials'
+import { visibleNavItemsFor, type NavScope } from '@/utils/nav-visibility'
+import { useSuperadmin } from '@/composables/useSuperadmin'
 
 // Nav items per DESIGN.md §8.1 (Dashboard / Projects / Candidates / Reports /
 // Settings). "Candidates" is the product-facing label for the Participant
 // resource (CLAUDE.md domain glossary: Participant is the model, "candidate"
 // is the user-facing term).
+// Every item carries a SCOPE. `client` pages read one tenant's data;
+// `platform` pages sit above the tenants. It is not a permission — a
+// superadmin passes every gate — it is whether the page has an answer at all:
+// "whose projects?" is unanswered until a client is selected, and the product
+// agrees underneath, because TenantScoped throws on a create with no
+// organization resolved.
 const navItems = [
-  { to: '/', labelKey: 'nav.dashboard', icon: HomeIcon },
-  { to: '/projects', labelKey: 'nav.projects', icon: FolderIcon },
-  { to: '/participants', labelKey: 'nav.candidates', icon: UsersIcon },
-  { to: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon },
+  { to: '/', labelKey: 'nav.dashboard', icon: HomeIcon, scope: 'client' },
+  { to: '/projects', labelKey: 'nav.projects', icon: FolderIcon, scope: 'client' },
+  { to: '/participants', labelKey: 'nav.candidates', icon: UsersIcon, scope: 'client' },
+  { to: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon, scope: 'client' },
   // C14. Configuration rather than a record, so it sits beside Settings and
   // after the pages an operator opens daily.
   //
@@ -120,8 +128,15 @@ const navItems = [
     labelKey: 'nav.avatarTemplates',
     icon: Cog6ToothIcon,
     requires: 'avatarTemplates.viewAny',
+    scope: 'platform',
   },
-  { to: '/settings', labelKey: 'nav.settings', icon: Cog6ToothIcon, requires: 'users.viewAny' },
+  {
+    to: '/settings',
+    labelKey: 'nav.settings',
+    icon: Cog6ToothIcon,
+    requires: 'users.viewAny',
+    scope: 'platform',
+  },
 ] as const satisfies readonly NavItem[]
 
 /**
@@ -134,6 +149,7 @@ interface NavItem {
   labelKey: string
   icon: unknown
   requires?: AbilityKey
+  scope: NavScope
 }
 
 /**
@@ -143,11 +159,19 @@ interface NavItem {
  * out again for the users who may not have them.
  */
 const visibleNavItems = computed(() =>
-  navItems.filter((item) => {
-    const requires = 'requires' in item ? item.requires : undefined
+  // TWO filters, and they answer different questions. `requires` asks whether
+  // the server would let this viewer in; the scope filter asks whether the
+  // page means anything for them at all. A superadmin passes every gate, so
+  // abilities alone would keep offering Projects to somebody who has not said
+  // whose.
+  visibleNavItemsFor(
+    navItems.filter((item) => {
+      const requires = 'requires' in item ? item.requires : undefined
 
-    return requires === undefined || can(requires)
-  })
+      return requires === undefined || can(requires)
+    }),
+    { isSuperadmin: isSuperadmin.value, actingClientId: actingClientId.value }
+  )
 )
 
 const route = useRoute()
@@ -182,9 +206,24 @@ const currentUserPhotoUrl = ref<string | null>(null)
 // computed has a stable dependency.
 const { can } = useCurrentUser()
 
+// Whether the client pages have an answer yet. Both default to the
+// UNRESTRICTED case, so an ordinary operator is never briefly shown a
+// superadmin's stripped-down menu while identity is in flight.
+const isSuperadmin = ref(false)
+const actingClientId = ref<number | null>(null)
+
 onMounted(async () => {
   try {
     const { user } = await useCurrentUser().ensureLoaded()
+    isSuperadmin.value = user.is_superadmin === true
+
+    if (isSuperadmin.value) {
+      // Read from the SERVER rather than remembered locally: the selection
+      // lives in the superadmin's session, and a menu built from a stale
+      // local copy would offer pages the next request then refuses.
+      actingClientId.value = (await useSuperadmin().fetchClients()).acting_organization_id ?? null
+    }
+
     currentUserName.value = user.name
     currentUserPhotoUrl.value = user.photo_url
   } catch {

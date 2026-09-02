@@ -127,6 +127,12 @@
       "title": "Recent activity",
       "empty": "No candidates yet. They appear here as soon as the calling system creates one.",
       "noProject": "Project unavailable"
+    },
+    "filters": {
+      "year": "Year",
+      "month": "Month",
+      "allTime": "All time",
+      "wholeYear": "Whole year"
     }
   },
   "participants": {
@@ -1111,5 +1117,28 @@
       "llmActual": "Conversation LLM tokens — actual",
       "llmNotBilled": "This session did not run on a model BEAI manages, so no token cost was recorded. That is not a charge of zero."
     }
+  },
+  "projectQuestions": {
+    "title": "Predefined questions",
+    "description": "The questions the avatar opens each competency with. Follow-ups stay decided by the AI in real time.",
+    "empty": "No predefined question: the avatar will open the competency itself.",
+    "add": "Add question",
+    "edit": "Edit",
+    "remove": "Delete",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "textEn": "Text (English)",
+    "textIt": "Text (Italian)",
+    "saveError": "Could not save the question.",
+    "reorderError": "Could not reorder the questions. The previous order was kept.",
+    "dragHandle": "Drag to reorder",
+    "noCompetencies": "This project has no competencies yet: choose them before writing questions.",
+    "confirmRemoveTitle": "Delete this question?",
+    "confirmRemoveBody": "It will no longer be asked in future interviews. Interviews already conducted are unchanged."
+  },
+  "superadmin": {
+    "switchClient": "Viewing client",
+    "allClients": "All clients",
+    "switchError": "Could not switch client."
   }
 }

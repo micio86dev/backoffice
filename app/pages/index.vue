@@ -2,6 +2,12 @@
   <div class="flex flex-col gap-6">
     <PageHeader :title="$t('dashboard.title')" :subtitle="$t('dashboard.subtitle')" />
 
+    <!--
+      Above everything it filters, so the period is read before the numbers
+      rather than discovered after wondering why they changed.
+    -->
+    <DashboardFilters :locale="locale" @change="onRangeChange" />
+
     <Alert
       v-if="loadError"
       :variant="loadError === 'not-ready' ? 'default' : 'destructive'"
@@ -45,6 +51,8 @@
 // even disabled/placeholder (observability delta scenario).
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
+import DashboardFilters from '@/components/molecules/DashboardFilters.vue'
+import type { DateRange } from '@/utils/dashboard-period'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import RecentActivity from '@/components/organisms/RecentActivity.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
@@ -142,9 +150,18 @@ const costBreakdown = computed(() => {
   })
 })
 
-onMounted(async () => {
+/**
+ * The period every panel on this page is describing.
+ *
+ * ONE range passed to BOTH endpoints. Fetching them with separately-derived
+ * filters would eventually let the tiles and the activity list cover different
+ * months, and nothing on the screen would say so.
+ */
+const range = ref<DateRange>({})
+
+async function load(): Promise<void> {
   try {
-    const response = await fetchMetrics()
+    const response = await fetchMetrics(range.value)
     metrics.value = response.data
     loadError.value = null
 
@@ -152,12 +169,19 @@ onMounted(async () => {
     // is context, and a dashboard that refuses to render its counters because a
     // secondary panel failed reports the wrong problem to the operator.
     try {
-      activity.value = (await fetchActivity()).data
+      activity.value = (await fetchActivity(range.value)).data
     } catch {
       activity.value = []
     }
   } catch (error) {
     loadError.value = resolveResourceErrorState(error)
   }
-})
+}
+
+function onRangeChange(next: DateRange): void {
+  range.value = next
+  void load()
+}
+
+onMounted(load)
 </script>

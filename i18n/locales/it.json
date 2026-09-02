@@ -127,6 +127,12 @@
       "title": "Attività recente",
       "empty": "Ancora nessun candidato. Compariranno qui appena il sistema che ti ha integrato ne crea uno.",
       "noProject": "Progetto non disponibile"
+    },
+    "filters": {
+      "year": "Anno",
+      "month": "Mese",
+      "allTime": "Tutto il periodo",
+      "wholeYear": "Tutto l'anno"
     }
   },
   "participants": {

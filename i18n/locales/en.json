@@ -127,6 +127,12 @@
       "title": "Recent activity",
       "empty": "No candidates yet. They appear here as soon as the calling system creates one.",
       "noProject": "Project unavailable"
+    },
+    "filters": {
+      "year": "Year",
+      "month": "Month",
+      "allTime": "All time",
+      "wholeYear": "Whole year"
     }
   },
   "participants": {

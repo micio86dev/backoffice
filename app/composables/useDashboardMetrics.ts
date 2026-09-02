@@ -70,15 +70,42 @@ export interface DashboardActivityResponse {
   data: DashboardActivityRow[]
 }
 
+/**
+ * An inclusive range of DAYS, `YYYY-MM-DD`. Both ends optional; omitting both
+ * means all time, which is what every caller got before this existed.
+ */
+export interface DashboardRange {
+  from?: string
+  to?: string
+}
+
 export function useDashboardMetrics() {
   const { apiFetch } = useApi()
 
-  async function fetchMetrics(): Promise<DashboardMetricsResponse> {
-    return apiFetch<DashboardMetricsResponse>('/dashboard/metrics')
+  /**
+   * The date range, as the API expects it.
+   *
+   * Both endpoints take the SAME range and the caller passes one object to
+   * both, so the tiles and the activity list cannot end up describing
+   * different periods — a dashboard that contradicts itself says nothing on
+   * screen about it.
+   */
+  function rangeQuery(range?: DashboardRange): string {
+    if (!range?.from && !range?.to) return ''
+
+    const params = new URLSearchParams()
+    if (range.from) params.set('from', range.from)
+    if (range.to) params.set('to', range.to)
+
+    return `?${params.toString()}`
   }
 
-  async function fetchActivity(): Promise<DashboardActivityResponse> {
-    return apiFetch<DashboardActivityResponse>('/dashboard/activity')
+  async function fetchMetrics(range?: DashboardRange): Promise<DashboardMetricsResponse> {
+    return apiFetch<DashboardMetricsResponse>(`/dashboard/metrics${rangeQuery(range)}`)
+  }
+
+  async function fetchActivity(range?: DashboardRange): Promise<DashboardActivityResponse> {
+    return apiFetch<DashboardActivityResponse>(`/dashboard/activity${rangeQuery(range)}`)
   }
 
   return { fetchMetrics, fetchActivity }

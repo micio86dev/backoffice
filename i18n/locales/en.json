@@ -269,7 +269,9 @@
       "status": "Status",
       "actions": "Actions",
       "empty": "No projects yet.",
-      "uncoveredCompetencies": "{count} without anchors"
+      "uncoveredCompetencies": "{count} without anchors",
+      "avatarProvider": "Avatar service",
+      "avatarTemplate": "Template"
     },
     "action": {
       "new": "New project",
@@ -338,6 +340,9 @@
         "avatarTemplate": "Which avatar template this project uses. It also decides the provider, and is required: if you have not created one yet, create it before the project.",
         "webhookUrl": "BEAI posts progress and evaluation events to this address. Leave empty to use the organization default.",
         "competencies": "The competencies this interview covers. More competencies means a longer interview for the candidate."
+      },
+      "serverError": {
+        "POTENTIAL_CATALOG_INCOMPLETE": "The catalogue for a potential assessment is incomplete: the MTG and LAT competencies are missing. A potential project cannot be created until they are loaded."
       }
     },
     "secret": {
@@ -352,6 +357,10 @@
       "noBars": "No behavioural anchors for this role yet — it cannot be assessed, so it cannot be selected.",
       "attachedNoBars": "Already in this project but has no behavioural anchors for this role — it will not be scored. Remove it to fix the report.",
       "coverageSummary": "{missing} of {total} competencies have no behavioural anchors for this role yet."
+    },
+    "avatarProvider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
     }
   },
   "report": {
@@ -553,8 +562,8 @@
       },
       "error": {
         "invalidKey": "This key was rejected by the provider. Check it and try again.",
-        "rateLimited": "Stored, but the provider is currently rate-limiting verification. It will be retried automatically on next use.",
-        "unreachable": "Stored, but the provider could not be reached to verify it. It will be retried automatically on next use."
+        "rateLimited": "Stored, but the provider is currently rate-limiting verification. Save again in a minute to retry.",
+        "unreachable": "Stored, but the provider could not be reached to verify it. Save again to retry."
       },
       "table": {
         "name": "Name",

@@ -269,7 +269,9 @@
       "status": "Stato",
       "actions": "Azioni",
       "empty": "Nessun progetto ancora presente.",
-      "uncoveredCompetencies": "{count} senza ancore"
+      "uncoveredCompetencies": "{count} senza ancore",
+      "avatarProvider": "Servizio avatar",
+      "avatarTemplate": "Template"
     },
     "action": {
       "new": "Nuovo progetto",
@@ -338,6 +340,9 @@
         "avatarTemplate": "Quale template avatar usa questo progetto. Determina anche il fornitore ed è obbligatorio: se non ne hai ancora creato uno, crealo prima di creare il progetto.",
         "webhookUrl": "BEAI invia a questo indirizzo gli eventi di avanzamento e di valutazione. Lascia vuoto per usare l'impostazione predefinita dell'organizzazione.",
         "competencies": "Le competenze valutate in questo colloquio. Più competenze significano un colloquio più lungo per il candidato."
+      },
+      "serverError": {
+        "POTENTIAL_CATALOG_INCOMPLETE": "Il catalogo per la valutazione di tipo «potential» non è completo: le competenze MTG e LAT non sono presenti. Un progetto «potential» non può essere creato finché non vengono caricate."
       }
     },
     "secret": {
@@ -352,6 +357,10 @@
       "noBars": "Nessuna ancora comportamentale per questo ruolo — non è valutabile, quindi non è selezionabile.",
       "attachedNoBars": "Già presente in questo progetto ma senza ancore comportamentali per questo ruolo — non verrà valutata. Rimuovila per correggere il report.",
       "coverageSummary": "{missing} competenze su {total} non hanno ancora ancore comportamentali per questo ruolo."
+    },
+    "avatarProvider": {
+      "heygen": "HeyGen",
+      "tavus": "Tavus"
     }
   },
   "report": {
@@ -553,8 +562,8 @@
       },
       "error": {
         "invalidKey": "Questa chiave è stata rifiutata dal fornitore. Controllala e riprova.",
-        "rateLimited": "Salvata, ma al momento il fornitore sta limitando le verifiche. Verrà ritentata automaticamente al prossimo utilizzo.",
-        "unreachable": "Salvata, ma non è stato possibile raggiungere il fornitore per verificarla. Verrà ritentata automaticamente al prossimo utilizzo."
+        "rateLimited": "Salvata, ma al momento il fornitore sta limitando le verifiche. Salva di nuovo tra un minuto per riprovare.",
+        "unreachable": "Salvata, ma non è stato possibile raggiungere il fornitore per verificarla. Salva di nuovo per riprovare."
       },
       "table": {
         "name": "Nome",

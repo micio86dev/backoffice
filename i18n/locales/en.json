@@ -277,7 +277,9 @@
       "empty": "No projects yet.",
       "uncoveredCompetencies": "{count} without anchors",
       "avatarProvider": "Avatar service",
-      "avatarTemplate": "Template"
+      "avatarTemplate": "Template",
+      "noCompetencies": "No competencies selected — this project cannot run an interview.",
+      "noAvatarTemplate": "No avatar template assigned"
     },
     "action": {
       "new": "New project",
@@ -460,7 +462,8 @@
       "webhooks": "Webhook defaults",
       "users": "Users & roles",
       "llmCredentials": "Conversation LLM credentials",
-      "branding": "Appearance"
+      "branding": "Appearance",
+      "platform": "Platform"
     },
     "sectionDescription": {
       "organization": "Name and tenancy identifier",
@@ -468,7 +471,8 @@
       "webhooks": "Where BEAI delivers progress and evaluation events",
       "users": "Who can sign in, and what they are allowed to do",
       "llmCredentials": "The vendor API key the interview model runs on",
-      "branding": "The client's logo and colour, applied to this panel and to the candidate app."
+      "branding": "The client's logo and colour, applied to this panel and to the candidate app.",
+      "platform": "BEAI-wide settings. Visible to platform administrators only."
     },
     "organization": {
       "name": "Name",
@@ -604,6 +608,18 @@
         "removeLogoTitle": "Remove the logo?",
         "removeLogoBody": "The file will be permanently deleted. If you no longer have the original you will not be able to restore it. Until a new one is uploaded, the BEAI logo is used."
       }
+    },
+    "platform": {
+      "maxQuestions": {
+        "standard": "Max questions per competency — standard",
+        "standardHelp": "How many questions an operator may predefine for one competency in a standard assessment. The interview stays adaptive: these are asked first, the rest is followed up by the interviewer.",
+        "potential": "Max questions per competency — potential",
+        "potentialHelp": "The same cap for potential assessments, which are built around fixed questions by design.",
+        "range": "Enter a whole number between 1 and 10."
+      },
+      "saved": "Platform settings saved.",
+      "saveFailed": "Could not save the platform settings.",
+      "loadFailed": "Could not load the platform settings. The values shown are the defaults."
     }
   },
   "users": {
@@ -831,7 +847,9 @@
         "vendor_mismatch": "This credential does not match the selected model's provider.",
         "model_required": "Choose a model: the model and the credential must be set together.",
         "credential_required": "Choose a credential: the model and the credential must be set together."
-      }
+      },
+      "write_title": "The change was not applied",
+      "projectCount": "{count} project is pinned to it. | {count} projects are pinned to it."
     },
     "warning": {
       "title": "Saved, with a warning",
@@ -912,7 +930,11 @@
     },
     "llmForecastIntro": "Each template below carries an estimate of what one typical interview costs in conversation-LLM tokens. Avatar minutes are billed by a different vendor on a different meter and are not included here.",
     "llmForecast": "≈ $ {amount} in LLM tokens for a typical {minutes}-minute, {turns}-turn interview. An estimate, and a total for that whole interview — not a rate per minute.",
-    "llmForecastUnavailable": "No conversation model is bound to this template, so its LLM cost cannot be forecast."
+    "llmForecastUnavailable": "No conversation model is bound to this template, so its LLM cost cannot be forecast.",
+    "serverError": {
+      "template_in_use": "This template cannot be deleted while projects still use it.",
+      "template_active": "The active template cannot be deleted. Activate another one first."
+    }
   },
   "help": {
     "label": "Help",
@@ -1134,7 +1156,10 @@
     "dragHandle": "Drag to reorder",
     "noCompetencies": "This project has no competencies yet: choose them before writing questions.",
     "confirmRemoveTitle": "Delete this question?",
-    "confirmRemoveBody": "It will no longer be asked in future interviews. Interviews already conducted are unchanged."
+    "confirmRemoveBody": "It will no longer be asked in future interviews. Interviews already conducted are unchanged.",
+    "newFor": "New question · {competency}",
+    "editFor": "Edit question · {competency}",
+    "textEnRequired": "The English question is required."
   },
   "superadmin": {
     "switchClient": "Viewing client",

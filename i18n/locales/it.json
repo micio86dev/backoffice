@@ -277,7 +277,9 @@
       "empty": "Nessun progetto ancora presente.",
       "uncoveredCompetencies": "{count} senza ancore",
       "avatarProvider": "Servizio avatar",
-      "avatarTemplate": "Template"
+      "avatarTemplate": "Template",
+      "noCompetencies": "Nessuna competenza selezionata: questo progetto non può avviare un colloquio.",
+      "noAvatarTemplate": "Nessun template avatar assegnato"
     },
     "action": {
       "new": "Nuovo progetto",
@@ -460,7 +462,8 @@
       "webhooks": "Valori predefiniti webhook",
       "users": "Utenti e ruoli",
       "llmCredentials": "Credenziali LLM di conversazione",
-      "branding": "Aspetto"
+      "branding": "Aspetto",
+      "platform": "Piattaforma"
     },
     "sectionDescription": {
       "organization": "Nome e identificatore del tenant",
@@ -468,7 +471,8 @@
       "webhooks": "Dove BEAI recapita gli eventi di avanzamento e valutazione",
       "users": "Chi può accedere e cosa può fare",
       "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista",
-      "branding": "Logo e colore del cliente, applicati a questo pannello e all'app del candidato."
+      "branding": "Logo e colore del cliente, applicati a questo pannello e all'app del candidato.",
+      "platform": "Impostazioni valide per tutto BEAI. Visibili solo agli amministratori di piattaforma."
     },
     "organization": {
       "name": "Nome",
@@ -604,6 +608,18 @@
         "removeLogoTitle": "Rimuovere il logo?",
         "removeLogoBody": "Il file verrà eliminato definitivamente. Se non hai più l'originale non potrai ripristinarlo. Fino a un nuovo caricamento verrà usato il logo BEAI."
       }
+    },
+    "platform": {
+      "maxQuestions": {
+        "standard": "Domande massime per competenza — standard",
+        "standardHelp": "Quante domande un operatore può predefinire per una competenza in una valutazione standard. Il colloquio resta adattivo: queste vengono poste per prime, il resto lo approfondisce l'intervistatore.",
+        "potential": "Domande massime per competenza — potenziale",
+        "potentialHelp": "Lo stesso limite per le valutazioni di potenziale, che per costruzione si basano su domande fisse.",
+        "range": "Inserisci un numero intero tra 1 e 10."
+      },
+      "saved": "Impostazioni di piattaforma salvate.",
+      "saveFailed": "Non è stato possibile salvare le impostazioni di piattaforma.",
+      "loadFailed": "Non è stato possibile caricare le impostazioni di piattaforma. I valori mostrati sono quelli predefiniti."
     }
   },
   "users": {
@@ -831,7 +847,9 @@
         "vendor_mismatch": "Questa credenziale non corrisponde al fornitore del modello selezionato.",
         "model_required": "Seleziona un modello: modello e credenziale vanno impostati insieme.",
         "credential_required": "Seleziona una credenziale: modello e credenziale vanno impostati insieme."
-      }
+      },
+      "write_title": "La modifica non è stata applicata",
+      "projectCount": "{count} progetto lo utilizza. | {count} progetti lo utilizzano."
     },
     "warning": {
       "title": "Salvato, con un avviso",
@@ -912,7 +930,11 @@
     },
     "llmForecastIntro": "Ogni template qui sotto riporta una stima di quanto costa in token dell'LLM di conversazione una singola intervista tipica. I minuti dell'avatar sono fatturati da un fornitore diverso su un contatore diverso e non sono inclusi.",
     "llmForecast": "≈ $ {amount} in token LLM per un'intervista tipica di {minutes} minuti e {turns} turni. È una stima, ed è il totale di quell'intera intervista — non una tariffa al minuto.",
-    "llmForecastUnavailable": "A questo template non è associato alcun modello di conversazione, quindi il suo costo LLM non può essere stimato."
+    "llmForecastUnavailable": "A questo template non è associato alcun modello di conversazione, quindi il suo costo LLM non può essere stimato.",
+    "serverError": {
+      "template_in_use": "Questo template non può essere eliminato finché dei progetti lo usano.",
+      "template_active": "Il template attivo non può essere eliminato. Attivane prima un altro."
+    }
   },
   "help": {
     "label": "Aiuto",
@@ -1134,7 +1156,10 @@
     "dragHandle": "Trascina per riordinare",
     "noCompetencies": "Questo progetto non ha ancora competenze: selezionale prima di scrivere le domande.",
     "confirmRemoveTitle": "Eliminare questa domanda?",
-    "confirmRemoveBody": "La domanda non verrà più posta nei prossimi colloqui. Quelli già svolti restano invariati."
+    "confirmRemoveBody": "La domanda non verrà più posta nei prossimi colloqui. Quelli già svolti restano invariati.",
+    "newFor": "Nuova domanda · {competency}",
+    "editFor": "Modifica domanda · {competency}",
+    "textEnRequired": "La domanda in inglese è obbligatoria."
   },
   "superadmin": {
     "switchClient": "Cliente visualizzato",

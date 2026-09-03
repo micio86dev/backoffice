@@ -1159,7 +1159,9 @@
     "confirmRemoveBody": "It will no longer be asked in future interviews. Interviews already conducted are unchanged.",
     "newFor": "New question · {competency}",
     "editFor": "Edit question · {competency}",
-    "textEnRequired": "The English question is required."
+    "textEnRequired": "The English question is required.",
+    "loadError": "Could not load the questions.",
+    "removeError": "Could not remove the question."
   },
   "superadmin": {
     "switchClient": "Viewing client",

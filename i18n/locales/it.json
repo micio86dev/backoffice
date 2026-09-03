@@ -1159,7 +1159,9 @@
     "confirmRemoveBody": "La domanda non verrà più posta nei prossimi colloqui. Quelli già svolti restano invariati.",
     "newFor": "Nuova domanda · {competency}",
     "editFor": "Modifica domanda · {competency}",
-    "textEnRequired": "La domanda in inglese è obbligatoria."
+    "textEnRequired": "La domanda in inglese è obbligatoria.",
+    "loadError": "Non è stato possibile caricare le domande.",
+    "removeError": "Non è stato possibile rimuovere la domanda."
   },
   "superadmin": {
     "switchClient": "Cliente visualizzato",

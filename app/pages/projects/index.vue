@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-6">
     <PageHeader :title="$t('projects.title')" :subtitle="$t('projects.subtitle')">
       <template #actions>
-        <Button data-testid="projects-new" @click="editing = 'new'">
+        <Button v-if="canCreate" data-testid="projects-new" @click="editing = 'new'">
           {{ $t('projects.action.new') }}
         </Button>
       </template>
@@ -22,6 +22,7 @@
       :projects="projects"
       :coverage="uncoveredIdsByRole"
       :can-invite="canInvite"
+      :can-edit="canEdit"
       :locale="locale"
       @edit="onEdit"
     />
@@ -77,7 +78,7 @@ import { Separator } from '@/components/ui/separator'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useBarsCoverage } from '@/composables/useBarsCoverage'
-import { useProfile } from '@/composables/useProfile'
+import { useCurrentUser } from '@/composables/useCurrentUser'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -106,23 +107,29 @@ useHead({
 
 const { listProjects } = useProjects()
 const { uncoveredIdsByRole, loadRoles } = useBarsCoverage()
-const { fetchProfile } = useProfile()
 
-// "Invite candidate" (operator-interview-link, design D4): minting starts an
-// assessment, it is not a read — a viewer must see neither this row action
-// nor the participant-detail "Generate new link" card. Fail-closed default
-// (false) until the profile fetch confirms a non-viewer role, mirroring
-// profile.vue:52's own coercion of a missing/unrecognized role to 'viewer'.
-const canInvite = ref(false)
-
-async function loadViewerGate(): Promise<void> {
-  try {
-    const profile = await fetchProfile()
-    canInvite.value = (profile.data.role ? String(profile.data.role) : 'viewer') !== 'viewer'
-  } catch {
-    canInvite.value = false
-  }
-}
+/**
+ * What this operator may do, ANSWERED BY THE SERVER'S POLICIES.
+ *
+ * This page used to fetch `/api/profile`, read `data.role` out of it, and
+ * compare the string to `'viewer'`. That is the second copy of an
+ * authorization rule that `UserAbilities` exists to prevent, and it had
+ * already gone stale in two ways: `projects-new` was gated on nothing at all
+ * (a viewer was offered a form the API refuses), and "invite candidate" was
+ * derived from the project role when the rule that governs it lives in
+ * `ParticipantPolicy` — two different policies collapsed into one string
+ * comparison.
+ *
+ * It also cost a second round trip. `/auth/me` is fetched once per page load
+ * and shared; `can()` reads that cache and fails closed, so a transient error
+ * hides controls rather than offering ones that come back 403.
+ */
+const { can } = useCurrentUser()
+const canCreate = computed(() => can('projects.create'))
+const canEdit = computed(() => can('projects.update'))
+// Minting an entry link STARTS an assessment — a participant write, governed
+// by ParticipantPolicy, never by whether this person may edit the project.
+const canInvite = computed(() => can('participants.create'))
 
 const projects = ref<Project[]>([])
 
@@ -172,6 +179,12 @@ async function onFormSaved(): Promise<void> {
 
 onMounted(() => {
   void load()
-  void loadViewerGate()
+
+  // Fills the shared `/auth/me` cache `can()` reads. Swallowed: `can()`
+  // already answers false without it, so a failure hides controls rather
+  // than offering ones the API would refuse.
+  void useCurrentUser()
+    .ensureLoaded()
+    .catch(() => undefined)
 })
 </script>

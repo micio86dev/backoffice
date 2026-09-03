@@ -15,6 +15,7 @@ import { ref } from 'vue'
 // layouts/default.vue — which a page spec mounts outside of, so the spec has
 // to stand in for the layout.
 import { withTooltipProvider } from '../../support/tooltip-host'
+import { currentUserStub } from '../../support/abilities'
 
 const tMock = (key: string) => key
 
@@ -65,21 +66,6 @@ function detailResponse(
         evaluation_raw: { type: 'application/json', ref: 'evaluation', url: '/y' },
       },
       created_at: '2026-03-14T09:00:00Z',
-    },
-  }
-}
-
-/** ProfileResponse fixture — operator-interview-link's viewer-gate source. */
-function profileResponse(role: string) {
-  return {
-    data: {
-      id: 1,
-      name: 'Test User',
-      email: 'user@example.com',
-      locale: 'en',
-      role,
-      organization: { id: 1, name: 'Acme' },
-      photo_url: null,
     },
   }
 }
@@ -294,7 +280,13 @@ describe('pages/participants/[id].vue', () => {
       await wrapper.get('[data-testid="download-transcript"]').trigger('click')
       await flushPromises()
 
-      expect(wrapper.text()).toContain('report.states.notReady.title')
+      // The message alone was not evidence: flipping the variant to destructive
+      // left this green, and destructive is exactly the wrong chrome for a
+      // not-ready state. Same assertion the transcript alert already makes.
+      const alert = wrapper.get('[data-testid="download-error"]')
+
+      expect(alert.attributes('data-state')).toBe('not-ready')
+      expect(alert.text()).toContain('report.states.notReady.title')
     })
   })
 
@@ -493,8 +485,8 @@ describe('pages/participants/[id].vue', () => {
           fetchParticipant: vi.fn().mockResolvedValue(detailResponse('in_attesa', project)),
         }),
       }))
-      vi.doMock('../../../../app/composables/useProfile', () => ({
-        useProfile: () => ({ fetchProfile: vi.fn().mockResolvedValue(profileResponse(role)) }),
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => currentUserStub(role),
       }))
       vi.doMock('../../../../app/composables/useEntryLinks', () => ({
         useEntryLinks: () => ({ generateEntryLink: generateEntryLinkMock }),
@@ -594,10 +586,8 @@ describe('pages/participants/[id].vue', () => {
             fetchParticipant: vi.fn().mockResolvedValue(detailResponse(participantStatus)),
           }),
         }))
-        vi.doMock('../../../../app/composables/useProfile', () => ({
-          useProfile: () => ({
-            fetchProfile: vi.fn().mockResolvedValue(profileResponse('operator')),
-          }),
+        vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+          useCurrentUser: () => currentUserStub('operator'),
         }))
         vi.doMock('../../../../app/composables/useEntryLinks', () => ({
           useEntryLinks: () => ({ generateEntryLink: vi.fn() }),
@@ -788,9 +778,12 @@ describe('pages/participants/[id].vue', () => {
         },
       })
 
-      expect(wrapper.get('[data-testid="cost-coverage"]').text()).toBe(
-        'participants.detail.interview.costCoverage'
-      )
+      expect(
+        wrapper
+          .get('[data-testid="interview-cost"]')
+          .get('[data-testid="metric-card-detail"]')
+          .text()
+      ).toBe('participants.detail.interview.costCoverage')
     })
 
     it('states nothing about coverage when the cost total is complete (full coverage)', async () => {
@@ -807,7 +800,12 @@ describe('pages/participants/[id].vue', () => {
         },
       })
 
-      expect(wrapper.find('[data-testid="cost-coverage"]').exists()).toBe(false)
+      expect(
+        wrapper
+          .get('[data-testid="interview-cost"]')
+          .find('[data-testid="metric-card-detail"]')
+          .exists()
+      ).toBe(false)
     })
 
     it('renders a dash rather than 0 when no session yields a cost estimate', async () => {
@@ -843,16 +841,17 @@ describe('pages/participants/[id].vue', () => {
         interview: { elapsed: { seconds: 780, sessions_counted: 2, sessions_total: 3 } },
       })
 
-      expect(wrapper.get('[data-testid="elapsed-coverage"]').text()).toBe(
-        'participants.detail.interview.elapsedCoverage'
-      )
+      expect(
+        wrapper
+          .get('[data-testid="interview-elapsed"]')
+          .get('[data-testid="metric-card-detail"]')
+          .text()
+      ).toBe('participants.detail.interview.elapsedCoverage')
     })
 
     it('a viewer sees every interview-summary field — no restriction beyond RBAC', async () => {
-      vi.doMock('../../../../app/composables/useProfile', () => ({
-        useProfile: () => ({
-          fetchProfile: vi.fn().mockResolvedValue(profileResponse('viewer')),
-        }),
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => currentUserStub('viewer'),
       }))
 
       const { wrapper } = await mountDetailPage({
@@ -946,8 +945,30 @@ describe('pages/participants/[id].vue', () => {
         fetchTranscriptImpl: () => Promise.reject(serverError),
       })
 
-      expect(wrapper.find('[data-testid="transcript-load-error"]').exists()).toBe(true)
+      const alert = wrapper.get('[data-testid="transcript-load-error"]')
+
+      expect(alert.attributes('data-state')).toBe('error')
       expect(wrapper.find('[data-testid="transcript-panel"]').exists()).toBe(false)
+    })
+
+    it('renders a 409 as not-ready, not as a failure', async () => {
+      // 409 here means the transcript is still being assembled — temporal and
+      // self-resolving. It was painted the same destructive red as a 403, a 404
+      // and a dead transport, while the TEXT resolved to errors.states.notReady:
+      // two channels telling the operator opposite things about whether they
+      // had to do something. The 409 path had no test at all; the only one here
+      // used a 500.
+      const conflict = Object.assign(new Error('not ready'), { status: 409 })
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        fetchTranscriptImpl: () => Promise.reject(conflict),
+      })
+
+      const alert = wrapper.get('[data-testid="transcript-load-error"]')
+
+      expect(alert.attributes('data-state')).toBe('not-ready')
+      // Distinct from the failure case above, which is what the rule is about.
+      expect(alert.classes().join(' ')).not.toContain('destructive')
     })
   })
 })

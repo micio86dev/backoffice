@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { currentUserStub } from '../../support/abilities'
 import { ref } from 'vue'
 import { waitFor } from '../../support/wait-for'
 
@@ -61,6 +62,13 @@ let useHeadMock: ReturnType<typeof vi.fn>
 describe('pages/projects/index.vue', () => {
   beforeEach(() => {
     vi.resetModules()
+    // The page gates "New project" on `projects.create` and the row edit on
+    // `projects.update`, both read from `/auth/me`'s ability map. Unmocked,
+    // `can()` fails closed (correctly) and every control this file drives is
+    // absent. `admin` is the identity these tests describe.
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => currentUserStub('admin'),
+    }))
     // The drawer mounts the REAL ProjectForm, and a project cannot be saved
     // without an avatar template — the column is NOT NULL and the form refuses
     // a submit with nothing selected. Unmocked, the composable reaches for the

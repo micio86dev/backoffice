@@ -7,7 +7,7 @@
       whether it can proceed, so opening the link even once (to "check it
       works") spends it.
     -->
-    <Alert variant="destructive" data-testid="entry-link-disclosure">
+    <Alert variant="warning" data-testid="entry-link-disclosure">
       <AlertDescription>{{ $t('entryLink.disclosure') }}</AlertDescription>
     </Alert>
 

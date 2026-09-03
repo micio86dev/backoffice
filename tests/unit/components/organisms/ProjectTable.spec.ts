@@ -274,3 +274,59 @@ describe('ProjectTable avatar columns', () => {
     expect(wrapper.find('tbody td').attributes('colspan')).toBe(String(headers))
   })
 })
+
+/**
+ * The template cell names the MODEL underneath the template.
+ *
+ * The provider column already says HeyGen or Tavus. What it cannot say is
+ * which LLM the conversation actually runs on, and that is the line that
+ * decides cost and behaviour — an operator comparing two projects on the same
+ * provider has no other way to tell them apart.
+ *
+ * Same cell rather than a fourth column: the model is an attribute OF the
+ * template, not a peer of it, and a table that grows a column per attribute
+ * stops being scannable well before it stops being correct.
+ */
+describe('ProjectTable template cell', () => {
+  it('stacks the LLM model under the template name', () => {
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [
+          project({
+            avatar_template: {
+              id: 7,
+              name: 'Ada Warm',
+              provider: 'tavus',
+              llm_model: 'Gemini 3 Flash Preview',
+            },
+          }),
+        ],
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const cell = wrapper.get('[data-testid="project-row-template-1"]')
+
+    expect(cell.text()).toContain('Ada Warm')
+    expect(cell.text()).toContain('Gemini 3 Flash Preview')
+  })
+
+  it('shows the template alone when no model is bound', () => {
+    // Nullable by schema, and "not configured" must read as absent rather
+    // than as an empty second line pretending to hold something.
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [
+          project({
+            avatar_template: { id: 7, name: 'Ada Warm', provider: 'tavus', llm_model: null },
+          }),
+        ],
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const cell = wrapper.get('[data-testid="project-row-template-1"]')
+
+    expect(cell.text()).toBe('Ada Warm')
+  })
+})

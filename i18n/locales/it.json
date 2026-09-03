@@ -127,6 +127,12 @@
       "title": "Attività recente",
       "empty": "Ancora nessun candidato. Compariranno qui appena il sistema che ti ha integrato ne crea uno.",
       "noProject": "Progetto non disponibile"
+    },
+    "filters": {
+      "year": "Anno",
+      "month": "Mese",
+      "allTime": "Tutto il periodo",
+      "wholeYear": "Tutto l'anno"
     }
   },
   "participants": {
@@ -1111,5 +1117,28 @@
       "llmActual": "Token LLM di conversazione — effettivo",
       "llmNotBilled": "Questa sessione non ha usato un modello gestito da BEAI, quindi non è stato registrato alcun costo per i token. Non si tratta di un addebito pari a zero."
     }
+  },
+  "projectQuestions": {
+    "title": "Domande predefinite",
+    "description": "Le domande con cui l'avatar apre ogni competenza. I follow-up restano decisi dall'AI in tempo reale.",
+    "empty": "Nessuna domanda predefinita: l'avatar aprirà la competenza da sé.",
+    "add": "Aggiungi domanda",
+    "edit": "Modifica",
+    "remove": "Elimina",
+    "moveUp": "Sposta su",
+    "moveDown": "Sposta giù",
+    "textEn": "Testo (inglese)",
+    "textIt": "Testo (italiano)",
+    "saveError": "Non è stato possibile salvare la domanda.",
+    "reorderError": "Non è stato possibile riordinare le domande. L'ordine precedente è stato mantenuto.",
+    "dragHandle": "Trascina per riordinare",
+    "noCompetencies": "Questo progetto non ha ancora competenze: selezionale prima di scrivere le domande.",
+    "confirmRemoveTitle": "Eliminare questa domanda?",
+    "confirmRemoveBody": "La domanda non verrà più posta nei prossimi colloqui. Quelli già svolti restano invariati."
+  },
+  "superadmin": {
+    "switchClient": "Cliente visualizzato",
+    "allClients": "Tutti i clienti",
+    "switchError": "Non è stato possibile cambiare cliente."
   }
 }

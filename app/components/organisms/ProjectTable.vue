@@ -45,8 +45,21 @@
           }}</template>
           <template v-else>–</template>
         </TableCell>
+        <!--
+          The template, and underneath it the MODEL the conversation runs on.
+          The provider column says HeyGen or Tavus; it cannot say Gemini Flash,
+          and that is the line deciding cost and behaviour — two projects on
+          the same provider are otherwise indistinguishable here.
+
+          One cell rather than a fourth column: the model is an attribute OF
+          the template, not a peer of it, and a table that grows a column per
+          attribute stops being scannable long before it stops being correct.
+        -->
         <TableCell :data-testid="`project-row-template-${project.id}`">
           {{ project.avatar_template?.name ?? '–' }}
+          <div v-if="project.avatar_template?.llm_model" class="text-muted-foreground text-xs">
+            {{ project.avatar_template.llm_model }}
+          </div>
         </TableCell>
         <TableCell>
           <ProjectStatusBadge :status="project.status" />

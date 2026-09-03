@@ -33,13 +33,12 @@
       </label>
     </div>
 
-    <Alert
+    <FormMessage
       v-if="message"
-      :variant="message.kind === 'error' ? 'destructive' : 'success'"
-      data-testid="portability-result"
-    >
-      <AlertDescription>{{ message.text }}</AlertDescription>
-    </Alert>
+      :kind="message.kind"
+      :text="message.text"
+      test-id="portability-result"
+    />
 
     <!--
       The file is already fully parsed at this point — the dialog names WHAT
@@ -69,7 +68,7 @@
  * out at interview time, on a candidate.
  */
 import { computed, ref } from 'vue'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
@@ -81,7 +80,7 @@ const { t } = useI18n()
 const { exportTemplates, importTemplates } = useAvatarTemplates()
 
 const picker = ref<HTMLInputElement | null>(null)
-const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
+const message = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 // The count and names to preview — the content, not a generic warning, IS
 // the confirmation (design.md D8). Preview cutoff: every name when 10 or
@@ -173,7 +172,7 @@ async function onImportConfirmed(): Promise<void> {
     const result = await importTemplates(document_)
 
     message.value = {
-      kind: 'ok',
+      kind: 'success',
       text: t('avatar_templates.portability.importDone', { count: result.data.length }),
     }
     emit('imported')

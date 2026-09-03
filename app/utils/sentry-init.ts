@@ -40,3 +40,25 @@ export function sentryPosture(dsn: string, environment: string): SentryPosture {
     sendDefaultPii: false,
   }
 }
+
+/**
+ * Whether `Sentry.init()` should be called AT ALL.
+ *
+ * `sentryPosture` returns `enabled: false` for an empty DSN, and that was
+ * trusted to make the SDK inert. It does not. Verified in a real browser on
+ * 2026-09-02: with `sentryDsn: ""` the page still ends up with a populated
+ * `window.__SENTRY__` carrier — the client is constructed, it registers
+ * globals, and it brings its vendored copy of web-vitals with it. The visible
+ * cost was a recurring `Uncaught TypeError: Cannot read properties of
+ * undefined (reading 'startTime') at et.reportAllChanges` in the console of an
+ * app that observes no web vitals of its own and has no other dependency that
+ * bundles them.
+ *
+ * `enabled: false` stays in the posture regardless: it is what stops anything
+ * being SENT if a future caller initialises despite this guard. Belt and
+ * braces, in the order that actually holds — this one decides whether the SDK
+ * runs, that one decides whether it transmits.
+ */
+export function shouldInitSentry(dsn: string): boolean {
+  return dsn.trim() !== ''
+}

@@ -96,15 +96,12 @@
           >
         </Field>
 
-        <Alert
+        <FormMessage
           v-if="formMessage"
-          :variant="formMessage.kind === 'error' ? 'destructive' : 'default'"
-          role="alert"
-          aria-live="polite"
-          data-testid="profile-password-banner"
-        >
-          <AlertDescription>{{ formMessage.text }}</AlertDescription>
-        </Alert>
+          :kind="formMessage.kind"
+          :text="formMessage.text"
+          test-id="profile-password-banner"
+        />
 
         <Button type="submit" :loading="saving" data-testid="profile-password-submit">
           {{ $t('profile.password.title') }}
@@ -125,7 +122,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { useProfile } from '@/composables/useProfile'
 import { useAuth } from '@/composables/useAuth'
 import { useCurrentUser } from '@/composables/useCurrentUser'
@@ -147,7 +144,7 @@ const newPassword = ref('')
 const confirmation = ref('')
 
 const saving = ref(false)
-const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
+const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 const errors = ref<{ current?: string; next?: string; confirmation?: string }>({})
 
 function validateCurrent(): boolean {

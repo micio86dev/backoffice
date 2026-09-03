@@ -80,15 +80,12 @@
       photoError
     }}</FieldError>
 
-    <Alert
+    <FormMessage
       v-if="formMessage"
-      :variant="formMessage.kind === 'error' ? 'destructive' : 'success'"
-      role="alert"
-      aria-live="polite"
-      data-testid="profile-photo-banner"
-    >
-      <AlertDescription>{{ formMessage.text }}</AlertDescription>
-    </Alert>
+      :kind="formMessage.kind"
+      :text="formMessage.text"
+      test-id="profile-photo-banner"
+    />
 
     <ConfirmDialog
       :open="confirmOpen"
@@ -113,7 +110,7 @@ import { ref } from 'vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useProfile } from '@/composables/useProfile'
 import { applyServerFieldErrors } from '@/utils/http-error'
@@ -145,7 +142,7 @@ const inputEl = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const confirmOpen = ref(false)
 const photoError = ref<string | undefined>(undefined)
-const formMessage = ref<{ kind: 'error' | 'success'; text: string } | null>(null)
+const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 const SERVER_FIELD_TO_ERROR_KEY = {
   photo: 'photo',

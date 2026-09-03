@@ -76,14 +76,26 @@ const ADMIN_ONLY = new Set([
   'apiClients.viewAny',
 ])
 
-function mockCurrentUser(role: 'admin' | 'operator' | null) {
+function mockCurrentUser(role: 'admin' | 'operator' | 'superadmin' | null) {
+  const isSuperadmin = role === 'superadmin'
+  // A superadmin also holds every org ability through `Gate::before`, so the
+  // ability answers below treat them as an admin — anything narrower would
+  // make the platform-section tests pass for the wrong reason.
+  const abilityRole = isSuperadmin ? 'admin' : role
+
   vi.doMock('../../../../app/composables/useCurrentUser', () => ({
     useCurrentUser: () => ({
       ensureLoaded:
         role === null
           ? vi.fn().mockRejectedValue(new Error('unauthenticated'))
-          : vi.fn().mockResolvedValue({ roles: [role] }),
-      can: (ability: string) => role !== null && (role === 'admin' || !ADMIN_ONLY.has(ability)),
+          : vi.fn().mockResolvedValue({ roles: [abilityRole] }),
+      can: (ability: string) =>
+        abilityRole !== null && (abilityRole === 'admin' || !ADMIN_ONLY.has(ability)),
+      // The page reads `is_superadmin` for the PLATFORM section, which is
+      // gated on identity rather than on an ability: its rows belong to no
+      // organization, so no org-scoped policy can describe who may edit them.
+      // `null` for the unauthenticated case, so that path still fails closed.
+      user: ref(role === null ? null : { is_superadmin: isSuperadmin }),
     }),
   }))
 }
@@ -216,5 +228,39 @@ describe('pages/settings/index.vue', () => {
 
     expect(wrapper.findAll('[role="tab"]')).toHaveLength(0)
     expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+  })
+
+  /**
+   * The PLATFORM section.
+   *
+   * Gated on identity, not on an ability, and the distinction is the point:
+   * these rows belong to BEAI rather than to any organization, so no org-scoped
+   * policy can describe who may edit them. An org ADMIN — who holds every
+   * tenant ability there is — must not see it.
+   */
+  it('shows the platform section to a superadmin', async () => {
+    mockCurrentUser('superadmin')
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).toContain('settings.tabs.platform')
+  })
+
+  it('hides the platform section from an org admin, who holds every tenant ability', async () => {
+    mockCurrentUser('admin')
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).not.toContain('settings.tabs.platform')
+  })
+
+  it('hides the platform section when the identity fetch fails', async () => {
+    // Fails closed like every other section: the one moment the page knows
+    // least about who is looking at it is the moment to show least.
+    mockCurrentUser(null)
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).not.toContain('settings.tabs.platform')
   })
 })

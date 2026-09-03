@@ -77,7 +77,7 @@
 
 <script setup lang="ts">
 import PageHeader from '@/components/molecules/PageHeader.vue'
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent, type Component } from 'vue'
 import {
   BuildingOffice2Icon,
   KeyIcon,
@@ -85,12 +85,13 @@ import {
   UserGroupIcon,
   CpuChipIcon,
   SwatchIcon,
+  AdjustmentsHorizontalIcon,
 } from '@heroicons/vue/24/outline'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
-import { useCurrentUser } from '@/composables/useCurrentUser'
+import { useCurrentUser, type AbilityKey } from '@/composables/useCurrentUser'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -109,10 +110,34 @@ const LlmCredentialsPanel = defineAsyncComponent(
   () => import('@/components/organisms/LlmCredentialsPanel.vue')
 )
 const BrandingForm = defineAsyncComponent(() => import('@/components/organisms/BrandingForm.vue'))
+const PlatformSettingsPanel = defineAsyncComponent(
+  () => import('@/components/organisms/PlatformSettingsPanel.vue')
+)
+
+/**
+ * One settings section.
+ *
+ * Typed rather than inferred from `as const`, because the filter below has to
+ * read `superadminOnly` on EVERY entry — and on an inferred literal tuple the
+ * property exists only on the one entry that declares it, which is how the
+ * filter came to branch on `requires === null` instead.
+ */
+interface SettingsSection {
+  value: string
+  labelKey: string
+  descriptionKey: string
+  icon: Component
+  component: Component
+  needsOrganization: boolean
+  /** The ability this section needs, or null when identity decides instead. */
+  requires: AbilityKey | null
+  /** Platform-owned: gated on `is_superadmin`, never on an org-scoped policy. */
+  superadminOnly?: boolean
+}
 
 // The rail and the panel headers read from the same source, so a section can
 // never show one label in the nav and another above its content.
-const SECTIONS = [
+const SECTIONS: readonly SettingsSection[] = [
   {
     value: 'organization',
     labelKey: 'settings.tabs.organization',
@@ -172,7 +197,22 @@ const SECTIONS = [
     // section anyone should be shown speculatively.
     requires: 'llmCredentials.viewAny',
   },
-] as const
+  {
+    // PLATFORM, not tenant. The only section gated on identity rather than on
+    // an ability, because it is not an ability question: these rows belong to
+    // BEAI and the superadmin — who belongs to no organization — is the only
+    // one who may write them. `superadminOnly` is what the filter reads;
+    // `requires: null` records that there is no ability to name.
+    value: 'platform',
+    labelKey: 'settings.tabs.platform',
+    descriptionKey: 'settings.sectionDescription.platform',
+    icon: AdjustmentsHorizontalIcon,
+    component: PlatformSettingsPanel,
+    needsOrganization: false,
+    requires: null,
+    superadminOnly: true,
+  },
+]
 
 definePageMeta({
   name: 'settings',
@@ -200,10 +240,28 @@ const loadError = ref<ResourceErrorState | null>(null)
 // the endpoints behind each section authorize independently.
 const { can } = useCurrentUser()
 
-// EVERY section names an ability — none is unconditional. A section with no
-// gate stays on screen when `/auth/me` fails, which is the one moment the page
-// knows least about who is looking at it.
-const visibleSections = computed(() => SECTIONS.filter((section) => can(section.requires)))
+// EVERY section is gated — none is unconditional. A section with no gate stays
+// on screen when `/auth/me` fails, which is the one moment the page knows least
+// about who is looking at it.
+//
+// Two KINDS of gate, and the distinction is not cosmetic. A tenant section
+// names an ABILITY, answered by the server's own policies. The platform section
+// names an IDENTITY: its rows belong to no organization, so no org-scoped
+// policy can describe who may edit them, and `is_superadmin` — which `/auth/me`
+// publishes as an explicit boolean for exactly this kind of question — is the
+// honest gate. Both fail closed.
+const { user } = useCurrentUser()
+
+const visibleSections = computed(() =>
+  SECTIONS.filter((section) =>
+    section.superadminOnly === true
+      ? user.value?.is_superadmin === true
+      : // Fails closed on BOTH halves: a section naming neither an ability nor
+        // the platform identity is hidden rather than shown, so an incomplete
+        // declaration cannot grant access by accident.
+        section.requires !== null && can(section.requires)
+  )
+)
 
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))

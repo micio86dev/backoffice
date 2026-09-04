@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * Entry link mint, end to end (operator-interview-link, design D4).
@@ -36,7 +37,11 @@ const ACTIVE_PROJECT = {
   created_at: '2026-03-01T10:00:00Z',
   updated_at: '2026-03-01T10:00:00Z',
   pin_context: null,
-  competencies: [],
+  // NOT empty. A project with no competencies cannot run an interview, and the
+  // table now says so and withholds the invite action rather than offering a
+  // link that would 422 at /start with `no_competency_remaining`. This fixture
+  // is meant to be a project an operator CAN invite to, so it carries one.
+  competencies: [{ id: 11, code: 'COM', position: 0 }],
 }
 
 const PARTICIPANT = {
@@ -108,6 +113,36 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
         refresh_token: 'e2e-refresh',
         token_type: 'bearer',
       })
+  )
+
+  // `/auth/me` — the ABILITY MAP, and the reason this suite went red.
+  //
+  // The UI gates its controls on `can()`, which reads this endpoint and fails
+  // CLOSED when it is unmocked: no map, no abilities, and the mint button is
+  // not disabled but absent, so every locator here waited for an element that
+  // was never going to render. `/profile` below is a different endpoint and
+  // carries no abilities, which is why mocking it was not enough.
+  //
+  // `abilitiesFor` derives the map from the role rather than hardcoding it —
+  // a second copy of an authorization rule drifts, and a fixture that drifts
+  // makes every test using it quietly stop testing what it says it tests.
+  await page.route(
+    (url) => url.pathname === '/auth/me',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            user: {
+              id: 1,
+              name: 'Operator One',
+              email: 'operator@example.com',
+              locale: 'it',
+              photo_url: null,
+            },
+            organization: { id: 1, name: 'Acme' },
+            roles: ['operator'],
+            abilities: abilitiesFor(['operator']),
+          })
+        : route.continue()
   )
 
   // operator role — eligible to mint (ParticipantPolicy::create, design D2).

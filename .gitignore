@@ -29,3 +29,6 @@ playwright-report/
 
 # Coverage
 coverage/
+
+# Local skill-registry cache (tooling artifact, never project code)
+.atl/

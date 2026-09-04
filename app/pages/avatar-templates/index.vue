@@ -19,8 +19,9 @@
           <HelpTip term="llmCost" />
         </p>
       </div>
-      <TemplatePortability :is-admin="isAdmin" @imported="load" />
+      <TemplatePortability :is-admin="canCreate" @imported="load" />
       <button
+        v-if="canCreate"
         type="button"
         data-testid="template-new"
         class="shrink-0 rounded-md border border-border px-4 py-2 text-sm font-medium"
@@ -33,6 +34,26 @@
     <Alert v-if="loadError" variant="destructive" data-testid="templates-error">
       <AlertTitle>{{ $t('avatar_templates.error.load_title') }}</AlertTitle>
       <AlertDescription>{{ $t('avatar_templates.error.load_body') }}</AlertDescription>
+    </Alert>
+
+    <!--
+      A failed write, in its OWN alert with its OWN copy. The load message
+      ("Could not load templates… check that you hold the administrator role")
+      was being shown for a failed write, which is the wrong sentence even in
+      the tick before it was wiped.
+    -->
+    <Alert
+      v-if="writeError || writeErrorCode"
+      variant="destructive"
+      data-testid="template-write-error"
+    >
+      <AlertTitle>{{ $t('avatar_templates.error.write_title') }}</AlertTitle>
+      <AlertDescription>
+        {{ writeErrorMessage }}
+        <span v-if="writeErrorCount !== null" data-testid="template-write-error-count">
+          {{ $t('avatar_templates.error.projectCount', { count: writeErrorCount }) }}
+        </span>
+      </AlertDescription>
     </Alert>
 
     <Alert v-if="warning" variant="warning" data-testid="template-warning">
@@ -97,6 +118,7 @@
 
         <div class="flex shrink-0 gap-2">
           <button
+            v-if="canUpdate"
             type="button"
             :data-testid="`template-edit-${template.id}`"
             class="rounded-md border border-border px-3 py-1.5 text-sm"
@@ -116,24 +138,38 @@
             that choice. Nothing live moves — the projects pinning it keep
             running on it — and the action is one click to undo.
           -->
-          <button
-            v-if="!template.is_active"
-            type="button"
-            :data-testid="`template-activate-${template.id}`"
-            class="rounded-md border border-border px-3 py-1.5 text-sm"
-            @click="activateTarget = template"
-          >
-            {{ $t('avatar_templates.action.activate') }}
-          </button>
-          <button
-            v-else
-            type="button"
-            :data-testid="`template-deactivate-${template.id}`"
-            class="rounded-md border border-border px-3 py-1.5 text-sm"
-            @click="onDeactivate(template)"
-          >
-            {{ $t('avatar_templates.action.deactivate') }}
-          </button>
+          <!--
+            The ability wraps the PAIR rather than each branch: `v-else` binds
+            to the immediately preceding sibling, so `v-if="canActivate && …"`
+            on the first and a bare `v-else` on the second would leave the
+            second rendering for someone who may not activate — the exact
+            silent-permissive failure this sweep exists to remove. One
+            `<template v-if>` around both keeps the branches adjacent.
+
+            One ability for both directions, deliberately: activate and
+            deactivate are the same write to `is_active`, and
+            `AvatarTemplatePolicy::activate` is the single gate on it.
+          -->
+          <template v-if="canActivate">
+            <button
+              v-if="!template.is_active"
+              type="button"
+              :data-testid="`template-activate-${template.id}`"
+              class="rounded-md border border-border px-3 py-1.5 text-sm"
+              @click="activateTarget = template"
+            >
+              {{ $t('avatar_templates.action.activate') }}
+            </button>
+            <button
+              v-else
+              type="button"
+              :data-testid="`template-deactivate-${template.id}`"
+              class="rounded-md border border-border px-3 py-1.5 text-sm"
+              @click="onDeactivate(template)"
+            >
+              {{ $t('avatar_templates.action.deactivate') }}
+            </button>
+          </template>
           <!--
             No delete button on the active template at all. The API answers 409,
             but offering a control whose only outcome is an error is a worse
@@ -141,7 +177,7 @@
             so an operator would hesitate over it before finding out.
           -->
           <button
-            v-if="!template.is_active"
+            v-if="canDelete && !template.is_active"
             type="button"
             :data-testid="`template-delete-${template.id}`"
             class="rounded-md border border-border px-3 py-1.5 text-sm"
@@ -227,12 +263,19 @@ import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
+import {
+  resolveResourceErrorState,
+  resourceErrorKey,
+  type ResourceErrorState,
+} from '@/utils/error-state'
+import { serverMessageCode } from '@/utils/http-error'
+import { translateServerCode } from '@/utils/server-message'
 import { formatUsdAmount } from '@/utils/format'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 
 definePageMeta({ name: 'avatar-templates' })
 
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 
 /**
  * What one typical interview on this template costs in conversation-LLM
@@ -272,6 +315,51 @@ const {
 const templates = ref<AvatarTemplate[]>([])
 const fieldSpecs = ref<Record<ProviderName, FieldSpec[]>>({ heygen: [], tavus: [] })
 const loadError = ref(false)
+
+/**
+ * A failed WRITE, kept separate from a failed read.
+ *
+ * Activate, deactivate and delete all used to set `loadError` and then call
+ * `load()`, which sets it back to false the moment the listing succeeds. The
+ * flag was raised and wiped within the same tick, so the operator clicked, the
+ * API refused, and the screen showed a list that looked exactly as before —
+ * no error, no change, no explanation.
+ *
+ * Not academic since the 2026-09-02 ruling: activate and delete are now
+ * platform-only, so 403 is the ORDINARY answer for an admin, and deleting a
+ * pinned template answers 409. Both landed in the same bare catch.
+ *
+ * `load()` owns `loadError`; a write owns this. Resolved through
+ * `resolveResourceErrorState` like every other surface, so 403, 404, 409 and a
+ * dead network read as themselves rather than as one boolean.
+ */
+const writeError = ref<ResourceErrorState | null>(null)
+
+/**
+ * The server's own explanation, when it gave one.
+ *
+ * A 409 from this endpoint is NOT the "not ready yet, reopen later" that
+ * `resolveResourceErrorState` maps it to — the API answers
+ * `{"error": "template_in_use", "project_count": 7}`, meaning seven projects
+ * pin this template and someone has to reassign them. Rendering that as
+ * "processing will finish shortly" is not a vague message, it is a confidently
+ * wrong one, and it discards the count the server computed precisely so the
+ * operator would know how much work they are signing up for.
+ *
+ * Same shape `participants/[id].vue` already uses for the same class of
+ * response: prefer the machine code when there is one, fall back to the HTTP
+ * state when there is not.
+ */
+const writeErrorCode = ref<string | null>(null)
+const writeErrorCount = ref<number | null>(null)
+
+const writeErrorMessage = computed(() => {
+  if (writeErrorCode.value !== null) {
+    return translateServerCode({ t, te }, 'avatar_templates.serverError', writeErrorCode.value)
+  }
+
+  return writeError.value === null ? null : t(resourceErrorKey(writeError.value, 'message'))
+})
 const warning = ref<string | null>(null)
 const saving = ref(false)
 // The raw rejection, passed down VERBATIM (form-clarity-and-console-warnings,
@@ -331,8 +419,16 @@ async function load(): Promise<void> {
 // changes. `can()` fails closed, so a transient `/auth/me` error hides the
 // import/export controls rather than offering ones that come back 403.
 // Affordance only — the endpoints enforce.
+// One computed per ability rather than one `isAdmin` reused for all of them.
+// The page had exactly that, and it was wrong in both directions the day
+// managing templates became platform-only (2026-09-02): `create` no longer
+// implies `update`, and reading the list — which an ADMIN may still do — is
+// not an ability the row controls should ever have been inferring from.
 const { can } = useCurrentUser()
-const isAdmin = computed(() => can('avatarTemplates.create'))
+const canCreate = computed(() => can('avatarTemplates.create'))
+const canUpdate = computed(() => can('avatarTemplates.update'))
+const canActivate = computed(() => can('avatarTemplates.activate'))
+const canDelete = computed(() => can('avatarTemplates.delete'))
 
 onMounted(async () => {
   await load()
@@ -392,7 +488,30 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
   }
 }
 
+/**
+ * One place that decides what a failed write MEANS.
+ *
+ * The machine code wins when the server sent one, because it says what
+ * actually happened; the HTTP state is the fallback for a network fault or an
+ * endpoint that answered nothing useful.
+ */
+function recordWriteFailure(error: unknown): void {
+  writeErrorCode.value = serverMessageCode(error)
+  writeError.value = writeErrorCode.value === null ? resolveResourceErrorState(error) : null
+
+  const data = (error as { data?: { project_count?: unknown } } | null)?.data
+  writeErrorCount.value = typeof data?.project_count === 'number' ? data.project_count : null
+}
+
+function clearWriteFailure(): void {
+  writeError.value = null
+  writeErrorCode.value = null
+  writeErrorCount.value = null
+}
+
 async function onActivateConfirmed(): Promise<void> {
+  clearWriteFailure()
+
   if (activateTarget.value === null) return
   const template = activateTarget.value
   activateTarget.value = null
@@ -402,8 +521,8 @@ async function onActivateConfirmed(): Promise<void> {
   try {
     const response = await activateTemplate(template.id)
     warning.value = response.warning ?? null
-  } catch {
-    loadError.value = true
+  } catch (error) {
+    recordWriteFailure(error)
   }
 
   // Reloaded rather than patched locally: the server deactivates the previous
@@ -422,26 +541,29 @@ async function onActivateConfirmed(): Promise<void> {
  */
 async function onDeactivate(template: AvatarTemplate): Promise<void> {
   warning.value = null
+  clearWriteFailure()
 
   try {
     const response = await deactivateTemplate(template.id)
     warning.value = response.warning ?? null
-  } catch {
-    loadError.value = true
+  } catch (error) {
+    recordWriteFailure(error)
   }
 
   await load()
 }
 
 async function onDeleteConfirmed(): Promise<void> {
+  clearWriteFailure()
+
   if (deleteTarget.value === null) return
   const template = deleteTarget.value
   deleteTarget.value = null
 
   try {
     await deleteTemplate(template.id)
-  } catch {
-    loadError.value = true
+  } catch (error) {
+    recordWriteFailure(error)
   }
 
   await load()

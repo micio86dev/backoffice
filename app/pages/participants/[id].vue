@@ -70,33 +70,32 @@
             :value="progressLabel"
             data-testid="interview-progress"
           />
-          <div class="flex flex-col gap-1" data-testid="interview-elapsed">
+          <!--
+            `detail`, not a hand-rolled sibling paragraph. MetricCard already
+            has the prop and documents it for exactly this — "a headline figure
+            that is a sum of parts" — and `pages/index.vue` uses it for a cost
+            with a breakdown. Re-implementing it outside the Card put the
+            explanation outside the thing it explains, and duplicated styling a
+            molecule already owns (DESIGN.md §5).
+          -->
+          <div data-testid="interview-elapsed">
             <MetricCard
               :label="$t('participants.detail.interview.elapsed')"
               :value="elapsedLabel"
+              :detail="elapsedCoverageLabel || undefined"
             />
-            <p
-              v-if="elapsedCoverageLabel"
-              class="text-muted-foreground text-xs"
-              data-testid="elapsed-coverage"
-            >
-              {{ elapsedCoverageLabel }}
-            </p>
           </div>
-          <div class="flex flex-col gap-1" data-testid="interview-cost">
-            <MetricCard :label="$t('review.costEstimate')" :value="costLabel" />
-            <p
-              v-if="costCoverageLabel"
-              class="text-muted-foreground text-xs"
-              data-testid="cost-coverage"
-            >
-              {{ costCoverageLabel }}
-            </p>
+          <div data-testid="interview-cost">
+            <MetricCard
+              :label="$t('review.costEstimate')"
+              :value="costLabel"
+              :detail="costCoverageLabel || undefined"
+            />
           </div>
         </CardContent>
       </Card>
 
-      <Card v-if="!isViewer">
+      <Card v-if="canInvite">
         <CardHeader>
           <CardTitle>{{ $t('entryLink.reissue.title') }}</CardTitle>
         </CardHeader>
@@ -135,9 +134,9 @@
 
       <!--
         Participant recovery (participant-error-recovery, design D9): the
-        operator's ONLY path back out of `errore`. `!isViewer` is UI
+        operator's ONLY path back out of `errore`. `canRecover` is UI
         convenience only — ParticipantPolicy::recover is the real server-side
-        gate (a control that renders and then 403s teaches the operator the
+        gate, and this reads that very policy's answer out of the ability map (a control that renders and then 403s teaches the operator the
         product is broken, same reasoning as the entry-link card above).
         Visible while status === 'errore' OR immediately after a successful
         recovery (`justRecovered`) — status flips to 'in_attesa' the instant
@@ -146,7 +145,7 @@
         operator ever saw it.
       -->
       <Card
-        v-if="!isViewer && (participant.status === 'errore' || justRecovered)"
+        v-if="canRecover && (participant.status === 'errore' || justRecovered)"
         data-testid="participant-recovery-card"
       >
         <CardHeader>
@@ -224,7 +223,24 @@
               }}
             </Button>
           </div>
-          <Alert v-if="downloadError" variant="destructive" data-testid="download-error">
+          <!--
+            Same rule as the transcript Alert above, and the same fix: a 409
+            means the artefact is not ready YET, which is temporal and
+            self-resolving, and must not wear the red of a 403 or a dead
+            transport. `useDownloads` documents that these endpoints apply the
+            identical lifecycle gate as their read counterparts, so a 409 here
+            is a designed state, not an edge case.
+
+            `:data-state` because every sibling alert on this page carries it
+            and a test had nothing to grab: the 409 case asserted only the
+            message text, so flipping the variant left it green.
+          -->
+          <Alert
+            v-if="downloadError"
+            :variant="downloadError === 'not-ready' ? 'default' : 'destructive'"
+            :data-state="downloadError"
+            data-testid="download-error"
+          >
             <AlertTitle>{{ $t(downloadErrorTitleKey) }}</AlertTitle>
             <AlertDescription>{{ $t(downloadErrorMessageKey) }}</AlertDescription>
           </Alert>
@@ -249,9 +265,22 @@
           <p v-if="transcriptState === 'loading'" class="text-muted-foreground text-sm">
             {{ $t('report.states.loading') }}
           </p>
+          <!--
+            409 is "not ready yet" — temporal and self-resolving — and must not
+            wear the same red as a 403, a 404 or a dead transport. This Alert
+            hardcoded `destructive` for all four while its TEXT resolved
+            correctly to `errors.states.notReady.*`, so the two channels told
+            the operator opposite things about whether they had to act. Every
+            other surface in this file already gets it right (line 8, and the
+            evaluation's own not-ready Alert below).
+
+            `:data-state` so a test can tell which state rendered at all — the
+            sibling alerts carry it and this one did not.
+          -->
           <Alert
             v-else-if="transcriptState !== 'ready'"
-            variant="destructive"
+            :variant="transcriptState === 'not-ready' ? 'default' : 'destructive'"
+            :data-state="transcriptState"
             data-testid="transcript-load-error"
           >
             <AlertTitle>{{ $t(transcriptErrorTitleKey) }}</AlertTitle>
@@ -347,7 +376,7 @@ import { useTranscript, type TranscriptData } from '@/composables/useTranscript'
 import { useDownloads } from '@/composables/useDownloads'
 import { useSessionReview, type SessionSummary } from '@/composables/useSessionReview'
 import { useEntryLinks } from '@/composables/useEntryLinks'
-import { useProfile } from '@/composables/useProfile'
+import { useCurrentUser } from '@/composables/useCurrentUser'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
 import { formatDate, formatDuration, formatUsdAmount } from '@/utils/format'
 import {
@@ -496,8 +525,12 @@ const downloadErrorMessageKey = computed(() =>
 )
 
 function downloadFilename(type: 'transcript' | 'evaluation', extension: string): string {
-  const ref = participant.value?.candidate_ref ?? 'candidate'
-  const slug = ref.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '') || 'candidate'
+  // `candidateRef`, not `ref` — that shadowed the `ref` imported from Vue at
+  // the top of this block. Harmless until someone adds a `ref()` call inside
+  // this function, at which point it fails with a message pointing nowhere
+  // near the cause.
+  const candidateRef = participant.value?.candidate_ref ?? 'candidate'
+  const slug = candidateRef.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '') || 'candidate'
   return `beai-${type}-${slug}.${extension}`
 }
 
@@ -535,13 +568,30 @@ const { listSessions } = useSessionReview()
 // "Generate new link" (operator-interview-link, design D4/D5): re-issue an
 // entry link for this already-known participant, pre-filled from their own
 // project/candidate_ref/display_name/role_code/language. Neither this Card
-// NOR the "Invite candidate" row action (ProjectTable.vue) may render for a
-// viewer — minting starts an assessment, it is not a read, and
+// NOR the "Invite candidate" row action (ProjectTable.vue) may render
+// without `participants.create` — minting starts an assessment, it is not a read, and
 // ParticipantPolicy::create already denies viewer server-side (a control
 // that renders and then 403s teaches the operator the product is broken).
 const { generateEntryLink } = useEntryLinks()
-const { fetchProfile } = useProfile()
-const isViewer = ref(true)
+
+/**
+ * Resolved from `/auth/me`'s ability map, NOT from a role string.
+ *
+ * This page used to fetch `/api/profile`, coerce `data.role` to `'viewer'`
+ * when it did not recognise it, and hide both cards on that comparison. It
+ * worked, and it was still the wrong shape: two different policies decide
+ * these two cards — `ParticipantPolicy::create` mints a link,
+ * `ParticipantPolicy::recover` unsticks a failed interview — and one string
+ * comparison cannot tell them apart. The day either narrows, a role check
+ * keeps answering the old question.
+ *
+ * Both fail closed, so a transient `/auth/me` error hides the cards rather
+ * than offering actions the API refuses. Affordance only: the endpoints
+ * enforce.
+ */
+const { can } = useCurrentUser()
+const canInvite = computed(() => can('participants.create'))
+const canRecover = computed(() => can('participants.recover'))
 const entryLink = ref<EntryLink | null>(null)
 const entryLinkError = ref<string | null>(null)
 const generatingEntryLink = ref(false)
@@ -634,25 +684,14 @@ async function loadSessions(id: string): Promise<void> {
   }
 }
 
-async function loadViewerGate(): Promise<void> {
-  try {
-    const profile = await fetchProfile()
-    // Fail-closed default, mirroring profile.vue:52's own coercion: an
-    // unrecognized/missing role is treated as 'viewer' (the least
-    // privileged), not as an accidental grant.
-    isViewer.value = (profile.data.role ? String(profile.data.role) : 'viewer') === 'viewer'
-  } catch {
-    // The mint action is a bonus surface on this page, not its primary
-    // purpose — a failed profile fetch hides it (fail-closed) rather than
-    // blanking the whole participant detail view.
-    isViewer.value = true
-  }
-}
-
 onMounted(async () => {
   const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
 
-  void loadViewerGate()
+  // Fills the shared `/auth/me` cache both `can()` calls read. Swallowed:
+  // they already answer false without it, which is the safe direction.
+  void useCurrentUser()
+    .ensureLoaded()
+    .catch(() => undefined)
 
   try {
     const response = await fetchParticipant(id as string)

@@ -20,8 +20,29 @@
         <TableCell>
           <span class="text-foreground font-medium">{{ project.name }}</span>
           <div class="text-muted-foreground text-xs">{{ project.slug }}</div>
+          <!--
+            No competencies at all — a project that cannot run.
+
+            Checked BEFORE the coverage warning and rendered instead of it:
+            "3 competencies lack BARS anchors" and "there are no competencies"
+            are not two facts to stack, and the second makes the first
+            meaningless.
+
+            This state was completely silent. `/candidate/interview/start`
+            resolves the next competency from `project_competencies`, finds
+            none, and answers 422 — so the candidate opened their link, met no
+            avatar, and got a generic error with a Retry that could never
+            succeed. The project meanwhile looked identical to a working one.
+          -->
           <div
-            v-if="uncoveredCount(project) > 0"
+            v-if="hasNoCompetencies(project)"
+            class="text-destructive text-xs"
+            :data-testid="`project-row-no-competencies-${project.id}`"
+          >
+            {{ $t('projects.table.noCompetencies') }}
+          </div>
+          <div
+            v-else-if="uncoveredCount(project) > 0"
             class="text-destructive text-xs"
             :data-testid="`project-row-uncovered-${project.id}`"
           >
@@ -43,7 +64,16 @@
           <template v-if="project.avatar_template">{{
             $t(`projects.avatarProvider.${project.avatar_template.provider}`)
           }}</template>
-          <template v-else>–</template>
+          <!--
+            The dash CARRIES MEANING — the comment above says so — and a screen
+            reader gets either silence or "en dash" from it. Paired with an
+            `sr-only` label, the same way `ScoreChip.vue` handles the identical
+            symbol.
+          -->
+          <template v-else>
+            <span aria-hidden="true">–</span>
+            <span class="sr-only">{{ $t('projects.table.noAvatarTemplate') }}</span>
+          </template>
         </TableCell>
         <!--
           The template, and underneath it the MODEL the conversation runs on.
@@ -56,7 +86,11 @@
           attribute stops being scannable long before it stops being correct.
         -->
         <TableCell :data-testid="`project-row-template-${project.id}`">
-          {{ project.avatar_template?.name ?? '–' }}
+          <template v-if="project.avatar_template">{{ project.avatar_template.name }}</template>
+          <template v-else>
+            <span aria-hidden="true">–</span>
+            <span class="sr-only">{{ $t('projects.table.noAvatarTemplate') }}</span>
+          </template>
           <div v-if="project.avatar_template?.llm_model" class="text-muted-foreground text-xs">
             {{ project.avatar_template.llm_model }}
           </div>
@@ -67,16 +101,22 @@
         <TableCell class="text-right">
           <div class="flex justify-end gap-2">
             <Button
-              v-if="canInvite"
+              v-if="canInvite && !hasNoCompetencies(project)"
               variant="outline"
               size="sm"
               :disabled="!projectAccessibility(project).eligible"
+              :aria-describedby="
+                projectAccessibility(project).eligible
+                  ? undefined
+                  : `project-row-invite-disabled-reason-${project.id}`
+              "
               :data-testid="`project-row-invite-${project.id}`"
               @click="openInvite(project)"
             >
               {{ $t('entryLink.invite') }}
             </Button>
             <Button
+              v-if="canEdit"
               variant="outline"
               size="sm"
               :data-testid="`project-row-edit-${project.id}`"
@@ -85,8 +125,29 @@
               {{ $t('projects.action.edit') }}
             </Button>
           </div>
+          <!--
+            SUBORDINATE to the button's own guard, not a parallel condition.
+            The two disagreed: the button was withheld for having no
+            competencies while this rendered for a different predicate, so a
+            draft project with no competencies showed no control and still
+            explained "this project is not yet active" — an explanation for
+            something that is not on screen, naming a reason that is not why.
+            Activating the project, which is what that message prescribes,
+            brought the button back with still no interview to run.
+
+            A project with no competencies already says so in its name cell;
+            that is the blocker, and it is stated once.
+
+            `aria-describedby` on the button above, because a disabled control
+            is out of the tab order and its reason would otherwise be reachable
+            only in reading order — the same wiring ApiKeysPanel and
+            EntryLinkForm use.
+          -->
           <p
-            v-if="canInvite && !projectAccessibility(project).eligible"
+            v-if="
+              canInvite && !hasNoCompetencies(project) && !projectAccessibility(project).eligible
+            "
+            :id="`project-row-invite-disabled-reason-${project.id}`"
             class="text-muted-foreground mt-1 text-xs"
             :data-testid="`project-row-invite-disabled-reason-${project.id}`"
           >
@@ -190,21 +251,44 @@ const props = withDefaults(
   defineProps<{
     projects: Project[]
     coverage?: Record<string, number[]>
-    // "Invite candidate" (operator-interview-link, design D4): the PARENT
-    // resolves the operator's role once (useProfile) and passes the result
-    // down — minting starts an assessment, it is not a read, and a viewer
-    // must see neither this row action nor the participant-detail
-    // "Generate new link" card (admin-backoffice spec, "Viewer sees neither
-    // action"). Defaults to false: fail-closed until the parent confirms.
+    // Both gates are resolved ONCE by the parent, from `/auth/me`'s ability
+    // map, and passed down — a table that asked `useCurrentUser()` itself
+    // would answer the same question once per render for every row.
+    //
+    // Two abilities, not one, because two different policies decide them.
+    // "Invite candidate" mints an entry link and STARTS an assessment
+    // (`ParticipantPolicy::create`, operator-interview-link design D4);
+    // editing a project is `ProjectPolicy::update`. They agree today for
+    // every role, and the day one narrows, a single flag would silently take
+    // the other control with it.
+    //
+    // Both default to false: fail-closed until the parent confirms, so a
+    // table rendered before `/auth/me` resolves offers nothing rather than
+    // everything.
     canInvite?: boolean
+    canEdit?: boolean
     locale?: string
   }>(),
-  { coverage: () => ({}), canInvite: false, locale: 'it' }
+  { coverage: () => ({}), canInvite: false, canEdit: false, locale: 'it' }
 )
 
 defineEmits<{
   (e: 'edit', id: number): void
 }>()
+
+/**
+ * A project with nothing to ask about.
+ *
+ * Deliberately NOT folded into `projectAccessibility()`. That helper documents
+ * itself as a mirror of the API's `EntryLinkMinter::projectIsAccessible()`, and
+ * a reason living in the mirror that the server does not enforce would make
+ * the two silently disagree — the exact drift its docblock exists to prevent.
+ * This is a readiness signal the backoffice owns, shown where the other
+ * readiness signal already lives.
+ */
+function hasNoCompetencies(project: Project): boolean {
+  return project.competencies.length === 0
+}
 
 function uncoveredCount(project: Project): number {
   if (!project.role_code) return 0

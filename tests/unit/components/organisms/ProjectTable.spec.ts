@@ -34,7 +34,12 @@ function project(overrides: Record<string, unknown> = {}) {
     created_at: '2026-03-01T10:00:00Z',
     updated_at: '2026-03-01T10:00:00Z',
     pin_context: null,
-    competencies: [],
+    // A project with ONE competency is the ordinary case, and the fixture has
+    // to represent it: a project with none cannot run an interview at all, so
+    // defaulting to `[]` made every test here describe a broken project while
+    // claiming to describe a normal one. The empty case is opted into
+    // explicitly by the tests that are about it.
+    competencies: [{ id: 1, code: 'COL', name: { en: 'Collaboration' } }],
     ...overrides,
   }
 }
@@ -61,7 +66,10 @@ describe('ProjectTable', () => {
 
   it('emits edit with the project id when its row action is clicked, using a real Button', () => {
     const wrapper = mount(ProjectTable, {
-      props: { projects: [project({ id: 9 })] },
+      // `canEdit` is explicit because the prop fails closed: the table offers
+      // no edit control until the parent has resolved `projects.update` from
+      // the ability map, so a mount that omits it renders no button at all.
+      props: { projects: [project({ id: 9 })], canEdit: true },
       global: { mocks: { $t: tMock } },
     })
 
@@ -73,6 +81,30 @@ describe('ProjectTable', () => {
 
     editButton.trigger('click')
     expect(wrapper.emitted('edit')?.[0]).toEqual([9])
+  })
+
+  it('offers no edit action to someone who may not update projects', () => {
+    // A viewer. `ProjectPolicy::update` refuses them, and the row used to
+    // offer the button anyway — the click reached the drawer, the drawer
+    // collected a full form, and the save came back 403.
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 9 })], canEdit: false },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-edit-9"]').exists()).toBe(false)
+  })
+
+  it('offers no edit action before the ability map has resolved', () => {
+    // Fail-closed default, asserted rather than assumed: the first render
+    // happens before `/auth/me` settles, and defaulting to true would flash
+    // a control at everyone for one tick.
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 9 })] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-edit-9"]').exists()).toBe(false)
   })
 })
 
@@ -257,8 +289,16 @@ describe('ProjectTable avatar columns', () => {
       global: { mocks: { $t: tMock } },
     })
 
-    expect(wrapper.find('[data-testid="project-row-provider-1"]').text()).toBe('–')
-    expect(wrapper.find('[data-testid="project-row-template-1"]').text()).toBe('–')
+    // The dash is what a sighted operator reads; the `sr-only` label is what
+    // everyone else reads, because the dash CARRIES meaning here and a screen
+    // reader would otherwise get silence or "en dash". Same pairing
+    // `ScoreChip.vue` uses for the identical symbol.
+    for (const cell of ['project-row-provider-1', 'project-row-template-1']) {
+      const text = wrapper.find(`[data-testid="${cell}"]`).text()
+
+      expect(text).toContain('–')
+      expect(text).toContain('projects.table.noAvatarTemplate')
+    }
   })
 
   it('keeps the empty row spanning every column', () => {
@@ -328,5 +368,86 @@ describe('ProjectTable template cell', () => {
     const cell = wrapper.get('[data-testid="project-row-template-1"]')
 
     expect(cell.text()).toBe('Ada Warm')
+  })
+})
+
+/**
+ * A project with NO competencies selected.
+ *
+ * It is not a runnable assessment: `/candidate/interview/start` resolves the
+ * next competency from `project_competencies`, finds none, and answers 422
+ * `no_competency_remaining`. The candidate reaches the interview, the avatar
+ * never speaks, and they are shown a generic error with a Retry that cannot
+ * ever succeed.
+ *
+ * Nothing in the backoffice said so. The project saved, it went active, it
+ * looked exactly like a working one, and the first person to learn it was
+ * broken was the candidate.
+ */
+describe('ProjectTable — a project with no competencies', () => {
+  it('says so on the row', () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 7, competencies: [] })] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-no-competencies-7"]').exists()).toBe(true)
+  })
+
+  it('stays quiet for a project that has some', () => {
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [project({ id: 7, competencies: [{ id: 1, code: 'COL', name: { en: 'x' } }] })],
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-no-competencies-7"]').exists()).toBe(false)
+  })
+
+  it('does not offer the invite action for it', () => {
+    // The link would mint, the candidate would open it, and the interview
+    // would die on arrival. Offering it is worse than withholding it.
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 7, competencies: [] })], canInvite: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-invite-7"]').exists()).toBe(false)
+  })
+
+  it('does not explain a control it is not showing', async () => {
+    // The paired assertion the first version of this test was missing: it
+    // checked only that the button was gone, so an orphaned paragraph sat
+    // beside it through a green suite. A draft project with no competencies
+    // rendered no invite button and still said "this project is not yet
+    // active" — an explanation for something absent, naming a reason that is
+    // not why, and prescribing a fix (activate it) that changes nothing.
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [project({ id: 7, competencies: [], status: 'draft' })],
+        canInvite: true,
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-invite-7"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="project-row-invite-disabled-reason-7"]').exists()).toBe(
+      false
+    )
+  })
+
+  it('ties a disabled invite to its reason for assistive technology', () => {
+    // A disabled button is out of the tab order, so the reason beside it is
+    // reachable only in reading order unless the two are wired together.
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 7, status: 'draft' })], canInvite: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const button = wrapper.get('[data-testid="project-row-invite-7"]')
+
+    expect(button.attributes('aria-describedby')).toBe('project-row-invite-disabled-reason-7')
+    expect(wrapper.find('#project-row-invite-disabled-reason-7').exists()).toBe(true)
   })
 })

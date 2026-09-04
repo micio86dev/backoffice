@@ -87,7 +87,36 @@ type Handlers = Partial<{
   deleteTemplate: ReturnType<typeof vi.fn>
 }>
 
-async function mountPage(handlers: Handlers = {}) {
+/**
+ * What the server says this operator may do, as `/auth/me` publishes it.
+ *
+ * Defaults to the PLATFORM answer — every ability true — because every test
+ * written before CTA gating existed assumes the controls are on screen, and a
+ * default of "admin" would have silently emptied them all. The gating tests
+ * pass the narrower maps explicitly.
+ */
+function abilities(overrides: Record<string, boolean> = {}) {
+  return {
+    viewAny: true,
+    create: true,
+    update: true,
+    activate: true,
+    delete: true,
+    ...overrides,
+  }
+}
+
+async function mountPage(
+  handlers: Handlers = {},
+  avatarTemplates: Record<string, boolean> = abilities()
+) {
+  vi.doMock('../../app/composables/useCurrentUser', () => ({
+    useCurrentUser: () => ({
+      can: (key: string) => avatarTemplates[key.split('.')[1] ?? ''] === true,
+      ensureLoaded: vi.fn().mockResolvedValue(undefined),
+    }),
+  }))
+
   const api = {
     listTemplates: vi.fn().mockResolvedValue({ data: [template()] }),
     fetchFieldSpecs: vi.fn().mockResolvedValue({ data: SPECS }),
@@ -624,5 +653,215 @@ describe('AvatarTemplatesPage — deactivation', () => {
     // Reloaded rather than patched locally, same reason as activation: the
     // server owns which template is active and guessing is guessing.
     expect(api.listTemplates).toHaveBeenCalledTimes(2)
+  })
+
+  /**
+   * The admin case, which is the one that shipped broken.
+   *
+   * Managing templates became PLATFORM-only on 2026-09-02 while this page kept
+   * rendering every control to anyone who could open it — and an admin can
+   * open it, because reading the list is still theirs. So the page offered New,
+   * Edit and Activate to a role the API refuses, and the only way to find out
+   * was to click and read a 403.
+   *
+   * Read stays. The point is not to hide the page from an admin; it is to stop
+   * promising them actions that cannot happen.
+   */
+  describe('with an admin who may read but not manage', () => {
+    const READ_ONLY = {
+      viewAny: true,
+      create: false,
+      update: false,
+      activate: false,
+      delete: false,
+    }
+
+    it('still lists the templates', async () => {
+      const { wrapper } = await mountPage({}, READ_ONLY)
+
+      expect(wrapper.find('[data-testid="templates-list"]').exists()).toBe(true)
+    })
+
+    it('offers no New, no Edit, and no activation control', async () => {
+      const { wrapper } = await mountPage(
+        {
+          listTemplates: vi
+            .fn()
+            .mockResolvedValue({ data: [template({ id: 1, is_active: false })] }),
+        },
+        READ_ONLY
+      )
+
+      expect(wrapper.find('[data-testid="template-new"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="template-edit-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="template-activate-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="template-delete-1"]').exists()).toBe(false)
+    })
+
+    it('offers no Deactivate on the active one either', async () => {
+      // Activate and deactivate are one ability, not two: both write
+      // `is_active`, and `AvatarTemplatePolicy::activate` guards the pair.
+      const { wrapper } = await mountPage(
+        {
+          listTemplates: vi
+            .fn()
+            .mockResolvedValue({ data: [template({ id: 1, is_active: true })] }),
+        },
+        READ_ONLY
+      )
+
+      expect(wrapper.find('[data-testid="template-deactivate-1"]').exists()).toBe(false)
+    })
+  })
+
+  describe('with the platform identity that may manage', () => {
+    it('offers New and the row controls', async () => {
+      const { wrapper } = await mountPage({
+        listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: false })] }),
+      })
+
+      expect(wrapper.find('[data-testid="template-new"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="template-edit-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="template-activate-1"]').exists()).toBe(true)
+    })
+  })
+})
+
+/**
+ * A failed WRITE has to survive the reload that follows it.
+ *
+ * Activate, deactivate and delete each set the LOAD error flag and then called
+ * `load()`, which clears it the moment the listing succeeds. The flag was
+ * raised and wiped in the same tick, so the operator clicked, the API refused,
+ * and the screen showed a list identical to before — no error, no change, no
+ * explanation. Nothing tested it: the spec rejected `listTemplates` and
+ * `createTemplate` and never once rejected a write.
+ *
+ * Not academic. Since managing templates became platform-only on 2026-09-02,
+ * 403 is the ORDINARY answer here for an admin.
+ */
+describe('AvatarTemplatesPage — a write that the API refuses', () => {
+  // The same globals the main describe stubs. This block sits outside it, so it
+  // inherits none of them, and without `useI18n` the page never finishes
+  // setup — the list renders empty and every assertion here fails for a reason
+  // that has nothing to do with what it tests.
+  beforeEach(() => {
+    vi.resetModules()
+    tMock.mockClear()
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, locale: ref('it') }))
+    )
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  function rejection(status: number) {
+    return Object.assign(new Error(`HTTP ${status}`), { status })
+  }
+
+  it('keeps a failed activation visible after the list reloads', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: false })] }),
+      activateTemplate: vi.fn().mockRejectedValue(rejection(403)),
+    })
+
+    await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
+    await flushPromises()
+    await confirmDialog()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(true)
+    // And NOT the load message, which says the listing failed — it did not.
+    expect(wrapper.find('[data-testid="templates-error"]').exists()).toBe(false)
+  })
+
+  it('keeps a failed deactivation visible', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: true })] }),
+      deactivateTemplate: vi.fn().mockRejectedValue(rejection(403)),
+    })
+
+    await wrapper.find('[data-testid="template-deactivate-1"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(true)
+  })
+
+  it('keeps a failed delete visible', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: false })] }),
+      deleteTemplate: vi.fn().mockRejectedValue(rejection(409)),
+    })
+
+    await wrapper.find('[data-testid="template-delete-1"]').trigger('click')
+    await flushPromises()
+    await confirmDialog()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(true)
+  })
+
+  it('tells the operator WHY a 409 happened, not that it will resolve itself', async () => {
+    // The server answers `{"error": "template_in_use", "project_count": 7}`.
+    // Mapped through the generic HTTP-state helper, 409 renders as "Not ready
+    // yet — it becomes visible once processing completes, reopen this page
+    // later." Nothing is processing, reopening never helps, and the count the
+    // server computed so the operator knows how much reassignment work they
+    // face is discarded. A confidently wrong message is worse than a vague one.
+    const deleteTemplate = vi.fn().mockRejectedValue(
+      Object.assign(new Error('HTTP 409'), {
+        status: 409,
+        data: { error: 'template_in_use', message: 'template_in_use', project_count: 7 },
+      })
+    )
+
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: false })] }),
+      deleteTemplate,
+    })
+
+    await wrapper.find('[data-testid="template-delete-1"]').trigger('click')
+    await flushPromises()
+    await confirmDialog()
+    await flushPromises()
+
+    const alert = wrapper.get('[data-testid="template-write-error"]')
+
+    expect(alert.text()).toContain('avatar_templates.serverError.template_in_use')
+    expect(alert.text()).not.toContain('notReady')
+    // The count reaches the operator rather than being thrown away.
+    expect(wrapper.find('[data-testid="template-write-error-count"]').text()).toContain('7')
+  })
+
+  it('clears a previous write failure when the next write starts', async () => {
+    // Otherwise a stale refusal sits under a later success and reads as though
+    // the new action failed too.
+    const activateTemplate = vi
+      .fn()
+      .mockRejectedValueOnce(rejection(403))
+      .mockResolvedValue({ data: template({ id: 1, is_active: true }) })
+
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [template({ id: 1, is_active: false })] }),
+      activateTemplate,
+    })
+
+    await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
+    await flushPromises()
+    await confirmDialog()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="template-activate-1"]').trigger('click')
+    await flushPromises()
+    await confirmDialog()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(false)
   })
 })

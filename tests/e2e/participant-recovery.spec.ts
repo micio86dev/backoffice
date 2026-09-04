@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { abilitiesFor } from './fixtures/abilities'
 
 /**
  * Participant recovery, end to end (participant-error-recovery, design D9).
@@ -128,6 +129,29 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
         refresh_token: 'e2e-refresh',
         token_type: 'bearer',
       })
+  )
+
+  // `/auth/me` — the ABILITY MAP. The UI gates its controls on `can()`, which
+  // reads this endpoint and fails CLOSED when it is unmocked: the control is
+  // then not disabled but ABSENT, so a locator waits for an element that will
+  // never render. `/profile` is a different endpoint and carries no abilities.
+  await page.route(
+    (url) => url.pathname === '/auth/me',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            user: {
+              id: 1,
+              name: 'Operator One',
+              email: 'operator@example.com',
+              locale: 'it',
+              photo_url: null,
+            },
+            organization: { id: 1, name: 'Acme' },
+            roles: ['operator'],
+            abilities: abilitiesFor(['operator']),
+          })
+        : route.continue()
   )
 
   // operator role — eligible to recover (ParticipantPolicy::recover, design D4).

@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { abilitiesFor } from './fixtures/abilities'
 import { checkA11y } from './fixtures/a11y'
 
 /**
@@ -103,6 +104,29 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
         refresh_token: 'e2e-refresh',
         token_type: 'bearer',
       })
+  )
+
+  // `/auth/me` — the ABILITY MAP. The UI gates its controls on `can()`, which
+  // reads this endpoint and fails CLOSED when it is unmocked: the control is
+  // then not disabled but ABSENT, so a locator waits for an element that will
+  // never render. `/profile` is a different endpoint and carries no abilities.
+  await page.route(
+    (url) => url.pathname === '/auth/me',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            user: {
+              id: 1,
+              name: 'Admin One',
+              email: 'admin@example.com',
+              locale: 'it',
+              photo_url: null,
+            },
+            organization: { id: 1, name: 'Acme' },
+            roles: ['admin'],
+            abilities: abilitiesFor(['admin']),
+          })
+        : route.continue()
   )
   // Stateful on purpose. A POST that returns 201 while every subsequent GET
   // keeps returning the ORIGINAL list makes "the new project appears in the

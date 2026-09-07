@@ -123,16 +123,19 @@
       "completionRate": "Tasso di completamento",
       "tokensUsed": "Token AI utilizzati",
       "latency": "Latenza AI (p50 / p95)",
-      "latencyValue": "{p50} / {p95} ms",
+      "latencyValue": "{p50} / {p95}",
       "cost": "Spesa AI e avatar",
-      "costValue": "$ {usd}",
-      "costBreakdown": "Valutazione $ {scoring} · Colloquio $ {conversation}",
-      "noData": "Nessun dato disponibile"
+      "costValue": "{currency} {usd}",
+      "costBreakdown": "Valutazione {currency} {scoring} · Colloquio {currency} {conversation}",
+      "noData": "Nessun dato disponibile",
+      "notMeasured": "non misurato",
+      "latencyMs": "{value} ms"
     },
     "activity": {
       "title": "Attività recente",
       "empty": "Ancora nessun candidato. Compariranno qui appena il sistema che ti ha integrato ne crea uno.",
-      "noProject": "Progetto non disponibile"
+      "noProject": "Progetto non disponibile",
+      "loading": "Caricamento…"
     },
     "filters": {
       "year": "Anno",

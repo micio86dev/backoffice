@@ -1,6 +1,7 @@
 import { test, expect, type Route } from '@playwright/test'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
+import type { TenantRole } from '../unit/support/abilities'
 
 /**
  * Settings tabs (Unit 6, task 24.9/26.1): role-based locators, network
@@ -230,7 +231,13 @@ const CREDENTIAL = {
   created_at: '2026-08-01T09:00:00Z',
 }
 
-async function mockIdentity(page: import('@playwright/test').Page, roles: string[]): Promise<void> {
+async function mockIdentity(
+  page: import('@playwright/test').Page,
+  // , not `string[]`: the union exists to catch a typo
+  // like 'oprator' falling through every branch to viewer-level abilities, and
+  // `string[]` widened it straight back.
+  roles: readonly TenantRole[]
+): Promise<void> {
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>

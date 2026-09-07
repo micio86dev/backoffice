@@ -6,7 +6,7 @@
         id="dashboard-year"
         :value="year === null ? '' : String(year)"
         data-testid="dashboard-year"
-        class="border-border bg-card text-foreground rounded-md border px-2 py-1 text-sm"
+        :class="formSelectClass"
         @change="onYear"
       >
         <!--
@@ -26,7 +26,7 @@
         :value="month === null ? '' : String(month)"
         :disabled="year === null"
         data-testid="dashboard-month"
-        class="border-border bg-card text-foreground rounded-md border px-2 py-1 text-sm disabled:opacity-50"
+        :class="formSelectClass"
         @change="onMonth"
       >
         <!--
@@ -57,6 +57,7 @@
  */
 import { computed, ref } from 'vue'
 import { Field, FieldLabel } from '@/components/ui/field'
+import { formSelectClass } from '@/components/ui/form-control'
 import { periodToRange, yearsBack, type DateRange } from '@/utils/dashboard-period'
 
 const props = withDefaults(

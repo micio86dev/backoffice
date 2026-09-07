@@ -30,19 +30,33 @@
     </div>
 
     <!--
-      `resetKey` remounts the uncontrolled native controls so "clear" empties
-      what the operator SEES, not just the emitted query. The selects and date
-      inputs stay uncontrolled on purpose: `:value` on a native <select> sets
-      the attribute rather than the property and would not move the selection.
+      CONTROLLED, like the `ToggleGroup` twenty lines down has always been.
+
+      These five sat uncontrolled behind a `:key` remount, justified by the
+      claim that "`:value` on a native <select> sets the attribute rather than
+      the property and would not move the selection". Vue 3 does not behave
+      that way: `shouldSetAsProp` ends in `return key in el`, and `'value' in
+      HTMLSelectElement` is true, so it is set as a PROPERTY —
+      `DashboardFilters`, `ClientSwitcher`, `LlmModelPicker` and
+      `AvatarTemplateForm` all rely on that today.
+
+      The remount hid the consequence rather than removing it: `activeCount`
+      read from the model while the controls did not, so the badge and the
+      controls were one hydration away from disagreeing — "3 active" over five
+      empty fields the first time a query string or a saved view seeds
+      `modelValue`. Reading from the model makes "clear" empty what the
+      operator SEES for the same reason it empties the query: they are now the
+      same source.
     -->
-    <div :key="resetKey" class="flex flex-col gap-4">
+    <div class="flex flex-col gap-4">
       <div class="grid gap-4 md:grid-cols-3">
         <Field>
           <FieldLabel for="report-filter-project">{{ $t('reports.filters.project') }}</FieldLabel>
           <select
             id="report-filter-project"
             data-testid="report-filter-project"
-            :class="formControlClass"
+            :value="modelValue.project_id ?? ''"
+            :class="formSelectClass"
             @change="onProjectChange"
           >
             <option value="">{{ $t('reports.filters.allProjects') }}</option>
@@ -59,7 +73,8 @@
           <select
             id="report-filter-assessment-type"
             data-testid="report-filter-assessment-type"
-            :class="formControlClass"
+            :value="modelValue.assessment_type ?? ''"
+            :class="formSelectClass"
             @change="onAssessmentTypeChange"
           >
             <option value="">{{ $t('reports.filters.allTypes') }}</option>
@@ -73,7 +88,8 @@
           <select
             id="report-filter-role"
             data-testid="report-filter-role"
-            :class="formControlClass"
+            :value="modelValue.role_code ?? ''"
+            :class="formSelectClass"
             @change="onRoleCodeChange"
           >
             <option value="">{{ $t('reports.filters.allRoles') }}</option>
@@ -87,8 +103,20 @@
       <Separator />
 
       <div class="flex flex-wrap items-end gap-x-8 gap-y-4">
-        <Field class="w-auto">
-          <FieldLabel>{{ $t('reports.filters.status') }}</FieldLabel>
+        <!--
+          FieldSet + FieldLegend, the shape the date range eleven lines down
+          already uses — because this is the same thing: a labelled GROUP of
+          controls, not a single labelled control.
+
+          `FieldLabel` renders a real `<label>` (ui/field/FieldLabel -> ui/label).
+          With no `for`, and a `ToggleGroup` that reka-ui renders as a
+          `role="group"` div with no id, it was an orphan label pointing at
+          nothing: a screen reader announced two bare buttons, "Completed" and
+          "Pending", with no way to know they filter STATUS. It also lost
+          `cursor: pointer`, since `main.css` keys that on `label[for]`.
+        -->
+        <FieldSet class="w-auto gap-2">
+          <FieldLegend variant="label">{{ $t('reports.filters.status') }}</FieldLegend>
           <ToggleGroup
             type="single"
             variant="outline"
@@ -103,7 +131,7 @@
               {{ $t('reports.filters.statusPending') }}
             </ToggleGroupItem>
           </ToggleGroup>
-        </Field>
+        </FieldSet>
 
         <!--
           The two dates are one filter, not two, so they read as one control
@@ -122,6 +150,7 @@
                 type="date"
                 autocomplete="off"
                 class="w-40"
+                :model-value="modelValue.evaluated_from ?? ''"
                 data-testid="report-filter-from"
                 @change="onFromChange"
               />
@@ -136,6 +165,7 @@
                 type="date"
                 autocomplete="off"
                 class="w-40"
+                :model-value="modelValue.evaluated_to ?? ''"
                 data-testid="report-filter-to"
                 @change="onToChange"
               />
@@ -151,13 +181,13 @@
 // Report filters (D6/D8): the whitelisted set, emitting ONE filter object —
 // never a raw <select>/<button> per-filter cascade of separate emits, so the
 // page always has a single source of truth for the current query.
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { FunnelIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { formControlClass } from '@/components/ui/form-control'
+import { formSelectClass } from '@/components/ui/form-control'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { EvaluationQueryParams } from '@/utils/evaluation-query'
@@ -178,15 +208,12 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: EvaluationQueryParams): void
 }>()
 
-const resetKey = ref(0)
-
 const activeCount = computed(
   () =>
     Object.values(props.modelValue).filter((value) => value !== undefined && value !== '').length
 )
 
 function clearAll(): void {
-  resetKey.value += 1
   emit('update:modelValue', {})
 }
 

@@ -18,7 +18,7 @@
           id="candidate-status"
           v-model="statusInput"
           data-testid="candidate-status-filter"
-          :class="cn(formControlClass, 'min-w-40')"
+          :class="cn(formSelectClass, 'min-w-40')"
           @change="onStatusChange"
         >
           <option value="">{{ $t('participants.filters.allStatuses') }}</option>
@@ -109,7 +109,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Field, FieldLabel } from '@/components/ui/field'
-import { formControlClass } from '@/components/ui/form-control'
+import { formSelectClass } from '@/components/ui/form-control'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'

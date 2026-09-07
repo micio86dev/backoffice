@@ -51,8 +51,8 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="en">EN</SelectItem>
-                <SelectItem value="it">IT</SelectItem>
+                <SelectItem value="en">{{ $t('common.language.en') }}</SelectItem>
+                <SelectItem value="it">{{ $t('common.language.it') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

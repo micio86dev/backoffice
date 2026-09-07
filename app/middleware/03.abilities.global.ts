@@ -39,6 +39,7 @@ import { useCurrentUser } from '@/composables/useCurrentUser'
 const REQUIRED: Record<string, AbilityKey> = {
   settings: 'users.viewAny',
   'avatar-templates': 'avatarTemplates.viewAny',
+  clients: 'clients.viewAny',
 }
 
 /**

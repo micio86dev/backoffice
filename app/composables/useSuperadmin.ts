@@ -15,11 +15,28 @@ export type ClientsResponse =
 
 export type Client = ClientsResponse['data'][number]
 
+/**
+ * `GET /admin/clients` — the superadmin console's directory, one row per
+ * organization with the platform-wide statistics the page renders (design
+ * D3). Distinct from `ClientsResponse` above: `ClientDirectory`'s
+ * identity-only `{id, name}` contract (the topbar switcher) is never widened
+ * to carry these fields, so the two response shapes stay two types.
+ */
+export type ClientOverviewResponse =
+  paths['/admin/clients']['get']['responses']['200']['content']['application/json']
+
+export type ClientOverviewRow = ClientOverviewResponse['data'][number]
+
 export function useSuperadmin() {
   const { apiFetch } = useApi()
 
   async function fetchClients(): Promise<ClientsResponse> {
     return apiFetch<ClientsResponse>('/admin/organizations')
+  }
+
+  /** Every client with its platform-wide statistics — the `/clients` console page. */
+  async function fetchClientOverview(): Promise<ClientOverviewResponse> {
+    return apiFetch<ClientOverviewResponse>('/admin/clients')
   }
 
   /**
@@ -38,5 +55,5 @@ export function useSuperadmin() {
     })
   }
 
-  return { fetchClients, setActingClient }
+  return { fetchClients, fetchClientOverview, setActingClient }
 }

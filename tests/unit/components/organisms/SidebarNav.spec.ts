@@ -27,6 +27,15 @@ vi.mock('../../../../app/composables/useCurrentUser', () => ({
   useCurrentUser: () => ({ ensureLoaded: ensureLoadedMock, can: canMock }),
 }))
 
+// The superadmin-only client list. Separate from the identity above precisely
+// because the two used to share one `try`, and a rejection here discarded an
+// identity that had already arrived.
+const fetchClientsMock = vi.fn().mockResolvedValue({ data: [], acting_organization_id: null })
+
+vi.mock('../../../../app/composables/useSuperadmin', () => ({
+  useSuperadmin: () => ({ fetchClients: fetchClientsMock }),
+}))
+
 const NuxtLinkStub = {
   props: ['to'],
   template: '<a :href="to"><slot /></a>',
@@ -321,5 +330,93 @@ describe('SidebarNav — pages the user may not use are not offered', () => {
 
     expect(hrefs).toContain('/settings')
     expect(hrefs).toContain('/avatar-templates')
+  })
+
+  it('never shows Clients to a non-superadmin, even though the item is scope: platform (admin-backoffice spec, "The item is absent for any non-superadmin")', async () => {
+    // Clients is scope: 'platform', so visibleNavItemsFor's scope filter alone
+    // would NOT hide it from an ordinary operator — a superadmin-only scope
+    // filter only ever REMOVES items from a superadmin (nav-visibility.ts).
+    // The ability gate is what has to withhold it here.
+    canMock.mockReset().mockImplementation((ability: string) => ability !== 'clients.viewAny')
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
+    expect(hrefs).not.toContain('/clients')
+    expect(canMock).toHaveBeenCalledWith('clients.viewAny')
+  })
+
+  it('shows Clients once the server grants clients.viewAny', async () => {
+    canMock.mockReset().mockImplementation(() => true)
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
+    expect(hrefs).toContain('/clients')
+  })
+  it('keeps the footer identity when the superadmin client list fails to load', async () => {
+    // The identity assignment used to sit AFTER the superadmin-only await
+    // inside ONE try, so a rejected `fetchClients()` jumped to the catch and
+    // cleared a name and photo that had already been fetched successfully.
+    // Two unrelated requests, one of which failed — and the one that succeeded
+    // was thrown away with it. `NavBar.vue` splits these for this exact reason.
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: {
+        name: 'Platform Owner',
+        photo_url: null,
+        is_superadmin: true,
+      },
+    })
+    fetchClientsMock.mockReset().mockRejectedValue(new Error('network error'))
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="sidebar-footer-identity"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Platform Owner')
+
+    fetchClientsMock.mockReset().mockResolvedValue({ data: [], acting_organization_id: null })
+  })
+
+  it('does not hide the client pages when the client list fails to load', async () => {
+    // For a SUPERADMIN, `actingClientId: null` is the RESTRICTED branch, not a
+    // neutral default: `visibleNavItemsFor` reads it as "no client chosen" and
+    // drops every client-scope page. So a catch that leaves the ref at its
+    // initial null does not fall back — it ASSERTS a selection that may be
+    // false, and a transient 500 hid Dashboard, Projects, Candidates and
+    // Reports from a superadmin who was acting as a client the whole time.
+    // Those pages work: the selection lives in the server-side session and the
+    // failed request never touched it.
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: { name: 'Platform Owner', photo_url: null, is_superadmin: true },
+    })
+    fetchClientsMock.mockReset().mockRejectedValue(new Error('boom'))
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('nav.dashboard')
+    expect(wrapper.text()).toContain('nav.projects')
+    expect(wrapper.text()).toContain('nav.candidates')
+    expect(wrapper.text()).toContain('nav.reports')
+
+    fetchClientsMock.mockReset().mockResolvedValue({ data: [], acting_organization_id: null })
+  })
+
+  it('still narrows the rail when the client list says no client is selected', async () => {
+    // The counterpart, so the fix above cannot become "never narrow". A KNOWN
+    // null is a real answer and must still hide the pages that have none.
+    ensureLoadedMock.mockReset().mockResolvedValue({
+      user: { name: 'Platform Owner', photo_url: null, is_superadmin: true },
+    })
+    fetchClientsMock.mockReset().mockResolvedValue({ data: [], acting_organization_id: null })
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('nav.dashboard')
+    expect(wrapper.text()).not.toContain('nav.projects')
   })
 })

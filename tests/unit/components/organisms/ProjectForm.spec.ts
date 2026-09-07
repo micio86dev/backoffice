@@ -344,6 +344,38 @@ describe('ProjectForm', () => {
     )
   })
 
+  it('maps a 422 on avatar_template_id onto its own control, not the banner', async () => {
+    // `avatar_template_id` was absent from SERVER_FIELD_TO_ERROR_KEY while
+    // `errors.avatarTemplateId` and `project-form-avatar-template-error` both
+    // existed — so the one field with a control and no map entry sent its
+    // refusal to the generic banner, which is the exact failure that table was
+    // written to end. The docblock claimed it covered every submitted field.
+    createProjectMock.mockRejectedValue(
+      Object.assign(new Error('Unprocessable'), {
+        status: 422,
+        data: { errors: { avatar_template_id: ['The selected template is invalid.'] } },
+      })
+    )
+
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+    await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    await wrapper
+      .get('[data-testid="project-form-assessment-type"] button:last-child')
+      .trigger('click')
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-form-avatar-template-error"]').text()).toBe(
+      'The selected template is invalid.'
+    )
+  })
+
   it('creates via useProjects on a valid submit and emits saved', async () => {
     const wrapper = mount(ProjectForm, {
       props: { project: null },
@@ -1056,5 +1088,22 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
 
       expect(updateProjectMock).toHaveBeenCalled()
     })
+  })
+  it('gives the assessment-type toggle an accessible name a label cannot provide', () => {
+    // `for` binds only to LABELABLE elements — button, input, select, textarea,
+    // meter, output, progress. reka-ui renders ToggleGroup as a
+    // `<div role="group">`, so the old `<FieldLabel for>` was a no-op: it read
+    // as correct precisely because the Select beside it, whose `for` targets a
+    // SelectTrigger button, genuinely is.
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const group = wrapper.get('[data-testid="project-form-assessment-type"]')
+    const fieldset = group.element.closest('fieldset')
+
+    expect(fieldset).not.toBeNull()
+    expect(fieldset!.querySelector('legend')?.textContent).toContain('projects.form.assessmentType')
   })
 })

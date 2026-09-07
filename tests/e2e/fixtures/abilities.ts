@@ -23,38 +23,22 @@
  * right; this only has to agree with it.
  */
 import type { Abilities } from '../../../app/composables/useCurrentUser'
-import { toIdentity, type MirroredIdentityInput } from '../../unit/support/abilities'
+import { abilitiesForRole, type MirroredIdentityInput } from '../../unit/support/abilities'
 
 export function abilitiesFor(input: MirroredIdentityInput): Abilities {
-  // The superadmin is NOT a Spatie role. `/auth/me` builds `roles` from
-  // `getRoleNames()`, which for them is `[]`, so branching on
-  // `roles.includes('platform')` keys off something the API cannot emit — and
-  // a fixture that mocks the superadmin honestly would then answer
-  // `avatarTemplates.create: false`, the opposite of the truth. The identity
-  // lives in its own field, here as in `SidebarNav.vue`.
-  const identity = toIdentity(input)
-
-  const platform = identity.isSuperadmin === true
-  const admin = platform || identity.roles.includes('admin')
-  const operator = admin || identity.roles.includes('operator')
-  // What the server answers from `admin || operator || viewer`. Derived, not
-  // written `true`: the two stop being the same answer the moment a role exists
-  // outside that set.
-  const viewer = operator || identity.roles.includes('viewer')
-
-  return {
-    organization: { view: viewer, update: admin },
-    apiClients: { viewAny: admin, create: admin, delete: admin },
-    users: { viewAny: admin, create: admin, update: admin, deactivate: admin, activate: admin },
-    llmCredentials: { viewAny: admin, create: admin, update: admin, delete: admin },
-    avatarTemplates: {
-      viewAny: admin,
-      create: platform,
-      update: platform,
-      activate: platform,
-      delete: platform,
-    },
-    projects: { viewAny: viewer, create: operator, update: operator, delete: admin },
-    participants: { viewAny: viewer, create: operator, recover: operator },
-  }
+  // DELEGATES, and that is the fix rather than a tidy-up.
+  //
+  // This re-implemented `abilitiesForRole` line for line — four derivations,
+  // nine groups — while already importing from that very module one line up,
+  // so the barrier that might have justified the copy did not exist. The
+  // duplication was invisible to every gate: `abilities-contract.ts` checks the
+  // SHAPE (its own docblock says no type can check the booleans),
+  // `AbilitiesMapTest.php` lives in another repo, and `typecheck` skips
+  // `tests/unit/**`.
+  //
+  // The mutation that made nothing fail: narrow `participants.recover` to
+  // `admin` in the unit mirror, forget it here, and an e2e mocking an operator
+  // with `recover: true` passes against a UI that 403s on click — the exact
+  // scenario both docblocks exist to prevent.
+  return abilitiesForRole(input)
 }

@@ -5,6 +5,10 @@
       "save": "Salva",
       "cancel": "Annulla",
       "close": "Chiudi"
+    },
+    "language": {
+      "en": "Inglese",
+      "it": "Italiano"
     }
   },
   "login": {

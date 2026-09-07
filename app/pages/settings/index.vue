@@ -24,7 +24,19 @@
       and keeps lazy panel mounting: still no `force-mount`, so only the
       section the operator is looking at is ever in the DOM (D10).
     -->
-    <Tabs v-else default-value="organization" orientation="vertical" class="items-start gap-8">
+    <!--
+      NOT `v-else` on the alert above, and that is the whole fix.
+
+      The organization is ONE section's data, not the page's. A superadmin
+      belongs to no organization — `users.organization_id` is null, which is
+      what makes them one — so `/api/organization` answers 404 on every load,
+      and hiding the entire rail behind that told them "this resource was not
+      found" on a page whose PLATFORM section is built for exactly them and
+      needs no organization at all. Four of the seven sections fetch their own
+      data; only the three that take `organization` as a prop can be affected
+      by its absence, and `visibleSections` drops precisely those.
+    -->
+    <Tabs v-model="activeSection" orientation="vertical" class="items-start gap-8">
       <TabsList
         class="sticky top-6 w-64 shrink-0 items-stretch gap-1 rounded-none bg-transparent p-0"
       >
@@ -59,9 +71,9 @@
           </div>
           <Separator />
           <!--
-            `organization` is null until the first fetch resolves; the two
+            `organization` is null until the first fetch resolves; the THREE
             panels that take it as a prop must not mount before then, while
-            the two that fetch their own data must not wait for it.
+            the FOUR that fetch their own data must not wait for it.
           -->
           <component
             :is="section.component"
@@ -77,7 +89,7 @@
 
 <script setup lang="ts">
 import PageHeader from '@/components/molecules/PageHeader.vue'
-import { ref, computed, onMounted, defineAsyncComponent, type Component } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent, type Component } from 'vue'
 import {
   BuildingOffice2Icon,
   KeyIcon,
@@ -230,6 +242,25 @@ const { fetchOrganization } = useOrganization()
 const organization = ref<OrganizationResponse['data'] | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
 
+/**
+ * A superadmin with no client selected has NO organization to load, and that
+ * is not a failure.
+ *
+ * `users.organization_id` being null is what makes them a superadmin, so
+ * `/api/organization` answers 404 on every load. Rendering that as a
+ * destructive "this resource could not be found" tells them something is
+ * broken on a page where nothing is: the same complaint as the collapsed rail,
+ * just moved into the banner. `NavBar.vue` already applies this exact guard to
+ * this exact request — it was simply never applied here.
+ *
+ * A superadmin ACTING AS a client is the opposite case and must not be caught
+ * by it: `TenantContext` scopes them to that organization, the route answers
+ * 200, and they get the full settings page for the client they selected. So
+ * this is resolved from the RESPONSE, not from identity alone — a 404 for a
+ * superadmin is structural, and every other outcome means what it always did.
+ */
+const noOrganizationInContext = ref(false)
+
 // Each section names the ABILITY it needs, and `can()` answers from the map
 // the server resolves through its own policies — never from `roles.includes
 // ('admin')`, which is a second copy of an authorization rule that drifts the
@@ -238,7 +269,7 @@ const loadError = ref<ResourceErrorState | null>(null)
 // `can()` fails closed, so a transient `/auth/me` error hides sections rather
 // than offering ones whose every request would come back 403. Affordance only:
 // the endpoints behind each section authorize independently.
-const { can } = useCurrentUser()
+const { can, user, ensureLoaded } = useCurrentUser()
 
 // EVERY section is gated — none is unconditional. A section with no gate stays
 // on screen when `/auth/me` fails, which is the one moment the page knows least
@@ -249,18 +280,69 @@ const { can } = useCurrentUser()
 // names an IDENTITY: its rows belong to no organization, so no org-scoped
 // policy can describe who may edit them, and `is_superadmin` — which `/auth/me`
 // publishes as an explicit boolean for exactly this kind of question — is the
-// honest gate. Both fail closed.
-const { user } = useCurrentUser()
+// honest gate. Both fail closed. `user` and `ensureLoaded` come from the
+// destructure above — one call, since the composable's state is module-scoped
+// and three calls only made it look like three sources of truth.
 
 const visibleSections = computed(() =>
-  SECTIONS.filter((section) =>
-    section.superadminOnly === true
+  SECTIONS.filter((section) => {
+    // Gated on `loadError`, NOT on `organization === null`. The two differ
+    // during the first tick: the organization is null before the fetch
+    // resolves, and filtering on that would flash three sections out of the
+    // rail and back in on every load. `loadError` is only set once the read
+    // has actually failed.
+    // TWO reasons an organization section cannot render, and they are not the
+    // same thing. `loadError` is a failure worth telling the operator about;
+    // `noOrganizationInContext` is the ordinary shape of a superadmin's page
+    // and gets no banner at all. Both drop the section; only one is an error.
+    if (section.needsOrganization && (loadError.value !== null || noOrganizationInContext.value)) {
+      return false
+    }
+
+    return section.superadminOnly === true
       ? user.value?.is_superadmin === true
       : // Fails closed on BOTH halves: a section naming neither an ability nor
         // the platform identity is hidden rather than shown, so an incomplete
         // declaration cannot grant access by accident.
         section.requires !== null && can(section.requires)
-  )
+  })
+)
+
+/**
+ * Which section is open — a MODEL, not a default.
+ *
+ * `default-value` cannot do this job, and that is a framework fact rather than
+ * a preference: `TabsRoot` calls
+ * `useVModel(props, 'modelValue', emits, { defaultValue: props.defaultValue })`
+ * (`reka-ui/dist/Tabs/TabsRoot.js:57`), so `props.defaultValue` is read ONCE at
+ * setup and unwrapped into a plain value. Nothing watches it afterwards, and
+ * `TabsContent` selects on strict equality against the model. A computed handed
+ * to that prop is a computed nobody is listening to.
+ *
+ * The timing is what makes it bite. `useCurrentUser`'s identity arrives from
+ * `ensureLoaded()` in `onMounted` — AFTER `<Tabs>` has run its setup — so at
+ * first render `can()` fails closed on everything, `visibleSections` is EMPTY,
+ * and the fallback below is what gets frozen in. Then `/auth/me` resolves, a
+ * superadmin's `/api/organization` 404s, the three organization sections drop,
+ * and the model still names one of them: a full rail beside an empty column.
+ *
+ * So the value is owned here and re-pointed whenever the section it names
+ * stops existing. The guard is `!some`, not `length === 0`: the list being
+ * non-empty says nothing about whether it still contains the OPEN section,
+ * which is the case that was actually broken.
+ */
+const activeSection = ref<string>('organization')
+
+watch(
+  visibleSections,
+  (sections) => {
+    if (sections.length === 0) return
+
+    if (!sections.some((section) => section.value === activeSection.value)) {
+      activeSection.value = sections[0]!.value
+    }
+  },
+  { immediate: true }
 )
 
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
@@ -271,8 +353,22 @@ async function load(): Promise<void> {
     const response = await fetchOrganization()
     organization.value = response.data
     loadError.value = null
+    noOrganizationInContext.value = false
   } catch (error) {
-    loadError.value = resolveResourceErrorState(error)
+    const state = resolveResourceErrorState(error)
+
+    // Identity may still be in flight; `ensureLoaded()` is awaited in
+    // `onMounted` before this runs, so `user.value` is settled by now.
+    if (state === 'not-found' && user.value?.is_superadmin === true) {
+      organization.value = null
+      loadError.value = null
+      noOrganizationInContext.value = true
+
+      return
+    }
+
+    loadError.value = state
+    noOrganizationInContext.value = false
   }
 }
 
@@ -280,13 +376,15 @@ async function onSaved(): Promise<void> {
   await load()
 }
 
-onMounted(() => {
-  void load()
-  // Fills the shared identity cache `can()` reads. Swallowed on failure for
-  // the same reason it always was: `can()` already answers false without it,
-  // so a failed identity narrows the page rather than breaking it.
-  void useCurrentUser()
-    .ensureLoaded()
-    .catch(() => undefined)
+onMounted(async () => {
+  // Identity FIRST, then the organization — `load()` asks `user.is_superadmin`
+  // whether a 404 is structural or a failure, and a null identity would answer
+  // "failure" and put the banner back. Swallowed on failure for the reason it
+  // always was: `can()` already answers false without it, so a failed identity
+  // narrows the page rather than breaking it. A superadmin whose identity did
+  // not load is then told the organization was not found, which is the honest
+  // answer when the page cannot tell who is asking.
+  await ensureLoaded().catch(() => undefined)
+  await load()
 })
 </script>

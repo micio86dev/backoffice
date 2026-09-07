@@ -3,7 +3,7 @@
     :value="actingClientId === null ? '' : String(actingClientId)"
     :aria-label="$t('superadmin.switchClient')"
     data-testid="client-switcher"
-    class="border-border bg-card text-foreground max-w-56 truncate rounded-md border px-2 py-1 text-sm"
+    :class="cn(formSelectClass, 'max-w-56 truncate')"
     @change="onChange"
   >
     <!--
@@ -35,6 +35,8 @@
  * unlabelled control, because the text it shows is the CURRENT VALUE and says
  * nothing about what changing it does.
  */
+import { formSelectClass } from '@/components/ui/form-control'
+import { cn } from '@/lib/utils'
 import type { Client } from '@/composables/useSuperadmin'
 
 defineProps<{

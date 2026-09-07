@@ -90,7 +90,7 @@
           data-testid="template-field-provider"
           :disabled="!isNew"
           autocomplete="off"
-          :class="formControlClass"
+          :class="formSelectClass"
         >
           <option v-for="name in providers" :key="name" :value="name">
             {{ $t(`avatar_templates.provider.${name}`) }}
@@ -155,7 +155,7 @@
               :aria-invalid="Boolean(configErrors[field.key])"
               :aria-required="field.required ? 'true' : undefined"
               :aria-describedby="describedBy(field)"
-              :class="formControlClass"
+              :class="formSelectClass"
               @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
             >
               <!--
@@ -275,7 +275,7 @@
             data-testid="template-llm-credential"
             autocomplete="off"
             :aria-invalid="Boolean(llmCredentialError)"
-            :class="formControlClass"
+            :class="formSelectClass"
             :value="draft.llmCredentialId === null ? '' : String(draft.llmCredentialId)"
             @change="onCredentialChange"
           >
@@ -320,7 +320,7 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
-import { formControlClass } from '@/components/ui/form-control'
+import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { getErrorFields } from '@/utils/http-error'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'

@@ -71,8 +71,8 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="en">EN</SelectItem>
-                <SelectItem value="it">IT</SelectItem>
+                <SelectItem value="en">{{ $t('common.language.en') }}</SelectItem>
+                <SelectItem value="it">{{ $t('common.language.it') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -81,12 +81,20 @@
           </FieldDescription>
         </Field>
 
-        <Field>
-          <FieldLabel for="project-form-assessment-type">
+        <!--
+          This LOOKED associated and was not. `for` only binds to LABELABLE
+          elements — button, input, select, textarea, meter, output, progress —
+          and reka-ui renders `ToggleGroup` as a `<div role="group">`. Pointing
+          a label at a div is a no-op: no accessible name, no click-to-focus.
+          The `Select` fields beside it are genuinely fine, because their `for`
+          targets a `SelectTrigger`, which IS a button — which is exactly why
+          this one read as correct.
+        -->
+        <FieldSet class="gap-2">
+          <FieldLegend variant="label">
             {{ $t('projects.form.assessmentType') }}
-          </FieldLabel>
+          </FieldLegend>
           <ToggleGroup
-            id="project-form-assessment-type"
             type="single"
             :model-value="assessmentType"
             :disabled="lockedWhenLive"
@@ -112,7 +120,7 @@
           <FieldDescription v-if="lockedWhenLive">
             {{ $t('projects.form.immutableWhenLive') }}
           </FieldDescription>
-        </Field>
+        </FieldSet>
 
         <Field v-if="assessmentType === 'standard'" :data-invalid="Boolean(errors.roleCode)">
           <FieldLabel for="project-form-role-code">{{ $t('projects.form.roleCode') }}</FieldLabel>
@@ -255,7 +263,7 @@
             id="project-form-avatar-template"
             data-testid="project-form-avatar-template"
             autocomplete="off"
-            :class="formControlClass"
+            :class="formSelectClass"
             :value="avatarTemplateId === null ? '' : String(avatarTemplateId)"
             :aria-invalid="Boolean(errors.avatarTemplateId)"
             :aria-describedby="
@@ -271,7 +279,7 @@
             validator below refuses a submit made in it.
           -->
             <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
-              {{ template.name }} ({{ template.provider }})
+              {{ template.name }} ({{ $t(`avatar_templates.provider.${template.provider}`) }})
             </option>
           </select>
           <FieldDescription id="project-form-avatar-template-help">
@@ -417,7 +425,15 @@
 // 422. Self-contained (owns its own submit/validation), matching login.vue's
 // pattern rather than delegating persistence to the parent.
 import { ref, computed, onMounted, watch } from 'vue'
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
@@ -439,7 +455,7 @@ import CompetencyPicker, {
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
-import { formControlClass } from '@/components/ui/form-control'
+import { formSelectClass } from '@/components/ui/form-control'
 import type { TemplateOption } from '@/types/avatar-template'
 import {
   isNudgeMinCharsValid,
@@ -592,7 +608,6 @@ const nextTransition = computed<'active' | 'archived' | null>(() => {
 })
 
 function validateName(): boolean {
-  errors.value.name = name.value.trim() === '' ? undefined : errors.value.name
   if (name.value.trim() === '') errors.value.name = missingKey('nameRequired')
   else errors.value.name = undefined
   return !errors.value.name
@@ -712,17 +727,28 @@ async function loadCompetencyOptions(): Promise<void> {
 /**
  * Server field name -> local error key.
  *
- * Table-driven, and covering EVERY field this form submits, because the
- * hand-written version covered three of them: a 422 on `webhook_url`,
- * `exit_redirect_url`, `pause_every_n_competencies`, `nudge_min_chars`,
- * `assessment_type`, `language`, `competency_ids` or `framework_version_id`
- * was silently reduced to a generic "could not save" banner, leaving the
- * operator to guess which field the server had refused.
+ * Table-driven, because the hand-written version covered three fields: a 422
+ * on `webhook_url`, `exit_redirect_url`, `pause_every_n_competencies` or
+ * `nudge_min_chars` was silently reduced to a generic "could not save" banner,
+ * leaving the operator to guess which field the server had refused.
+ *
+ * Covers every submitted field THAT HAS A CONTROL OF ITS OWN — not "every
+ * field this form submits", which is what this said while omitting
+ * `avatar_template_id`, a field with both an `errors.avatarTemplateId` slot
+ * and a rendered `project-form-avatar-template-error`. A 422 on it landed in
+ * the banner instead of on the select that caused it, which is the exact
+ * failure the table was written to end.
+ *
+ * `assessment_type`, `language`, `competency_ids` and `framework_version_id`
+ * stay out deliberately: none of them renders an error slot, so the banner IS
+ * the right destination for those. `applyServerFieldErrors` returns whatever
+ * it could not place, and the banner shows it.
  */
 const SERVER_FIELD_TO_ERROR_KEY = {
   name: 'name',
   slug: 'slug',
   role_code: 'roleCode',
+  avatar_template_id: 'avatarTemplateId',
   pause_every_n_competencies: 'pauseEveryNCompetencies',
   nudge_min_chars: 'nudgeMinChars',
   exit_redirect_url: 'exitRedirectUrl',
@@ -877,12 +903,20 @@ onMounted(() => {
 /**
  * The organization's avatar templates, for the per-project pin.
  *
- * A rejected load leaves the list empty and the control rendered with only the
- * organization-default option — never blocks the form. This is one optional
- * setting among many, and an operator must still be able to save a name change
- * when the template endpoint is having a bad day. That is also why nothing
- * here writes to `errors`: a background read failing is not a validation
- * problem with anything the operator typed.
+ * A rejected load leaves the list EMPTY, and that does block creation — say it
+ * plainly rather than the reverse. `projects.avatar_template_id` is NOT NULL
+ * and the API refuses an explicit null, so there is no organization-default
+ * option to fall back to: `ProjectForm.spec.ts` asserts both, that no empty
+ * option is offered and that submitting against an empty list is refused with
+ * `avatarTemplateRequired` on the control.
+ *
+ * This docblock previously promised the opposite — a default option, and a
+ * form that never blocks — which was true while the column was nullable and
+ * became a comment asserting behaviour its own tests contradict.
+ *
+ * Nothing here writes to `errors` even so: a background read failing is not a
+ * validation problem with anything the operator typed, and the refusal belongs
+ * to submit, where `validateAvatarTemplate()` already puts it.
  */
 async function loadAvatarTemplates(): Promise<void> {
   try {
@@ -923,9 +957,10 @@ function applyDefaultTemplate(): void {
 
 function onAvatarTemplateChange(event: Event): void {
   const select = event.target as HTMLSelectElement
-  // '' is the organization-default option, and must reach the server as an
-  // explicit null — never be dropped as "unchanged", or unpinning would be
-  // impossible once a template had been pinned.
+  // `''` is not an option this control offers — the field is required and the
+  // empty state is only reachable before the default resolves. Mapped to null
+  // anyway so the value stays `number | null` rather than becoming `NaN` from
+  // `Number('')`, which would then be submitted.
   avatarTemplateId.value = select.value === '' ? null : Number(select.value)
 }
 

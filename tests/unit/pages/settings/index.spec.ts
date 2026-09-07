@@ -1,8 +1,9 @@
 /**
  * pages/settings/index.vue (Unit 6, task 24.8 — RED)
  *
- * Five `Tabs`/`TabsTrigger` inside `TabsList` for an admin (Organization
- * profile, API keys, Webhook defaults, Users & roles, LLM credentials); each
+ * Seven sections, six of them reachable by an org admin (Organization profile,
+ * Branding, API keys, Webhook defaults, Users & roles, LLM credentials) and the
+ * seventh — Platform — gated on `is_superadmin` rather than on an ability. Each
  * tab panel mounts lazily (only the active tab, D10).
  *
  * The LLM credentials section is ADMIN-ONLY and is the only gated section on
@@ -14,7 +15,7 @@
  * because a control that appears and then 403s teaches the operator that the
  * product is broken rather than that they lack the right.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { waitFor } from '../../support/wait-for'
 import { ref } from 'vue'
@@ -31,6 +32,8 @@ await Promise.all([
   import('../../../../app/components/organisms/ApiKeysPanel.vue'),
   import('../../../../app/components/organisms/UsersPanel.vue'),
   import('../../../../app/components/organisms/LlmCredentialsPanel.vue'),
+  import('../../../../app/components/organisms/BrandingForm.vue'),
+  import('../../../../app/components/organisms/PlatformSettingsPanel.vue'),
 ])
 
 const tMock = (key: string) => key
@@ -54,6 +57,23 @@ function mockOrganization() {
   vi.doMock('../../../../app/composables/useOrganization', () => ({
     useOrganization: () => ({
       fetchOrganization: vi.fn().mockResolvedValue(organizationResponse()),
+      updateOrganization: vi.fn(),
+    }),
+  }))
+}
+
+/**
+ * `/api/organization` rejecting the way it does for a SUPERADMIN.
+ *
+ * Not a hypothetical: a superadmin belongs to no organization
+ * (`users.organization_id` is null — that is what makes them one), so the
+ * singular self-resolving route has no row to return and answers 404 on every
+ * page load. `NavBar.vue` already documents this and skips the call entirely.
+ */
+function mockOrganizationNotFound() {
+  vi.doMock('../../../../app/composables/useOrganization', () => ({
+    useOrganization: () => ({
+      fetchOrganization: vi.fn().mockRejectedValue({ status: 404 }),
       updateOrganization: vi.fn(),
     }),
   }))
@@ -100,9 +120,82 @@ function mockCurrentUser(role: 'admin' | 'operator' | 'superadmin' | null) {
   }))
 }
 
+/**
+ * Identity arriving the way it actually arrives.
+ *
+ * `mockCurrentUser` hands back a populated `user` ref and a synchronous `can()`,
+ * so under test `visibleSections` is already correct on the FIRST tick. In
+ * production it is empty on that tick: `ensureLoaded()` runs in `onMounted`,
+ * after `<Tabs>` has finished its setup. A mock that skips the gap deletes the
+ * only window in which the open-section bug can happen, which is how a green
+ * suite sat on top of a page that opened no panel at all.
+ */
+function mockCurrentUserAsync(role: 'admin' | 'operator' | 'superadmin') {
+  const isSuperadmin = role === 'superadmin'
+  // Same mapping as the synchronous sibling: a superadmin holds every org
+  // ability through `Gate::before`, so ability-wise they answer as an admin.
+  const abilityRole = isSuperadmin ? 'admin' : role
+  const user = ref<{ is_superadmin: boolean } | null>(null)
+  const loaded = ref(false)
+
+  vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+    useCurrentUser: () => ({
+      ensureLoaded: vi.fn().mockImplementation(async () => {
+        user.value = { is_superadmin: isSuperadmin }
+        loaded.value = true
+        return { roles: ['admin'] }
+      }),
+      // Fails closed until the identity lands — exactly like the real one.
+      //
+      // `!ADMIN_ONLY.has(ability) || true` was here, which is `true`: the gate
+      // collapsed to `loaded.value` and authorized EVERYTHING, in the one mock
+      // the two panel tests below depend on. A mock that grants every ability
+      // cannot fail on an ability-gating regression, which is the whole thing
+      // those tests exist to hold.
+      can: (ability: string) =>
+        loaded.value && (abilityRole === 'admin' || !ADMIN_ONLY.has(ability)),
+      user,
+    }),
+  }))
+}
+
+/**
+ * Every panel's own `onMounted` fetch, resolved rather than rejected.
+ *
+ * The panels are `defineAsyncComponent` chunks (D10): whichever one is OPEN
+ * mounts and immediately fetches. With no access token `apiFetch` throws
+ * `Not authenticated`, and because that happens after the test body has
+ * finished, it surfaces as an UNHANDLED REJECTION — the suite printed
+ * "16 passed" and exited 1 on roughly half of its runs. A gate that goes red
+ * on half its runs while every assertion reads green is worse than no gate:
+ * the next real regression is indistinguishable from the flake.
+ *
+ * Stubbing the transport rather than the panels, because
+ * `'mounts only the active tab panel'` asserts on the panels' REAL testids and
+ * a stubbed panel would make that assertion vacuous.
+ */
+function mockApiTransport() {
+  vi.doMock('../../../../app/composables/useApi', () => ({
+    useApi: () => ({ apiFetch: vi.fn().mockResolvedValue({ data: [] }) }),
+  }))
+}
+
+/**
+ * Wrappers still mounted when a test ends.
+ *
+ * `vi.resetModules()` in `beforeEach` tears down the module registry, and a
+ * panel chunk still resolving against the OLD one threw
+ * `$setup.fieldVariants is not a function` from `Field.vue` — after the test
+ * body, so it landed as an unhandled rejection rather than a failure. Unmount
+ * and flush first, so pending work finishes inside the registry that started
+ * it.
+ */
+const mounted: { unmount: () => void }[] = []
+
 async function mountSettings() {
   const SettingsPage = (await import('../../../../app/pages/settings/index.vue')).default
   const wrapper = mount(SettingsPage, { global: { mocks: { $t: tMock } } })
+  mounted.push(wrapper)
   await flushPromises()
   return wrapper
 }
@@ -117,13 +210,25 @@ let useHeadMock: ReturnType<typeof vi.fn>
 describe('pages/settings/index.vue', () => {
   beforeEach(() => {
     vi.resetModules()
+    mockApiTransport()
     useHeadMock = vi.fn()
+    // Nuxt auto-import, absent under Vitest. Needed since these tests began
+    // asserting on an OPEN panel: an active panel runs its own `onMounted`
+    // fetch, `useApi` finds no access token and calls `navigateTo('/login')`,
+    // and the resulting unhandled rejection made the run exit non-zero while
+    // every test still reported green.
+    vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', useHeadMock)
     vi.stubGlobal(
       'useI18n',
       vi.fn(() => ({ t: (key: string) => key, locale: ref('en') }))
     )
+  })
+
+  afterEach(async () => {
+    while (mounted.length > 0) mounted.pop()!.unmount()
+    await flushPromises()
   })
 
   it('renders every tab an admin may use inside a TabsList', async () => {
@@ -262,5 +367,120 @@ describe('pages/settings/index.vue', () => {
     const wrapper = await mountSettings()
 
     expect(wrapper.text()).not.toContain('settings.tabs.platform')
+  })
+  /**
+   * The organization is ONE section's data, not the page's.
+   *
+   * A superadmin with no client selected gets a 404 from
+   * `/api/organization`, and the page used to answer that by replacing the
+   * whole `Tabs` block with a "not found" alert — hiding Users, LLM
+   * credentials and, worst of all, the PLATFORM section, which is the one
+   * built for exactly this viewer and needs no organization at all. Observed
+   * in production: the superadmin opened Settings and was told the resource
+   * did not exist.
+   *
+   * Three of the seven sections take the organization as a prop; the other
+   * four fetch their own data. Only the first three may be affected by its
+   * absence.
+   */
+  it('keeps the sections that need no organization when the organization 404s', async () => {
+    mockCurrentUser('superadmin')
+    mockOrganizationNotFound()
+
+    const wrapper = await mountSettings()
+
+    // The one section that exists FOR this viewer.
+    expect(wrapper.text()).toContain('settings.tabs.platform')
+    // And the tenant sections that fetch their own data.
+    expect(wrapper.text()).toContain('settings.tabs.users')
+    expect(wrapper.text()).toContain('settings.tabs.llmCredentials')
+    expect(wrapper.text()).toContain('settings.tabs.apiKeys')
+  })
+
+  it('does not call a superadmin having no organization an error', async () => {
+    // A superadmin's `users.organization_id` is null — that is what makes them
+    // one — so `/api/organization` 404s on every load. A destructive "this
+    // resource could not be found" banner on every visit reports a failure
+    // that did not happen. `NavBar.vue` already guards this exact request for
+    // this exact viewer.
+    mockCurrentUserAsync('superadmin')
+    mockOrganizationNotFound()
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.findAll('[role="tabpanel"][data-state="active"]').length > 0)
+
+    expect(wrapper.find('[data-testid="settings-error"]').exists()).toBe(false)
+  })
+
+  it('still reports a real failure to an operator who has an organization', async () => {
+    // The counterpart, so the silence above cannot spread: scoping the error
+    // must not make it silent for someone whose organization genuinely failed
+    // to load and who is left without their profile section.
+    mockCurrentUserAsync('admin')
+    mockOrganizationNotFound()
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.find('[data-testid="settings-error"]').exists())
+
+    expect(wrapper.find('[data-testid="settings-error"]').exists()).toBe(true)
+  })
+  /**
+   * The panel, not the rail label.
+   *
+   * Every other assertion in this file reads `wrapper.text()`, which is
+   * satisfied by the TRIGGER in the rail — rendered by `v-for` over
+   * `visibleSections` regardless of which section is open. So a page showing a
+   * full rail beside an EMPTY column passed all of them.
+   *
+   * The panel ELEMENT always renders — `reka-ui/dist/Tabs/TabsContent.js:48-64`
+   * sets `present: forceMount || isSelected` and only gates the SLOT on it, so
+   * every visible section contributes a `[role="tabpanel"]` and the inactive
+   * ones carry `hidden` plus `data-state="inactive"`. The active one is what
+   * the operator can actually read, so that is what these assert on.
+   */
+  it('opens a panel that survives the organization 404, not just its rail entry', async () => {
+    mockCurrentUserAsync('superadmin')
+    mockOrganizationNotFound()
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.findAll('[role="tabpanel"][data-state="active"]').length > 0)
+
+    const open = wrapper.findAll('[role="tabpanel"][data-state="active"]')
+
+    // Exactly one section is open — not zero, which is the rail-beside-an-
+    // empty-column state this test exists to catch.
+    expect(open).toHaveLength(1)
+    // And it is not the section that was dropped.
+    expect(open[0]!.text()).not.toContain('settings.tabs.organization')
+  })
+
+  it('opens the organization panel when the organization does load', async () => {
+    // The counterpart, so the assertion above cannot pass by opening nothing
+    // useful: with the organization present it must be first, as before.
+    mockCurrentUserAsync('admin')
+    mockOrganization()
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.findAll('[role="tabpanel"][data-state="active"]').length > 0)
+
+    const open = wrapper.findAll('[role="tabpanel"][data-state="active"]')
+
+    expect(open).toHaveLength(1)
+    expect(open[0]!.text()).toContain('settings.tabs.organization')
+  })
+  it('opens a panel for an operator, and none of the admin-only ones', async () => {
+    // Exercises the async mock's ABILITY gate, which the two tests above
+    // cannot: both of their roles map to `admin`, so `ADMIN_ONLY` never
+    // discriminates for them and a tautological `can()` would look identical
+    // to a correct one. An operator is the only caller that tells them apart.
+    mockCurrentUserAsync('operator')
+    mockOrganization()
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.findAll('[role="tabpanel"][data-state="active"]').length > 0)
+
+    expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+    expect(wrapper.text()).not.toContain('settings.tabs.users')
+    expect(wrapper.findAll('[role="tabpanel"][data-state="active"]')).toHaveLength(1)
   })
 })

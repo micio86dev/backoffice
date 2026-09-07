@@ -123,4 +123,149 @@ describe('RecentActivity — the rows go somewhere', () => {
     expect(href).toBe('/participants/7')
     expect(href).not.toContain('ext-abc-999')
   })
+
+  it('keeps the live region mounted before it has anything to say', () => {
+    // A live region announces by MUTATION inside a node already in the
+    // accessibility tree. `v-if` on the region itself put the element and its
+    // text into the DOM in the same frame, which NVDA, JAWS and VoiceOver
+    // announce unreliably — the first version of this fix reproduced the
+    // silence it was written to end. The region is therefore always present
+    // and only its TEXT toggles.
+    // The idle case is a feed WITH rows. An empty one is not silent any more:
+    // "No candidates yet" is a claim about the operator's data delivered after
+    // an async resolution, so it belongs inside the live region too — it used
+    // to be a plain paragraph beside it, announced by nobody.
+    const idle = mount(RecentActivity, {
+      props: {
+        rows: [
+          {
+            id: 1,
+            candidate_ref: 'ref-1',
+            display_name: 'Rossi',
+            status: 'completato',
+            project_name: 'Retail',
+            updated_at: '2026-03-01T10:00:00+00:00',
+          },
+        ],
+        locale: 'en',
+        failure: null,
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    const region = idle.get('[role="status"]')
+
+    expect(region.exists()).toBe(true)
+    expect(region.text()).toBe('')
+
+    const failed = mount(RecentActivity, {
+      props: { rows: [], locale: 'en', failure: 'error' as const },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(failed.get('[role="status"]').text()).not.toBe('')
+    // And the empty state must not claim there are no candidates.
+    expect(failed.find('[data-testid="activity-empty"]').exists()).toBe(false)
+  })
+
+  it('keeps the four failure states distinct instead of collapsing them', () => {
+    // The metrics read on this same page resolves through
+    // resolveResourceErrorState and says forbidden/not-ready/not-found/error
+    // separately. The feed used to flatten all four into one boolean and one
+    // sentence, so an operator missing the candidate-list ability was told
+    // "could not be loaded" and retried something that was never going to work.
+    const messages = (['forbidden', 'not-ready', 'not-found', 'error'] as const).map((failure) =>
+      mount(RecentActivity, {
+        props: { rows: [], locale: 'en', failure },
+        global: { mocks: { $t: tMock } },
+      })
+        .get('[data-testid="activity-failed"]')
+        .text()
+    )
+
+    expect(new Set(messages).size).toBe(4)
+  })
+
+  it('says it is loading rather than claiming the feed is empty', () => {
+    // `rows` starts empty, so before the first response lands the panel used to
+    // assert "No candidates yet. They appear here as soon as the calling system
+    // creates one." — the same affirmative false sentence the failure state was
+    // added to remove, reached by a different route.
+    const loading = mount(RecentActivity, {
+      props: { rows: [], locale: 'en', loading: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(loading.find('[data-testid="activity-empty"]').exists()).toBe(false)
+    expect(loading.get('[data-testid="activity-loading"]').text()).toBe(
+      'dashboard.activity.loading'
+    )
+  })
+
+  it("hides the previous period's rows while the next read is in flight", () => {
+    // The empty state got a `!loading` guard and the list one line below did
+    // not, so on a range change the OLD period's rows stayed on screen under
+    // the new period's filter label — the exact divergence `loadToken` exists
+    // to prevent, one element short of prevented.
+    const wrapper = mount(RecentActivity, {
+      props: {
+        rows: [
+          {
+            id: 1,
+            candidate_ref: 'ref-1',
+            display_name: 'Rossi',
+            status: 'completato',
+            project_name: 'Retail',
+            updated_at: '2026-03-01T10:00:00+00:00',
+          },
+        ],
+        locale: 'en',
+        loading: true,
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="activity-list"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Rossi')
+  })
+
+  it('announces the empty state, instead of rendering it beside the live region', () => {
+    // Trace what a screen reader got on a slow load of an empty feed: the
+    // region said "Loading...", then it emptied, then a plain <p> appeared
+    // OUTSIDE it. Silence — the exact silence role="status" was added to end,
+    // applied to the failure branch only.
+    const wrapper = mount(RecentActivity, {
+      props: { rows: [], locale: 'en' },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const region = wrapper.get('[role="status"]')
+
+    expect(region.attributes('data-testid')).toBe('activity-empty')
+    expect(region.text()).toBe('dashboard.activity.empty')
+    // And there is no second copy outside it.
+    expect(wrapper.findAll('[data-testid="activity-empty"]')).toHaveLength(1)
+  })
+
+  it('gives two feeds on one page different heading ids', () => {
+    // Mounted in ONE app: useId() counts per app instance, so two separate
+    // mount() calls both return 'v-0' and would prove nothing about a page.
+    const page = mount(
+      {
+        components: { RecentActivity },
+        template: `
+          <div>
+            <RecentActivity :rows="[]" locale="en" />
+            <RecentActivity :rows="[]" locale="en" />
+          </div>
+        `,
+      },
+      { global: { mocks: { $t: tMock } } }
+    )
+
+    const [first, second] = page.findAllComponents(RecentActivity)
+
+    expect(first!.get('section').attributes('aria-labelledby')).not.toBe(
+      second!.get('section').attributes('aria-labelledby')
+    )
+  })
 })

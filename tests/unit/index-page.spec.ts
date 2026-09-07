@@ -9,10 +9,14 @@ import { ref } from 'vue'
 
 const tMock = vi.fn((key: string) => (key === 'dashboard.title' ? 'Dashboard' : key))
 
-function metricsResponse() {
+/**
+ * @param inCorso lets a test tell two responses apart — the stale-load test
+ *   needs the slow one and the fresh one to be distinguishable on screen.
+ */
+function metricsResponse(inCorso = 2) {
   return {
     data: {
-      participants_by_status: { in_corso: 2, completato: 3 },
+      participants_by_status: { in_corso: inCorso, completato: 3 },
       evaluations_by_status: { completato: 3 },
       completion_rate: 0.6,
       ai_usage: {
@@ -109,7 +113,77 @@ describe('IndexPage (dashboard)', () => {
     expect(wrapper.text()).not.toContain('dashboard.kpi.noData')
   })
 
-  it('shows the no-data placeholder before the fetch resolves, never a raw 0 masquerading as a real total', async () => {
+  it('drops a previous failure when a new read starts, instead of showing it over the retry', async () => {
+    // `statusKey` checks `failure` before `loading`, and `v-if="loadError"`
+    // wins over `v-else-if="loading"`. Clearing the failure only on SUCCESS
+    // therefore kept "You do not have permission" on screen for the entire
+    // in-flight retry — stale state outranking the fresh read, which is the
+    // defect the loading state was added to fix, one variable over.
+    let resolveSecond: (value: ReturnType<typeof metricsResponse>) => void = () => {}
+    const second = new Promise<ReturnType<typeof metricsResponse>>((resolve) => {
+      resolveSecond = resolve
+    })
+    const fetchMetricsMock = vi
+      .fn()
+      .mockRejectedValueOnce({ response: { status: 403 } })
+      .mockReturnValueOnce(second)
+
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: fetchMetricsMock,
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'DashboardFilters' }).vm.$emit('change', { from: '2026-01-01' })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(true)
+
+    resolveSecond(metricsResponse())
+    await flushPromises()
+  })
+
+  it('renders the KPI tiles as soon as the metrics land, without waiting on the feed', async () => {
+    // The two flags were one. `loading = false` sat in the outer finally, after
+    // the awaited activity fetch, so a slow secondary panel held counters that
+    // had already resolved as skeletons — the same "a secondary panel must not
+    // hold the dashboard hostage" rule the swallowed catch is built on, one
+    // await too late.
+    let resolveActivity: (value: { data: [] }) => void = () => {}
+    const pendingActivity = new Promise<{ data: [] }>((resolve) => {
+      resolveActivity = resolve
+    })
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockReturnValue(pendingActivity),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(false)
+    // 2 in_corso + 3 completato — the tile is addressed directly rather than
+    // searching the page text, where a bare '5' also appears inside '500 ms'.
+    expect(wrapper.get('[data-testid="dashboard-total-participants"]').text()).toContain('5')
+    // ...while the feed is still honestly saying it is loading.
+    expect(wrapper.find('[data-testid="activity-loading"]').exists()).toBe(true)
+
+    resolveActivity({ data: [] })
+    await flushPromises()
+  })
+
+  it('shows a loading state before the fetch resolves — neither a raw 0 nor a claim of no data', async () => {
     let resolveFetch: (value: ReturnType<typeof metricsResponse>) => void = () => {}
     const pending = new Promise<ReturnType<typeof metricsResponse>>((resolve) => {
       resolveFetch = resolve
@@ -124,10 +198,19 @@ describe('IndexPage (dashboard)', () => {
     const IndexPage = (await import('../../app/pages/index.vue')).default
     const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
 
-    expect(wrapper.text()).toContain('dashboard.kpi.noData')
+    // This used to assert `noData`, and asserting it was the defect: "No data
+    // available" is a claim about the operator's numbers, made before anything
+    // had been read. A raw 0 would have been worse; a loading state is the only
+    // one of the three that is TRUE while the request is in flight.
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('dashboard.kpi.noData')
+    expect(wrapper.text()).not.toContain('dashboard.activity.empty')
 
     resolveFetch(metricsResponse())
     await flushPromises()
+
+    // And it clears — a spinner that never resolves is its own defect.
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(false)
   })
 
   describe('page title (i18n)', () => {
@@ -161,10 +244,16 @@ describe('IndexPage (dashboard)', () => {
       const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
       await flushPromises()
 
-      // The formatted percentiles still reach the message as parameters…
+      // Each percentile carries its own UNIT now, so `latencyValue` joins two
+      // already-complete phrases rather than two bare numbers followed by a
+      // trailing `ms`. That trailing unit is what produced "not measured / not
+      // measured ms" the moment a percentile was null — the unit has to travel
+      // with a number or not at all.
+      expect(composableTMock).toHaveBeenCalledWith('dashboard.kpi.latencyMs', { value: '500' })
+      expect(composableTMock).toHaveBeenCalledWith('dashboard.kpi.latencyMs', { value: '900' })
       expect(composableTMock).toHaveBeenCalledWith('dashboard.kpi.latencyValue', {
-        p50: '500',
-        p95: '900',
+        p50: 'dashboard.kpi.latencyMs',
+        p95: 'dashboard.kpi.latencyMs',
       })
       // …and the rendered value is the i18n key, never a hand-built
       // `${p50} / ${p95} ms` template literal.
@@ -247,7 +336,15 @@ describe('IndexPage (dashboard)', () => {
 
     expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('dashboard.kpi.totalParticipants')
-    expect(wrapper.find('[data-testid="activity-empty"]').exists()).toBe(true)
+    // The feed SAYS it failed. This line asserted `activity-empty` — it pinned
+    // the defect as the requirement: a 403 or a 500 rendered "No candidates
+    // yet. They appear here as soon as the calling system creates one.", an
+    // affirmative claim about the operator's own data made without having read
+    // it. Swallowing the rejection so the counters survive is right; laundering
+    // it into a success-looking empty state is the exact failure
+    // `error-state.ts`'s docblock names.
+    expect(wrapper.find('[data-testid="activity-failed"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="activity-empty"]').exists()).toBe(false)
   })
 
   it('renders the activity rows the API returns', async () => {
@@ -311,8 +408,16 @@ describe('IndexPage — cost KPI', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('dashboard.kpi.cost')
-    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', { usd: '1.75' })
+    // `currency` comes from the API rather than a symbol baked into the i18n
+    // string. `useDashboardMetrics` types `costs.currency` and its docblock
+    // says it is "carried rather than assumed"; the page assumed anyway, in
+    // both locales, on a figure an operator may reconcile against an invoice.
+    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', {
+      currency: 'USD',
+      usd: '1.75',
+    })
     expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costBreakdown', {
+      currency: 'USD',
       scoring: '1.25',
       conversation: '0.50',
     })
@@ -345,6 +450,102 @@ describe('IndexPage — cost KPI', () => {
     mount(IndexPage, { global: { mocks: { $t: tMock } } })
     await flushPromises()
 
-    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', { usd: '0.00' })
+    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', {
+      currency: 'USD',
+      usd: '0.00',
+    })
+  })
+
+  it('drops a stale load, so the numbers never describe a period the filter is not showing', async () => {
+    // Change year, then month quickly: two loads are in flight. Without
+    // sequencing whichever resolves LAST wins, so the slower OLDER range
+    // overwrites the newer one and the filter confidently shows a period the
+    // counters are not describing. The shared `range` stops the two PANELS
+    // disagreeing with each other; it never addressed either disagreeing with
+    // the filter.
+    let resolveFirst: (v: unknown) => void = () => {}
+    const first = new Promise((r) => {
+      resolveFirst = r
+    })
+
+    const fetchMetrics = vi
+      .fn()
+      // The first call hangs until we release it — the SLOW, STALE one.
+      .mockImplementationOnce(() => first.then(() => metricsResponse(1)))
+      // The second resolves immediately — the NEWER one the operator asked for.
+      .mockResolvedValue(metricsResponse(999))
+
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics,
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+
+    // Second load starts while the first is still pending.
+    wrapper.findComponent({ name: 'DashboardFilters' }).vm.$emit('change', { from: '2025-01-01' })
+    await flushPromises()
+
+    // Now let the stale one land. It must NOT overwrite.
+    resolveFirst(null)
+    await flushPromises()
+
+    // 999 + 3 completed = 1002 total participants, the FRESH answer.
+    // The stale one would render 1 + 3 = 4.
+    expect(fetchMetrics).toHaveBeenCalledTimes(2)
+    const text = wrapper.text().replace(/[\u202F\u00A0.,]/g, '')
+    expect(text).toContain('1002')
+    expect(text).not.toContain('dashboard.kpi.totalParticipants4')
+  })
+
+  it('renders a missing latency without inheriting the unit', async () => {
+    // Asserted on the RENDERED SENTENCE, not on the $t call. The existing
+    // latency test checks only that the translator was invoked with the right
+    // params, and the mock echoes the key back — so "not measured / not
+    // measured ms", produced by interpolating the missing-value label into a
+    // slot the unit followed, was invisible to it.
+    //
+    // Stubs `useI18n`, not `$t`: the computed reads `t` from the composable,
+    // and a template mock would never have been consulted.
+    const translate = (key: string, params?: Record<string, unknown>): string => {
+      if (key === 'dashboard.kpi.notMeasured') return 'not measured'
+      if (key === 'dashboard.kpi.latencyMs') return `${params?.value} ms`
+      if (key === 'dashboard.kpi.latencyValue') return `${params?.p50} / ${params?.p95}`
+      return key
+    }
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: translate, locale: ref('en') }))
+    )
+
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue({
+          data: {
+            participants_by_status: { in_attesa: 1 },
+            evaluations_by_status: {},
+            completion_rate: 0,
+            ai_usage: {
+              input_tokens: 0,
+              output_tokens: 0,
+              latency_ms_p50: null,
+              latency_ms_p95: null,
+            },
+            costs: { scoring_usd: 0, conversation_usd: 0, total_usd: 0, currency: 'USD' },
+          },
+        }),
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('not measured / not measured')
+    expect(wrapper.text()).not.toContain('not measured ms')
   })
 })

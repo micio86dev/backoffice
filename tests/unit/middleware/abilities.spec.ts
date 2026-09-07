@@ -111,4 +111,29 @@ describe('03.abilities.global.ts', () => {
     expect(canMock).toHaveBeenCalledWith('avatarTemplates.viewAny')
     expect(canMock).not.toHaveBeenCalledWith('users.viewAny')
   })
+
+  it('guards the clients console by its own ability', async () => {
+    // Mirrors the test above, which exists because this mistake was made once
+    // already. `clients` was added to REQUIRED with no test, so deleting the
+    // entry outright left all seven green — the route gate on the platform
+    // owner's console was load-bearing and unheld.
+    canMock.mockReturnValue(true)
+    vi.stubGlobal('navigateTo', vi.fn())
+
+    await run('/clients')
+
+    expect(canMock).toHaveBeenCalledWith('clients.viewAny')
+    expect(canMock).not.toHaveBeenCalledWith('users.viewAny')
+  })
+
+  it('redirects away from the clients console without the ability', async () => {
+    // The half that matters: a guard which never refuses is not a guard.
+    canMock.mockReturnValue(false)
+    const navigateToMock = vi.fn()
+    vi.stubGlobal('navigateTo', navigateToMock)
+
+    await run('/clients')
+
+    expect(navigateToMock).toHaveBeenCalled()
+  })
 })

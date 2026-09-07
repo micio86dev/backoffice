@@ -33,6 +33,7 @@ const ITEMS = [
   { to: '/projects', scope: 'client' as const },
   { to: '/avatar-templates', scope: 'platform' as const },
   { to: '/settings', scope: 'platform' as const },
+  { to: '/clients', scope: 'platform' as const },
 ]
 
 describe('nav visibility', () => {
@@ -64,5 +65,18 @@ describe('nav visibility', () => {
 
     expect(none.map((i) => i.to)).toContain('/avatar-templates')
     expect(one.map((i) => i.to)).toContain('/avatar-templates')
+  })
+
+  it('shows Clients among the platform-scope items for a superadmin with no acting client', () => {
+    // The ONLY place visibleNavItemsFor is exercised for a superadmin
+    // (superadmin-clients-console spec, "Superadmin with no acting client
+    // sees Clients and opens it"). Alongside Avatar Templates and Settings —
+    // scope alone puts it there; the ability gate (SidebarNav.spec.ts) is
+    // what would otherwise be the only thing missing.
+    const visible = visibleNavItemsFor(ITEMS, { isSuperadmin: true, actingClientId: null })
+
+    expect(visible.map((i) => i.to)).toEqual(
+      expect.arrayContaining(['/clients', '/avatar-templates', '/settings'])
+    )
   })
 })

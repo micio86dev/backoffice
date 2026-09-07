@@ -79,7 +79,8 @@
       "reports": "Report",
       "settings": "Impostazioni",
       "review": "Resoconto sessione — BEAI",
-      "profile": "Il mio profilo"
+      "profile": "Il mio profilo",
+      "clients": "Clienti"
     }
   },
   "errors": {
@@ -111,6 +112,7 @@
     "settings": "Impostazioni",
     "logout": "Esci",
     "avatarTemplates": "Template avatar",
+    "clients": "Clienti",
     "profileLabel": "Profilo di {name}"
   },
   "dashboard": {
@@ -1171,5 +1173,22 @@
     "switchClient": "Cliente visualizzato",
     "allClients": "Tutti i clienti",
     "switchError": "Non è stato possibile cambiare cliente."
+  },
+  "clients": {
+    "title": "Clienti",
+    "subtitle": "Tutte le organizzazioni della piattaforma, in un colpo d'occhio.",
+    "table": {
+      "client": "Cliente",
+      "clientSince": "Cliente dal",
+      "projects": "Progetti",
+      "candidates": "Candidati",
+      "completed": "Completati",
+      "errored": "In errore",
+      "lastActivity": "Ultima attività dei candidati",
+      "actions": "Azioni",
+      "empty": "Ancora nessun cliente."
+    },
+    "actAs": "Entra come {name}",
+    "actAsCurrent": "Stai già operando come {name}"
   }
 }

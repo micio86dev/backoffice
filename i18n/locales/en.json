@@ -79,7 +79,8 @@
       "reports": "Reports",
       "settings": "Settings",
       "review": "Session review — BEAI",
-      "profile": "My profile"
+      "profile": "My profile",
+      "clients": "Clients"
     }
   },
   "errors": {
@@ -111,6 +112,7 @@
     "settings": "Settings",
     "logout": "Log out",
     "avatarTemplates": "Avatar templates",
+    "clients": "Clients",
     "profileLabel": "{name}'s profile"
   },
   "dashboard": {
@@ -1171,5 +1173,22 @@
     "switchClient": "Viewing client",
     "allClients": "All clients",
     "switchError": "Could not switch client."
+  },
+  "clients": {
+    "title": "Clients",
+    "subtitle": "Every organization on the platform, at a glance.",
+    "table": {
+      "client": "Client",
+      "clientSince": "Client since",
+      "projects": "Projects",
+      "candidates": "Candidates",
+      "completed": "Completed",
+      "errored": "Errored",
+      "lastActivity": "Last candidate activity",
+      "actions": "Actions",
+      "empty": "No clients yet."
+    },
+    "actAs": "Act as {name}",
+    "actAsCurrent": "You are already acting as {name}"
   }
 }

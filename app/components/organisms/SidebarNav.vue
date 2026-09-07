@@ -82,6 +82,7 @@ import {
   UsersIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/vue/24/outline'
 import { computed, onMounted, ref } from 'vue'
 import {
@@ -116,6 +117,20 @@ const navItems = [
   { to: '/projects', labelKey: 'nav.projects', icon: FolderIcon, scope: 'client' },
   { to: '/participants', labelKey: 'nav.candidates', icon: UsersIcon, scope: 'client' },
   { to: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon, scope: 'client' },
+  // superadmin-clients-console: the platform owner's directory of every
+  // organization. First in the platform block — it is the entry point for
+  // the only viewer who ever sees a platform-only sidebar (DESIGN.md §8.1).
+  // `requires` gates it the same way as the two below: an org admin,
+  // operator or viewer never receives `clients.viewAny`, so the scope filter
+  // alone (which only ever REMOVES items from a SUPERADMIN) would leave this
+  // visible to every other role — the ability gate is what actually hides it.
+  {
+    to: '/clients',
+    labelKey: 'nav.clients',
+    icon: BuildingOffice2Icon,
+    requires: 'clients.viewAny',
+    scope: 'platform',
+  },
   // C14. Configuration rather than a record, so it sits beside Settings and
   // after the pages an operator opens daily.
   //
@@ -170,7 +185,14 @@ const visibleNavItems = computed(() =>
 
       return requires === undefined || can(requires)
     }),
-    { isSuperadmin: isSuperadmin.value, actingClientId: actingClientId.value }
+    // `isSuperadmin && actingClientKnown`: the narrowing is a claim about the
+    // SELECTION, so it may only be made when the selection was actually read.
+    // Unknown falls to the unrestricted case, which is what the comment on
+    // these refs always promised and what the code did not do.
+    {
+      isSuperadmin: isSuperadmin.value && actingClientKnown.value,
+      actingClientId: actingClientId.value,
+    }
   )
 )
 
@@ -212,23 +234,56 @@ const { can } = useCurrentUser()
 const isSuperadmin = ref(false)
 const actingClientId = ref<number | null>(null)
 
+/**
+ * Whether the acting selection is KNOWN, which is not the same as being null.
+ *
+ * For a superadmin, `actingClientId: null` is the RESTRICTED branch — it means
+ * "no client chosen", and `visibleNavItemsFor` answers by hiding every
+ * client-scope page. So a failed `fetchClients()` leaving the ref at its
+ * initial null does not fall back to a default; it asserts a selection that may
+ * not be true. A transient 500 then hid Dashboard, Projects, Candidates and
+ * Reports from a superadmin who WAS acting as a client — those pages work, the
+ * selection lives in the server-side session and the failure never touched it.
+ *
+ * D4's discipline, applied to a nav rather than a page: a failed read must
+ * never render as a state the operator could have chosen.
+ */
+const actingClientKnown = ref(false)
+
 onMounted(async () => {
+  // TWO try blocks, the shape NavBar.vue uses one file over, and the reason is
+  // not symmetry. The identity assignment used to sit AFTER the superadmin-only
+  // await inside a single try: a rejected `fetchClients()` skipped straight to
+  // the catch and cleared a name and photo that had already arrived. The
+  // comment above promised the footer "simply omits identity rather than
+  // showing one" for a transient error — but the identity was not missing, it
+  // was in hand and discarded by an unrelated failure.
+  let user: Awaited<ReturnType<ReturnType<typeof useCurrentUser>['ensureLoaded']>>['user'] | null =
+    null
+
   try {
-    const { user } = await useCurrentUser().ensureLoaded()
+    user = (await useCurrentUser().ensureLoaded()).user
     isSuperadmin.value = user.is_superadmin === true
-
-    if (isSuperadmin.value) {
-      // Read from the SERVER rather than remembered locally: the selection
-      // lives in the superadmin's session, and a menu built from a stale
-      // local copy would offer pages the next request then refuses.
-      actingClientId.value = (await useSuperadmin().fetchClients()).acting_organization_id ?? null
-    }
-
     currentUserName.value = user.name
     currentUserPhotoUrl.value = user.photo_url
   } catch {
     currentUserName.value = null
     currentUserPhotoUrl.value = null
+  }
+
+  if (user === null || !isSuperadmin.value) return
+
+  try {
+    // Read from the SERVER rather than remembered locally: the selection lives
+    // in the superadmin's session, and a menu built from a stale local copy
+    // would offer pages the next request then refuses.
+    actingClientId.value = (await useSuperadmin().fetchClients()).acting_organization_id ?? null
+    actingClientKnown.value = true
+  } catch {
+    // `actingClientKnown` stays false, so the rail is NOT narrowed. Hiding four
+    // working pages because one unrelated request failed is worse than showing
+    // them: the pages behind them are scoped by the server's own session, which
+    // this failure did not touch.
   }
 })
 </script>

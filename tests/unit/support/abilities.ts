@@ -120,6 +120,12 @@ export function abilitiesForRole(input: MirroredIdentityInput | TenantRole): Abi
     },
     projects: { viewAny: viewer, create: operator, update: operator, delete: admin },
     participants: { viewAny: viewer, create: operator, recover: operator },
+    // Both PLATFORM capabilities, keyed off `isSuperadmin` rather than a Spatie
+    // role — the superadmin has none, which is why the `platform` flag exists.
+    // An org admin holds every tenant ability there is and must still read
+    // false for these two.
+    clients: { viewAny: platform },
+    platformSettings: { viewAny: platform },
   }
 }
 

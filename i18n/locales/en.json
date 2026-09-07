@@ -123,16 +123,19 @@
       "completionRate": "Completion rate",
       "tokensUsed": "AI tokens used",
       "latency": "AI latency (p50 / p95)",
-      "latencyValue": "{p50} / {p95} ms",
+      "latencyValue": "{p50} / {p95}",
       "cost": "AI & avatar spend",
-      "costValue": "$ {usd}",
-      "costBreakdown": "Scoring $ {scoring} · Interview $ {conversation}",
-      "noData": "No data yet"
+      "costValue": "{currency} {usd}",
+      "costBreakdown": "Scoring {currency} {scoring} · Interview {currency} {conversation}",
+      "noData": "No data yet",
+      "notMeasured": "not measured",
+      "latencyMs": "{value} ms"
     },
     "activity": {
       "title": "Recent activity",
       "empty": "No candidates yet. They appear here as soon as the calling system creates one.",
-      "noProject": "Project unavailable"
+      "noProject": "Project unavailable",
+      "loading": "Loading…"
     },
     "filters": {
       "year": "Year",

@@ -1,45 +1,34 @@
 /**
  * useDashboardMetrics — GET /api/dashboard/metrics (D7).
  *
- * `DashboardMetricsResource`'s generated schema is a generic
- * `additionalProperties: {}` object — Scramble cannot trace a shape through
- * `DashboardMetricsResource`'s passthrough `toArray()` (same pre-existing
- * limitation already documented for `EvaluationResource` since A2; confirmed
- * NOT a regression). The runtime shape below is hand-typed from
- * `api/app/Http/Controllers/Api/DashboardController.php::metrics()`, which
- * IS the source of truth until Scramble can infer it — no cost/currency
- * field exists anywhere (D7: token usage only, no billing schema).
- */
-import { useApi } from './useApi'
+ * BOTH response types are aliases of the generated client. Nothing here is
+ * hand-maintained.
+ *
+ * They used to be hand-written interfaces, defended with "Scramble cannot trace
+ * a shape through a passthrough `toArray()`". That was never true — the API
+ * resources were simply missing `@scramble-return`, while their constructor
+ * `@param` had spelled the shapes out all along. The excuse outlived the fact
+ * and was extended to a second type that never needed it: the activity row was
+ * already fully typed in the spec.
+ *
+ * Both copies caused real damage. The activity row declared
+ * `project_name: string | null` — correct against the PHP, and therefore
+ * silently absorbing a PUBLISHED contract that said non-nullable, leaving a
+ * wrong spec shipping to every other consumer. And renaming `costs.total_usd`
+ * on the API failed nothing at all: not the drift check, not a typecheck, and
+ * the figure an operator reconciles against an invoice rendered from
+ * `undefined`.
+ *
+ * With the API resources annotated and these aliased, that rename is now
+ * `TS2339` here — verified by mutating the generated type. The class docblock
+ * that claimed the metrics resource "NEVER carries a cost/currency field", seven
+ * lines above a `@param` declaring `costs`, is corrected in the same pass: what
+ * is true is the different statement that there is no BILLING schema — no MRR,
+ * no invoices, no plan.
+ */ import { useApi } from './useApi'
+import type { components, operations } from '../../types/api'
 
-export interface DashboardMetrics {
-  participants_by_status: Record<string, number>
-  evaluations_by_status: Record<string, number>
-  completion_rate: number
-  ai_usage: {
-    input_tokens: number
-    output_tokens: number
-    latency_ms_p50: number | null
-    latency_ms_p95: number | null
-  }
-  /**
-   * What this organization's assessments have cost, in USD.
-   *
-   * Reported apart as well as summed because the two answer different
-   * questions: scoring is per completed evaluation and predictable,
-   * conversation is per minute of interview and is the one that moves when
-   * candidates talk longer.
-   *
-   * `currency` is carried rather than assumed — a bare number on a dashboard
-   * is read in whatever currency the reader happens to think in.
-   */
-  costs: {
-    scoring_usd: number
-    conversation_usd: number
-    total_usd: number
-    currency: string
-  }
-}
+export type DashboardMetrics = components['schemas']['DashboardMetricsResource']
 
 export interface DashboardMetricsResponse {
   data: DashboardMetrics
@@ -48,23 +37,14 @@ export interface DashboardMetricsResponse {
 /**
  * One row of the recent-activity feed.
  *
- * Hand-typed for the same reason as `DashboardMetrics` above: Scramble cannot
- * trace a shape through a JsonResource's `toArray()`. Source of truth is
- * `api/app/Http/Resources/Admin/DashboardActivityResource.php`.
+ * See the file docblock: both types are aliases now, for the same reason. This
+ * one used to carry its own justification claiming the metrics schema "is still
+ * a bare object" — false since `@scramble-return` was added to
+ * `DashboardMetricsResource`, and left standing next to a file docblock that
+ * said the opposite. Two claims about one schema, and the wrong one was the
+ * load-bearing excuse for hand-writing an interface here.
  */
-export interface DashboardActivityRow {
-  /**
-   * Addresses the candidate inside this product, and is what the feed links
-   * on. `candidate_ref` below is the CALLING SYSTEM's opaque identifier and
-   * addresses nothing here.
-   */
-  id: number
-  candidate_ref: string
-  display_name: string
-  status: string
-  project_name: string | null
-  updated_at: string
-}
+export type DashboardActivityRow = components['schemas']['DashboardActivityResource']
 
 export interface DashboardActivityResponse {
   data: DashboardActivityRow[]
@@ -73,11 +53,19 @@ export interface DashboardActivityResponse {
 /**
  * An inclusive range of DAYS, `YYYY-MM-DD`. Both ends optional; omitting both
  * means all time, which is what every caller got before this existed.
+ *
+ * GENERATED, like the two response types above — and it could not have been
+ * until now. The API validated `from`/`to` inside a static helper, which
+ * Scramble cannot see, so the spec published no parameters at all and
+ * `types/api.ts` emitted `query?: never` for both endpoints. The entire filter
+ * lived in this file and in the API's parser with nothing between them: rename
+ * a parameter server-side and the only symptom was a dashboard quietly
+ * reporting all time.
+ *
+ * `NonNullable` because the generated `query` is optional at the operation
+ * level; the members inside it are what this type is for.
  */
-export interface DashboardRange {
-  from?: string
-  to?: string
-}
+export type DashboardRange = NonNullable<operations['dashboard.metrics']['parameters']['query']>
 
 export function useDashboardMetrics() {
   const { apiFetch } = useApi()

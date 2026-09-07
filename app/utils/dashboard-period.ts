@@ -6,13 +6,33 @@
  * running it instead of by reading a template.
  */
 
+import type { DashboardRange } from '@/composables/useDashboardMetrics'
+
 export type Period =
   { kind: 'all' } | { kind: 'year'; year: number } | { kind: 'month'; year: number; month: number }
 
-export interface DateRange {
-  from?: string
-  to?: string
-}
+/**
+ * Re-exported from the generated client, not re-declared.
+ *
+ * This was its own interface with the same two fields, and the composable's
+ * `DashboardRange` — which the API actually receives — is generated from the
+ * spec. Two declarations of one wire shape, and only one of them was bound to
+ * the contract. A server-side rename of `from`/`to` happened to be caught here
+ * by TypeScript's weak-type check on the object literals below, which is
+ * protection by accident: add a third optional field and that check stops
+ * firing while the drift stays.
+ *
+ * IMPORT-then-alias, not `export type { X as DateRange } from`. A pure
+ * re-export introduces no binding into this module's own scope, so the
+ * `: DateRange` annotation below had nothing local to resolve against — it
+ * compiled only because Nuxt's auto-import codegen emits `export type {
+ * DateRange } from '../../app/utils/dashboard-period'` inside `declare global`,
+ * making the annotation resolve as a global defined by a re-export FROM THIS
+ * FILE. Circular through codegen, correct by luck, and `tsc` without `.nuxt`
+ * reports TS2304. The same protection-by-accident this docblock argues
+ * against, one line down.
+ */
+export type DateRange = DashboardRange
 
 function pad(value: number): string {
   return String(value).padStart(2, '0')

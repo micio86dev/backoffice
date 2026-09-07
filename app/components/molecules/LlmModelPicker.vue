@@ -5,7 +5,7 @@
       :id="id"
       data-testid="llm-model-picker"
       autocomplete="off"
-      :class="formControlClass"
+      :class="formSelectClass"
       :value="modelValue ?? ''"
       @change="onChange"
     >
@@ -70,7 +70,7 @@
 // binding one FOR THE FIRST TIME is exactly what I5 refuses.
 import { computed } from 'vue'
 import { Field, FieldLabel } from '@/components/ui/field'
-import { formControlClass } from '@/components/ui/form-control'
+import { formSelectClass } from '@/components/ui/form-control'
 import type { LlmModel } from '@/types/llm'
 
 const props = defineProps<{

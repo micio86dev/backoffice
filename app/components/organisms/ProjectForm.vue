@@ -263,7 +263,7 @@
             id="project-form-avatar-template"
             data-testid="project-form-avatar-template"
             autocomplete="off"
-            :class="formControlClass"
+            :class="formSelectClass"
             :value="avatarTemplateId === null ? '' : String(avatarTemplateId)"
             :aria-invalid="Boolean(errors.avatarTemplateId)"
             :aria-describedby="
@@ -455,7 +455,7 @@ import CompetencyPicker, {
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
-import { formControlClass } from '@/components/ui/form-control'
+import { formSelectClass } from '@/components/ui/form-control'
 import type { TemplateOption } from '@/types/avatar-template'
 import {
   isNudgeMinCharsValid,

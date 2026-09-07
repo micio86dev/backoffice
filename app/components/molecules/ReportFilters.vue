@@ -56,7 +56,7 @@
             id="report-filter-project"
             data-testid="report-filter-project"
             :value="modelValue.project_id ?? ''"
-            :class="formControlClass"
+            :class="formSelectClass"
             @change="onProjectChange"
           >
             <option value="">{{ $t('reports.filters.allProjects') }}</option>
@@ -74,7 +74,7 @@
             id="report-filter-assessment-type"
             data-testid="report-filter-assessment-type"
             :value="modelValue.assessment_type ?? ''"
-            :class="formControlClass"
+            :class="formSelectClass"
             @change="onAssessmentTypeChange"
           >
             <option value="">{{ $t('reports.filters.allTypes') }}</option>
@@ -89,7 +89,7 @@
             id="report-filter-role"
             data-testid="report-filter-role"
             :value="modelValue.role_code ?? ''"
-            :class="formControlClass"
+            :class="formSelectClass"
             @change="onRoleCodeChange"
           >
             <option value="">{{ $t('reports.filters.allRoles') }}</option>
@@ -187,7 +187,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Field, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { formControlClass } from '@/components/ui/form-control'
+import { formSelectClass } from '@/components/ui/form-control'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { EvaluationQueryParams } from '@/utils/evaluation-query'

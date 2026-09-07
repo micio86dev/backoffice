@@ -45,7 +45,7 @@
  * those, role by role, against the real policies.
  */
 import type { Abilities } from '../../app/composables/useCurrentUser'
-import type { abilitiesFor } from '../e2e/fixtures/abilities'
+import { abilitiesFor } from '../e2e/fixtures/abilities'
 import { currentUserStub, type abilitiesForRole } from '../unit/support/abilities'
 
 /** Resolves to `true` only when A and B are mutually assignable. */
@@ -78,3 +78,25 @@ export const stubAcceptsOnlyRealAbilityKeys: boolean = [
   currentUserStub('operator').can('participants.recover'),
   currentUserStub('viewer').can('projects.viewAny'),
 ].every((answer) => typeof answer === 'boolean')
+
+/**
+ * The E2E fixture's INPUT type, checked at a real call site.
+ *
+ * `abilitiesFor` was imported here as a TYPE, so its parameter union was never
+ * applied to anything: every one of the nine real call sites lives under
+ * `tests/e2e/**`, which `.nuxt/tsconfig.app.json` excludes, there is no
+ * type-aware ESLint (`eslint.config.mjs` declares no `project`), and Playwright
+ * transpiles with esbuild. `TenantRole` promised to catch a typo like
+ * `'oprator'` falling through to viewer-level abilities — and could not, because
+ * nothing type-checked a caller.
+ *
+ * It had already happened: `settings-tabs.spec.ts` typed its helper parameter
+ * `string[]`, widening the union back to `string` in practice. A value import
+ * plus these four calls is what turns the union from prose into a gate.
+ */
+export const e2eFixtureAcceptsOnlyRealRoles: boolean = [
+  abilitiesFor(['admin']),
+  abilitiesFor(['operator']),
+  abilitiesFor(['viewer']),
+  abilitiesFor({ roles: [], isSuperadmin: true }),
+].every((map) => typeof map.organization.view === 'boolean')

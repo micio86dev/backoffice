@@ -113,6 +113,76 @@ describe('IndexPage (dashboard)', () => {
     expect(wrapper.text()).not.toContain('dashboard.kpi.noData')
   })
 
+  it('drops a previous failure when a new read starts, instead of showing it over the retry', async () => {
+    // `statusKey` checks `failure` before `loading`, and `v-if="loadError"`
+    // wins over `v-else-if="loading"`. Clearing the failure only on SUCCESS
+    // therefore kept "You do not have permission" on screen for the entire
+    // in-flight retry — stale state outranking the fresh read, which is the
+    // defect the loading state was added to fix, one variable over.
+    let resolveSecond: (value: ReturnType<typeof metricsResponse>) => void = () => {}
+    const second = new Promise<ReturnType<typeof metricsResponse>>((resolve) => {
+      resolveSecond = resolve
+    })
+    const fetchMetricsMock = vi
+      .fn()
+      .mockRejectedValueOnce({ response: { status: 403 } })
+      .mockReturnValueOnce(second)
+
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: fetchMetricsMock,
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'DashboardFilters' }).vm.$emit('change', { from: '2026-01-01' })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(true)
+
+    resolveSecond(metricsResponse())
+    await flushPromises()
+  })
+
+  it('renders the KPI tiles as soon as the metrics land, without waiting on the feed', async () => {
+    // The two flags were one. `loading = false` sat in the outer finally, after
+    // the awaited activity fetch, so a slow secondary panel held counters that
+    // had already resolved as skeletons — the same "a secondary panel must not
+    // hold the dashboard hostage" rule the swallowed catch is built on, one
+    // await too late.
+    let resolveActivity: (value: { data: [] }) => void = () => {}
+    const pendingActivity = new Promise<{ data: [] }>((resolve) => {
+      resolveActivity = resolve
+    })
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockReturnValue(pendingActivity),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(false)
+    // 2 in_corso + 3 completato — the tile is addressed directly rather than
+    // searching the page text, where a bare '5' also appears inside '500 ms'.
+    expect(wrapper.get('[data-testid="dashboard-total-participants"]').text()).toContain('5')
+    // ...while the feed is still honestly saying it is loading.
+    expect(wrapper.find('[data-testid="activity-loading"]').exists()).toBe(true)
+
+    resolveActivity({ data: [] })
+    await flushPromises()
+  })
+
   it('shows a loading state before the fetch resolves — neither a raw 0 nor a claim of no data', async () => {
     let resolveFetch: (value: ReturnType<typeof metricsResponse>) => void = () => {}
     const pending = new Promise<ReturnType<typeof metricsResponse>>((resolve) => {

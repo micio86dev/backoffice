@@ -73,7 +73,7 @@
       :rows="activity"
       :locale="locale"
       :failure="activityFailure"
-      :loading="loading"
+      :loading="activityLoading"
     />
   </div>
 </template>
@@ -134,6 +134,16 @@ const activityFailure = ref<ResourceErrorState | null>(null)
  * a filter that has already moved on.
  */
 const loading = ref(true)
+
+/**
+ * The FEED's own in-flight flag, separate from the tiles'.
+ *
+ * One shared flag put `loading = false` after the activity fetch, so a slow
+ * secondary panel held the counters as skeletons when they had already
+ * resolved — the same "a secondary panel must not hold the dashboard hostage"
+ * argument the swallowed catch below is built on, one await too late.
+ */
+const activityLoading = ref(true)
 
 // A failed metrics fetch must NEVER fall through to the "no data yet"
 // placeholder: that reports a 403 to the operator as an empty tenant (D4).
@@ -253,13 +263,25 @@ async function load(): Promise<void> {
   const isStale = (): boolean => token !== loadToken
 
   loading.value = true
+  activityLoading.value = true
+
+  // Cleared at the START, not on success. A retry after a 403 kept rendering
+  // "You do not have permission" for the whole in-flight read, so the panel
+  // never said it was loading: `statusKey` checks `failure` before `loading`,
+  // and `v-if="loadError"` wins over `v-else-if="loading"`. Stale state
+  // outranking the fresh read is the same defect the loading state was added
+  // to fix, one variable over.
+  loadError.value = null
+  activityFailure.value = null
 
   try {
     const response = await fetchMetrics(range.value)
     if (isStale()) return
 
     metrics.value = response.data
-    loadError.value = null
+    // The tiles are ready HERE — before the feed is fetched, so a slow feed
+    // cannot hold them.
+    loading.value = false
 
     // Deliberately AFTER the metrics call and deliberately swallowed: the feed
     // is context, and a dashboard that refuses to render its counters because a
@@ -269,7 +291,6 @@ async function load(): Promise<void> {
       if (isStale()) return
 
       activity.value = rows
-      activityFailure.value = null
     } catch (activityError) {
       if (isStale()) return
 
@@ -286,9 +307,12 @@ async function load(): Promise<void> {
     loadError.value = resolveResourceErrorState(error)
   } finally {
     // Guarded like every other write in here: a superseded load must not clear
-    // the flag out from under the load that replaced it, or the spinner
-    // vanishes while the current request is still in flight.
-    if (!isStale()) loading.value = false
+    // the flags out from under the load that replaced it, or the skeletons
+    // vanish while the current request is still in flight.
+    if (!isStale()) {
+      loading.value = false
+      activityLoading.value = false
+    }
   }
 }
 

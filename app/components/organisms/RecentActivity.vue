@@ -35,34 +35,15 @@
       NVDA, JAWS and VoiceOver. The first version of this fix reproduced the
       silence it was written to end.
     -->
-    <p
-      role="status"
-      class="text-sm text-muted-foreground"
-      :data-testid="failure ? 'activity-failed' : loading ? 'activity-loading' : 'activity-status'"
-    >
+    <p role="status" class="text-sm text-muted-foreground" :data-testid="regionTestId">
       {{ statusKey ? $t(statusKey) : '' }}
     </p>
 
-    <!--
-      An empty feed is a state, not a failure: a brand-new organization has no
-      candidates yet, and a blank panel would read as something broken. It says
-      what will fill it and who fills it, because BEAI never creates candidates
-      itself (CLAUDE.md, ruling 8).
-
-      `!loading` guards it for the same reason `!failure` does. `rows` starts
-      empty, so on first paint — before the very first response lands — this
-      asserted "No candidates yet" about data nobody had read. Same affirmative
-      false sentence the failure state was added to remove, different trigger.
-    -->
-    <p
-      v-if="!failure && !loading && rows.length === 0"
-      class="text-sm text-muted-foreground"
-      data-testid="activity-empty"
+    <ol
+      v-if="!failure && !loading && rows.length > 0"
+      class="flex flex-col"
+      data-testid="activity-list"
     >
-      {{ $t('dashboard.activity.empty') }}
-    </p>
-
-    <ol v-if="!failure && rows.length > 0" class="flex flex-col" data-testid="activity-list">
       <!--
         Keyed on `row.id`, not on the display fields. This keyed on
         `project_name` — typed `string | null`, so it stringified to "null-…" —
@@ -181,7 +162,37 @@ const headingId = useId()
 const statusKey = computed<string>(() => {
   if (props.failure) return resourceErrorKey(props.failure, 'message')
   if (props.loading) return 'dashboard.activity.loading'
+  // An empty feed is a state, not a failure: a brand-new organization has no
+  // candidates yet, and a blank panel would read as something broken. It says
+  // what will fill it and who fills it, because BEAI never creates candidates
+  // itself (CLAUDE.md, ruling 8).
+  //
+  // It lives IN the live region rather than in a paragraph beside it, and that
+  // is not tidiness. This component spends fifteen lines arguing that a message
+  // appearing after an async resolution with no focus change needs
+  // `role="status"` — and then applied that reasoning to the failure branch
+  // only. On a slow load of an empty feed a screen reader heard "Loading...",
+  // then the region emptied, then a plain paragraph was inserted OUTSIDE it:
+  // silence, which is exactly the silence the region was added to end. Empty
+  // and failed are the same class of message — a claim about the operator's
+  // data, delivered after an async resolution.
+  if (props.rows.length === 0) return 'dashboard.activity.empty'
 
   return ''
+})
+
+/**
+ * Which of the four states the region is in, as a test hook.
+ *
+ * `activity-empty` keeps its name: the page spec and the E2E both query it, and
+ * it now marks the same message in the place it should always have been
+ * rendered.
+ */
+const regionTestId = computed<string>(() => {
+  if (props.failure) return 'activity-failed'
+  if (props.loading) return 'activity-loading'
+  if (props.rows.length === 0) return 'activity-empty'
+
+  return 'activity-status'
 })
 </script>

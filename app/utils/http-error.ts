@@ -113,8 +113,14 @@ export function applyServerFieldErrors<K extends string>(
     const message = messages?.[0]
     if (message === undefined) continue
 
+    // The EXACT key first, then the root. Laravel reports nested rules as
+    // `text.en` / `text.it`, and matching only the root made those two the
+    // same field — so a refusal about the Italian text marked the English
+    // control invalid, and no map could tell them apart however it was
+    // written. The root fallback stays: a caller that only cares about
+    // `text` still catches every branch of it with one entry.
     const root = serverField.split('.')[0] ?? serverField
-    const localKey = map[root]
+    const localKey = map[serverField] ?? map[root]
 
     if (localKey !== undefined) assign(localKey, message)
     else if (!unmapped.includes(message)) unmapped.push(message)

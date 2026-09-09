@@ -13,6 +13,9 @@ import { useApi } from './useApi'
 export type RoleCompetenciesResponse =
   paths['/framework/roles/{roleCode}/competencies']['get']['responses']['200']['content']['application/json']
 
+export type PotentialCompetenciesResponse =
+  paths['/framework/potential-competencies']['get']['responses']['200']['content']['application/json']
+
 export function useFrameworkRoles() {
   const { apiFetch } = useApi()
 
@@ -20,5 +23,15 @@ export function useFrameworkRoles() {
     return apiFetch<RoleCompetenciesResponse>(`/framework/roles/${roleCode}/competencies`)
   }
 
-  return { fetchRoleCompetencies }
+  /**
+   * MTG and LAT — the `potential` set.
+   *
+   * A separate call because they belong to no role, which is exactly what
+   * makes them potential, so the role endpoint above cannot serve them.
+   */
+  async function fetchPotentialCompetencies(): Promise<PotentialCompetenciesResponse> {
+    return apiFetch<PotentialCompetenciesResponse>('/framework/potential-competencies')
+  }
+
+  return { fetchRoleCompetencies, fetchPotentialCompetencies }
 }

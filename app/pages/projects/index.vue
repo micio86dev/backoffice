@@ -42,12 +42,13 @@
       :title="editing === 'new' ? $t('projects.form.newTitle') : $t('projects.form.editTitle')"
       form-id="project-form"
       :pending="saving"
-      @update:open="(open) => !open && (editing = null)"
+      @update:open="(open) => !open && closeDrawer()"
     >
       <ProjectForm
         v-if="editing !== null"
         :project="editingProject"
         @update:pending="(value) => (saving = value)"
+        @update:competencies="(value) => (liveCompetencies = value)"
         @saved="onFormSaved"
       />
 
@@ -60,11 +61,63 @@
         <Separator class="my-6" />
         <ProjectQuestionsPanel
           :project-id="editingProject.id"
-          :competencies="editingProject.competencies ?? []"
+          :competencies="panelCompetencies"
           :locale="editingProject.language"
         />
+
+        <!--
+          Deletion, offered ONLY where the API will accept it. `can.delete`
+          carries both halves — the admin-only policy and the not-while-active
+          state rule — so an operator never meets this control and an admin
+          never meets it on a live project. A button that always earns a 409
+          is worse than one that is not there.
+        -->
+        <template v-if="editingProject.can?.delete">
+          <Separator class="my-6" />
+
+          <div class="flex flex-col gap-2">
+            <h3 class="text-foreground text-sm font-semibold">
+              {{ $t('projects.delete.title') }}
+            </h3>
+            <p class="text-muted-foreground text-sm">{{ $t('projects.delete.description') }}</p>
+
+            <div>
+              <Button
+                type="button"
+                variant="destructive"
+                :disabled="deleting"
+                data-testid="project-delete"
+                @click="confirmingDelete = true"
+              >
+                {{ $t('projects.delete.action') }}
+              </Button>
+            </div>
+
+            <FormMessage
+              v-if="deleteError"
+              kind="error"
+              :text="deleteError"
+              test-id="project-delete-error"
+            />
+          </div>
+        </template>
       </template>
     </FormDrawer>
+
+    <!--
+      Outside the drawer: the dialog teleports to the body anyway, and nesting
+      it under a `v-if="editingProject"` would unmount the confirmation the
+      moment the delete succeeds and closed the drawer.
+    -->
+    <ConfirmDialog
+      :open="confirmingDelete"
+      variant="destructive"
+      :title="$t('projects.delete.confirmTitle')"
+      :description="$t('projects.delete.confirmDescription')"
+      :confirm-label="$t('projects.delete.action')"
+      @confirm="onDeleteConfirmed"
+      @cancel="confirmingDelete = false"
+    />
   </div>
 </template>
 
@@ -74,6 +127,9 @@ import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
+import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
+import FormMessage from '@/components/molecules/FormMessage.vue'
+import { getErrorStatus } from '@/utils/http-error'
 import { Separator } from '@/components/ui/separator'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
@@ -105,7 +161,7 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-const { listProjects } = useProjects()
+const { listProjects, deleteProject } = useProjects()
 const { uncoveredIdsByRole, loadRoles } = useBarsCoverage()
 
 /**
@@ -141,6 +197,83 @@ const editing = ref<'new' | number | null>(null)
 // needs to know when that control must be disabled.
 const saving = ref(false)
 
+/**
+ * The competencies the FORM currently has ticked.
+ *
+ * Held here rather than read from `editingProject`, because the questions
+ * panel is a sibling of the form and the persisted set is exactly what is
+ * stale while the operator is editing. `ProjectForm` publishes it immediately
+ * on mount, so this is populated before the panel first renders.
+ */
+const liveCompetencies = ref<{ id: number; code: string }[] | null>(null)
+
+/**
+ * The questions panel's competencies: the form's live set once it has
+ * published one, the project's persisted set until then.
+ *
+ * `null` vs `[]` is the whole distinction, and `.length > 0` collapsed it:
+ * `CompetencyPicker` legitimately emits `[]` when the operator unticks the
+ * last box, and treating that as "nothing published yet" handed back the
+ * PERSISTED set — question editors for competencies they had just detached.
+ * Empty is not unknown.
+ *
+ * The form holds its first emit until its options resolve, so the fallback is
+ * what stops the panel saying "this project has no competencies yet" about a
+ * fully configured project while that fetch is in flight.
+ */
+const panelCompetencies = computed(
+  () => liveCompetencies.value ?? editingProject.value?.competencies ?? []
+)
+
+/**
+ * Closing forgets the form's published set.
+ *
+ * It is scoped to the project that published it; leaving it behind means
+ * opening the NEXT project shows the previous one's competency groups until
+ * its form re-emits.
+ */
+function closeDrawer(): void {
+  editing.value = null
+  liveCompetencies.value = null
+  deleteError.value = null
+}
+
+const confirmingDelete = ref(false)
+const deleting = ref(false)
+const deleteError = ref<string | null>(null)
+
+/**
+ * Delete, then close and reload.
+ *
+ * The confirmation is what makes this legal at all — `deleteProject(` matches
+ * DESTRUCTIVE_CALL_REGEX, and the guard exists because a project takes every
+ * participant, session and evaluation beneath it out of every list.
+ */
+async function onDeleteConfirmed(): Promise<void> {
+  const target = editingProject.value
+
+  confirmingDelete.value = false
+
+  if (target === null) return
+
+  deleting.value = true
+  deleteError.value = null
+
+  try {
+    await deleteProject(target.id)
+    closeDrawer()
+    await load()
+  } catch (error) {
+    // The 409 the endpoint answers while a project is live has its own
+    // sentence. Anything else gets the generic one, because there is nothing
+    // more specific that is also true.
+    deleteError.value =
+      getErrorStatus(error) === 409 ? t('projects.delete.stillActive') : t('projects.delete.error')
+  } finally {
+    deleting.value = false
+  }
+}
+
 const editingProject = computed<Project | null>(() => {
   if (editing.value === null || editing.value === 'new') return null
   return projects.value.find((project) => project.id === editing.value) ?? null
@@ -173,7 +306,7 @@ function onEdit(id: number): void {
 }
 
 async function onFormSaved(): Promise<void> {
-  editing.value = null
+  closeDrawer()
   await load()
 }
 

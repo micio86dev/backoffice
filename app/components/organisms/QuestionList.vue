@@ -28,15 +28,19 @@
           control only a pointer could use. Dropping onto the grip is where a
           handle-drag is aimed anyway.
 
-          `tabindex="-1"` because the move buttons beside it already carry the
-          keyboard path: two focus stops for one operation would make the row
-          slower to traverse without adding a capability.
+          `tabindex="-1"` AND `aria-hidden`, because the move buttons beside
+          it already carry the keyboard path. It used to carry an
+          `aria-label`: browse mode still reaches a `tabindex="-1"` button, so
+          a screen reader announced "drag handle, button" for a control with
+          no click and no keydown handler — activating it does nothing. A name
+          on an inoperable control is worse than no name.
         -->
         <button
+          v-if="reorderable"
           type="button"
           tabindex="-1"
           draggable="true"
-          :aria-label="$t('projectQuestions.dragHandle')"
+          aria-hidden="true"
           class="text-muted-foreground cursor-grab select-none pt-1"
           :data-testid="`question-grip-${q.id}`"
           @dragstart="onDragStart(index)"
@@ -53,8 +57,15 @@
             DISABLED at the ends rather than hidden: a control that disappears
             changes the row's width as the list is reordered, and the operator
             loses the button they were aiming at mid-sequence.
+
+            The whole GROUP is hidden when there is only one question, which is
+            a different question from "which end are we at". One item has no
+            order: two arrows that can never do anything, and a drag handle
+            with nowhere to drag to, are three controls that only teach the
+            operator this list ignores them.
           -->
           <Button
+            v-if="reorderable"
             variant="ghost"
             size="sm"
             :disabled="index === 0"
@@ -65,6 +76,7 @@
             ↑
           </Button>
           <Button
+            v-if="reorderable"
             variant="ghost"
             size="sm"
             :disabled="index === questions.length - 1"
@@ -118,7 +130,7 @@
  * so that does not ship. The move buttons are the accessible path and carry
  * the same behaviour.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import type { ProjectQuestion } from '@/composables/useProjectQuestions'
 
@@ -127,6 +139,14 @@ const props = defineProps<{
   /** The PROJECT's language — the interview's, not the operator's. */
   locale: string
 }>()
+
+/**
+ * There is an order to change only once there are two questions.
+ *
+ * Computed, not a prop: the list already knows how many it holds, and letting
+ * a caller answer would be one more thing a caller can answer wrongly.
+ */
+const reorderable = computed(() => props.questions.length > 1)
 
 const emit = defineEmits<{
   (e: 'reorder', ids: number[]): void

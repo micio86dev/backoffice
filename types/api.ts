@@ -570,6 +570,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/framework/potential-competencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /api/framework/potential-competencies
+         * @description The competencies a `potential` assessment scores: MTG and LAT.
+         *
+         *     They belong to NO role — that is what makes them the potential set —
+         *     so `roleCompetencies` above cannot serve them, and the backoffice was
+         *     building them locally from two hardcoded codes with no `id`. Without an
+         *     id `CompetencyPicker` refuses to tick a box, so a `potential` project
+         *     could not have its competencies selected at all: both boxes rendered,
+         *     neither responded, and an already-persisted set rendered unchecked.
+         *
+         *     Driven by `type`, never by a hardcoded code list: the catalogue decides
+         *     which competencies are potential, and a third one must appear here the
+         *     day it is authored rather than the day someone edits this method.
+         *
+         *     `bars_available` is deliberately false for every row. Coverage is a
+         *     question about a role×competency pair, and these belong to no role —
+         *     the same reason the frontend's local list answered `null` for it.
+         */
+        get: operations["framework.potentialCompetencies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/framework/versions": {
         parameters: {
             query?: never;
@@ -1291,10 +1326,39 @@ export interface paths {
         put: operations["projects.update"];
         post?: never;
         /**
-         * DELETE /api/projects/{project}
-         * @description Soft-deletes the project. Returns HTTP 204 No Content.
-         *     The pinned FrameworkVersion remains locked (soft-delete does not unlock).
-         *     Project is resolved manually — see class docblock.
+         * DELETE /api/projects/{project} — soft-delete, never while live
+         * @description 204 on success; 409 while the project is `active`. The pinned
+         *     FrameworkVersion remains locked either way (soft-delete does not
+         *     unlock), and the project is resolved manually — see class docblock.
+         *
+         *     NO `@scramble-return` here, deliberately. Annotating it overrode
+         *     per-path inference and published ONE 200 carrying the error body — the
+         *     204 gone, the 409 invisible, and both Nuxt clients generated against a
+         *     response this endpoint never sends. `AvatarTemplateController::destroy`
+         *     has the same 204/409 shape, carries no annotation, and its spec is
+         *     right.
+         *
+         *     The ARCHIVED rule is checked HERE rather than in the policy, and that
+         *     placement is the whole point: `Gate::before` returns true for a
+         *     superadmin and short-circuits every policy method, so a lifecycle
+         *     invariant written as a permission is one every superadmin skips without
+         *     noticing. Permission is `who`; this is `what state`.
+         *
+         *     409, not 403: the caller IS allowed to delete projects. This one is in
+         *     the wrong state, and telling an admin they lack permission would send
+         *     them to ask for a role they already have.
+         *
+         *     The refused state is `active`, NOT "anything but archived", and the
+         *     difference is not cosmetic. Deleting a `draft` costs nothing — nobody
+         *     has been interviewed under it — while the same button on an `active`
+         *     project takes a live assessment away from candidates mid-interview, and
+         *     no confirmation dialog makes that recoverable.
+         *
+         *     Demanding `archived` would have trapped every draft permanently: the
+         *     only approved transitions are `draft -> active` and
+         *     `active -> archived`, so the one route out of a mistyped draft would
+         *     have been to PUBLISH it to candidates first — which also freezes
+         *     `assessment_type` and `role_code` on the way past.
          */
         delete: operations["projects.destroy"];
         options?: never;
@@ -1309,6 +1373,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /**
+         * The cap travels WITH the list, in `meta`
+         * @description `StoreProjectQuestionRequest` already refuses the (N+1)th question, but
+         *     the backoffice had no way to know N before trying: the setting lives
+         *     behind the superadmin-only platform-settings endpoint, so an operator
+         *     met the cap as a 422 on a question they had already written. It depends
+         *     on the project's `assessment_type`, which is exactly what this route
+         *     already resolved.
+         */
         get: operations["projectQuestion.index"];
         put?: never;
         post: operations["projectQuestion.store"];
@@ -2087,6 +2160,7 @@ export interface components {
             email: string;
             locale: string | null;
             role: string | null;
+            is_superadmin: boolean;
             organization: {
                 id: number;
                 name: string;
@@ -2122,7 +2196,8 @@ export interface components {
             pause_every_n_competencies: number | null;
             nudge_min_chars: number | null;
             exit_redirect_url: string | null;
-            avatar_template_id: number | null;
+            error_redirect_url: string | null;
+            avatar_template_id: number;
             avatar_template: {
                 id: number;
                 name: string;
@@ -2399,19 +2474,8 @@ export interface components {
             /** Format: uri */
             webhook_url?: string | null;
             /**
-             * @description Which avatar template this project runs on. Nullable: absent
-             *     means "use the organization's active template", the behaviour
-             *     every project had before this field existed. Org-scoped `Rule::exists`, exactly like `framework_version_id`
-             *     above — a foreign template must be refused HERE, not merely
-             *     ignored by `ActiveTemplateResolver` later. Ignoring it would
-             *     still leave a cross-tenant id persisted in our row.
-             *     REQUIRED. It shipped nullable with the organization's active
-             *     template as a fallback, and the fallback is exactly what let the
-             *     configuration choose silently instead of the project — the defect
-             *     the column was added to fix. An organization that owns no
-             *     template therefore cannot create a project until it has one:
-             *     deliberate, and surfaced as a validation error on this field
-             *     rather than as an interview that runs on something nobody chose.
+             * @description REQUIRED, and org-scoped: see `avatarTemplateRule()` in the
+             *     trait for why, and for the soft-delete clause.
              */
             avatar_template_id: number;
             webhook_secret?: string | null;
@@ -2614,6 +2678,31 @@ export interface components {
             email?: string;
             /** @enum {string} */
             locale?: "it" | "en";
+        };
+        /**
+         * UpdateProjectQuestionRequest
+         * @description UpdateProjectQuestionRequest.
+         *
+         *     Only the WORDING is editable. The competency is deliberately absent from
+         *     these rules: a question written to probe one competency is not a question
+         *     about another, and "moving" it would silently change what an interview
+         *     measures. Delete and re-author instead.
+         *
+         *     Extracted from an inline `$request->validate()` in the controller that
+         *     duplicated `StoreProjectQuestionRequest`'s shape — raising `max:2000` in
+         *     one would have left the other silently disagreeing.
+         *
+         *     Authorization happens HERE, not in the controller, and it has to. A
+         *     FormRequest is resolved during method-argument resolution, which Laravel
+         *     runs BEFORE the controller body — so leaving the tenant lookup downstream
+         *     let validation overtake it, and a PATCH to another organization's project
+         *     answered 422 for an invalid body where the file's own doctrine says 404.
+         */
+        UpdateProjectQuestionRequest: {
+            text: {
+                en: string;
+                it?: string | null;
+            };
         };
         /**
          * UpdateProjectRequest
@@ -3705,6 +3794,29 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["BarsIndicatorResource"][];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+        };
+    };
+    "framework.potentialCompetencies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of `CompetencyResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CompetencyResource"][];
                     };
                 };
             };
@@ -4982,6 +5094,19 @@ export interface operations {
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "Archive the project before deleting it.";
+                        /** @constant */
+                        error: "project_is_active";
+                    };
+                };
+            };
         };
     };
     "projectQuestion.index": {
@@ -4995,14 +5120,27 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Array of `ProjectQuestionResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["ProjectQuestionResource"][];
+                        data: {
+                            id: number;
+                            project_id: number;
+                            competency_id: number;
+                            competency_code: string | null;
+                            text: {
+                                [key: string]: string;
+                            };
+                            position: number;
+                            created_at: string;
+                            updated_at: string;
+                        }[];
+                        meta: {
+                            max_questions_per_competency: number;
+                        };
                     };
                 };
             };
@@ -5109,12 +5247,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    text: {
-                        en: string;
-                        it?: string | null;
-                    };
-                };
+                "application/json": components["schemas"]["UpdateProjectQuestionRequest"];
             };
         };
         responses: {

@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { currentUserStub } from '../../support/abilities'
+import { realI18n } from '../../support/i18n'
 import { ref } from 'vue'
 import { waitFor } from '../../support/wait-for'
 
@@ -48,6 +49,10 @@ function listResponse() {
         updated_at: '2026-03-01T10:00:00Z',
         pin_context: null,
         competencies: [],
+        // `can` is what the drawer reads to decide whether to offer deletion.
+        // Absent from this fixture, every test here exercised the "not
+        // offered" branch and nothing exercised the other one.
+        can: { update: true, delete: false },
       },
     ],
   }
@@ -84,10 +89,11 @@ describe('pages/projects/index.vue', () => {
     useHeadMock = vi.fn()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', useHeadMock)
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: (key: string) => key, locale: ref('en') }))
-    )
+    // `te` from the REAL locale files. Without it `translateServerCodeOrFallback`
+    // cannot tell a code with copy from one without, and falls back for
+    // everything — which is the correct production-safe default and useless
+    // as a test signal.
+    vi.stubGlobal('useI18n', () => ({ ...realI18n(), locale: ref('en') }))
   })
 
   it('fetches the list on mount and renders the returned projects', async () => {
@@ -216,7 +222,7 @@ describe('pages/projects/index.vue', () => {
       const createProject = vi.fn().mockRejectedValue(
         Object.assign(new Error('Unprocessable'), {
           status: 422,
-          data: { errors: { name: ['The name has already been taken.'] } },
+          data: { errors: { name: ['name_too_long'] } },
         })
       )
       const wrapper = await mountWithProjects({ createProject })
@@ -230,10 +236,17 @@ describe('pages/projects/index.vue', () => {
       const slugInput = document.body.querySelector<HTMLInputElement>(
         '[data-testid="project-form-slug"]'
       )
+      // REQUIRED on create. It used to ship as `Number('') === 0` and be
+      // refused by the server; the form refuses it now.
+      const frameworkInput = document.body.querySelector<HTMLInputElement>(
+        '[data-testid="project-form-framework-version"]'
+      )
       nameInput!.value = 'Demo'
       nameInput!.dispatchEvent(new Event('input'))
       slugInput!.value = 'demo'
       slugInput!.dispatchEvent(new Event('input'))
+      frameworkInput!.value = '1'
+      frameworkInput!.dispatchEvent(new Event('input'))
       // `potential`, so the submit is not also blocked by the role/competency
       // cross-field rules a `standard` project carries.
       document.body
@@ -255,7 +268,9 @@ describe('pages/projects/index.vue', () => {
       expect(formInDrawer()).not.toBeNull()
       expect(
         document.body.querySelector('[data-testid="project-form-name-error"]')?.textContent
-      ).toContain('The name has already been taken.')
+        // The CODE, translated. The endpoint answers with codes, and the
+        // previous fixture asserted the raw English it used to print.
+      ).toContain('projects.form.serverError.name_too_long')
 
       wrapper.unmount()
     })
@@ -448,10 +463,16 @@ describe('pages/projects/index.vue', () => {
       const slugInput = dialogBody().querySelector<HTMLInputElement>(
         '[data-testid="project-form-slug"]'
       )
+      // REQUIRED on create — see the sibling test above.
+      const frameworkInput = dialogBody().querySelector<HTMLInputElement>(
+        '[data-testid="project-form-framework-version"]'
+      )
       nameInput!.value = 'New Demo'
       nameInput!.dispatchEvent(new Event('input'))
       slugInput!.value = 'new-demo'
       slugInput!.dispatchEvent(new Event('input'))
+      frameworkInput!.value = '1'
+      frameworkInput!.dispatchEvent(new Event('input'))
       dialogBody()
         .querySelector<HTMLButtonElement>(
           '[data-testid="project-form-assessment-type"] button:last-child'
@@ -643,6 +664,149 @@ describe('pages/projects/index.vue', () => {
       await flushPromises()
 
       expect(wrapper.text()).not.toContain('projects.table.uncoveredCompetencies')
+    })
+  })
+
+  describe('deleting a project from the drawer', () => {
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    async function mountWith(
+      can: { update: boolean; delete: boolean },
+      deleteProject = vi.fn().mockResolvedValue(undefined)
+    ) {
+      const response = listResponse()
+      response.data[0]!.can = can
+      // A PERSISTED competency, so "not published yet" and "published empty"
+      // give different answers. With an empty persisted set both branches
+      // agree and the distinction is untestable.
+      response.data[0]!.competencies = [{ id: 99, code: 'PRS', type: 'standard', position: 0 }]
+
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue(response),
+          createProject: vi.fn(),
+          updateProject: vi.fn(),
+          deleteProject,
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+      await wrapper.get('[data-testid="project-row-edit-1"]').trigger('click')
+      await waitFor(
+        () => document.body.querySelector('[data-testid="form-drawer"]'),
+        'the drawer to open'
+      )
+      await flushPromises()
+
+      return wrapper
+    }
+
+    it('shows NO competency groups once the operator unticks the last one', async () => {
+      // `[]` is a real published value — `CompetencyPicker` emits it when the
+      // last box is unchecked — and treating it as "nothing published yet"
+      // handed the PERSISTED set back: question editors for competencies the
+      // operator had just detached. Empty is not unknown.
+      const wrapper = await mountWith({ update: true, delete: false })
+
+      // The form is code-split, so it mounts a tick after the drawer opens.
+      await waitFor(
+        () => document.body.querySelector('[data-testid="project-form"]'),
+        'the project form to mount inside the drawer'
+      )
+      await flushPromises()
+
+      const form = wrapper
+        .findAllComponents({ name: 'ProjectForm' })
+        .find((component) => component.exists())
+
+      expect(form).toBeDefined()
+
+      form!.vm.$emit('update:competencies', [{ id: 11, code: 'COL' }])
+      await flushPromises()
+
+      const panel = wrapper.findComponent({ name: 'ProjectQuestionsPanel' })
+      expect(panel.props('competencies')).toEqual([{ id: 11, code: 'COL' }])
+
+      form!.vm.$emit('update:competencies', [])
+      await flushPromises()
+
+      // NOT the persisted `PRS`, which is what `.length > 0` handed back.
+      expect(
+        wrapper.findComponent({ name: 'ProjectQuestionsPanel' }).props('competencies')
+      ).toEqual([])
+
+      wrapper.unmount()
+    })
+
+    it('offers no deletion when the API says the project cannot be deleted', async () => {
+      // `can.delete` carries the admin-only policy AND the not-while-active
+      // state rule. A button that always earns a 409 is worse than none.
+      const wrapper = await mountWith({ update: true, delete: false })
+
+      expect(document.body.querySelector('[data-testid="project-delete"]')).toBeNull()
+
+      wrapper.unmount()
+    })
+
+    it('offers it when the API says it can, and asks first', async () => {
+      const deleteProject = vi.fn().mockResolvedValue(undefined)
+      const wrapper = await mountWith({ update: true, delete: true }, deleteProject)
+
+      const button = document.body.querySelector<HTMLButtonElement>(
+        '[data-testid="project-delete"]'
+      )
+      expect(button).not.toBeNull()
+
+      button!.click()
+      await waitFor(
+        () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+        'the confirmation to open'
+      )
+
+      // Nothing has happened yet. The confirmation IS the protection.
+      expect(deleteProject).not.toHaveBeenCalled()
+
+      document.body
+        .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')!
+        .click()
+      await flushPromises()
+
+      expect(deleteProject).toHaveBeenCalledWith(1)
+
+      wrapper.unmount()
+    })
+
+    it('says what a 409 means rather than "try again"', async () => {
+      // The endpoint refuses while the project is live. Telling the operator
+      // to retry would send them at a request that fails identically.
+      const deleteProject = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('409'), { status: 409 }))
+
+      const wrapper = await mountWith({ update: true, delete: true }, deleteProject)
+
+      document.body.querySelector<HTMLButtonElement>('[data-testid="project-delete"]')!.click()
+      await waitFor(
+        () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+        'the confirmation to open'
+      )
+      document.body
+        .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')!
+        .click()
+      await flushPromises()
+
+      const error = document.body.querySelector('[data-testid="project-delete-error"]')
+      expect(error?.textContent).toContain('projects.delete.stillActive')
+      expect(error?.textContent).not.toContain('projects.delete.error')
+
+      wrapper.unmount()
     })
   })
 })

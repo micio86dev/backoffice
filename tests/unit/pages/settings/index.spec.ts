@@ -397,6 +397,80 @@ describe('pages/settings/index.vue', () => {
     expect(wrapper.text()).toContain('settings.tabs.apiKeys')
   })
 
+  /**
+   * The Users section follows the SCOPE (platform-user-management D6).
+   *
+   * One click of the client switcher moves this section between an
+   * organization's people and BEAI's own. The signal is the page's existing
+   * `noOrganizationInContext` — set only when `/api/organization` 404s FOR A
+   * SUPERADMIN — so it is derived from a response the page already makes and
+   * fails closed on every other outcome.
+   */
+  async function openUsersTab(wrapper: Awaited<ReturnType<typeof mountSettings>>) {
+    const tab = wrapper
+      .findAll('[role="tab"]')
+      .find((candidate) => candidate.text().includes('settings.tabs.users'))
+
+    expect(tab, 'the users tab is not on this page').toBeTruthy()
+    // reka-ui's TabsTrigger activates on a real pointer sequence, not on a
+    // bare synthetic click — the same discipline ConfirmDialog's helper
+    // already documents for its own reka-ui buttons.
+    tab!.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    tab!.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    tab!.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    await waitFor(() => wrapper.find('[data-testid="users-scope"]').exists())
+
+    return wrapper.find('[data-testid="users-scope"]')
+  }
+
+  it('manages BEAI’s own people for a superadmin with no client selected', async () => {
+    mockCurrentUser('superadmin')
+    mockOrganizationNotFound()
+
+    const scope = await openUsersTab(await mountSettings())
+
+    expect(scope.text()).toContain('users.scope.platform')
+  })
+
+  it('manages the organization’s people when a client IS selected', async () => {
+    // A superadmin acting as a client: TenantContext scopes them to that
+    // organization and `/api/organization` answers 200, so this is the
+    // ordinary organization surface — the whole point of the scope switch.
+    mockCurrentUser('superadmin')
+    mockOrganization()
+
+    const scope = await openUsersTab(await mountSettings())
+
+    expect(scope.text()).toContain('users.scope.organization')
+  })
+
+  it('never shows the platform variant to an org admin', async () => {
+    mockCurrentUser('admin')
+    mockOrganization()
+
+    const scope = await openUsersTab(await mountSettings())
+
+    expect(scope.text()).toContain('users.scope.organization')
+  })
+
+  it('FAILS CLOSED to the organization variant when the organization read errors', async () => {
+    // A 500 is not "no client selected". Treating any failed read as the
+    // platform scope would show BEAI's own people to someone whose request
+    // merely broke.
+    mockCurrentUser('superadmin')
+    vi.doMock('../../../../app/composables/useOrganization', () => ({
+      useOrganization: () => ({
+        fetchOrganization: vi.fn().mockRejectedValue({ status: 500 }),
+        updateOrganization: vi.fn(),
+      }),
+    }))
+
+    const scope = await openUsersTab(await mountSettings())
+
+    expect(scope.text()).toContain('users.scope.organization')
+  })
+
   it('does not call a superadmin having no organization an error', async () => {
     // A superadmin's `users.organization_id` is null — that is what makes them
     // one — so `/api/organization` 404s on every load. A destructive "this

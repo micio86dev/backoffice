@@ -1696,7 +1696,17 @@ export interface paths {
         put?: never;
         /**
          * POST /api/users/{id}/deactivate
-         * @description 204 No Content. Soft deactivation only — the row survives so
+         * @description The guard refusal is RETURNED, not left to `UserGuardException::render()`.
+         *     Scramble infers error responses from what a controller visibly answers,
+         *     so a globally-rendered 422 never reached the generated client — and the
+         *     backoffice reads `{error}` off exactly this rejection to explain the
+         *     refusal. A contract the client depends on and the spec does not declare
+         *     is one rename away from silently degrading.
+         *
+         *     The 422 body is `{error, message}`: `last_admin` when refusing for a
+         *     peer, `self_deactivation` when the caller is the last one.
+         *
+         *     204 No Content. Soft deactivation only — the row survives so
          *     audit-relevant authorship survives (D5).
          */
         post: operations["user.deactivate"];
@@ -4537,6 +4547,21 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
         };
     };
     "platformUser.store": {
@@ -4619,7 +4644,34 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
             404: components["responses"]["ModelNotFoundException"];
+            /** @description Refused: the write would leave no active administrator. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message: string;
+                    };
+                };
+            };
         };
     };
     "platformUser.activate": {
@@ -4641,6 +4693,21 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
             404: components["responses"]["ModelNotFoundException"];
         };
     };
@@ -5641,6 +5708,18 @@ export interface operations {
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
+            /** @description Refused: the write would leave no active administrator. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message: string;
+                    };
+                };
+            };
         };
     };
     "user.activate": {

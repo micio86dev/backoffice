@@ -73,7 +73,14 @@
           >
         </Field>
 
-        <Field>
+        <!--
+          No role under the PLATFORM variant (platform-user-management D2).
+          `is_superadmin` is the only platform identity the system has, and
+          `Gate::before` grants such a user every ability — so a picker here
+          would be a control with one option, and a lie the moment somebody
+          read it as an organization role.
+        -->
+        <Field v-if="!isPlatform">
           <FieldLabel for="user-form-role">{{ $t('users.accessLevel') }}</FieldLabel>
           <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
           <Select v-model="role">
@@ -124,7 +131,7 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 // admin/operator/viewer (the code-level allow-list, mirrored client-side —
 // never free text, never a BEAI role_code value). Password is admin-set
 // (D4 "New User Initial Password Set By Admin") and only offered at create.
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -137,13 +144,27 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useUsers, type UserResponse } from '@/composables/useUsers'
-import { applyServerFieldErrors } from '@/utils/http-error'
+import { usePlatformUsers } from '@/composables/usePlatformUsers'
+import { applyServerFieldErrors, getErrorStatus } from '@/utils/http-error'
+import { translateServerCode, translateServerCodes } from '@/utils/server-message'
 
 const ACCESS_LEVELS = ['admin', 'operator', 'viewer'] as const
 
-const props = defineProps<{
-  user: UserResponse['data'] | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    user: (Omit<UserResponse['data'], 'role'> & { role?: UserResponse['data']['role'] }) | null
+    /**
+     * Which population this form writes to (platform-user-management D6). A
+     * prop rather than a second component: the fields, the validation and the
+     * server-error mapping are identical, and duplicating them would give the
+     * defect two places to hide.
+     */
+    variant?: 'organization' | 'platform'
+  }>(),
+  { variant: 'organization' }
+)
+
+const isPlatform = computed(() => props.variant === 'platform')
 
 const emit = defineEmits<{
   (e: 'saved'): void
@@ -157,7 +178,8 @@ const emit = defineEmits<{
 }>()
 
 const { createUser, updateUser } = useUsers()
-const { t } = useI18n()
+const { createPlatformUser, updatePlatformUser } = usePlatformUsers()
+const { t, te } = useI18n()
 
 const isEditing = props.user !== null
 
@@ -255,25 +277,42 @@ async function onSubmit(): Promise<void> {
   saving.value = true
   try {
     if (isEditing && props.user) {
-      await updateUser(props.user.id, { name: name.value, email: email.value, role: role.value })
+      // `role` is omitted entirely on the platform path rather than sent as
+      // null: the endpoint does not read it, and the population has no such
+      // concept to describe.
+      await (isPlatform.value
+        ? updatePlatformUser(props.user.id, { name: name.value, email: email.value })
+        : updateUser(props.user.id, { name: name.value, email: email.value, role: role.value }))
     } else {
-      await createUser({
-        name: name.value,
-        email: email.value,
-        password: password.value,
-        role: role.value,
-      })
+      const base = { name: name.value, email: email.value, password: password.value }
+
+      await (isPlatform.value
+        ? createPlatformUser(base)
+        : createUser({ ...base, role: role.value }))
     }
     emit('saved')
   } catch (error) {
     const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
-      errors.value[key] = message
+      // The CODE, translated here. The platform endpoints answer with machine
+      // codes and this app is the only layer that knows the operator's
+      // language; rendering the wire value put English in an Italian field.
+      errors.value[key] = translateServerCode({ t, te }, 'users.serverError', message)
     })
     // A field with no control of its own (`role`, constrained client-side to
     // admin/operator/viewer) still has to reach the operator — the server's
     // own message beats a generic banner that hides it.
     formMessage.value =
-      unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('users.form.saveError')
+      unmapped && unmapped.length > 0
+        ? // Translated, like the per-field path above. Joining the raw wire
+          // values printed Laravel's English — or a bare `email_taken` —
+          // straight onto an Italian page.
+          translateServerCodes({ t, te }, 'users.serverError', unmapped).join(' ')
+        : // A rejection carrying NO field payload — a 403 from either create
+          // endpoint answers `{message}` alone — is not "review the
+          // highlighted fields", because nothing is highlighted and no field
+          // could have fixed it. `saveError` keeps its meaning for a genuine
+          // save failure; a refusal says it was refused.
+          t(getErrorStatus(error) === 403 ? 'users.form.forbidden' : 'users.form.saveError')
   } finally {
     saving.value = false
   }

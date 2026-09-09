@@ -674,7 +674,8 @@
         "email": "The address this person signs in with, and where their invitation is sent. It cannot already belong to another user.",
         "password": "At least 8 characters. You are setting it on this person's behalf, so pass it to them directly.",
         "role": "Admin can do everything, including managing users, API keys and avatar templates. Operator creates and manages projects and reads reports, but not users or credentials. Viewer can only read projects, candidates and reports."
-      }
+      },
+      "forbidden": "You do not have permission to do that."
     },
     "table": {
       "name": "Name",
@@ -682,12 +683,32 @@
       "accessLevel": "Access level",
       "state": "State",
       "actions": "Actions",
-      "empty": "No users yet."
+      "empty": "No users yet.",
+      "noAccessLevel": "No access level"
     },
     "newPlatform": "New BEAI team member",
     "scope": {
       "organization": "You are managing this organization's people.",
       "platform": "You are managing the BEAI team: platform administrators, who can see and act on every client."
+    },
+    "actionError": "That action could not be completed. Please try again.",
+    "serverError": {
+      "email_invalid": "That email address is not valid.",
+      "email_required": "An email address is required.",
+      "email_taken": "That email address is already in use.",
+      "email_too_long": "The email address is too long.",
+      "last_admin": "This organization must keep at least one administrator.",
+      "last_superadmin": "The platform must keep at least one active platform administrator.",
+      "name_invalid": "The name is not valid.",
+      "name_required": "A name is required.",
+      "name_too_long": "The name is too long.",
+      "password_invalid": "The password is not valid.",
+      "password_required": "A password is required.",
+      "password_too_short": "The password must be at least 8 characters.",
+      "role_invalid": "That access level is not one this product offers.",
+      "role_required": "An access level is required.",
+      "self_deactivation": "You are the last active administrator; deactivating yourself would lock everyone out.",
+      "self_demotion": "You are the last administrator; changing your own role would leave the organization with none."
     }
   },
   "profile": {

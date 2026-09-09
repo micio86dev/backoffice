@@ -674,7 +674,8 @@
         "email": "L'indirizzo con cui questa persona accede e a cui viene inviato il suo invito. Non può appartenere già a un altro utente.",
         "password": "Almeno 8 caratteri. La stai impostando per conto di questa persona: comunicagliela direttamente.",
         "role": "Amministratore può fare tutto, inclusa la gestione di utenti, chiavi API e template avatar. Operatore crea e gestisce i progetti e consulta i report, ma non gli utenti né le credenziali. Visualizzatore può solo consultare progetti, candidati e report."
-      }
+      },
+      "forbidden": "Non hai i permessi per questa operazione."
     },
     "table": {
       "name": "Nome",
@@ -682,12 +683,32 @@
       "accessLevel": "Livello di accesso",
       "state": "Stato",
       "actions": "Azioni",
-      "empty": "Nessun utente ancora presente."
+      "empty": "Nessun utente ancora presente.",
+      "noAccessLevel": "Nessun livello di accesso"
     },
     "newPlatform": "Nuovo membro del team BEAI",
     "scope": {
       "organization": "Stai gestendo le persone di questa organizzazione.",
       "platform": "Stai gestendo il team BEAI: amministratori di piattaforma, che vedono e operano su ogni cliente."
+    },
+    "actionError": "Non è stato possibile completare l'operazione. Riprova.",
+    "serverError": {
+      "email_invalid": "L'indirizzo email non è valido.",
+      "email_required": "L'indirizzo email è obbligatorio.",
+      "email_taken": "Questo indirizzo email è già in uso.",
+      "email_too_long": "L'indirizzo email è troppo lungo.",
+      "last_admin": "Questa organizzazione deve mantenere almeno un amministratore.",
+      "last_superadmin": "La piattaforma deve mantenere almeno un amministratore di piattaforma attivo.",
+      "name_invalid": "Il nome non è valido.",
+      "name_required": "Il nome è obbligatorio.",
+      "name_too_long": "Il nome è troppo lungo.",
+      "password_invalid": "La password non è valida.",
+      "password_required": "La password è obbligatoria.",
+      "password_too_short": "La password deve avere almeno 8 caratteri.",
+      "role_invalid": "Questo livello di accesso non è tra quelli previsti dal prodotto.",
+      "role_required": "Il livello di accesso è obbligatorio.",
+      "self_deactivation": "Sei l'ultimo amministratore attivo: disattivarti chiuderebbe fuori tutti.",
+      "self_demotion": "Sei l'ultimo amministratore: cambiare il tuo ruolo lascerebbe l'organizzazione senza."
     }
   },
   "profile": {

@@ -78,7 +78,7 @@
           <component
             :is="section.component"
             v-if="!section.needsOrganization || organization"
-            v-bind="section.needsOrganization ? { organization } : {}"
+            v-bind="sectionProps(section)"
             @saved="onSaved"
           />
         </TabsContent>
@@ -260,6 +260,37 @@ const loadError = ref<ResourceErrorState | null>(null)
  * superadmin is structural, and every other outcome means what it always did.
  */
 const noOrganizationInContext = ref(false)
+
+/**
+ * Which population the Users section manages (platform-user-management D6).
+ *
+ * Read from `noOrganizationInContext`, which is set ONLY when
+ * `/api/organization` answered 404 AND the viewer is a superadmin — the exact
+ * shape of "a superadmin with no client selected". It is derived from a
+ * response this page already makes, so there is no fourth `fetchClients()`
+ * call to keep in step with the three that exist.
+ *
+ * It FAILS CLOSED, and that matters more than the saved request: any other
+ * outcome — a 500, a network error, an identity that never landed — leaves it
+ * false and the section on the organization variant. Treating a merely FAILED
+ * read as "all clients" would show BEAI's own people to someone whose request
+ * simply broke.
+ */
+const usersVariant = computed<'organization' | 'platform'>(() =>
+  noOrganizationInContext.value ? 'platform' : 'organization'
+)
+
+/**
+ * The props a section is handed. Three sections take the organization; the
+ * Users one takes its scope; the rest take nothing and fetch their own data.
+ */
+function sectionProps(section: SettingsSection): Record<string, unknown> {
+  if (section.needsOrganization) {
+    return { organization: organization.value }
+  }
+
+  return section.value === 'users' ? { variant: usersVariant.value } : {}
+}
 
 // Each section names the ABILITY it needs, and `can()` answers from the map
 // the server resolves through its own policies — never from `roles.includes

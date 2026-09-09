@@ -209,6 +209,10 @@ test.describe('Projects CRUD (Unit 2b)', () => {
     await page.getByRole('button', { name: 'Nuovo progetto' }).click()
     await page.getByLabel('Nome').fill('New E2E Project')
     await page.getByLabel('Slug').fill('new-e2e-project')
+    // The framework pin is required too. It used to ship as `Number('')`, i.e.
+    // 0, and be refused by the server with the message landing in the banner;
+    // the form refuses it up front now.
+    await page.getByLabel('Versione del framework').fill('1')
 
     // A standard assessment needs a role and at least one competency. Filling
     // only name and slug used to leave the form correctly refusing to submit —

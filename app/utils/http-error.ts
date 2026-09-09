@@ -124,6 +124,31 @@ export function applyServerFieldErrors<K extends string>(
 }
 
 /**
+ * Extracts the `{data:{error}}` machine code a guard rejection carries.
+ *
+ * `UserGuardException::render()` answers 422 with `{error, message}` — the
+ * code in `error`, and an English SENTENCE in `message`. So neither
+ * `serverMessageCode` (which reads `message`, and correctly refuses prose) nor
+ * `serverErrorCode` (which reads `code`) sees it, and the codes that matter
+ * most — last_admin, self_demotion, self_deactivation, last_superadmin —
+ * would have gone unread.
+ *
+ * The same lowercase-token shape as its siblings, so an English sentence that
+ * ever lands in this field is refused rather than printed at an operator.
+ */
+export function guardErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null
+
+  const data = (error as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return null
+
+  const code = (data as { error?: unknown }).error
+  if (typeof code !== 'string') return null
+
+  return /^[a-z][a-z0-9_]*$/.test(code) ? code : null
+}
+
+/**
  * Extracts a machine-facing code from a `{data:{message: string}}` body.
  *
  * The API answers refusals with a stable snake_case code in `message` — a

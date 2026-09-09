@@ -1065,6 +1065,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/platform-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["platformUser.index"];
+        put?: never;
+        /**
+         * `organization_id` and `is_superadmin` are never read from the request —
+         *     they are decided here, exactly as `UserController::store()` decides them
+         *     for an organization's people. A field that is never read cannot be
+         *     crafted
+         */
+        post: operations["platformUser.store"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/platform-users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["platformUser.update"];
+        trace?: never;
+    };
+    "/admin/platform-users/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The guarded verb. Reaching zero active superadmins is unrecoverable from
+         *     inside the product, so the count and the write share one transaction and
+         *     one row lock — see PlatformUserGuards
+         */
+        post: operations["platformUser.deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/platform-users/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Never guarded: activating only ever ADDS a survivor, so there is no
+         *     invariant for it to break
+         */
+        post: operations["platformUser.activate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/profile": {
         parameters: {
             query?: never;
@@ -1617,7 +1696,17 @@ export interface paths {
         put?: never;
         /**
          * POST /api/users/{id}/deactivate
-         * @description 204 No Content. Soft deactivation only — the row survives so
+         * @description The guard refusal is RETURNED, not left to `UserGuardException::render()`.
+         *     Scramble infers error responses from what a controller visibly answers,
+         *     so a globally-rendered 422 never reached the generated client — and the
+         *     backoffice reads `{error}` off exactly this rejection to explain the
+         *     refusal. A contract the client depends on and the spec does not declare
+         *     is one rename away from silently degrading.
+         *
+         *     The 422 body is `{error, message}`: `last_admin` when refusing for a
+         *     peer, `self_deactivation` when the caller is the last one.
+         *
+         *     204 No Content. Soft deactivation only — the row survives so
          *     audit-relevant authorship survives (D5).
          */
         post: operations["user.deactivate"];
@@ -1982,6 +2071,15 @@ export interface components {
             completed_at: string | null;
             created_at: string | null;
         };
+        /** PlatformUserResource */
+        PlatformUserResource: {
+            id: number;
+            name: string;
+            email: string;
+            is_deactivated: boolean;
+            created_at: string | null;
+            updated_at: string | null;
+        };
         /** ProfileResource */
         ProfileResource: {
             id: number;
@@ -2207,6 +2305,26 @@ export interface components {
             llm_cost_usd: number | null;
         };
         /**
+         * StorePlatformUserRequest
+         * @description Validates POST /api/admin/platform-users (platform-user-management D2).
+         *
+         *     There is no `role` rule and no `organization_id` rule, and their absence is
+         *     the point rather than an omission: both are DECIDED by the surface, exactly
+         *     as `/api/users` decides them for an organization's people. A field that is
+         *     never read cannot be crafted.
+         */
+        StorePlatformUserRequest: {
+            name: string;
+            /**
+             * Format: email
+             * @description Unique across EVERY user, not only platform ones: `email` is the
+             *     login identity for this whole system, and two rows sharing it
+             *     would make authentication ambiguous.
+             */
+            email: string;
+            password: string;
+        };
+        /**
          * StoreProjectQuestionRequest
          * @description Validates a predefined question
          *     (potential-competencies-and-authored-questions, AD-4).
@@ -2413,6 +2531,24 @@ export interface components {
             current_password: string;
             password: string;
             password_confirmation: string;
+        };
+        /**
+         * UpdatePlatformUserRequest
+         * @description Validates PATCH /api/admin/platform-users/{id} (platform-user-management D2).
+         *
+         *     Every field is `sometimes`: a partial update must not blank what it does not
+         *     mention. `role` and `organization_id` are absent for the same reason as on
+         *     the store request — they are the surface's to decide, not the caller's.
+         */
+        UpdatePlatformUserRequest: {
+            name?: string;
+            /**
+             * Format: email
+             * @description Ignoring THIS row, or renaming a user without changing their
+             *     address would fail against their own record.
+             */
+            email?: string;
+            password?: string;
         };
         /**
          * UpdateProfilePhotoRequest
@@ -4390,6 +4526,191 @@ export interface operations {
             422: components["responses"]["ValidationException"];
         };
     };
+    "platformUser.index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Array of `PlatformUserResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformUserResource"][];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
+        };
+    };
+    "platformUser.store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorePlatformUserRequest"];
+            };
+        };
+        responses: {
+            /** @description `PlatformUserResource` */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformUserResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "platformUser.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlatformUserRequest"];
+            };
+        };
+        responses: {
+            /** @description `PlatformUserResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformUserResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            404: components["responses"]["ModelNotFoundException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "platformUser.deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
+            404: components["responses"]["ModelNotFoundException"];
+            /** @description Refused: the write would leave no active administrator. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message: string;
+                    };
+                };
+            };
+        };
+    };
+    "platformUser.activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
+            404: components["responses"]["ModelNotFoundException"];
+        };
+    };
     "profile.show": {
         parameters: {
             query?: never;
@@ -4846,6 +5167,10 @@ export interface operations {
                             oldest_age_seconds: Record<string, never> | null;
                         };
                         redis_eviction_policy: string;
+                        mail: {
+                            mailer: string;
+                            delivers: boolean;
+                        };
                     };
                 };
             };
@@ -4864,6 +5189,10 @@ export interface operations {
                         queue: null;
                         failed: null;
                         redis_eviction_policy: string;
+                        mail: {
+                            mailer: string;
+                            delivers: boolean;
+                        };
                     };
                 };
             };
@@ -5379,6 +5708,18 @@ export interface operations {
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
+            /** @description Refused: the write would leave no active administrator. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message: string;
+                    };
+                };
+            };
         };
     };
     "user.activate": {

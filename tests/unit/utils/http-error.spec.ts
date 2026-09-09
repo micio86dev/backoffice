@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
+  guardErrorCode,
   getErrorStatus,
   getErrorFields,
   getConflictTemplates,
@@ -230,5 +231,41 @@ describe('serverErrorCode', () => {
     expect(serverErrorCode({ data: { message: 'nope' } })).toBeNull()
     expect(serverErrorCode({})).toBeNull()
     expect(serverErrorCode(null)).toBeNull()
+  })
+})
+
+describe('guardErrorCode', () => {
+  // The shape guard is the whole point: `UserGuardException::render()` answers
+  // {error, message} where `message` is English prose. The day that prose
+  // reaches `data.error`, translateServerCode falls back to rendering the code
+  // verbatim and an Italian operator reads an English sentence on an Italian
+  // page — the exact failure serverMessageCode was built to end.
+  it('accepts a machine code', () => {
+    expect(guardErrorCode({ data: { error: 'last_superadmin' } })).toBe('last_superadmin')
+    expect(guardErrorCode({ data: { error: 'self_deactivation' } })).toBe('self_deactivation')
+  })
+
+  it('REFUSES an English sentence', () => {
+    expect(guardErrorCode({ data: { error: 'You are the last active administrator.' } })).toBeNull()
+    expect(guardErrorCode({ data: { error: 'Last admin' } })).toBeNull()
+  })
+
+  it('refuses anything that is not a lowercase token', () => {
+    expect(guardErrorCode({ data: { error: 'LAST_SUPERADMIN' } })).toBeNull()
+    expect(guardErrorCode({ data: { error: '9lives' } })).toBeNull()
+    expect(guardErrorCode({ data: { error: 'has-dashes' } })).toBeNull()
+  })
+
+  it('refuses a non-string, a missing data, and a non-object', () => {
+    expect(guardErrorCode({ data: { error: 42 } })).toBeNull()
+    expect(guardErrorCode({ data: {} })).toBeNull()
+    expect(guardErrorCode({})).toBeNull()
+    expect(guardErrorCode(null)).toBeNull()
+    expect(guardErrorCode('boom')).toBeNull()
+  })
+
+  it('does not confuse the message field with the error field', () => {
+    // `message` carries the sentence; only `error` carries the code.
+    expect(guardErrorCode({ data: { message: 'last_superadmin' } })).toBeNull()
   })
 })

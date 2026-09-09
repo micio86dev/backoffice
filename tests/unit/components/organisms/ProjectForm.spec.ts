@@ -187,6 +187,40 @@ describe('ProjectForm', () => {
     })
   })
 
+  describe('a failed lifecycle transition', () => {
+    it('shows the banner even when a previous submit left a field error behind', async () => {
+      // `applyServerErrors` suppresses the banner when a field error was
+      // mapped. A transition refused with an empty `errors: {}` would find
+      // the PREVIOUS submit's stale field error still set, decide the
+      // operator already has their reason, and fail in silence.
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ status: 'draft' }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      updateProjectMock.mockReset().mockRejectedValueOnce(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { name: ['name_too_long'] } },
+        })
+      )
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="project-form-name-error"]').exists()).toBe(true)
+
+      updateProjectMock
+        .mockReset()
+        .mockRejectedValueOnce(
+          Object.assign(new Error('422'), { status: 422, data: { errors: {} } })
+        )
+      await wrapper.get('[data-testid="project-form-transition-activate"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="project-form-banner"]').exists()).toBe(true)
+    })
+  })
+
   // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
   // document.body — wrapper.find() never matches it. Every test mounting a
   // dialog-driven interaction needs attachTo: document.body (task 4.5).
@@ -1195,7 +1229,12 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       // resolved value it was given at module level still has to stand.
       createProjectMock.mockClear()
 
-      const wrapper = mount(ProjectForm, { global: { mocks: { $t: tMock } } })
+      // `project: null` IS create mode. Omitting the required prop only
+      // produced a [Vue warn].
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
       await flushPromises()
 
       await wrapper.get('#project-form-name').setValue('New project')

@@ -1067,6 +1067,15 @@ async function onSubmit(): Promise<void> {
 
 async function onTransition(status: 'active' | 'archived'): Promise<void> {
   if (!props.project) return
+
+  // Cleared, exactly as `onSubmit` does. `applyServerErrors` suppresses the
+  // banner when a field error was mapped — so a transition refused with an
+  // empty `errors: {}` would find a PREVIOUS submit's stale field error still
+  // set, decide the operator already has their reason, and archive would fail
+  // in silence.
+  formMessage.value = null
+  errors.value = {}
+
   saving.value = true
   try {
     await updateProject(props.project.id, { status })

@@ -6,8 +6,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../../support/i18n'
 
 const tMock = (key: string) => key
+
+// See OrganizationProfileForm.spec.ts: the global `te` stub answers true to
+// every key, which makes any translation assertion unfalsifiable.
+vi.stubGlobal('useI18n', () => realI18n())
 const updateOrganizationMock = vi.fn()
 
 vi.mock('../../../../app/composables/useOrganization', () => ({
@@ -107,6 +112,87 @@ describe('WebhookDefaultsForm', () => {
     expect(wrapper.get('[data-testid="webhook-defaults-url-error"]').text()).toContain(
       'That address is not reachable.'
     )
+  })
+
+  it('translates the machine code the endpoint actually sends', async () => {
+    // The endpoint answers `webhook_url_invalid`, not a sentence. The prose
+    // case above is the FALLBACK path; this is the contract.
+    updateOrganizationMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { default_webhook_url: ['webhook_url_invalid'] } },
+      })
+    )
+
+    const wrapper = mount(WebhookDefaultsForm, {
+      props: { organization: organization() },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="webhook-defaults-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="webhook-defaults-url-error"]').text()).toContain(
+      'settings.webhooks.serverError.webhook_url_invalid'
+    )
+  })
+
+  // The ONLY client-side validation this form performs, and nothing exercised
+  // it — which is how it came to call a length check while promising a scheme
+  // check. Stubbing the predicate to `() => true` left the suite green.
+  it.each([
+    ['not-a-url', 'settings.webhooks.invalidUrl'],
+    ['ftp://example.test/hook', 'settings.webhooks.invalidUrl'],
+    ['javascript:alert(1)', 'settings.webhooks.invalidUrl'],
+    [`https://example.test/${'a'.repeat(2100)}`, 'settings.webhooks.urlTooLong'],
+  ])('refuses %s before any request', async (value, key) => {
+    const wrapper = mount(WebhookDefaultsForm, {
+      props: { organization: organization() },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="webhook-defaults-url"]').setValue(value)
+    await wrapper.get('[data-testid="webhook-defaults-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateOrganizationMock).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="webhook-defaults-url-error"]').text()).toBe(key)
+  })
+
+  it('accepts a well-formed https URL', async () => {
+    // The control: a predicate that refused everything would look identical.
+    const wrapper = mount(WebhookDefaultsForm, {
+      props: { organization: organization() },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="webhook-defaults-url"]').setValue('https://example.test/hook')
+    await wrapper.get('[data-testid="webhook-defaults-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateOrganizationMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not stack the generic banner on top of a mapped field error', async () => {
+    // The reason is already under the control; the banner would only tell the
+    // operator to retry a request that will fail the same way.
+    updateOrganizationMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { default_webhook_url: ['webhook_url_invalid'] } },
+      })
+    )
+
+    const wrapper = mount(WebhookDefaultsForm, {
+      props: { organization: organization() },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="webhook-defaults-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="webhook-defaults-url-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="webhook-defaults-banner"]').exists()).toBe(false)
   })
 
   // form-clarity-and-console-warnings — regression proof for CRITICAL 1's

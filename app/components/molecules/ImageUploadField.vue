@@ -14,17 +14,17 @@
       already blocks click, drag and keyboard activation.
     -->
     <button
+      :id="id"
       type="button"
       :data-testid="`${testId}-dropzone`"
       :disabled="disabled"
       :aria-invalid="invalid ? 'true' : undefined"
-      :aria-describedby="describedBy"
-      :aria-labelledby="`${id}-label`"
-      class="border-input hover:border-primary hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive flex flex-1 items-center gap-4 rounded-lg border border-dashed p-3 text-left transition-colors duration-150 focus-visible:ring-3 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      :aria-describedby="announcedBy"
+      class="border-input not-disabled:hover:border-primary not-disabled:hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive flex flex-1 items-center gap-4 rounded-lg border border-dashed p-3 text-left transition-colors duration-150 focus-visible:ring-3 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       :class="draggingOver ? 'border-primary bg-muted/50' : ''"
       @click="inputEl?.click()"
-      @dragenter.prevent="draggingOver = true"
-      @dragover.prevent="draggingOver = true"
+      @dragenter.prevent="draggingOver = !disabled"
+      @dragover.prevent="draggingOver = !disabled"
       @dragleave.prevent="draggingOver = false"
       @drop.prevent="onDrop"
     >
@@ -61,14 +61,30 @@
         />
       </span>
 
+      <!--
+        Two of these three lines are DESCRIBED, not named. `<label for>`
+        supersedes a button's own subtree when it computes the accessible
+        name, so everything here was rendered for sighted readers and
+        announced to nobody — the name was the caller's static "Logo" and
+        nothing else. Two things were lost with it: WCAG 2.5.3 (a speech-input
+        user says "Add image" and matches nothing), and the fact that Add vs
+        Replace is the ONLY textual signal of whether an image is currently
+        set — the preview is `alt=""`, so with the subtree superseded there
+        was no cue left at all.
+
+        The middle line, the drag hint, is deliberately NOT referenced. It
+        describes a pointer gesture to a reader who is not using one, and
+        `role=button` already implies activation. Announcing it would add
+        length to every focus without adding information.
+      -->
       <span class="min-w-0">
-        <span class="text-foreground block text-sm font-semibold">
+        <span :id="`${id}-cta`" class="text-foreground block text-sm font-semibold">
           {{ displayUrl ? $t('imageUpload.cta.replace') : $t('imageUpload.cta.add') }}
         </span>
         <span class="text-muted-foreground mt-0.5 block text-xs">
           {{ $t('imageUpload.cta.hint') }}
         </span>
-        <span class="text-muted-foreground mt-1 block text-xs">
+        <span :id="`${id}-constraints`" class="text-muted-foreground mt-1 block text-xs">
           {{ $t('imageUpload.constraints', { aspect }) }}
         </span>
       </span>
@@ -91,18 +107,18 @@
     </Button>
 
     <!--
-      sr-only rather than display:none so it stays in the accessibility tree —
-      but `tabindex="-1"`, because the button above is the operable element
-      and having both was two tab stops for one affordance, the second of them
-      clipped to a pixel with no visible focus.
-      The button carries the field's name through `aria-labelledby`, pointing
-      at the caller's FieldLabel: the label is `for` this input, so without it
-      the control that announces the error was the one with no name.
+      A MECHANISM, not a control. The button above is what the operator
+      interacts with and what the caller's FieldLabel names; this element only
+      exists to open the picker when that button asks it to.
+      So it is out of the tab order AND out of the accessibility tree. It was
+      neither: labelled by the same FieldLabel as the button, it gave the field
+      TWO controls with one name — which a screen-reader user meets as two
+      identical things, and which a strict locator meets as an ambiguity.
     -->
     <input
-      :id="id"
       ref="inputEl"
       tabindex="-1"
+      aria-hidden="true"
       type="file"
       :accept="ACCEPT"
       :disabled="disabled"
@@ -149,7 +165,7 @@
  * one that saves on selection (profile photo) without either behaviour
  * leaking into the shared code.
  */
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ImageIcon } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import ImageCropDialog from '@/components/molecules/ImageCropDialog.vue'
@@ -167,9 +183,10 @@ const PREVIEW_WIDTH = 88
 const props = withDefaults(
   defineProps<{
     /**
-     * The file input's id, and the id the caller's `FieldLabel` points `for`
-     * at. The dropzone button references `{id}-label`, so the caller MUST
-     * give that FieldLabel `id="{id}-label"`.
+     * The DROPZONE BUTTON's id — the operable control, and the one the
+     * caller's `FieldLabel` must point `for` at. `<button>` is labelable, so
+     * the label names it directly and nothing else in this component carries
+     * a name.
      */
     id: string
     testId: string
@@ -295,8 +312,29 @@ function onFileChosen(event: Event): void {
   accept((event.target as HTMLInputElement).files?.[0])
 }
 
+/**
+ * The caller's help and error ids, plus the two the button renders itself.
+ *
+ * The caller cannot supply these: the strings live inside this component and
+ * change with its state. Appending them here is what puts the CTA (Add vs
+ * Replace) and the required shape back into the accessibility tree after
+ * `<label for>` supersedes the button's contents.
+ */
+const announcedBy = computed(() =>
+  [props.describedBy, `${props.id}-cta`, `${props.id}-constraints`]
+    .filter((value): value is string => value !== undefined && value !== '')
+    .join(' ')
+)
+
 function onDrop(event: DragEvent): void {
   draggingOver.value = false
+
+  // HTML makes a disabled control swallow CLICK events. A drop is not a
+  // click, and the crop dialog teleports out of the disabled fieldset, so a
+  // file dropped mid-upload would open a fully interactive dialog and the
+  // confirm would start a SECOND concurrent upload — whose sibling's
+  // `finally` then re-enables the form underneath it.
+  if (props.disabled) return
 
   accept(event.dataTransfer?.files?.[0])
 }

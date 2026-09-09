@@ -7,9 +7,7 @@
   >
     <FormFieldset :disabled="uploading">
       <Field :data-invalid="Boolean(photoError)">
-        <FieldLabel id="profile-photo-input-label" for="profile-photo-input">{{
-          $t('profile.photo.inputLabel')
-        }}</FieldLabel>
+        <FieldLabel for="profile-photo-dropzone">{{ $t('profile.photo.inputLabel') }}</FieldLabel>
 
         <!--
           The same control as the organization logo, differing only in its
@@ -24,7 +22,7 @@
           AvatarRoot that no longer exists.
         -->
         <ImageUploadField
-          id="profile-photo-input"
+          id="profile-photo-dropzone"
           ref="photoField"
           test-id="profile-photo"
           aspect="1:1"
@@ -168,7 +166,20 @@ async function onPhotoCropped(file: File): Promise<void> {
     if (unmapped === null || unmapped.length > 0 || photoError.value === undefined) {
       formMessage.value = {
         kind: 'error',
-        text: unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('profile.photo.uploadError'),
+        // `uploadError` says "review the highlighted field". On the `null`
+        // branch — a network failure or a 500, no `{errors}` body — nothing
+        // WAS highlighted and no field could have fixed it, so that sentence
+        // sends the operator hunting for a defect that is not on the page.
+        // `photo_upload_failed` says "try again", which is the truth here.
+        text:
+          unmapped && unmapped.length > 0
+            ? // CODES, not sentences — the same wire contract the mapped
+              // branch above already translates. Joining them verbatim would
+              // print `photo_too_large` at an operator. Unreachable while
+              // `photo` is the only field either layer rejects on, and one
+              // field name away from being reachable.
+              translateServerCodes({ t, te }, 'profile.photo.serverError', unmapped).join(' ')
+            : t('profile.photo.serverError.photo_upload_failed'),
       }
     }
   } finally {
@@ -187,6 +198,11 @@ async function removePhoto(): Promise<void> {
   confirmOpen.value = false
   uploading.value = true
   formMessage.value = null
+  // And the FIELD error. A rejected crop leaves `photoError` set; removing
+  // the STORED photo then succeeds and the form still announces a failure
+  // about a file that was never uploaded and no longer exists anywhere.
+  // `onPhotoCropped` clears it on its own success; removal did not.
+  photoError.value = undefined
   try {
     await deletePhoto()
     // Same contract BrandingForm follows: the control cannot infer this from

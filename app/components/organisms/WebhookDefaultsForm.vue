@@ -45,15 +45,13 @@
           <FieldDescription>{{ $t('settings.webhooks.note') }}</FieldDescription>
         </FieldSet>
 
-        <Alert
+        <!-- The shared banner: see BrandingForm. -->
+        <FormMessage
           v-if="formMessage"
-          variant="destructive"
-          role="alert"
-          aria-live="polite"
-          data-testid="webhook-defaults-banner"
-        >
-          <AlertDescription>{{ formMessage }}</AlertDescription>
-        </Alert>
+          kind="error"
+          :text="formMessage"
+          test-id="webhook-defaults-banner"
+        />
 
         <Button type="submit" :loading="saving" data-testid="webhook-defaults-submit">
           {{ $t('projects.action.save') }}
@@ -80,11 +78,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage from '@/components/molecules/FormMessage.vue'
 import WriteOnlySecretField from '@/components/molecules/WriteOnlySecretField.vue'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
-import { isUrlLengthValid } from '@/utils/project-field-specs'
+import { isProjectUrlValid, isUrlLengthValid } from '@/utils/project-field-specs'
 import { applyServerFieldErrors } from '@/utils/http-error'
+import { translateServerCodes } from '@/utils/server-message'
 
 const props = defineProps<{
   organization: OrganizationResponse['data']
@@ -95,7 +94,7 @@ const emit = defineEmits<{
 }>()
 
 const { updateOrganization } = useOrganization()
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const url = ref(props.organization.default_webhook_url ?? '')
 const secret = ref<string | undefined>(undefined)
@@ -116,7 +115,21 @@ const SERVER_FIELD_TO_ERROR_KEY = { default_webhook_url: 'url' } as const
 
 async function onSubmit(): Promise<void> {
   formMessage.value = null
-  error.value = isUrlLengthValid(url.value) ? undefined : t('settings.webhooks.invalidUrl')
+  // `isProjectUrlValid`, not `isUrlLengthValid`. The length predicate accepts
+  // ANYTHING under 2048 characters, so `not-a-url`, `ftp://x` and
+  // `javascript:alert(1)` all passed and came back as a 422 the operator had
+  // to wait for — while the message they eventually saw promised a scheme
+  // check nothing performed. `isProjectUrlValid` is written for this exact
+  // field and says so in its own docblock; it was simply never called.
+  //
+  // Length keeps its OWN message: telling someone their 3000-character
+  // https:// URL does not start with http:// is false, and it is the one
+  // rejection where the operator can see the field is obviously fine.
+  error.value = !isUrlLengthValid(url.value)
+    ? t('settings.webhooks.urlTooLong')
+    : isProjectUrlValid(url.value)
+      ? undefined
+      : t('settings.webhooks.invalidUrl')
   if (error.value) return
 
   saving.value = true
@@ -131,11 +144,21 @@ async function onSubmit(): Promise<void> {
       submitError,
       SERVER_FIELD_TO_ERROR_KEY,
       (_key, message) => {
-        error.value = message
+        // A CODE, never a sentence. The endpoint is machine-facing and this
+        // is the only layer that knows the operator's language; assigning
+        // `message` put English Laravel prose into an Italian field error.
+        error.value = translateServerCodes({ t, te }, 'settings.webhooks.serverError', [message])[0]
       }
     )
+    // When a 422 mapped cleanly the operator already has the exact reason
+    // under the control; stacking the generic banner on top invites a retry
+    // that will fail identically. Same guard BrandingForm applies.
     formMessage.value =
-      unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('settings.webhooks.saveError')
+      unmapped && unmapped.length > 0
+        ? translateServerCodes({ t, te }, 'settings.webhooks.serverError', unmapped).join(' ')
+        : error.value !== undefined
+          ? null
+          : t('settings.webhooks.saveError')
   } finally {
     saving.value = false
   }

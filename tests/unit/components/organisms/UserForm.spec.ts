@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../../support/i18n'
 import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
@@ -17,6 +18,11 @@ vi.mock('../../../../app/composables/useUsers', () => ({
 }))
 
 const UserForm = (await import('../../../../app/components/organisms/UserForm.vue')).default
+
+// `te` must answer from the real locale file here: the global stub says
+// true to everything, which makes every translation assertion below
+// unfalsifiable.
+vi.stubGlobal('useI18n', () => realI18n())
 
 describe('UserForm', () => {
   afterEach(() => {
@@ -166,14 +172,19 @@ describe('UserForm', () => {
   })
 
   // form-clarity-and-console-warnings — CRITICAL 1 fix. `role` has no entry in
-  // SERVER_FIELD_TO_ERROR_KEY (Select is constrained client-side, D4/D8), so a
-  // server 422 on it must reach the form-level banner VERBATIM — not be
-  // silently discarded in favour of the generic saveError string.
-  it('surfaces a 422 on a field outside the map (role) in the banner, not the generic message', async () => {
+  // SERVER_FIELD_TO_ERROR_KEY (the Select is constrained client-side, D4/D8),
+  // so a server 422 on it must REACH the form-level banner rather than being
+  // discarded in favour of the generic saveError string.
+  //
+  // It is TRANSLATED on the way, not printed raw: the endpoints answer with
+  // machine codes and this app is the only layer that knows the operator's
+  // language. An unrecognised value still reaches the banner — that fallback
+  // is what stops a silent discard — which is what the second case covers.
+  it('surfaces a 422 on a field outside the map (role) in the banner, translated', async () => {
     createUserMock.mockRejectedValueOnce(
       Object.assign(new Error('422'), {
         status: 422,
-        data: { errors: { role: ['That role assignment is not permitted.'] } },
+        data: { errors: { role: ['role_invalid'] } },
       })
     )
 
@@ -186,7 +197,7 @@ describe('UserForm', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="user-form-banner"]').text()).toContain(
-      'That role assignment is not permitted.'
+      'users.serverError.role_invalid'
     )
   })
 })

@@ -120,8 +120,15 @@ function stripComments(source: string): string {
 // R1 — destructive call without a ConfirmDialog import
 // ---------------------------------------------------------------------------
 
+// The `(?<!URL\.)` is a PRECISION fix, not a loosening (image-upload-crop-field).
+// `URL.revokeObjectURL(` released a browser object-URL handle and tripped the
+// `revoke` arm — the guard exists for destructive actions on DOMAIN DATA, and
+// freeing a blob handle destroys nothing a user could miss. Narrowed to the
+// `URL.` receiver specifically rather than dropping `revoke`, so
+// `revokeApiKey(` — the call this arm was written for — still trips it. Both
+// halves are asserted below; do not widen the lookbehind past `URL.`.
 const DESTRUCTIVE_CALL_REGEX =
-  /\b(?:delete|remove|revoke|archive|destroy|import|activate|deactivate)[A-Z]\w*\(/
+  /(?<!URL\.)\b(?:delete|remove|revoke|archive|destroy|import|activate|deactivate)[A-Z]\w*\(/
 
 // Composable methods the regex above cannot see, because their NAME carries
 // no destructive-sounding verb — e.g. `updateProject(id, { status: 'archived' })`
@@ -180,6 +187,15 @@ function r2Violations(files: VueFile[]): string[] {
 }
 
 describe('destructive action confirmation guard (admin-backoffice spec)', () => {
+  // Guarding the guard: the `URL.` narrowing above must not cost a real
+  // detection. A regression here would make R1 silently blind to the exact
+  // call it was written to catch.
+  it('R1 — still trips on a domain revoke, and no longer on a released object URL', () => {
+    expect(callsDestructiveMethod('await revokeApiKey(id)')).toBe(true)
+    expect(callsDestructiveMethod('await deleteProject(id)')).toBe(true)
+    expect(callsDestructiveMethod('URL.revokeObjectURL(croppedUrl.value)')).toBe(false)
+  })
+
   it('R1 — every non-allowlisted destructive call site imports ConfirmDialog', () => {
     const violations = r1Violations(backofficeFiles())
 

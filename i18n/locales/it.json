@@ -597,8 +597,6 @@
     },
     "branding": {
       "logo": "Logo",
-      "logoAlt": "Logo dell'organizzazione",
-      "logoEmpty": "Nessun logo: viene usato quello BEAI.",
       "logoRemove": "Rimuovi",
       "primaryColor": "Colore primario",
       "colorClear": "Azzera",
@@ -616,7 +614,12 @@
       "confirm": {
         "removeLogoTitle": "Rimuovere il logo?",
         "removeLogoBody": "Il file verrà eliminato definitivamente. Se non hai più l'originale non potrai ripristinarlo. Fino a un nuovo caricamento verrà usato il logo BEAI."
-      }
+      },
+      "reject": {
+        "tooLarge": "Il file è troppo grande. Scegli un'immagine fino a 1 MB.",
+        "unsupportedType": "Questo tipo di file non è supportato. Usa un PNG o un JPEG."
+      },
+      "colorHexLabel": "Colore primario, valore esadecimale"
     },
     "platform": {
       "maxQuestions": {
@@ -671,7 +674,8 @@
         "email": "L'indirizzo con cui questa persona accede e a cui viene inviato il suo invito. Non può appartenere già a un altro utente.",
         "password": "Almeno 8 caratteri. La stai impostando per conto di questa persona: comunicagliela direttamente.",
         "role": "Amministratore può fare tutto, inclusa la gestione di utenti, chiavi API e template avatar. Operatore crea e gestisce i progetti e consulta i report, ma non gli utenti né le credenziali. Visualizzatore può solo consultare progetti, candidati e report."
-      }
+      },
+      "forbidden": "Non hai i permessi per questa operazione."
     },
     "table": {
       "name": "Nome",
@@ -679,7 +683,32 @@
       "accessLevel": "Livello di accesso",
       "state": "Stato",
       "actions": "Azioni",
-      "empty": "Nessun utente ancora presente."
+      "empty": "Nessun utente ancora presente.",
+      "noAccessLevel": "Nessun livello di accesso"
+    },
+    "newPlatform": "Nuovo membro del team BEAI",
+    "scope": {
+      "organization": "Stai gestendo le persone di questa organizzazione.",
+      "platform": "Stai gestendo il team BEAI: amministratori di piattaforma, che vedono e operano su ogni cliente."
+    },
+    "actionError": "Non è stato possibile completare l'operazione. Riprova.",
+    "serverError": {
+      "email_invalid": "L'indirizzo email non è valido.",
+      "email_required": "L'indirizzo email è obbligatorio.",
+      "email_taken": "Questo indirizzo email è già in uso.",
+      "email_too_long": "L'indirizzo email è troppo lungo.",
+      "last_admin": "Questa organizzazione deve mantenere almeno un amministratore.",
+      "last_superadmin": "La piattaforma deve mantenere almeno un amministratore di piattaforma attivo.",
+      "name_invalid": "Il nome non è valido.",
+      "name_required": "Il nome è obbligatorio.",
+      "name_too_long": "Il nome è troppo lungo.",
+      "password_invalid": "La password non è valida.",
+      "password_required": "La password è obbligatoria.",
+      "password_too_short": "La password deve avere almeno 8 caratteri.",
+      "role_invalid": "Questo livello di accesso non è tra quelli previsti dal prodotto.",
+      "role_required": "Il livello di accesso è obbligatorio.",
+      "self_deactivation": "Sei l'ultimo amministratore attivo: disattivarti chiuderebbe fuori tutti.",
+      "self_demotion": "Sei l'ultimo amministratore: cambiare il tuo ruolo lascerebbe l'organizzazione senza."
     }
   },
   "profile": {
@@ -690,13 +719,23 @@
     "photo": {
       "title": "Foto profilo",
       "inputLabel": "Carica una foto profilo",
-      "change": "Cambia foto",
       "remove": "Rimuovi foto",
       "confirmRemoveTitle": "Rimuovere la foto profilo?",
       "confirmRemoveDescription": "Questa operazione elimina la foto salvata. Potrai caricarne una nuova in qualsiasi momento.",
-      "tooLarge": "La foto è troppo grande. Scegli un file fino a 2 MB.",
       "uploadError": "Non è stato possibile caricare la foto. Controlla il campo evidenziato.",
-      "removeError": "Non è stato possibile rimuovere la foto. Riprova."
+      "removeError": "Non è stato possibile rimuovere la foto. Riprova.",
+      "reject": {
+        "tooLarge": "La foto è troppo grande. Scegli un file fino a 2 MB.",
+        "unsupportedType": "Questo tipo di file non è supportato. Usa un PNG o un JPEG."
+      },
+      "serverError": {
+        "photo_required": "Scegli una foto da caricare.",
+        "photo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
+        "photo_too_large": "La foto supera la dimensione massima consentita.",
+        "photo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito.",
+        "photo_upload_failed": "Non è stato possibile caricare la foto. Riprova."
+      },
+      "help": "JPEG o PNG, massimo 2 MB."
     },
     "details": {
       "title": "Dati account",
@@ -1193,5 +1232,24 @@
     },
     "actAs": "Entra come {name}",
     "actAsCurrent": "Stai già operando come {name}"
+  },
+  "imageUpload": {
+    "cta": {
+      "add": "Carica un'immagine",
+      "replace": "Sostituisci l'immagine",
+      "hint": "Trascina qui un file oppure clicca per sceglierlo."
+    },
+    "constraints": "PNG o JPEG · {aspect}",
+    "remove": "Rimuovi",
+    "crop": {
+      "title": "Inquadra l'immagine",
+      "description": "Trascina per riposizionare e usa il cursore per lo zoom. Viene salvato solo ciò che rientra nel riquadro.",
+      "frameLabel": "Area di inquadratura dell'immagine. Usa le frecce per spostarla e + o - per lo zoom.",
+      "zoomLabel": "Zoom",
+      "hint": "Trascina per riposizionare. Le frecce spostano, + e - regolano lo zoom.",
+      "cancel": "Annulla",
+      "confirm": "Applica",
+      "exportError": "Non è stato possibile elaborare l'immagine. Prova con un altro file."
+    }
   }
 }

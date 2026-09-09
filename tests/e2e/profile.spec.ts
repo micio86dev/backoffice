@@ -286,13 +286,18 @@ test.describe('Profile page (user-profile-self-service)', () => {
     await page.goto('/profile')
     await dismissConsent(page)
 
-    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-fallback')).toBeVisible()
 
+    // Choosing a file no longer uploads it: it opens the crop dialog, and the
+    // cropped result is what gets sent (image-upload-crop-field, D3).
     await page
       .getByLabel('Carica una foto profilo')
       .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: ONE_PIXEL_PNG })
 
-    await expect(page.getByTestId('profile-photo-avatar-image')).toBeVisible()
+    await expect(page.getByTestId('image-crop-dialog')).toBeVisible()
+    await page.getByTestId('image-crop-confirm').click()
+
+    await expect(page.getByTestId('profile-photo-preview')).toBeVisible()
   })
 
   // Post-apply verification finding (CRITICAL 2): user-self-service spec.md
@@ -331,8 +336,8 @@ test.describe('Profile page (user-profile-self-service)', () => {
     // distinguishes "hidden" from "absent".
     await expect(page.getByTestId('sidebar-footer-avatar-fallback')).toBeVisible()
     await expect(page.getByTestId('sidebar-footer-avatar-image')).not.toBeVisible()
-    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
-    await expect(page.getByTestId('profile-photo-avatar-image')).not.toBeVisible()
+    await expect(page.getByTestId('profile-photo-fallback')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-preview')).not.toBeVisible()
   })
 
   test('an aborted photo request falls back to initials, in the shell and on the page', async ({
@@ -363,8 +368,8 @@ test.describe('Profile page (user-profile-self-service)', () => {
     // distinguishes "hidden" from "absent".
     await expect(page.getByTestId('sidebar-footer-avatar-fallback')).toBeVisible()
     await expect(page.getByTestId('sidebar-footer-avatar-image')).not.toBeVisible()
-    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
-    await expect(page.getByTestId('profile-photo-avatar-image')).not.toBeVisible()
+    await expect(page.getByTestId('profile-photo-fallback')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-preview')).not.toBeVisible()
   })
 
   test('removing a photo goes through ConfirmDialog, then initials return', async ({ page }) => {
@@ -395,15 +400,15 @@ test.describe('Profile page (user-profile-self-service)', () => {
     await page.goto('/profile')
     await dismissConsent(page)
 
-    await expect(page.getByTestId('profile-photo-avatar-image')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-preview')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Rimuovi foto' }).click()
+    await page.getByTestId('profile-photo-remove').click()
     await expect(page.getByRole('alertdialog')).toBeVisible()
     expect(deleteCalled).toBe(false)
 
     await page.getByTestId('confirm-dialog-confirm').click()
 
-    await expect(page.getByTestId('profile-photo-avatar-fallback')).toBeVisible()
+    await expect(page.getByTestId('profile-photo-fallback')).toBeVisible()
     expect(deleteCalled).toBe(true)
   })
 })

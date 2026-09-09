@@ -597,8 +597,6 @@
     },
     "branding": {
       "logo": "Logo",
-      "logoAlt": "Organization logo",
-      "logoEmpty": "No logo set: the BEAI one is used.",
       "logoRemove": "Remove",
       "primaryColor": "Primary colour",
       "colorClear": "Clear",
@@ -616,7 +614,12 @@
       "confirm": {
         "removeLogoTitle": "Remove the logo?",
         "removeLogoBody": "The file will be permanently deleted. If you no longer have the original you will not be able to restore it. Until a new one is uploaded, the BEAI logo is used."
-      }
+      },
+      "reject": {
+        "tooLarge": "The file is too large. Choose an image up to 1 MB.",
+        "unsupportedType": "That file type is not supported. Use a PNG or a JPEG."
+      },
+      "colorHexLabel": "Primary colour, hex value"
     },
     "platform": {
       "maxQuestions": {
@@ -671,7 +674,8 @@
         "email": "The address this person signs in with, and where their invitation is sent. It cannot already belong to another user.",
         "password": "At least 8 characters. You are setting it on this person's behalf, so pass it to them directly.",
         "role": "Admin can do everything, including managing users, API keys and avatar templates. Operator creates and manages projects and reads reports, but not users or credentials. Viewer can only read projects, candidates and reports."
-      }
+      },
+      "forbidden": "You do not have permission to do that."
     },
     "table": {
       "name": "Name",
@@ -679,7 +683,32 @@
       "accessLevel": "Access level",
       "state": "State",
       "actions": "Actions",
-      "empty": "No users yet."
+      "empty": "No users yet.",
+      "noAccessLevel": "No access level"
+    },
+    "newPlatform": "New BEAI team member",
+    "scope": {
+      "organization": "You are managing this organization's people.",
+      "platform": "You are managing the BEAI team: platform administrators, who can see and act on every client."
+    },
+    "actionError": "That action could not be completed. Please try again.",
+    "serverError": {
+      "email_invalid": "That email address is not valid.",
+      "email_required": "An email address is required.",
+      "email_taken": "That email address is already in use.",
+      "email_too_long": "The email address is too long.",
+      "last_admin": "This organization must keep at least one administrator.",
+      "last_superadmin": "The platform must keep at least one active platform administrator.",
+      "name_invalid": "The name is not valid.",
+      "name_required": "A name is required.",
+      "name_too_long": "The name is too long.",
+      "password_invalid": "The password is not valid.",
+      "password_required": "A password is required.",
+      "password_too_short": "The password must be at least 8 characters.",
+      "role_invalid": "That access level is not one this product offers.",
+      "role_required": "An access level is required.",
+      "self_deactivation": "You are the last active administrator; deactivating yourself would lock everyone out.",
+      "self_demotion": "You are the last administrator; changing your own role would leave the organization with none."
     }
   },
   "profile": {
@@ -690,13 +719,23 @@
     "photo": {
       "title": "Profile photo",
       "inputLabel": "Upload a profile photo",
-      "change": "Change photo",
       "remove": "Remove photo",
       "confirmRemoveTitle": "Remove profile photo?",
       "confirmRemoveDescription": "This deletes the stored photo. You can upload a new one at any time.",
-      "tooLarge": "The photo is too large. Choose a file up to 2 MB.",
       "uploadError": "The photo could not be uploaded. Please review the highlighted field.",
-      "removeError": "The photo could not be removed. Please try again."
+      "removeError": "The photo could not be removed. Please try again.",
+      "reject": {
+        "tooLarge": "The photo is too large. Choose a file up to 2 MB.",
+        "unsupportedType": "That file type is not supported. Use a PNG or a JPEG."
+      },
+      "serverError": {
+        "photo_required": "Choose a photo to upload.",
+        "photo_invalid_image": "The file is not a valid JPEG or PNG image.",
+        "photo_too_large": "The photo exceeds the maximum allowed size.",
+        "photo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed.",
+        "photo_upload_failed": "The photo could not be uploaded. Please try again."
+      },
+      "help": "JPEG or PNG, 2 MB maximum."
     },
     "details": {
       "title": "Account details",
@@ -1193,5 +1232,24 @@
     },
     "actAs": "Act as {name}",
     "actAsCurrent": "You are already acting as {name}"
+  },
+  "imageUpload": {
+    "cta": {
+      "add": "Upload an image",
+      "replace": "Replace the image",
+      "hint": "Drag a file here or click to choose one."
+    },
+    "constraints": "PNG or JPEG · {aspect}",
+    "remove": "Remove",
+    "crop": {
+      "title": "Frame the image",
+      "description": "Drag to reposition and use the slider to zoom. Only what is inside the frame is saved.",
+      "frameLabel": "Image framing area. Use the arrow keys to move it and + or - to zoom.",
+      "zoomLabel": "Zoom",
+      "hint": "Drag to reposition. Arrow keys move, + and - zoom.",
+      "cancel": "Cancel",
+      "confirm": "Apply",
+      "exportError": "The image could not be processed. Try another file."
+    }
   }
 }

@@ -491,6 +491,10 @@
       "saveError": "The organization profile could not be saved. Please review the highlighted fields.",
       "help": {
         "name": "The display name of your organization. The slug above is the identifier the system uses and does not change with it."
+      },
+      "serverError": {
+        "name_invalid": "The organization name is not valid.",
+        "name_too_long": "The organization name is too long."
       }
     },
     "webhooks": {
@@ -504,7 +508,16 @@
       "note": "These defaults are copied onto a new project only at the moment it is created; changing them never retargets an existing project's live webhook.",
       "help": {
         "url": "The address BEAI posts progress and evaluation events to. It must be reachable from the internet and start with http:// or https://."
-      }
+      },
+      "serverError": {
+        "webhook_url_invalid": "The webhook URL is not a valid URL.",
+        "webhook_url_too_long": "The webhook URL is too long.",
+        "webhook_secret_invalid": "The webhook secret is not valid.",
+        "webhook_secret_too_long": "The webhook secret is too long.",
+        "webhook_events_invalid": "The event selection is not valid.",
+        "webhook_event_unknown": "One of the selected events is not recognised."
+      },
+      "urlTooLong": "This address is too long. Use at most 2048 characters."
     },
     "apiKeys": {
       "title": "API keys",
@@ -609,7 +622,10 @@
       "serverError": {
         "logo_invalid_image": "The file is not a valid JPEG or PNG image.",
         "logo_too_large": "The file exceeds the maximum allowed size.",
-        "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed."
+        "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed.",
+        "primary_color_invalid": "Enter a colour as six hexadecimal digits, for example #771AAF.",
+        "logo_required": "Choose a logo to upload.",
+        "logo_upload_failed": "The logo could not be uploaded. Please try again."
       },
       "confirm": {
         "removeLogoTitle": "Remove the logo?",

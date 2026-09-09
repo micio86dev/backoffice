@@ -112,10 +112,9 @@ describe('ImageUploadField', () => {
       // as a button — three things a clickable div has to reimplement badly.
       expect(dropzone.element.tagName).toBe('BUTTON')
       expect(dropzone.attributes('type')).toBe('button')
-      // Named by the caller's FieldLabel, which is `for` the hidden input:
-      // without this the control that announces the error is the one with no
-      // name.
-      expect(dropzone.attributes('aria-labelledby')).toBe('branding-logo-label')
+      // It carries the field's `id`, so the caller's FieldLabel names IT —
+      // <button> is labelable, and this is the element the operator uses.
+      expect(dropzone.attributes('id')).toBe('branding-logo')
     })
 
     it('keeps the file input in the DOM, hidden but focusable', () => {
@@ -128,7 +127,11 @@ describe('ImageUploadField', () => {
       // operable element and two tab stops for one affordance means focus
       // vanishing into a one-pixel control.
       expect(input.classes()).toContain('sr-only')
+      // A MECHANISM, not a control: out of the tab order AND out of the
+      // accessibility tree, so the field has exactly one named control.
       expect(input.attributes('tabindex')).toBe('-1')
+      expect(input.attributes('aria-hidden')).toBe('true')
+      expect(input.attributes('id')).toBeUndefined()
     })
 
     it('filters the picker to image formats the server actually accepts', () => {
@@ -396,7 +399,38 @@ describe('ImageUploadField', () => {
 
       const dropzone = inField(wrapper, 'dropzone')
       expect(dropzone.attributes('aria-invalid')).toBe('true')
-      expect(dropzone.attributes('aria-describedby')).toBe('branding-logo-error')
+      expect(dropzone.attributes('aria-describedby')).toContain('branding-logo-error')
+    })
+
+    it('announces its own CTA and constraints, which the label supersedes', () => {
+      // `<label for>` wins over a button's subtree when the accessible name is
+      // computed, so everything rendered inside this button reached nobody:
+      // the required shape, and — worse — Add vs Replace, the only textual
+      // signal that an image is already set. The preview is `alt=""`, so with
+      // the subtree superseded there was no cue left at all.
+      const wrapper = mountField({ describedBy: 'branding-logo-help' })
+
+      const described = inField(wrapper, 'dropzone').attributes('aria-describedby') ?? ''
+
+      // The caller's id is passed through; `-help` itself belongs to the
+      // caller's FieldDescription and is not rendered here.
+      expect(described).toContain('branding-logo-help')
+
+      // These two ARE this component's, so a dangling reference would be its
+      // own bug — an `aria-describedby` pointing at nothing announces nothing.
+      for (const id of ['branding-logo-cta', 'branding-logo-constraints']) {
+        expect(described).toContain(id)
+        expect(wrapper.find(`#${id}`).exists()).toBe(true)
+      }
+
+      // And the CTA text tracks the state it is the only signal of.
+      expect(wrapper.get('#branding-logo-cta').text()).toBe('imageUpload.cta.add')
+    })
+
+    it('switches that CTA to Replace once an image is set', async () => {
+      const wrapper = mountField({ previewUrl: 'https://api.test/logo.png' })
+
+      expect(wrapper.get('#branding-logo-cta').text()).toBe('imageUpload.cta.replace')
     })
 
     it('disables the affordance when the form is busy', () => {
@@ -404,6 +438,75 @@ describe('ImageUploadField', () => {
 
       expect((inField(wrapper, 'dropzone').element as HTMLButtonElement).disabled).toBe(true)
       expect((inField(wrapper, 'remove').element as HTMLButtonElement).disabled).toBe(true)
+    })
+
+    /**
+     * `trigger('drop', { dataTransfer })` does NOT deliver the file: the
+     * option is copied onto the synthetic event, but `DragEvent.dataTransfer`
+     * is a readonly accessor on the prototype, so the handler still reads
+     * `undefined` and `accept()` returns early whatever the guard does. A
+     * drop test written that way passes with or without the code it tests.
+     */
+    async function drop(wrapper: ReturnType<typeof mountField>): Promise<void> {
+      const event = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { files: [new File(['bytes'], 'logo.png', { type: 'image/png' })] },
+      })
+
+      inField(wrapper, 'dropzone').element.dispatchEvent(event)
+      await flushPromises()
+    }
+
+    it('refuses a DROPPED file while disabled', async () => {
+      // `disabled` makes a control swallow clicks, not drops. And the crop
+      // dialog teleports out of the disabled fieldset, so a file dropped
+      // mid-upload would open a live dialog whose confirm starts a SECOND
+      // concurrent upload — while the first one's `finally` re-enables the
+      // form underneath it.
+      const wrapper = mountField({ disabled: true })
+
+      await drop(wrapper)
+
+      expect(document.body.querySelector('[data-testid="image-crop-frame"]')).toBeNull()
+    })
+
+    it('does not paint the drag highlight while disabled', async () => {
+      // A disabled <button> still fires dragenter/dragover. Painting the
+      // active state invites a drop that `onDrop` then silently discards.
+      // dispatchEvent, not `trigger`: the harness suppresses synthetic events
+      // on a disabled control, so a `trigger`-based test passes with or
+      // without the guard. A real browser dispatches drag events at a
+      // disabled button — only CLICK is swallowed — which is the whole reason
+      // this guard exists.
+      const wrapper = mountField({ disabled: true })
+      const dropzone = inField(wrapper, 'dropzone')
+
+      dropzone.element.dispatchEvent(new Event('dragenter', { bubbles: true, cancelable: true }))
+      await flushPromises()
+
+      expect(dropzone.classes()).not.toContain('border-primary')
+    })
+
+    it('paints it when it is not disabled', async () => {
+      // The control: without this, a guard that never painted the highlight
+      // at all would look identical.
+      const wrapper = mountField()
+      const dropzone = inField(wrapper, 'dropzone')
+
+      dropzone.element.dispatchEvent(new Event('dragenter', { bubbles: true, cancelable: true }))
+      await flushPromises()
+
+      expect(dropzone.classes()).toContain('border-primary')
+    })
+
+    it('still accepts a DROPPED file when it is not disabled', async () => {
+      // The control for the assertion above: without this, a guard that
+      // refused every drop would look identical.
+      const wrapper = mountField()
+
+      await drop(wrapper)
+
+      expect(document.body.querySelector('[data-testid="image-crop-frame"]')).not.toBeNull()
     })
   })
 })

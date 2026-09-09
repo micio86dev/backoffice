@@ -104,6 +104,7 @@ import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMe
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { applyServerFieldErrors } from '@/utils/http-error'
+import { translateServerCodes } from '@/utils/server-message'
 
 const props = defineProps<{
   organization: OrganizationResponse['data']
@@ -115,7 +116,7 @@ const emit = defineEmits<{
 
 const { updateOrganization } = useOrganization()
 const { can } = useCurrentUser()
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 // Read from the server's own policy answer, never from a role name. Fails
 // closed, so a transient `/auth/me` error renders the read-only shape rather
@@ -161,17 +162,37 @@ async function onSubmit(): Promise<void> {
       submitError,
       SERVER_FIELD_TO_ERROR_KEY,
       (_key, message) => {
-        error.value = message
+        // A CODE, never a sentence. The endpoint is machine-facing and this
+        // is the only layer that knows the operator's language; assigning
+        // `message` put English Laravel prose into an Italian field error.
+        error.value = translateServerCodes({ t, te }, 'settings.organization.serverError', [
+          message,
+        ])[0]
       }
     )
     // A field with no control of its own (`slug`, read-only display) still
     // has to reach the operator — the server's own message beats a generic
     // banner that hides it.
-    formMessage.value = {
-      kind: 'error',
-      text:
-        unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('settings.organization.saveError'),
-    }
+    //
+    // But when a 422 mapped cleanly the operator ALREADY has the exact reason
+    // under the control, and stacking "Could not save, try again" on top of it
+    // invites a retry that will fail identically. Same guard BrandingForm and
+    // ProfilePhotoForm apply.
+    const mapped = error.value !== undefined
+
+    formMessage.value =
+      unmapped && unmapped.length > 0
+        ? {
+            kind: 'error',
+            text: translateServerCodes(
+              { t, te },
+              'settings.organization.serverError',
+              unmapped
+            ).join(' '),
+          }
+        : mapped
+          ? null
+          : { kind: 'error', text: t('settings.organization.saveError') }
   } finally {
     saving.value = false
   }

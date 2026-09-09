@@ -491,6 +491,10 @@
       "saveError": "Non è stato possibile salvare il profilo dell'organizzazione. Controlla i campi evidenziati.",
       "help": {
         "name": "Il nome visualizzato della tua organizzazione. Lo slug qui sopra è l'identificativo usato dal sistema e non cambia insieme al nome."
+      },
+      "serverError": {
+        "name_invalid": "Il nome dell'organizzazione non è valido.",
+        "name_too_long": "Il nome dell'organizzazione è troppo lungo."
       }
     },
     "webhooks": {
@@ -504,7 +508,16 @@
       "note": "Questi valori predefiniti vengono copiati su un nuovo progetto solo al momento della creazione; modificarli non ridirige mai il webhook live di un progetto esistente.",
       "help": {
         "url": "L'indirizzo a cui BEAI invia gli eventi di avanzamento e di valutazione. Deve essere raggiungibile da internet e iniziare con http:// o https://."
-      }
+      },
+      "serverError": {
+        "webhook_url_invalid": "L'URL del webhook non è un URL valido.",
+        "webhook_url_too_long": "L'URL del webhook è troppo lungo.",
+        "webhook_secret_invalid": "Il secret del webhook non è valido.",
+        "webhook_secret_too_long": "Il secret del webhook è troppo lungo.",
+        "webhook_events_invalid": "La selezione degli eventi non è valida.",
+        "webhook_event_unknown": "Uno degli eventi selezionati non è riconosciuto."
+      },
+      "urlTooLong": "Questo indirizzo è troppo lungo. Usa al massimo 2048 caratteri."
     },
     "apiKeys": {
       "title": "Chiavi API",
@@ -609,7 +622,10 @@
       "serverError": {
         "logo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
         "logo_too_large": "Il file supera la dimensione massima consentita.",
-        "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito."
+        "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito.",
+        "primary_color_invalid": "Inserisci un colore in sei cifre esadecimali, ad esempio #771AAF.",
+        "logo_required": "Scegli un logo da caricare.",
+        "logo_upload_failed": "Non è stato possibile caricare il logo. Riprova."
       },
       "confirm": {
         "removeLogoTitle": "Rimuovere il logo?",

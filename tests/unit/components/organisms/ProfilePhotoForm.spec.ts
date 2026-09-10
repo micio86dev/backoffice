@@ -13,9 +13,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../../support/i18n'
 import { waitFor, waitForTestId } from '../../support/wait-for'
 
 const tMock = (key: string) => key
+// `te` must answer from the real locale files. The global setup stubs it
+// as `() => true`, so `translateServerCode` always takes the hit branch
+// and returns the key — which makes every assertion below pass whether or
+// not the copy exists. That is exactly how `users.serverError.role_invalid`
+// shipped missing under a green suite.
+vi.stubGlobal('useI18n', () => realI18n())
+
 const uploadPhotoMock = vi.fn()
 const deletePhotoMock = vi.fn()
 
@@ -179,7 +187,34 @@ describe('ProfilePhotoForm', () => {
     await control(wrapper).vm.$emit('cropped', croppedFile())
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="profile-photo-banner"]').attributes('role')).toBe('alert')
+    const banner = wrapper.get('[data-testid="profile-photo-banner"]')
+    expect(banner.attributes('role')).toBe('alert')
+    // READ THE TEXT. Asserting only `role="alert"` passes for any sentence,
+    // which is how the banner came to say "review the highlighted field"
+    // while highlighting nothing: on this branch there is no `{errors}` body,
+    // so no FieldError renders and no field could have fixed it.
+    expect(banner.text()).toContain('profile.photo.serverError.photo_upload_failed')
+    expect(banner.text()).not.toContain('profile.photo.uploadError')
+    expect(wrapper.find('[data-testid="profile-photo-error"]').exists()).toBe(false)
+  })
+
+  it('translates codes it could not attribute to a field, never prints them', async () => {
+    // `unmapped` carries the same machine codes the mapped branch translates.
+    // Joining them verbatim puts `photo_too_large` in front of an operator.
+    uploadPhotoMock.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { some_other_field: ['photo_too_large'] } },
+      })
+    )
+
+    const wrapper = mountForm()
+    await control(wrapper).vm.$emit('cropped', croppedFile())
+    await flushPromises()
+
+    const banner = wrapper.get('[data-testid="profile-photo-banner"]')
+    expect(banner.text()).toContain('profile.photo.serverError.photo_too_large')
+    expect(banner.text()).not.toBe('photo_too_large')
   })
 
   // ConfirmDialog (AlertDialog) content is teleported to document.body, not
@@ -260,6 +295,28 @@ describe('ProfilePhotoForm — the control is told when its crop is done with', 
     await flushPromises()
 
     expect((control(wrapper).vm as unknown as { cleared: number }).cleared).toBe(1)
+  })
+
+  it('drops a standing field error when the removal succeeds', async () => {
+    // A rejected crop sets `photoError`. Removing the STORED photo then
+    // succeeds, and the field kept announcing a failure about a file that
+    // was never uploaded and no longer exists anywhere. Nothing remounts the
+    // form on `saved`, so it stayed until a reload.
+    const wrapper = mountForm('https://example.test/current.jpg', true)
+
+    await control(wrapper).vm.$emit('reject', 'tooLarge')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="profile-photo-error"]').exists()).toBe(true)
+
+    await control(wrapper).vm.$emit('remove')
+    await waitForTestId('confirm-dialog-confirm')
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')
+      ?.click()
+    await flushPromises()
+
+    expect(deletePhotoMock).toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="profile-photo-error"]').exists()).toBe(false)
   })
 
   it('clears after a confirmed removal', async () => {

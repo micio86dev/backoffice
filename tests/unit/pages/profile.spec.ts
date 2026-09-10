@@ -8,11 +8,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../support/i18n'
 import { ref } from 'vue'
 
 const tMock = (key: string) => key
 
-function profileResponse() {
+function profileResponse(overrides: Record<string, unknown> = {}) {
   return {
     data: {
       id: 1,
@@ -20,8 +21,13 @@ function profileResponse() {
       email: 'ada@example.test',
       locale: 'en',
       role: 'operator',
+      // Explicit, never absent: the page branches on it, and a fixture that
+      // omits it would exercise the `undefined` path in every test while the
+      // API always sends a boolean.
+      is_superadmin: false,
       organization: { id: 1, name: 'Acme' },
       photo_url: null,
+      ...overrides,
     },
   }
 }
@@ -54,10 +60,11 @@ describe('pages/profile.vue', () => {
     refreshCurrentUserMock.mockReset().mockResolvedValue(undefined)
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: (key: string) => key, locale: ref('en') }))
-    )
+    // `te` from the REAL locale files: `AccessLevelBadge` asks it whether a
+    // role has copy before rendering, so a stub without it crashes — and a
+    // stub answering true to everything would let a missing key render as
+    // its own name.
+    vi.stubGlobal('useI18n', () => ({ ...realI18n(), locale: ref('en') }))
   })
 
   async function mountPage() {
@@ -99,5 +106,41 @@ describe('pages/profile.vue', () => {
 
     expect(updateProfileMock).toHaveBeenCalled()
     expect(refreshCurrentUserMock).toHaveBeenCalled()
+  })
+
+  describe('what access level the page reports', () => {
+    it('says SUPER ADMIN for a superadmin, not Observer', async () => {
+      // A superadmin holds no Spatie role — their power comes from
+      // `Gate::before` — so `role` is null and the old fallback to `viewer`
+      // told the one person who can do anything that they were an observer.
+      fetchProfileMock.mockResolvedValue(profileResponse({ role: null, is_superadmin: true }))
+
+      const wrapper = await mountPage()
+
+      expect(wrapper.get('[data-testid="profile-role-badge"]').text()).toContain(
+        'users.role.superadmin'
+      )
+      expect(wrapper.text()).not.toContain('users.role.viewer')
+    })
+
+    it('says NO ROLE rather than inventing one', async () => {
+      // A user with no organization role is not an observer either. Guessing
+      // one is the same defect one case over.
+      fetchProfileMock.mockResolvedValue(profileResponse({ role: null, is_superadmin: false }))
+
+      const wrapper = await mountPage()
+
+      expect(wrapper.get('[data-testid="profile-role-badge"]').text()).toContain('users.role.none')
+    })
+
+    it('still reports a real organization role verbatim', async () => {
+      // The control: a rule that answered `superadmin` or `none` for everyone
+      // would look identical on the two cases above.
+      fetchProfileMock.mockResolvedValue(profileResponse({ role: 'admin' }))
+
+      const wrapper = await mountPage()
+
+      expect(wrapper.get('[data-testid="profile-role-badge"]').text()).toContain('users.role.admin')
+    })
   })
 })

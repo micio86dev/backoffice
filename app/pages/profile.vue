@@ -47,11 +47,15 @@
             cannot infer the return type of getRoleNames()->first()
             (Spatie), same as UserResource's `role` field. `String(...)`
             coerces it, mirroring UsersPanel.vue's precedent.
+
+            A SUPERADMIN holds no organization role: `getRoleNames()` is empty
+            for them, because their power comes from `Gate::before`, not from
+            Spatie. The old fallback to `viewer` therefore told the one person
+            who can do anything on this platform that they were an observer.
+            And the fallback itself was a guess — a user with no role at all is
+            not a viewer either, so that case now says so.
           -->
-          <AccessLevelBadge
-            :role="profile.role ? String(profile.role) : 'viewer'"
-            data-testid="profile-role-badge"
-          />
+          <AccessLevelBadge :role="accessLevel" data-testid="profile-role-badge" />
         </div>
         <div v-if="profile.organization" class="flex flex-col gap-1">
           <span class="text-xs text-muted-foreground">{{ $t('profile.organization') }}</span>
@@ -126,6 +130,19 @@ const { fetchProfile } = useProfile()
 
 const profile = ref<ProfileResponse['data'] | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
+
+/**
+ * What this user's access level actually IS.
+ *
+ * Three states, and the old code collapsed all three into `viewer`:
+ * a superadmin (no Spatie role — their power comes from `Gate::before`), a
+ * user with an organization role, and a user with none at all.
+ */
+const accessLevel = computed(() => {
+  if (profile.value?.is_superadmin === true) return 'superadmin'
+
+  return profile.value?.role ? String(profile.value.role) : 'none'
+})
 
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))

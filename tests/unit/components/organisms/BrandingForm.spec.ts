@@ -12,7 +12,12 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../../support/i18n'
 import BrandingForm from '../../../../app/components/organisms/BrandingForm.vue'
+
+// See ProfilePhotoForm.spec.ts: without this, `te` answers true to every
+// key and a code with no copy renders its own name and passes.
+vi.stubGlobal('useI18n', () => realI18n())
 
 const updateOrganization = vi.fn()
 const uploadLogo = vi.fn()
@@ -27,9 +32,12 @@ vi.mock('@/composables/useOrganization', () => ({
 // null meant no test here could ever observe a 422 reaching a field — the
 // suite was green and proved nothing about the one behaviour that contract
 // exists to guarantee.
-vi.mock('@/utils/server-message', () => ({
-  translateServerCodes: (_a: unknown, _b: unknown, c: string[]) => c,
-}))
+// `@/utils/server-message` is deliberately NOT mocked. It was, to the
+// identity — so the one thing this form has to do with a server code, turn it
+// into copy in the operator's language, was stubbed out of every test here.
+// The suite was green and proved nothing about it, and `te` answering true to
+// every key (see the stub above) meant even a code with no copy would have
+// looked translated.
 
 const stubs = {
   Field: { template: '<div><slot /></div>' },
@@ -38,10 +46,20 @@ const stubs = {
   FieldDescription: { template: '<p><slot /></p>' },
   FieldError: { template: '<p><slot /></p>' },
   FormFieldset: { template: '<fieldset><slot /></fieldset>' },
-  Alert: { template: '<div><slot /></div>' },
-  AlertDescription: { template: '<div><slot /></div>' },
+  // `Alert` is NOT stubbed: the shared FormMessage puts the banner's testid
+  // and its role/live-region on it, and a bare <div> stub drops all three.
   Button: { template: '<button><slot /></button>' },
-  Input: { props: ['modelValue'], template: '<input :value="modelValue" />' },
+  // TWO-WAY. The one-way stub this replaced never emitted
+  // `update:modelValue`, so typing into the hex field changed nothing the
+  // component could see — every assertion about a typed value passed for the
+  // wrong reason, and a form that silently discarded input would have looked
+  // identical here.
+  Input: {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template:
+      '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+  },
   // NOT stubbed away to an empty div: this dialog IS the protection on an
   // irreversible delete, and replacing it with <div /> removed the confirm
   // button and with it any coverage of the guarded path.
@@ -83,7 +101,7 @@ const stubs = {
     ],
     emits: ['cropped', 'reject', 'remove'],
     template:
-      '<div data-testid="image-upload-field" :data-aspect="aspect" :data-fit="fit" :data-preview="previewUrl" :data-described="describedBy" />',
+      '<div data-testid="image-upload-field" :data-aspect="aspect" :data-fit="fit" :data-preview="previewUrl" :data-described="describedBy" :data-id="id" />',
   },
 }
 
@@ -241,6 +259,28 @@ describe('BrandingForm — the server-error contract', () => {
     }
   })
 
+  it('clearing an invalid colour clears the error it caused', async () => {
+    // Clear produces the VALID empty state ("use the product palette"), but
+    // it never revalidated — so `aria-invalid` and the FieldError survived,
+    // and the Clear button is `v-if="color"`, so it had already disappeared.
+    // The operator was left with a field announced as invalid and no control
+    // left to fix it.
+    const wrapper = mountForm('#123456')
+
+    const text = wrapper.get('[data-testid="branding-color-text"]')
+    await text.setValue('zzz')
+    await text.trigger('blur')
+    expect(wrapper.find('[data-testid="branding-color-error"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="branding-color-clear"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="branding-color-error"]').exists()).toBe(false)
+    for (const testId of ['branding-color-text', 'branding-color-picker']) {
+      expect(wrapper.get(`[data-testid="${testId}"]`).attributes('aria-invalid')).toBe('false')
+    }
+  })
+
   it('falls back to the banner when the failure carries no field payload', async () => {
     // A network error or a 500 has nothing to attribute to a control, and
     // that is exactly what the banner is for.
@@ -268,6 +308,29 @@ describe('BrandingForm — the server-error contract', () => {
     await flushPromises()
 
     expect(removeLogo).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops a standing field error when the removal succeeds', async () => {
+    // A rejected crop sets `logoError`. Removing the STORED logo then
+    // succeeds and the field kept announcing a failure about a file that was
+    // never uploaded. `onRemoveRequested` already clears it on the cheap
+    // no-stored-logo branch; the destructive path was the door left open.
+    const wrapper = mount(BrandingForm, {
+      props: { organization: { primary_color: null, logo_url: 'https://api.test/logo.png' } },
+      global: { stubs, mocks: { $t: (k: string) => k } },
+    })
+
+    await wrapper.findComponent({ name: 'ImageUploadField' }).vm.$emit('reject', 'tooLarge')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="branding-logo-error"]').exists()).toBe(true)
+
+    await wrapper.findComponent({ name: 'ImageUploadField' }).vm.$emit('remove')
+    await flushPromises()
+    await wrapper.get('[data-testid="confirm-dialog-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(removeLogo).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="branding-logo-error"]').exists()).toBe(false)
   })
 
   it('cancelling the confirmation never deletes', async () => {
@@ -314,17 +377,117 @@ describe('BrandingForm — removing a logo that was only just cropped', () => {
 })
 
 describe('BrandingForm — the labelled control', () => {
-  it('names the dropzone through the field label the caller renders', async () => {
-    // ImageUploadField's button references `{id}-label`. If the caller does
-    // not put that id on its FieldLabel, the operable control has no
-    // accessible name at all.
+  it('points its label at the control the operator actually uses', () => {
+    // `for` must name the dropzone BUTTON, which is the operable element and
+    // takes the control's `id`. Pointing it at the hidden input gave the field
+    // two controls with one name.
     const wrapper = mountForm(null)
 
-    expect(wrapper.find('#branding-logo-label').exists()).toBe(true)
-    // The help text is referenced even with no error to report.
+    expect(wrapper.get('label').attributes('for')).toBe('branding-logo')
+    expect(wrapper.get('[data-testid="image-upload-field"]').attributes('data-id')).toBe(
+      'branding-logo'
+    )
+  })
+
+  it('references the help text even with no error to report', () => {
+    const wrapper = mountForm(null)
+
     expect(wrapper.get('[data-testid="image-upload-field"]').attributes('data-described')).toBe(
       'branding-logo-help'
     )
+  })
+})
+
+describe('BrandingForm — the server codes it renders', () => {
+  it('translates a colour code rather than printing it', async () => {
+    // The endpoint answers `primary_color_invalid`, and nothing asserted that
+    // this namespace could translate anything at all — it carried three logo
+    // codes and no colour code, so a 422 on the colour rendered the raw wire
+    // value.
+    updateOrganization.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { primary_color: ['primary_color_invalid'] } },
+      })
+    )
+
+    const wrapper = mountForm('#123456')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="branding-color-error"]').text()).toContain(
+      'settings.branding.serverError.primary_color_invalid'
+    )
+  })
+
+  // EVERY code the endpoint can emit under `logo`, not just the convenient
+  // one. `translateServerCode` falls back to the raw code by design, so a
+  // namespace missing a case renders snake_case at the operator instead of
+  // failing — and asserting only `logo_too_large` left `logo_required` and
+  // `logo_upload_failed` (the aborted-transfer branch, which a flaky
+  // connection reaches) with no copy and a green suite.
+  it.each([
+    'logo_required',
+    'logo_invalid_image',
+    'logo_too_large',
+    'logo_dimensions_invalid',
+    'logo_upload_failed',
+  ])('translates the logo code %s rather than printing it', async (code) => {
+    uploadLogo.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { logo: [code] } },
+      })
+    )
+
+    const wrapper = mountForm('#123456')
+    const control = wrapper.findComponent({ name: 'ImageUploadField' }) as unknown as {
+      vm: { $emit: (e: string, p?: unknown) => void }
+    }
+
+    await control.vm.$emit('cropped', new File(['bytes'], 'logo.png', { type: 'image/png' }))
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="branding-logo-error"]').text()).toBe(
+      `settings.branding.serverError.${code}`
+    )
+  })
+})
+
+describe('BrandingForm — a rejected upload', () => {
+  it('clears the control, so Remove cannot target the unseen stored logo', async () => {
+    // The control previews the crop BEFORE it emits, and `logoUrl` still
+    // points at the STORED logo. Leaving the refused crop on screen means the
+    // Remove confirmation says "the file will be permanently deleted" about
+    // the image on screen while deleting the one behind it.
+    uploadLogo.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { logo: ['logo_too_large'] } },
+      })
+    )
+
+    const wrapper = mountForm('#123456')
+    const control = wrapper.findComponent({ name: 'ImageUploadField' }) as unknown as {
+      vm: { $emit: (e: string, p?: unknown) => void; cleared: number }
+    }
+
+    await control.vm.$emit('cropped', new File(['bytes'], 'logo.png', { type: 'image/png' }))
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadLogo).toHaveBeenCalledTimes(1)
+    expect(control.vm.cleared).toBe(1)
+
+    // And the FILE goes with the preview. Clearing only the control leaves it
+    // queued with nothing on screen referring to it, so this second save —
+    // of the colour alone — silently re-uploads the image that was just
+    // refused. `cleared === 1` alone cannot see that.
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadLogo).toHaveBeenCalledTimes(1)
   })
 })
 

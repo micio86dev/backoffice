@@ -359,8 +359,50 @@
         "competencies": "Le competenze valutate in questo colloquio. Più competenze significano un colloquio più lungo per il candidato."
       },
       "serverError": {
-        "POTENTIAL_CATALOG_INCOMPLETE": "Il catalogo per la valutazione di tipo «potential» non è completo: le competenze MTG e LAT non sono presenti. Un progetto «potential» non può essere creato finché non vengono caricate."
-      }
+        "POTENTIAL_CATALOG_INCOMPLETE": "Il catalogo per la valutazione di tipo «potential» non è completo: le competenze MTG e LAT non sono presenti. Un progetto «potential» non può essere creato finché non vengono caricate.",
+        "assessment_type_required": "Scegli un tipo di valutazione.",
+        "assessment_type_invalid": "Quel tipo di valutazione non è valido.",
+        "avatar_template_required": "Scegli un template avatar.",
+        "avatar_template_invalid": "Quel template avatar non è disponibile.",
+        "competencies_invalid": "La selezione delle competenze non è valida.",
+        "competencies_duplicated": "Una competenza è stata selezionata due volte.",
+        "competency_unknown": "Una delle competenze selezionate non esiste.",
+        "deadline_invalid": "La scadenza non è una data valida.",
+        "goes_live_invalid": "La data di pubblicazione non è valida.",
+        "error_redirect_url_invalid": "L'indirizzo di reindirizzamento in caso di errore non è un URL valido.",
+        "error_redirect_url_too_long": "L'indirizzo di reindirizzamento in caso di errore è troppo lungo.",
+        "exit_redirect_url_invalid": "L'indirizzo di uscita non è un URL valido.",
+        "exit_redirect_url_too_long": "L'indirizzo di uscita è troppo lungo.",
+        "framework_version_required": "Scegli una versione del framework.",
+        "framework_version_invalid": "Quella versione del framework non è disponibile.",
+        "framework_version_immutable": "La versione del framework non può essere cambiata dopo la creazione del progetto.",
+        "language_required": "Scegli una lingua.",
+        "language_invalid": "Quella lingua non è supportata.",
+        "name_required": "Dai un nome al progetto.",
+        "name_invalid": "Il nome del progetto non è valido.",
+        "name_too_long": "Il nome del progetto è troppo lungo.",
+        "nudge_min_chars_invalid": "La soglia di sollecito è fuori intervallo.",
+        "pause_every_n_invalid": "L'intervallo di pausa è fuori intervallo.",
+        "role_invalid": "Scegli uno dei cinque ruoli.",
+        "role_code_immutable": "Il ruolo non può essere cambiato quando il progetto è attivo.",
+        "role_code_must_be_null": "Una valutazione di potenziale non ha ruolo.",
+        "assessment_type_immutable": "Il tipo di valutazione non può essere cambiato quando il progetto è attivo.",
+        "status_transition_forbidden": "Quel cambio di stato non è consentito.",
+        "project_not_found": "Questo progetto non esiste più.",
+        "slug_required": "Dai uno slug al progetto.",
+        "slug_invalid": "Lo slug può contenere solo lettere minuscole, numeri e trattini.",
+        "slug_too_long": "Lo slug è troppo lungo.",
+        "slug_taken": "Un altro progetto usa già questo slug.",
+        "status_invalid": "Quello stato non è valido.",
+        "webhook_event_unknown": "Uno degli eventi selezionati non è riconosciuto.",
+        "webhook_events_invalid": "La selezione degli eventi non è valida.",
+        "webhook_secret_invalid": "Il secret del webhook non è valido.",
+        "webhook_secret_too_long": "Il secret del webhook è troppo lungo.",
+        "webhook_url_invalid": "L'URL del webhook non è un URL valido.",
+        "webhook_url_too_long": "L'URL del webhook è troppo lungo."
+      },
+      "competenciesLoadError": "L'elenco delle competenze non è stato caricato. Riprova.",
+      "templatesLoadError": "L'elenco dei template avatar non è stato caricato. Riprova."
     },
     "secret": {
       "notSet": "Nessun segreto configurato.",
@@ -378,6 +420,15 @@
     "avatarProvider": {
       "heygen": "HeyGen",
       "tavus": "Tavus"
+    },
+    "delete": {
+      "title": "Elimina questo progetto",
+      "description": "Il progetto sparisce da ogni elenco. Partecipanti, trascrizioni e valutazioni restano conservati.",
+      "action": "Elimina progetto",
+      "confirmTitle": "Eliminare questo progetto?",
+      "confirmDescription": "Sparirà da ogni elenco del backoffice. Partecipanti, trascrizioni e valutazioni restano conservati, ma nulla vi rimanderà più.",
+      "error": "Non è stato possibile eliminare il progetto. Riprova.",
+      "stillActive": "Archivia il progetto prima di eliminarlo."
     }
   },
   "report": {
@@ -491,6 +542,10 @@
       "saveError": "Non è stato possibile salvare il profilo dell'organizzazione. Controlla i campi evidenziati.",
       "help": {
         "name": "Il nome visualizzato della tua organizzazione. Lo slug qui sopra è l'identificativo usato dal sistema e non cambia insieme al nome."
+      },
+      "serverError": {
+        "name_invalid": "Il nome dell'organizzazione non è valido.",
+        "name_too_long": "Il nome dell'organizzazione è troppo lungo."
       }
     },
     "webhooks": {
@@ -504,7 +559,16 @@
       "note": "Questi valori predefiniti vengono copiati su un nuovo progetto solo al momento della creazione; modificarli non ridirige mai il webhook live di un progetto esistente.",
       "help": {
         "url": "L'indirizzo a cui BEAI invia gli eventi di avanzamento e di valutazione. Deve essere raggiungibile da internet e iniziare con http:// o https://."
-      }
+      },
+      "serverError": {
+        "webhook_url_invalid": "L'URL del webhook non è un URL valido.",
+        "webhook_url_too_long": "L'URL del webhook è troppo lungo.",
+        "webhook_secret_invalid": "Il secret del webhook non è valido.",
+        "webhook_secret_too_long": "Il secret del webhook è troppo lungo.",
+        "webhook_events_invalid": "La selezione degli eventi non è valida.",
+        "webhook_event_unknown": "Uno degli eventi selezionati non è riconosciuto."
+      },
+      "urlTooLong": "Questo indirizzo è troppo lungo. Usa al massimo 2048 caratteri."
     },
     "apiKeys": {
       "title": "Chiavi API",
@@ -609,7 +673,10 @@
       "serverError": {
         "logo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
         "logo_too_large": "Il file supera la dimensione massima consentita.",
-        "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito."
+        "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito.",
+        "primary_color_invalid": "Inserisci un colore in sei cifre esadecimali, ad esempio #771AAF.",
+        "logo_required": "Scegli un logo da caricare.",
+        "logo_upload_failed": "Non è stato possibile caricare il logo. Riprova."
       },
       "confirm": {
         "removeLogoTitle": "Rimuovere il logo?",
@@ -645,7 +712,10 @@
     "role": {
       "admin": "Amministratore",
       "operator": "Operatore",
-      "viewer": "Osservatore"
+      "viewer": "Osservatore",
+      "superadmin": "Super Admin",
+      "none": "Nessun ruolo",
+      "unknown": "Ruolo sconosciuto"
     },
     "state": {
       "active": "Attivo",
@@ -1209,7 +1279,21 @@
     "editFor": "Modifica domanda · {competency}",
     "textEnRequired": "La domanda in inglese è obbligatoria.",
     "loadError": "Non è stato possibile caricare le domande.",
-    "removeError": "Non è stato possibile rimuovere la domanda."
+    "removeError": "Non è stato possibile rimuovere la domanda.",
+    "atCap": "Al massimo {max} per competenza. Rimuovine una per aggiungerne un’altra.",
+    "serverError": {
+      "text_required": "Scrivi il testo della domanda.",
+      "text_invalid": "Il testo della domanda non è valido.",
+      "text_en_required": "Il testo in inglese è obbligatorio.",
+      "text_en_invalid": "Il testo in inglese non è valido.",
+      "text_en_too_long": "Il testo in inglese è troppo lungo.",
+      "text_it_invalid": "Il testo in italiano non è valido.",
+      "text_it_too_long": "Il testo in italiano è troppo lungo.",
+      "competency_required": "Scegli una competenza.",
+      "competency_invalid": "Quella competenza non appartiene a questo progetto.",
+      "ids_required": "Invia l'elenco completo delle domande da riordinare.",
+      "ids_invalid": "Il payload di riordinamento non è valido."
+    }
   },
   "superadmin": {
     "switchClient": "Cliente visualizzato",

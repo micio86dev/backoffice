@@ -359,8 +359,50 @@
         "competencies": "The competencies this interview covers. More competencies means a longer interview for the candidate."
       },
       "serverError": {
-        "POTENTIAL_CATALOG_INCOMPLETE": "The catalogue for a potential assessment is incomplete: the MTG and LAT competencies are missing. A potential project cannot be created until they are loaded."
-      }
+        "POTENTIAL_CATALOG_INCOMPLETE": "The catalogue for a potential assessment is incomplete: the MTG and LAT competencies are missing. A potential project cannot be created until they are loaded.",
+        "assessment_type_required": "Choose an assessment type.",
+        "assessment_type_invalid": "That assessment type is not valid.",
+        "avatar_template_required": "Choose an avatar template.",
+        "avatar_template_invalid": "That avatar template is not available.",
+        "competencies_invalid": "The competency selection is not valid.",
+        "competencies_duplicated": "A competency was selected twice.",
+        "competency_unknown": "One of the selected competencies does not exist.",
+        "deadline_invalid": "The deadline is not a valid date.",
+        "goes_live_invalid": "The go-live date is not valid.",
+        "error_redirect_url_invalid": "The error redirect address is not a valid URL.",
+        "error_redirect_url_too_long": "The error redirect address is too long.",
+        "exit_redirect_url_invalid": "The exit redirect address is not a valid URL.",
+        "exit_redirect_url_too_long": "The exit redirect address is too long.",
+        "framework_version_required": "Choose a framework version.",
+        "framework_version_invalid": "That framework version is not available.",
+        "framework_version_immutable": "The framework version cannot be changed after the project is created.",
+        "language_required": "Choose a language.",
+        "language_invalid": "That language is not supported.",
+        "name_required": "Give the project a name.",
+        "name_invalid": "The project name is not valid.",
+        "name_too_long": "The project name is too long.",
+        "nudge_min_chars_invalid": "The nudge threshold is out of range.",
+        "pause_every_n_invalid": "The pause interval is out of range.",
+        "role_invalid": "Choose one of the five roles.",
+        "role_code_immutable": "The role cannot be changed once the project is live.",
+        "role_code_must_be_null": "A potential assessment has no role.",
+        "assessment_type_immutable": "The assessment type cannot be changed once the project is live.",
+        "status_transition_forbidden": "That status change is not allowed.",
+        "project_not_found": "This project no longer exists.",
+        "slug_required": "Give the project a slug.",
+        "slug_invalid": "The slug may contain only lowercase letters, numbers and hyphens.",
+        "slug_too_long": "The slug is too long.",
+        "slug_taken": "Another project already uses this slug.",
+        "status_invalid": "That status is not valid.",
+        "webhook_event_unknown": "One of the selected events is not recognised.",
+        "webhook_events_invalid": "The event selection is not valid.",
+        "webhook_secret_invalid": "The webhook secret is not valid.",
+        "webhook_secret_too_long": "The webhook secret is too long.",
+        "webhook_url_invalid": "The webhook URL is not a valid URL.",
+        "webhook_url_too_long": "The webhook URL is too long."
+      },
+      "competenciesLoadError": "The competency list could not be loaded. Please try again.",
+      "templatesLoadError": "The avatar template list could not be loaded. Please try again."
     },
     "secret": {
       "notSet": "No secret configured.",
@@ -378,6 +420,15 @@
     "avatarProvider": {
       "heygen": "HeyGen",
       "tavus": "Tavus"
+    },
+    "delete": {
+      "title": "Delete this project",
+      "description": "The project is hidden from every list. Its participants, transcripts and evaluations are kept.",
+      "action": "Delete project",
+      "confirmTitle": "Delete this project?",
+      "confirmDescription": "It disappears from every list in the backoffice. Participants, transcripts and evaluations are kept, but nothing will link to them any more.",
+      "error": "The project could not be deleted. Please try again.",
+      "stillActive": "Archive the project before deleting it."
     }
   },
   "report": {
@@ -491,6 +542,10 @@
       "saveError": "The organization profile could not be saved. Please review the highlighted fields.",
       "help": {
         "name": "The display name of your organization. The slug above is the identifier the system uses and does not change with it."
+      },
+      "serverError": {
+        "name_invalid": "The organization name is not valid.",
+        "name_too_long": "The organization name is too long."
       }
     },
     "webhooks": {
@@ -504,7 +559,16 @@
       "note": "These defaults are copied onto a new project only at the moment it is created; changing them never retargets an existing project's live webhook.",
       "help": {
         "url": "The address BEAI posts progress and evaluation events to. It must be reachable from the internet and start with http:// or https://."
-      }
+      },
+      "serverError": {
+        "webhook_url_invalid": "The webhook URL is not a valid URL.",
+        "webhook_url_too_long": "The webhook URL is too long.",
+        "webhook_secret_invalid": "The webhook secret is not valid.",
+        "webhook_secret_too_long": "The webhook secret is too long.",
+        "webhook_events_invalid": "The event selection is not valid.",
+        "webhook_event_unknown": "One of the selected events is not recognised."
+      },
+      "urlTooLong": "This address is too long. Use at most 2048 characters."
     },
     "apiKeys": {
       "title": "API keys",
@@ -609,7 +673,10 @@
       "serverError": {
         "logo_invalid_image": "The file is not a valid JPEG or PNG image.",
         "logo_too_large": "The file exceeds the maximum allowed size.",
-        "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed."
+        "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed.",
+        "primary_color_invalid": "Enter a colour as six hexadecimal digits, for example #771AAF.",
+        "logo_required": "Choose a logo to upload.",
+        "logo_upload_failed": "The logo could not be uploaded. Please try again."
       },
       "confirm": {
         "removeLogoTitle": "Remove the logo?",
@@ -645,7 +712,10 @@
     "role": {
       "admin": "Admin",
       "operator": "Operator",
-      "viewer": "Viewer"
+      "viewer": "Viewer",
+      "superadmin": "Super Admin",
+      "none": "No role",
+      "unknown": "Unknown role"
     },
     "state": {
       "active": "Active",
@@ -1209,7 +1279,21 @@
     "editFor": "Edit question · {competency}",
     "textEnRequired": "The English question is required.",
     "loadError": "Could not load the questions.",
-    "removeError": "Could not remove the question."
+    "removeError": "Could not remove the question.",
+    "atCap": "At most {max} per competency. Remove one to add another.",
+    "serverError": {
+      "text_required": "Write the question text.",
+      "text_invalid": "The question text is not valid.",
+      "text_en_required": "The English text is required.",
+      "text_en_invalid": "The English text is not valid.",
+      "text_en_too_long": "The English text is too long.",
+      "text_it_invalid": "The Italian text is not valid.",
+      "text_it_too_long": "The Italian text is too long.",
+      "competency_required": "Choose a competency.",
+      "competency_invalid": "That competency does not belong to this project.",
+      "ids_required": "Send the full list of questions to reorder.",
+      "ids_invalid": "The reordering payload is not valid."
+    }
   },
   "superadmin": {
     "switchClient": "Viewing client",

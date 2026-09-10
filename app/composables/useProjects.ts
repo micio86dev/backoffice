@@ -28,7 +28,10 @@ export type CreateProjectPayload =
  * written post-create, for the lifecycle transition).
  */
 export type UpdateProjectPayload = Partial<Omit<CreateProjectPayload, 'framework_version_id'>> & {
-  status?: 'draft' | 'active' | 'archived'
+  // From the SNAPSHOT, not hand-written: this union is already generated as
+  // `ProjectResource.status`, so a new lifecycle state on the server reaches
+  // this type through codegen instead of waiting for someone to remember.
+  status?: Project['status']
 }
 
 export function useProjects() {
@@ -49,5 +52,20 @@ export function useProjects() {
     return apiFetch<ProjectResponse>(`/projects/${id}`, { method: 'PATCH', body: payload })
   }
 
-  return { listProjects, createProject, updateProject }
+  /**
+   * Soft-delete a project.
+   *
+   * Named `deleteProject(` deliberately: it matches DESTRUCTIVE_CALL_REGEX in
+   * `tests/unit/destructive-action.spec.ts`, which is what forces every call
+   * site to be gated by a ConfirmDialog. Renaming it to dodge that regex
+   * would satisfy the guard and remove the protection.
+   *
+   * The API answers 409 while the project is `active`; `can.delete` on the
+   * resource already carries that half, so the control is not offered there.
+   */
+  async function deleteProject(id: number | string): Promise<void> {
+    await apiFetch<null>(`/projects/${id}`, { method: 'DELETE' })
+  }
+
+  return { listProjects, createProject, updateProject, deleteProject }
 }

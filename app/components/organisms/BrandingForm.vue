@@ -13,9 +13,7 @@
         belongs to the chrome, not to the picker.
       -->
         <Field :data-invalid="Boolean(logoError)">
-          <FieldLabel id="branding-logo-label" for="branding-logo">{{
-            $t('settings.branding.logo')
-          }}</FieldLabel>
+          <FieldLabel for="branding-logo">{{ $t('settings.branding.logo') }}</FieldLabel>
 
           <!--
             One control, shared with the profile photo. `fit="contain"` is the
@@ -89,7 +87,7 @@
               type="button"
               variant="outline"
               data-testid="branding-color-clear"
-              @click="color = ''"
+              @click="clearColor"
             >
               {{ $t('settings.branding.colorClear') }}
             </Button>
@@ -107,9 +105,19 @@
           >
         </Field>
 
-        <Alert v-if="formMessage" variant="destructive" role="alert" data-testid="branding-banner">
-          <AlertDescription>{{ formMessage }}</AlertDescription>
-        </Alert>
+        <!--
+          The SHARED banner, not a hand-rolled Alert. `FormMessage` exists so
+          "which role, which live region, which variant" is answered once —
+          this copy had drifted to `role="alert"` with no live region while
+          the shared one carries both, so two save failures in the same
+          settings surface announced differently.
+        -->
+        <FormMessage
+          v-if="formMessage"
+          kind="error"
+          :text="formMessage"
+          test-id="branding-banner"
+        />
 
         <Button type="submit" :loading="saving" data-testid="branding-submit">
           {{ $t('projects.action.save') }}
@@ -151,7 +159,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/c
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import FormMessage from '@/components/molecules/FormMessage.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import ImageUploadField from '@/components/molecules/ImageUploadField.vue'
 import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
@@ -201,6 +209,18 @@ function describedBy(baseId: string, hasError: boolean): string {
   return [hasError ? `${baseId}-error` : null, `${baseId}-help`]
     .filter((id): id is string => id !== null)
     .join(' ')
+}
+
+/**
+ * Clear IS a fix: an empty colour is the valid "use the product palette"
+ * state. Assigning without revalidating left `colorError` and both controls'
+ * `aria-invalid` reporting a field that had just become valid — and the Clear
+ * button is `v-if="color"`, so it had already vanished, leaving nothing to
+ * press to clear the error it caused.
+ */
+function clearColor(): void {
+  color.value = ''
+  validateColor()
 }
 
 function validateColor(): boolean {
@@ -256,6 +276,11 @@ function onRemoveRequested(): void {
 async function onRemoveLogo(): Promise<void> {
   confirmingRemoval.value = false
   formMessage.value = null
+  // Same as the sibling: a rejected crop leaves `logoError` set, and a
+  // successful removal must not leave an error standing about it. The
+  // no-stored-logo branch of `onRemoveRequested` already clears it — this
+  // destructive path was the one door left open.
+  logoError.value = undefined
   saving.value = true
 
   try {
@@ -326,6 +351,22 @@ async function onSubmit(): Promise<void> {
 
     emit('saved')
   } catch (submitError) {
+    // The rejected crop goes, and BOTH halves of it. The control sets its
+    // preview BEFORE it emits, so leaving the preview shows the refused image
+    // on top of the STORED logo while `logoUrl` still points at the stored
+    // one — and Remove is live, so confirming "the file will be permanently
+    // deleted" would delete a logo the operator can no longer see.
+    //
+    // Clearing only the control is worse than clearing neither: the preview
+    // goes, Remove is `v-if="displayUrl"` so it goes too, and the file stays
+    // queued in `pendingFile` with NOTHING on screen referring to it. The
+    // next save — of the colour alone — silently re-uploads the rejected
+    // image and reports an error about a file the operator cannot see, with
+    // no affordance short of a reload to get rid of it. `onRemoveLogo`
+    // already clears both.
+    pendingFile.value = null
+    logoField.value?.clear()
+
     const unmapped = applyServerFieldErrors(
       submitError,
       { primary_color: 'color', logo: 'logo' } as const,

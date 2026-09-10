@@ -16,6 +16,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../../support/i18n'
 
 const tMock = (key: string, params?: Record<string, unknown>) =>
   params ? `${key} ${JSON.stringify(params)}` : key
@@ -36,6 +37,11 @@ function question(overrides: Record<string, unknown> = {}) {
   }
 }
 
+// `te` must answer from the real locale files: the global stub says true
+// to every key, which would make the assertions below pass on copy nobody
+// wrote.
+vi.stubGlobal('useI18n', () => realI18n())
+
 const fetchQuestions = vi.fn()
 const createQuestion = vi.fn()
 const updateQuestion = vi.fn()
@@ -52,8 +58,14 @@ vi.mock('../../../../app/composables/useProjectQuestions', () => ({
   }),
 }))
 
-async function mountPanel(questions: ReturnType<typeof question>[] = []) {
-  fetchQuestions.mockResolvedValue({ data: questions })
+async function mountPanel(
+  questions: ReturnType<typeof question>[] = [],
+  meta: unknown = { max_questions_per_competency: 4 }
+) {
+  // `meta` too: the panel reads the per-competency cap from it, and a mock
+  // without it left `cap` null — so every assertion about the Add button
+  // passed against a control that could never disable.
+  fetchQuestions.mockResolvedValue({ data: questions, meta })
 
   const { default: ProjectQuestionsPanel } =
     await import('../../../../app/components/organisms/ProjectQuestionsPanel.vue')
@@ -72,10 +84,10 @@ async function mountPanel(questions: ReturnType<typeof question>[] = []) {
 describe('ProjectQuestionsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: tMock }))
-    )
+    // `te` from the REAL locale files. The stub here had only `t`, so
+    // `translateServerCode*` treated the translator as having no `te` at all
+    // and reported a hit for every key — including ones nobody wrote.
+    vi.stubGlobal('useI18n', () => realI18n())
     document.body.innerHTML = ''
   })
 
@@ -265,5 +277,179 @@ describe('ProjectQuestionsPanel', () => {
     await flushPromises()
 
     expect(createQuestion).toHaveBeenCalledWith(5, expect.objectContaining({ competency_id: 22 }))
+  })
+})
+
+describe('the per-competency cap', () => {
+  it('disables Add once the group holds as many questions as the cap allows', async () => {
+    const wrapper = await mountPanel([
+      question({ id: 1, competency_id: 11, position: 0 }),
+      question({ id: 2, competency_id: 11, position: 1 }),
+    ])
+
+    // Cap 2 for this case: mounted with 2 questions in competency 11.
+    expect(
+      (wrapper.get('[data-testid="question-add-22"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
+  })
+
+  it('stops the operator at the cap, and says why', async () => {
+    const filled = [0, 1, 2, 3].map((i) => question({ id: i + 1, competency_id: 11, position: i }))
+
+    const wrapper = await mountPanel(filled)
+
+    const add = wrapper.get('[data-testid="question-add-11"]').element as HTMLButtonElement
+
+    expect(add.disabled).toBe(true)
+    // A control that stops responding and says nothing teaches the operator
+    // the page is broken. The cap is a real limit and it has a number.
+    expect(wrapper.get('[data-testid="question-cap-11"]').text()).toContain(
+      'projectQuestions.atCap'
+    )
+    expect(wrapper.get('[data-testid="question-add-11"]').attributes('aria-describedby')).toBe(
+      'question-cap-11'
+    )
+
+    // The OTHER competency is untouched — the cap is per competency.
+    expect(
+      (wrapper.get('[data-testid="question-add-22"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
+  })
+
+  it('leaves Add enabled when the cap is unknown', async () => {
+    // An unknown limit must never disable the control: the server is still
+    // the enforcement, and a wrongly-disabled button is a feature the
+    // operator simply cannot reach.
+    const filled = [0, 1, 2, 3].map((i) => question({ id: i + 1, competency_id: 11, position: i }))
+
+    // `null`, not `undefined`: passing `undefined` for an optional parameter
+    // triggers its DEFAULT, so the cap would have arrived as 4 and this test
+    // would have asserted the opposite of its own name.
+    const wrapper = await mountPanel(filled, null)
+
+    expect(
+      (wrapper.get('[data-testid="question-add-11"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
+    expect(wrapper.find('[data-testid="question-cap-11"]').exists()).toBe(false)
+    // And the list still rendered: a missing `meta` is not a load failure.
+    expect(wrapper.find('[data-testid="question-row-1"]').exists()).toBe(true)
+  })
+})
+
+describe('what a rejected save says', () => {
+  it('translates a machine code onto the field', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="question-add-11"]').trigger('click')
+    await wrapper.get('[data-testid="question-text-en"]').setValue('A question.')
+
+    createQuestion.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { 'text.en': ['text_en_too_long'] } },
+      })
+    )
+
+    await wrapper.get('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="question-text-error"]').text()).toContain(
+      'projectQuestions.serverError.text_en_too_long'
+    )
+    // And the control points at it, so a user who tabs back learns why — at
+    // an id SCOPED to the competency, because this editor renders inside a
+    // `v-for` and a fixed id would be a `for` that resolves to the wrong
+    // element the day two drafts can be open.
+    const described = wrapper.get('[data-testid="question-text-en"]').attributes('aria-describedby')
+
+    expect(described).toBe('question-en-error-11')
+    expect(wrapper.get('[data-testid="question-text-error"]').attributes('id')).toBe(described)
+  })
+
+  it('never prints server PROSE at the operator', async () => {
+    // The per-competency cap answers with an authored English sentence
+    // composed around a number. Rendering it puts English under an Italian
+    // label — and the operator already has the localized cap sentence beside
+    // the disabled Add button.
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="question-add-11"]').trigger('click')
+    await wrapper.get('[data-testid="question-text-en"]').setValue('A question.')
+
+    createQuestion.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: {
+          errors: {
+            competency_id: ['a standard project allows at most 1 question per competency'],
+          },
+        },
+      })
+    )
+
+    await wrapper.get('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    const error = wrapper.get('[data-testid="question-competency-error"]').text()
+
+    expect(error).not.toContain('at most 1 question per competency')
+    expect(error).toContain('projectQuestions.saveError')
+  })
+})
+
+it('routes a text.it refusal to the Italian field, not the banner', async () => {
+  // It mapped to nothing, fell into `unmapped`, and landed in the panel
+  // banner with no indication of which field it was about.
+  const wrapper = await mountPanel()
+
+  await wrapper.get('[data-testid="question-add-11"]').trigger('click')
+  await wrapper.get('[data-testid="question-text-en"]').setValue('A question.')
+
+  createQuestion.mockRejectedValueOnce(
+    Object.assign(new Error('422'), {
+      status: 422,
+      data: { errors: { 'text.it': ['text_it_too_long'] } },
+    })
+  )
+
+  await wrapper.get('[data-testid="question-editor"]').trigger('submit')
+  await flushPromises()
+
+  expect(wrapper.get('[data-testid="question-text-it-error"]').text()).toContain(
+    'projectQuestions.serverError.text_it_too_long'
+  )
+  expect(wrapper.get('[data-testid="question-text-it"]').attributes('aria-describedby')).toBe(
+    'question-it-error-11'
+  )
+  // And NOT on the English field, which is what a shared mapping would do.
+  expect(wrapper.find('[data-testid="question-text-error"]').exists()).toBe(false)
+
+  // And no banner on top of it: the reason is already under the control, and
+  // "the question could not be saved" would invite a retry that fails
+  // identically.
+  expect(wrapper.find('[data-testid="project-questions-banner"]').exists()).toBe(false)
+})
+
+describe('a failed load', () => {
+  it('reports a 403 as permanent, not as "try again"', async () => {
+    // A 403 is permanent. "Could not load, please try again" invites a retry
+    // that fails identically — the shared mapper already has the right copy
+    // for each state, and this was the one remote read not using it.
+    fetchQuestions.mockReset().mockRejectedValue(Object.assign(new Error('403'), { status: 403 }))
+
+    const { default: ProjectQuestionsPanel } =
+      await import('../../../../app/components/organisms/ProjectQuestionsPanel.vue')
+
+    const wrapper = mount(ProjectQuestionsPanel, {
+      props: { projectId: 5, competencies: COMPETENCIES, locale: 'en' },
+      global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const banner = wrapper.get('[data-testid="project-questions-banner"]').text()
+
+    expect(banner).toContain('forbidden')
+    expect(banner).not.toContain('projectQuestions.loadError')
   })
 })

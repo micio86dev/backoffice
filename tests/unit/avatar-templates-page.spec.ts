@@ -10,6 +10,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { confirmDialog } from './support/confirm'
+import { realI18n } from './support/i18n'
 import { withTooltipProvider } from './support/tooltip-host'
 import { waitFor, waitForTestId } from './support/wait-for'
 
@@ -150,10 +151,14 @@ describe('AvatarTemplatesPage', () => {
     tMock.mockClear()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: tMock, locale: ref('it') }))
-    )
+    // `te` from the REAL locale files. Stubbing only `t` made
+    // `translateServerCode` report a hit for every key, so any assertion on a
+    // translated server code passed whether or not the copy existed.
+    // `t` stays this file's own mock — it renders params, and several
+    // assertions read them. Only `te` comes from the real locale files, which
+    // is the half that was answering true to every key and made any assertion
+    // on a translated server code pass whether or not the copy existed.
+    vi.stubGlobal('useI18n', () => ({ t: tMock, te: realI18n().te, locale: ref('it') }))
   })
 
   // ConfirmDialog renders through reka-ui's AlertDialog, which teleports to
@@ -542,10 +547,14 @@ describe('AvatarTemplatesPage — conversation-LLM forecast', () => {
     tMock.mockClear()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: tMock, locale: ref('it') }))
-    )
+    // `te` from the REAL locale files. Stubbing only `t` made
+    // `translateServerCode` report a hit for every key, so any assertion on a
+    // translated server code passed whether or not the copy existed.
+    // `t` stays this file's own mock — it renders params, and several
+    // assertions read them. Only `te` comes from the real locale files, which
+    // is the half that was answering true to every key and made any assertion
+    // on a translated server code pass whether or not the copy existed.
+    vi.stubGlobal('useI18n', () => ({ t: tMock, te: realI18n().te, locale: ref('it') }))
   })
 
   afterEach(() => {
@@ -605,10 +614,14 @@ describe('AvatarTemplatesPage — deactivation', () => {
     tMock.mockClear()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: tMock, locale: ref('it') }))
-    )
+    // `te` from the REAL locale files. Stubbing only `t` made
+    // `translateServerCode` report a hit for every key, so any assertion on a
+    // translated server code passed whether or not the copy existed.
+    // `t` stays this file's own mock — it renders params, and several
+    // assertions read them. Only `te` comes from the real locale files, which
+    // is the half that was answering true to every key and made any assertion
+    // on a translated server code pass whether or not the copy existed.
+    vi.stubGlobal('useI18n', () => ({ t: tMock, te: realI18n().te, locale: ref('it') }))
   })
 
   /**
@@ -750,10 +763,14 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
     tMock.mockClear()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
-    vi.stubGlobal(
-      'useI18n',
-      vi.fn(() => ({ t: tMock, locale: ref('it') }))
-    )
+    // `te` from the REAL locale files. Stubbing only `t` made
+    // `translateServerCode` report a hit for every key, so any assertion on a
+    // translated server code passed whether or not the copy existed.
+    // `t` stays this file's own mock — it renders params, and several
+    // assertions read them. Only `te` comes from the real locale files, which
+    // is the half that was answering true to every key and made any assertion
+    // on a translated server code pass whether or not the copy existed.
+    vi.stubGlobal('useI18n', () => ({ t: tMock, te: realI18n().te, locale: ref('it') }))
   })
 
   afterEach(() => {

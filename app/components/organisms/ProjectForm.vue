@@ -166,7 +166,7 @@
           </FieldDescription>
         </Field>
 
-        <Field>
+        <Field :data-invalid="Boolean(errors.frameworkVersionId)">
           <FieldLabel for="project-form-framework-version">
             {{ $t('projects.form.frameworkVersion') }}
           </FieldLabel>
@@ -177,15 +177,47 @@
             min="1"
             autocomplete="off"
             :disabled="isEditing"
+            :aria-invalid="Boolean(errors.frameworkVersionId)"
+            :aria-describedby="
+              describedBy('project-form-framework-version', Boolean(errors.frameworkVersionId))
+            "
             data-testid="project-form-framework-version"
+            @blur="validateFrameworkVersion"
           />
-          <FieldDescription>{{ $t('projects.form.frameworkVersionImmutable') }}</FieldDescription>
+          <!--
+            The help text was rendered and never referenced, so a
+            screen-reader user was never told the field is immutable — every
+            other field in this form wires `describedBy`, and this one call
+            site was skipped.
+          -->
+          <FieldDescription id="project-form-framework-version-help">{{
+            $t('projects.form.frameworkVersionImmutable')
+          }}</FieldDescription>
+          <FieldError
+            v-if="errors.frameworkVersionId"
+            id="project-form-framework-version-error"
+            data-testid="project-form-framework-version-error"
+            >{{ errors.frameworkVersionId }}</FieldError
+          >
         </Field>
 
         <CompetencyPicker
           v-model="competencyIds"
           :options="competencyOptions"
           :persisted-ids="persistedIds"
+        />
+
+        <!--
+          A failed load says so. The picker's own empty state reads "no
+          competencies available for this selection" — a claim about the
+          catalogue that a failed request cannot support, and one that would
+          send the operator changing the role to find the list they lost.
+        -->
+        <FormMessage
+          v-if="optionsError"
+          kind="error"
+          :text="$t('projects.form.competenciesLoadError')"
+          test-id="project-form-competencies-error"
         />
 
         <Field :data-invalid="Boolean(errors.pauseEveryNCompetencies)">
@@ -292,6 +324,19 @@
           >
             {{ errors.avatarTemplateId }}
           </FieldError>
+
+          <!--
+            A failed load, stated. The list is REQUIRED and now empty, so
+            without this the only thing on screen was "choose an avatar
+            template" under a control with nothing to choose — a network
+            failure reported as the operator's mistake.
+          -->
+          <FormMessage
+            v-if="templatesError"
+            kind="error"
+            :text="$t('projects.form.templatesLoadError')"
+            test-id="project-form-templates-error"
+          />
         </Field>
 
         <Field :data-invalid="Boolean(errors.exitRedirectUrl)">
@@ -464,7 +509,7 @@ import {
   PROJECT_FIELD_BOUNDS,
 } from '@/utils/project-field-specs'
 import { applyServerFieldErrors, serverErrorCode } from '@/utils/http-error'
-import { translateServerCode } from '@/utils/server-message'
+import { translateServerCodeOrFallback } from '@/utils/server-message'
 
 const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
 
@@ -472,16 +517,6 @@ const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
 // now serves the competency `id` alongside `code`/`name`, which is what
 // `StoreProjectRequest.competency_ids` validates against. It did not when D9
 // was written, and the gap made every competency selection a no-op.
-// `barsAvailable: null` explicitly, not omitted — D2's tri-state: the
-// coverage question does not APPLY to potential-assessment competencies
-// (they are not role-anchored), which is a different fact than "not yet
-// covered" (`false`). CompetencyOption.barsAvailable is required, so this
-// site has to state that reason rather than being allowed to skip it.
-const POTENTIAL_COMPETENCIES: CompetencyOption[] = [{ code: 'MTG' }, { code: 'LAT' }].map((c) => ({
-  ...c,
-  name: c.code,
-  barsAvailable: null,
-}))
 
 const props = defineProps<{
   project: Project | null
@@ -489,6 +524,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'saved'): void
+  /**
+   * The competencies currently TICKED, not the ones last saved.
+   *
+   * The questions panel below this form groups by competency, and it was fed
+   * `project.competencies` — the persisted set. So ticking a competency
+   * showed nowhere to write its first question until the operator saved and
+   * reopened the drawer, and unticking one left its group standing with its
+   * questions still editable.
+   */
+  (e: 'update:competencies', value: { id: number; code: string }[]): void
   /**
    * feature/form-drawer. This form owns its own persistence (and therefore its
    * own in-flight flag), but the submit control it belongs to now lives in the
@@ -514,7 +559,7 @@ const emit = defineEmits<{
 type AvatarTemplateOption = TemplateOption
 
 const { createProject, updateProject } = useProjects()
-const { fetchRoleCompetencies } = useFrameworkRoles()
+const { fetchRoleCompetencies, fetchPotentialCompetencies } = useFrameworkRoles()
 const { listTemplateOptions } = useAvatarTemplates()
 
 const isEditing = computed(() => props.project !== null)
@@ -563,9 +608,63 @@ const errors = ref<{
   exitRedirectUrl?: string
   webhookUrl?: string
   avatarTemplateId?: string
+  frameworkVersionId?: string
 }>({})
 
 const competencyOptions = ref<CompetencyOption[]>([])
+
+/**
+ * Whether the options have been RESOLVED at least once.
+ *
+ * The `update:competencies` watcher resolves ids through the options, and
+ * they are loaded in `onMounted` — so the first emit was always `[]`, for
+ * every project, and the questions panel below rendered "this project has no
+ * competencies yet" about a fully configured one until the fetch landed.
+ * Holding the first emit until the options exist is what makes the page's
+ * fallback to the persisted set meaningful.
+ */
+const optionsLoaded = ref(false)
+
+/** A failed load is not an empty catalogue — see `loadCompetencyOptions`. */
+const optionsError = ref(false)
+
+/** The same, for the avatar template list — which is REQUIRED, so an empty
+ * one blocks creation and has to say why. */
+const templatesError = ref(false)
+
+/**
+ * Resolved against the OPTIONS, so the panel gets codes and not bare ids.
+ *
+ * `immediate`, because the drawer opens on an existing project whose ticked
+ * set is already populated — waiting for a change would show no groups at all
+ * until the operator touched something.
+ */
+watch(
+  [competencyIds, competencyOptions, optionsLoaded],
+  () => {
+    // Nothing to publish until the options are known: emitting `[]` before
+    // they load tells the panel this project has no competencies.
+    if (!optionsLoaded.value) return
+
+    // `CompetencyOption.id` is optional — the `potential` path builds MTG/LAT
+    // locally without one — and an option with no id cannot be selected at
+    // all, so it can never appear here. Narrowing rather than asserting.
+    const byId = new Map(
+      competencyOptions.value
+        .filter((option): option is CompetencyOption & { id: number } => option.id !== undefined)
+        .map((option) => [option.id, option])
+    )
+
+    emit(
+      'update:competencies',
+      competencyIds.value
+        .map((id) => byId.get(id))
+        .filter((option) => option !== undefined)
+        .map((option) => ({ id: option.id, code: option.code }))
+    )
+  },
+  { immediate: true, deep: true }
+)
 
 /**
  * Joins a field's error id (when invalid) with its help-text id (form-clarity-
@@ -606,6 +705,35 @@ const nextTransition = computed<'active' | 'archived' | null>(() => {
   if (props.project?.status === 'active') return 'archived'
   return null
 })
+
+/**
+ * The pin is required on create, and nothing checked it.
+ *
+ * `frameworkVersionId` starts as `''`, and `Number('')` is `0` — so a blank
+ * required field shipped as a valid-looking integer, the server refused it,
+ * and the refusal landed in the banner because the field had no mapping.
+ * "Could not save", nothing highlighted, for a field the operator can see
+ * they left empty.
+ *
+ * Only on CREATE: the control is disabled while editing, and the value is
+ * whatever the project was pinned to.
+ */
+function validateFrameworkVersion(): boolean {
+  if (isEditing.value) {
+    errors.value.frameworkVersionId = undefined
+
+    return true
+  }
+
+  const value = Number(frameworkVersionId.value)
+
+  errors.value.frameworkVersionId =
+    frameworkVersionId.value !== '' && Number.isInteger(value) && value > 0
+      ? undefined
+      : t('projects.form.serverError.framework_version_required')
+
+  return errors.value.frameworkVersionId === undefined
+}
 
 function validateName(): boolean {
   if (name.value.trim() === '') errors.value.name = missingKey('nameRequired')
@@ -688,16 +816,29 @@ function onAssessmentTypeChange(value: unknown): void {
 }
 
 async function loadCompetencyOptions(): Promise<void> {
-  if (assessmentType.value === 'potential') {
-    competencyOptions.value = POTENTIAL_COMPETENCIES
-    return
-  }
-  if (!roleCode.value) {
+  // Cleared BEFORE the guard. Below it, switching from a failed `potential`
+  // load back to `standard` returns early — no role is selected yet — and
+  // left "the competencies could not be loaded" on screen about a state
+  // where no request was made and none should have been.
+  optionsError.value = false
+
+  if (!roleCode.value && assessmentType.value !== 'potential') {
     competencyOptions.value = []
+    optionsLoaded.value = true
     return
   }
+
   try {
-    const response = await fetchRoleCompetencies(roleCode.value)
+    // FROM THE CATALOGUE, both branches. The potential pair used to be built
+    // here from two hardcoded codes with no `id`, and `CompetencyPicker`
+    // returns early on a click when an option has none — so both boxes
+    // rendered, neither could be ticked, and an already-persisted selection
+    // rendered unchecked. A `potential` project was unconfigurable.
+    const response =
+      assessmentType.value === 'potential'
+        ? await fetchPotentialCompetencies()
+        : await fetchRoleCompetencies(roleCode.value)
+
     competencyOptions.value = response.data.map((competency) => ({
       // Carried through because `StoreProjectRequest.competency_ids` validates
       // integer primary keys. Dropping it made `CompetencyPicker.toggle()`
@@ -720,7 +861,13 @@ async function loadCompetencyOptions(): Promise<void> {
       barsAvailable: competency.bars_available,
     }))
   } catch {
+    // NOT an empty list. "No competencies available for this selection" is a
+    // claim about the catalogue, and a failed request supports no claim about
+    // it — the same D4 discipline the projects page states for its own list.
     competencyOptions.value = []
+    optionsError.value = true
+  } finally {
+    optionsLoaded.value = true
   }
 }
 
@@ -745,6 +892,10 @@ async function loadCompetencyOptions(): Promise<void> {
  * it could not place, and the banner shows it.
  */
 const SERVER_FIELD_TO_ERROR_KEY = {
+  // It HAS a control of its own, which is what this table is for. Leaving it
+  // out sent every refusal about the framework pin to the banner, so a blank
+  // required field came back as "could not save" with nothing highlighted.
+  framework_version_id: 'frameworkVersionId',
   name: 'name',
   slug: 'slug',
   role_code: 'roleCode',
@@ -760,7 +911,17 @@ function applyServerErrors(error: unknown): void {
   // belong to the same control as their parent — `applyServerFieldErrors`
   // splits at the first `.` so they still land here.
   const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
-    errors.value[key] = message
+    // NEVER the wire value. The endpoints answer with machine codes, and the
+    // handful of composition refusals that stay authored sentences are
+    // English — so assigning `message` put "The name has already been taken."
+    // into an Italian field error. Six sibling organisms already route
+    // through this; the longest form in the product was the one that did not.
+    errors.value[key] = translateServerCodeOrFallback(
+      { t, te },
+      'projects.form.serverError',
+      message,
+      'projects.form.saveError'
+    )
   })
 
   if (unmapped === null) {
@@ -775,8 +936,18 @@ function applyServerErrors(error: unknown): void {
 
     formMessage.value = {
       kind: 'error',
+      // The same guard the two paths below use. `translateServerCode` falls
+      // back to the RAW CODE by design — a fine module-level safety net, and
+      // the wrong answer here, where it is the only path in this function
+      // that can put `POTENTIAL_CATALOG_INCOMPLETE` in front of an Italian
+      // operator while every sibling path is protected.
       text: code
-        ? translateServerCode({ t, te }, 'projects.form.serverError', code)
+        ? translateServerCodeOrFallback(
+            { t, te },
+            'projects.form.serverError',
+            code,
+            'projects.form.saveError'
+          )
         : t('projects.form.saveError'),
     }
 
@@ -786,10 +957,29 @@ function applyServerErrors(error: unknown): void {
   // A field with no control of its own (framework_version_id, status,
   // webhook_secret, competency_ids) still has to reach the operator — showing
   // the server's own message beats a generic banner that hides it.
-  formMessage.value = {
-    kind: 'error',
-    text: unmapped.length > 0 ? unmapped.join(' ') : t('projects.form.saveError'),
-  }
+  const mapped = Object.values(errors.value).some((value) => value !== undefined)
+
+  formMessage.value =
+    unmapped.length > 0
+      ? {
+          kind: 'error',
+          text: unmapped
+            .map((value) =>
+              translateServerCodeOrFallback(
+                { t, te },
+                'projects.form.serverError',
+                value,
+                'projects.form.saveError'
+              )
+            )
+            .join(' '),
+        }
+      : mapped
+        ? // The reason is already under the control. "Review the highlighted
+          // fields" on top of it adds nothing and invites a retry that fails
+          // identically.
+          null
+        : { kind: 'error', text: t('projects.form.saveError') }
 }
 
 async function onSubmit(): Promise<void> {
@@ -803,8 +993,10 @@ async function onSubmit(): Promise<void> {
   const exitUrlOk = validateExitRedirectUrl()
   const webhookUrlOk = validateWebhookUrl()
   const templateOk = validateAvatarTemplate()
+  const frameworkOk = validateFrameworkVersion()
 
   if (
+    !frameworkOk ||
     !nameOk ||
     !slugOk ||
     !roleOk ||
@@ -875,6 +1067,15 @@ async function onSubmit(): Promise<void> {
 
 async function onTransition(status: 'active' | 'archived'): Promise<void> {
   if (!props.project) return
+
+  // Cleared, exactly as `onSubmit` does. `applyServerErrors` suppresses the
+  // banner when a field error was mapped — so a transition refused with an
+  // empty `errors: {}` would find a PREVIOUS submit's stale field error still
+  // set, decide the operator already has their reason, and archive would fail
+  // in silence.
+  formMessage.value = null
+  errors.value = {}
+
   saving.value = true
   try {
     await updateProject(props.project.id, { status })
@@ -924,7 +1125,14 @@ async function loadAvatarTemplates(): Promise<void> {
     avatarTemplates.value = response.data
     applyDefaultTemplate()
   } catch {
+    // SAY IT. The list is required and now empty, so the only thing the
+    // operator saw was "choose an avatar template" under a control with
+    // nothing in it — a network failure reported as their mistake. The
+    // docblock above already promised to "say it plainly rather than the
+    // reverse"; nothing on screen did. `loadCompetencyOptions` twenty lines
+    // down has done this correctly all along.
     avatarTemplates.value = []
+    templatesError.value = true
   }
 }
 

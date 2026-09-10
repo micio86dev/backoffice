@@ -7,15 +7,23 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { realI18n } from '../../support/i18n'
 import { confirmDialog } from '../../support/confirm'
 import { waitFor } from '../../support/wait-for'
 import CompetencyPicker from '../../../../app/components/molecules/CompetencyPicker.vue'
 
 const tMock = (key: string) => key
 
+// `te` from the REAL locale files. The global setup stubs it as
+// `() => true`, which reports a hit for every key — so a code with no
+// copy would render as its own name and every assertion below would
+// still pass.
+vi.stubGlobal('useI18n', () => realI18n())
+
 const createProjectMock = vi.fn()
 const updateProjectMock = vi.fn()
 const fetchRoleCompetenciesMock = vi.fn()
+const fetchPotentialCompetenciesMock = vi.fn()
 const listTemplatesMock = vi.fn()
 
 vi.mock('../../../../app/composables/useProjects', () => ({
@@ -23,7 +31,10 @@ vi.mock('../../../../app/composables/useProjects', () => ({
 }))
 
 vi.mock('../../../../app/composables/useFrameworkRoles', () => ({
-  useFrameworkRoles: () => ({ fetchRoleCompetencies: fetchRoleCompetenciesMock }),
+  useFrameworkRoles: () => ({
+    fetchRoleCompetencies: fetchRoleCompetenciesMock,
+    fetchPotentialCompetencies: fetchPotentialCompetenciesMock,
+  }),
 }))
 
 vi.mock('../../../../app/composables/useAvatarTemplates', () => ({
@@ -64,12 +75,149 @@ describe('ProjectForm', () => {
     createProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     updateProjectMock.mockReset().mockResolvedValue({ data: activeProject() })
     fetchRoleCompetenciesMock.mockReset().mockResolvedValue({ data: [] })
+    fetchPotentialCompetenciesMock.mockReset().mockResolvedValue({
+      data: [
+        { id: 91, code: 'MTG', name: 'Motivation', bars_available: false },
+        { id: 92, code: 'LAT', name: 'Learning agility', bars_available: false },
+      ],
+    })
     // At least one template, ALWAYS. A project cannot exist without one —
     // the column is NOT NULL and the form refuses a submit with nothing
     // selected — so an empty list is not a state any of these tests are about;
     // it would just make every submit assertion fail for an unrelated reason.
     listTemplatesMock.mockReset().mockResolvedValue({
       data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
+    })
+  })
+
+  describe('the framework pin is a required field with a control', () => {
+    it('refuses a blank pin on create, on the FIELD', async () => {
+      // `frameworkVersionId` starts as `''` and `Number('')` is `0`, so a blank
+      // required field shipped as a valid-looking integer. The server refused
+      // it, the key was excluded from the field map, and the refusal collapsed
+      // to "could not save" with nothing highlighted.
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+      await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+      await wrapper
+        .get('[data-testid="project-form-assessment-type"] button:last-child')
+        .trigger('click')
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+
+      expect(createProjectMock).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="project-form-framework-version-error"]').exists()).toBe(
+        true
+      )
+      expect(
+        wrapper.get('[data-testid="project-form-framework-version"]').attributes('aria-invalid')
+      ).toBe('true')
+    })
+
+    it('references its own help text, so the immutability is announced', async () => {
+      // Every other field wires `describedBy`; this one call site was skipped,
+      // so a screen-reader user was never told the field cannot be changed.
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        wrapper.get('[data-testid="project-form-framework-version"]').attributes('aria-describedby')
+      ).toContain('project-form-framework-version-help')
+    })
+
+    it('says a failed avatar-template load FAILED', async () => {
+      // The list is required and now empty, so the only thing on screen was
+      // "choose an avatar template" under a control with nothing to choose — a
+      // network failure reported as the operator's mistake.
+      listTemplatesMock.mockReset().mockRejectedValue(new Error('network down'))
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="project-form-templates-error"]').text()).toContain(
+        'projects.form.templatesLoadError'
+      )
+    })
+  })
+
+  describe('the form-level refusal code', () => {
+    it('translates POTENTIAL_CATALOG_INCOMPLETE rather than printing the token', async () => {
+      // The one 422 no control on this form can fix, and the only path here
+      // that could still put a raw machine token in front of an operator.
+      // It is UPPER_SNAKE, which a lowercase-only token guard would have
+      // discarded — replacing the message that says what actually went wrong
+      // with the generic one.
+      createProjectMock.mockRejectedValue(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { message: 'x', code: 'POTENTIAL_CATALOG_INCOMPLETE' },
+        })
+      )
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+      await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+      await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
+      await wrapper
+        .get('[data-testid="project-form-assessment-type"] button:last-child')
+        .trigger('click')
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+
+      const banner = wrapper.get('[data-testid="project-form-banner"]').text()
+
+      expect(banner).toContain('projects.form.serverError.POTENTIAL_CATALOG_INCOMPLETE')
+      expect(banner).not.toBe('POTENTIAL_CATALOG_INCOMPLETE')
+    })
+  })
+
+  describe('a failed lifecycle transition', () => {
+    it('shows the banner even when a previous submit left a field error behind', async () => {
+      // `applyServerErrors` suppresses the banner when a field error was
+      // mapped. A transition refused with an empty `errors: {}` would find
+      // the PREVIOUS submit's stale field error still set, decide the
+      // operator already has their reason, and fail in silence.
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ status: 'draft' }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      updateProjectMock.mockReset().mockRejectedValueOnce(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { name: ['name_too_long'] } },
+        })
+      )
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="project-form-name-error"]').exists()).toBe(true)
+
+      updateProjectMock
+        .mockReset()
+        .mockRejectedValueOnce(
+          Object.assign(new Error('422'), { status: 422, data: { errors: {} } })
+        )
+      await wrapper.get('[data-testid="project-form-transition-activate"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="project-form-banner"]').exists()).toBe(true)
     })
   })
 
@@ -274,10 +422,14 @@ describe('ProjectForm', () => {
   })
 
   it('renders a role="alert" banner adjacent to the submit CTA on a failed save, not at the top of the form', async () => {
+    // A field this form renders NO control for, so the banner is the only
+    // place the refusal can go. A payload keyed on `name` maps to a control
+    // and the banner is deliberately suppressed — the reason is already
+    // under the field, and repeating it invites a retry that fails the same.
     createProjectMock.mockRejectedValue(
       Object.assign(new Error('Unprocessable'), {
         status: 422,
-        data: { errors: { name: ['The name has already been taken.'] } },
+        data: { errors: { status: ['status_invalid'] } },
       })
     )
 
@@ -289,6 +441,10 @@ describe('ProjectForm', () => {
 
     await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
     await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    // REQUIRED on create. It used to ship as `Number('') === 0` and be
+    // refused by the server; the form refuses it now, so every create path
+    // has to fill it.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
     // Switch to `potential` (a real ToggleGroupItem button click) so the test
     // is not also incidentally exercising the `role_code`-required-for-
     // `standard` validation — that path is covered by its own test.
@@ -318,7 +474,7 @@ describe('ProjectForm', () => {
     createProjectMock.mockRejectedValue(
       Object.assign(new Error('Unprocessable'), {
         status: 422,
-        data: { errors: { name: ['The name has already been taken.'] } },
+        data: { errors: { name: ['name_too_long'] } },
       })
     )
 
@@ -330,6 +486,10 @@ describe('ProjectForm', () => {
 
     await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
     await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    // REQUIRED on create. It used to ship as `Number('') === 0` and be
+    // refused by the server; the form refuses it now, so every create path
+    // has to fill it.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
     // Switch to `potential` (a real ToggleGroupItem button click) so the test
     // is not also incidentally exercising the `role_code`-required-for-
     // `standard` validation — that path is covered by its own test.
@@ -340,7 +500,7 @@ describe('ProjectForm', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="project-form-name-error"]').text()).toBe(
-      'The name has already been taken.'
+      'projects.form.serverError.name_too_long'
     )
   })
 
@@ -353,7 +513,7 @@ describe('ProjectForm', () => {
     createProjectMock.mockRejectedValue(
       Object.assign(new Error('Unprocessable'), {
         status: 422,
-        data: { errors: { avatar_template_id: ['The selected template is invalid.'] } },
+        data: { errors: { avatar_template_id: ['avatar_template_invalid'] } },
       })
     )
 
@@ -365,6 +525,10 @@ describe('ProjectForm', () => {
 
     await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
     await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    // REQUIRED on create. It used to ship as `Number('') === 0` and be
+    // refused by the server; the form refuses it now, so every create path
+    // has to fill it.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
     await wrapper
       .get('[data-testid="project-form-assessment-type"] button:last-child')
       .trigger('click')
@@ -372,7 +536,7 @@ describe('ProjectForm', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="project-form-avatar-template-error"]').text()).toBe(
-      'The selected template is invalid.'
+      'projects.form.serverError.avatar_template_invalid'
     )
   })
 
@@ -385,6 +549,10 @@ describe('ProjectForm', () => {
 
     await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
     await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    // REQUIRED on create. It used to ship as `Number('') === 0` and be
+    // refused by the server; the form refuses it now, so every create path
+    // has to fill it.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
     // Switch to `potential` (a real ToggleGroupItem button click) so the test
     // is not also incidentally exercising the `role_code`-required-for-
     // `standard` validation — that path is covered by its own test.
@@ -491,7 +659,7 @@ describe('ProjectForm', () => {
     updateProjectMock.mockRejectedValueOnce(
       Object.assign(new Error('422'), {
         status: 422,
-        data: { errors: { [serverField]: ['Server says no.'] } },
+        data: { errors: { [serverField]: ['name_invalid'] } },
       })
     )
 
@@ -504,7 +672,11 @@ describe('ProjectForm', () => {
     await wrapper.get('[data-testid="project-form"]').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get(`[data-testid="${errorTestId}"]`).text()).toContain('Server says no.')
+    // A CODE, translated. The endpoints answer with codes, and asserting
+    // the wire value here is what let the raw English ship.
+    expect(wrapper.get(`[data-testid="${errorTestId}"]`).text()).toContain(
+      'projects.form.serverError.name_invalid'
+    )
   })
 
   // A field with no control of its own must still reach the operator rather
@@ -513,7 +685,11 @@ describe('ProjectForm', () => {
     updateProjectMock.mockRejectedValueOnce(
       Object.assign(new Error('422'), {
         status: 422,
-        data: { errors: { framework_version_id: ['That framework version is retired.'] } },
+        // `webhook_secret`: write-only, and this form renders no error slot
+        // for it. `framework_version_id` used to be the example here and is
+        // no longer control-less — it has a validator and a field error now,
+        // which is the point of this change.
+        data: { errors: { webhook_secret: ['webhook_secret_too_long'] } },
       })
     )
 
@@ -527,7 +703,7 @@ describe('ProjectForm', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="project-form-banner"]').text()).toContain(
-      'That framework version is retired.'
+      'projects.form.serverError.webhook_secret_too_long'
     )
   })
 })
@@ -798,6 +974,10 @@ describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-
 
     await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
     await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    // REQUIRED on create. It used to ship as `Number('') === 0` and be
+    // refused by the server; the form refuses it now, so every create path
+    // has to fill it.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
     await wrapper
       .get('[data-testid="project-form-assessment-type"] button:last-child')
       .trigger('click')
@@ -807,6 +987,95 @@ describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-
     expect(createProjectMock).toHaveBeenCalled()
     const [payload] = createProjectMock.mock.calls[0] as [Record<string, unknown>]
     expect(payload.competency_ids).toEqual([])
+  })
+
+  it('can actually TICK a potential competency, which it could not before', async () => {
+    // The options were built locally from two hardcoded codes with no `id`,
+    // and `CompetencyPicker.toggle()` returns early without one: both boxes
+    // rendered, neither responded, and a persisted selection rendered
+    // unchecked. `potential` is a first-class assessment type and it was
+    // unconfigurable. The case above asserts `[]` and never ticks a box —
+    // a snapshot of that bug, not evidence against it.
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+    await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    // REQUIRED on create. It used to ship as `Number('') === 0` and be
+    // refused by the server; the form refuses it now, so every create path
+    // has to fill it.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
+    await wrapper
+      .get('[data-testid="project-form-assessment-type"] button:last-child')
+      .trigger('click')
+    await flushPromises()
+
+    // Sourced from the catalogue, so each option carries the id the picker
+    // needs — and the picker is what decides whether a click does anything.
+    expect(fetchPotentialCompetenciesMock).toHaveBeenCalled()
+    expect(wrapper.findComponent(CompetencyPicker).props('options')).toEqual([
+      { id: 91, code: 'MTG', name: 'Motivation', barsAvailable: false },
+      { id: 92, code: 'LAT', name: 'Learning agility', barsAvailable: false },
+    ])
+
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [91])
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    const [payload] = createProjectMock.mock.calls.at(-1) as [Record<string, unknown>]
+    expect(payload.competency_ids).toEqual([91])
+  })
+
+  it('says a failed catalogue load FAILED, rather than showing an empty list', async () => {
+    // "No competencies available for this selection" is a claim about the
+    // catalogue, and a failed request supports no claim about it — it would
+    // send the operator changing the role to find the list they lost.
+    fetchRoleCompetenciesMock.mockReset().mockRejectedValue(new Error('network down'))
+
+    const wrapper = mount(ProjectForm, {
+      props: { project: activeProject({ status: 'draft', role_code: 'ICO' }) },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-form-competencies-error"]').text()).toContain(
+      'projects.form.competenciesLoadError'
+    )
+  })
+
+  it('publishes NOTHING until the options have resolved', async () => {
+    // The watcher resolves ids through the options, which load in
+    // `onMounted` — so the first emit was always `[]`, for every project, and
+    // the questions panel rendered "this project has no competencies yet"
+    // about a fully configured one until the fetch landed.
+    let resolveOptions: (value: unknown) => void = () => {}
+    fetchRoleCompetenciesMock.mockReset().mockReturnValue(
+      new Promise((resolve) => {
+        resolveOptions = resolve
+      })
+    )
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          role_code: 'ICO',
+          competencies: [{ id: 7, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:competencies')).toBeUndefined()
+
+    resolveOptions({ data: [{ id: 7, code: 'COL', name: 'Collaboration', bars_available: true }] })
+    await flushPromises()
+
+    expect(wrapper.emitted('update:competencies')?.at(-1)?.[0]).toEqual([{ id: 7, code: 'COL' }])
   })
 })
 
@@ -960,7 +1229,12 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       // resolved value it was given at module level still has to stand.
       createProjectMock.mockClear()
 
-      const wrapper = mount(ProjectForm, { global: { mocks: { $t: tMock } } })
+      // `project: null` IS create mode. Omitting the required prop only
+      // produced a [Vue warn].
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
       await flushPromises()
 
       await wrapper.get('#project-form-name').setValue('New project')
@@ -1105,5 +1379,94 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
 
     expect(fieldset).not.toBeNull()
     expect(fieldset!.querySelector('legend')?.textContent).toContain('projects.form.assessmentType')
+  })
+})
+
+/**
+ * The questions panel sits below this form and groups by competency. It was
+ * fed `project.competencies` — the PERSISTED set — so ticking a competency
+ * showed nowhere to write its first question until the operator saved and
+ * reopened the drawer, and unticking one left its group standing with its
+ * questions still editable.
+ */
+describe('ProjectForm — publishing the live competency selection', () => {
+  it('emits the ticked set on mount, before anything is touched', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue({
+      data: [{ id: 7, code: 'COL', name: 'Collaboration', bars_available: true }],
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          competencies: [{ id: 7, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    // Immediate: the drawer opens on a project that already has a set, and
+    // waiting for a change would show no groups at all until the operator
+    // touched something.
+    const emitted = wrapper.emitted('update:competencies')
+    expect(emitted).toBeTruthy()
+    expect(emitted?.at(-1)?.[0]).toEqual([{ id: 7, code: 'COL' }])
+  })
+
+  it('re-emits the moment a competency is ticked, not on save', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue({
+      data: [
+        { id: 7, code: 'COL', name: 'Collaboration', bars_available: true },
+        { id: 8, code: 'INN', name: 'Innovation', bars_available: true },
+      ],
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          competencies: [{ id: 7, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    const callsBefore = updateProjectMock.mock.calls.length
+
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [7, 8])
+    await flushPromises()
+
+    expect(wrapper.emitted('update:competencies')?.at(-1)?.[0]).toEqual([
+      { id: 7, code: 'COL' },
+      { id: 8, code: 'INN' },
+    ])
+
+    // And nothing was saved to produce it. Counted from THIS mount, because
+    // the mock is shared across the file.
+    expect(updateProjectMock.mock.calls.length).toBe(callsBefore)
+  })
+
+  it('drops a competency from the published set as soon as it is unticked', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue({
+      data: [{ id: 7, code: 'COL', name: 'Collaboration', bars_available: true }],
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          competencies: [{ id: 7, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [])
+    await flushPromises()
+
+    expect(wrapper.emitted('update:competencies')?.at(-1)?.[0]).toEqual([])
   })
 })

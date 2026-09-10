@@ -115,4 +115,31 @@ describe('QuestionList', () => {
 
     expect(wrapper.find('[data-testid="question-empty"]').exists()).toBe(true)
   })
+
+  describe('when there is nothing to reorder', () => {
+    it('hides the grip and both arrows for a single question', () => {
+      // One item has no order. Two arrows that can never do anything, and a
+      // drag handle with nowhere to drag to, are three controls that only
+      // teach the operator this list ignores them.
+      const wrapper = mountList([question(1, 'only', 0)])
+
+      expect(wrapper.find('[data-testid="question-grip-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="question-up-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="question-down-1"]').exists()).toBe(false)
+
+      // What DOES remain: the row, and the two actions that still apply.
+      expect(wrapper.find('[data-testid="question-row-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="question-edit-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="question-remove-1"]').exists()).toBe(true)
+    })
+
+    it('brings them back as soon as there are two', () => {
+      // The control: hiding them unconditionally would look identical above.
+      const wrapper = mountList()
+
+      expect(wrapper.find('[data-testid="question-grip-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="question-up-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="question-down-1"]').exists()).toBe(true)
+    })
+  })
 })

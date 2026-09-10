@@ -82,24 +82,65 @@
           other form here already uses. Hand-rolling the pair passed the eye and
           failed the linter, correctly.
         -->
+        <!--
+          Ids SCOPED to the competency, not fixed strings. This editor lives
+          inside `v-for="group in groups"`, and only one draft can be open
+          today — an invariant this component happens to hold and nothing
+          enforces, which is the same reason its refs were scoped. A `for`
+          that resolves to the wrong element is silent.
+        -->
         <Field :data-invalid="Boolean(errors.text)">
-          <FieldLabel for="question-en">{{ $t('projectQuestions.textEn') }}</FieldLabel>
+          <FieldLabel :for="`question-en-${group.competencyId}`">{{
+            $t('projectQuestions.textEn')
+          }}</FieldLabel>
           <Textarea
-            id="question-en"
+            :id="`question-en-${group.competencyId}`"
             v-model="draft.en"
             rows="2"
             required
             :aria-invalid="Boolean(errors.text)"
+            :aria-describedby="errors.text ? `question-en-error-${group.competencyId}` : undefined"
             data-testid="question-text-en"
           />
-          <FieldError v-if="errors.text" data-testid="question-text-error">{{
-            errors.text
-          }}</FieldError>
+          <!--
+            `role="alert"` announces this ONCE, when it appears. A user who
+            tabs back to the field afterwards hears "invalid" and nothing
+            about why — which is what `aria-describedby` is for, and what
+            every field in ProjectForm already wires by hand.
+          -->
+          <FieldError
+            v-if="errors.text"
+            :id="`question-en-error-${group.competencyId}`"
+            data-testid="question-text-error"
+            >{{ errors.text }}</FieldError
+          >
         </Field>
 
-        <Field>
-          <FieldLabel for="question-it">{{ $t('projectQuestions.textIt') }}</FieldLabel>
-          <Textarea id="question-it" v-model="draft.it" rows="2" data-testid="question-text-it" />
+        <Field :data-invalid="Boolean(errors.textIt)">
+          <FieldLabel :for="`question-it-${group.competencyId}`">{{
+            $t('projectQuestions.textIt')
+          }}</FieldLabel>
+          <Textarea
+            :id="`question-it-${group.competencyId}`"
+            v-model="draft.it"
+            rows="2"
+            :aria-invalid="Boolean(errors.textIt)"
+            :aria-describedby="
+              errors.textIt ? `question-it-error-${group.competencyId}` : undefined
+            "
+            data-testid="question-text-it"
+          />
+          <!--
+            The Italian field had no error path at all: a 422 keyed on
+            `text.it` mapped to nothing, fell into `unmapped`, and landed in
+            the panel banner with no indication of which field it was about.
+          -->
+          <FieldError
+            v-if="errors.textIt"
+            :id="`question-it-error-${group.competencyId}`"
+            data-testid="question-text-it-error"
+            >{{ errors.textIt }}</FieldError
+          >
         </Field>
 
         <!--
@@ -112,9 +153,12 @@
           decided by which Add was pressed — and that is the argument for a
           field-less message, not for borrowing the nearest field's.
         -->
-        <FieldError v-if="errors.competency" data-testid="question-competency-error">{{
-          errors.competency
-        }}</FieldError>
+        <FieldError
+          v-if="errors.competency"
+          :id="`question-competency-error-${group.competencyId}`"
+          data-testid="question-competency-error"
+          >{{ errors.competency }}</FieldError
+        >
 
         <div class="flex gap-2">
           <Button type="submit" :loading="saving" data-testid="question-save">
@@ -144,11 +188,27 @@
           type="button"
           variant="outline"
           size="sm"
+          :disabled="atCap(group)"
+          :aria-describedby="atCap(group) ? `question-cap-${group.competencyId}` : undefined"
           :data-testid="`question-add-${group.competencyId}`"
           @click="startNew(group.competencyId)"
         >
           {{ $t('projectQuestions.add') }}
         </Button>
+
+        <!--
+          The reason, next to the disabled control. A button that stops
+          responding and says nothing teaches the operator the page is broken;
+          the cap is a real limit and it has a number.
+        -->
+        <p
+          v-if="atCap(group)"
+          :id="`question-cap-${group.competencyId}`"
+          class="text-muted-foreground mt-1.5 text-xs"
+          :data-testid="`question-cap-${group.competencyId}`"
+        >
+          {{ $t('projectQuestions.atCap', { max: cap }) }}
+        </p>
       </div>
     </div>
 
@@ -197,6 +257,8 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import { applyServerFieldErrors } from '@/utils/http-error'
+import { translateServerCodeOrFallback } from '@/utils/server-message'
+import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { Textarea } from '@/components/ui/textarea'
 import { useProjectQuestions, type ProjectQuestion } from '@/composables/useProjectQuestions'
 
@@ -217,14 +279,27 @@ const props = defineProps<{
 
 const { fetchQuestions, createQuestion, updateQuestion, deleteQuestion, reorderQuestions } =
   useProjectQuestions()
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const questions = ref<ProjectQuestion[]>([])
+
+/**
+ * The per-competency maximum, published by the API alongside the list.
+ *
+ * The server has always refused the (N+1)th question; the operator learned N
+ * by writing one and being told no. It is a platform setting behind a
+ * superadmin-only endpoint, so it could not be read directly — it travels in
+ * `meta` on this list instead, and it depends on the project's assessment
+ * type, which is why it cannot be a constant here.
+ *
+ * `null` until the first load: an unknown cap must never disable the button.
+ */
+const cap = ref<number | null>(null)
 const message = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 const saving = ref(false)
 const removingId = ref<number | null>(null)
-const errors = ref<{ text?: string; competency?: string }>({})
+const errors = ref<{ text?: string; textIt?: string; competency?: string }>({})
 
 /**
  * The question being written. `id: null` means a new one.
@@ -299,6 +374,17 @@ watch(draft, async (value) => {
   editorField()?.focus()
 })
 
+/**
+ * A group is at the cap when it holds `cap` questions.
+ *
+ * False while `cap` is null — an unknown limit must not disable the control,
+ * because the server is still the enforcement and a wrongly-disabled button
+ * is a feature the operator simply cannot reach.
+ */
+function atCap(group: { questions: ProjectQuestion[] }): boolean {
+  return cap.value !== null && group.questions.length >= cap.value
+}
+
 const groups = computed(() =>
   props.competencies.map((competency) => ({
     competencyId: competency.id,
@@ -309,13 +395,29 @@ const groups = computed(() =>
 
 async function load(): Promise<void> {
   try {
-    questions.value = (await fetchQuestions(props.projectId)).data
-  } catch {
+    const response = await fetchQuestions(props.projectId)
+
+    questions.value = response.data
+    // Read defensively even though the contract declares it required: a
+    // missing `meta` must leave the cap UNKNOWN, not throw. Throwing here
+    // lands in the catch below and reports "could not load the questions"
+    // about a list that arrived perfectly well.
+    cap.value = response.meta?.max_questions_per_competency ?? null
+  } catch (loadFailure) {
     // Not `saveError`. Nothing was being saved — this is the LOAD — and
     // telling an operator "could not save the question" for a failed fetch
-    // sends them looking for a draft they never wrote. `reorderError` was
-    // already the precedent for per-operation copy.
-    message.value = { kind: 'error', text: t('projectQuestions.loadError') }
+    // sends them looking for a draft they never wrote.
+    //
+    // And through the SHARED mapper, like every other remote read in the
+    // backoffice: a 403 is permanent, and "could not load, please try again"
+    // invites a retry that fails identically. `error-state.ts` already holds
+    // the copy for each state.
+    const state = resolveResourceErrorState(loadFailure)
+
+    message.value = {
+      kind: state === 'not-ready' ? 'waiting' : 'error',
+      text: t(resourceErrorKey(state, 'message')),
+    }
   }
 }
 
@@ -466,16 +568,51 @@ async function onSubmit(): Promise<void> {
     // a generic banner would make the operator hunt for what to change.
     const unmapped = applyServerFieldErrors(
       submitError,
-      { text: 'text', 'text.en': 'text', competency_id: 'competency' } as const,
+      {
+        text: 'text',
+        'text.en': 'text',
+        'text.it': 'textIt',
+        competency_id: 'competency',
+      } as const,
       (key, serverMessage) => {
-        errors.value[key] = serverMessage
+        // NEVER the wire value. The shape rules answer with machine codes;
+        // the per-competency cap answers with authored English prose composed
+        // around a number, and printing that under an Italian label is the
+        // defect the i18n mandate exists to stop. An operator who hits the cap
+        // already has the localized sentence beside the disabled Add button.
+        errors.value[key] = translateServerCodeOrFallback(
+          { t, te },
+          'projectQuestions.serverError',
+          serverMessage,
+          'projectQuestions.saveError'
+        )
       }
     )
 
+    // The banner is for what the FIELDS could not say. When the 422 mapped
+    // cleanly the operator already has the exact reason under the control,
+    // and adding "the question could not be saved" on top invites a retry
+    // that will fail identically. Same guard BrandingForm applies.
+    const mapped = Object.values(errors.value).some((value) => value !== undefined)
+
     message.value =
       unmapped && unmapped.length > 0
-        ? { kind: 'error', text: unmapped.join(' ') }
-        : { kind: 'error', text: t('projectQuestions.saveError') }
+        ? {
+            kind: 'error',
+            text: unmapped
+              .map((value) =>
+                translateServerCodeOrFallback(
+                  { t, te },
+                  'projectQuestions.serverError',
+                  value,
+                  'projectQuestions.saveError'
+                )
+              )
+              .join(' '),
+          }
+        : mapped
+          ? null
+          : { kind: 'error', text: t('projectQuestions.saveError') }
   } finally {
     saving.value = false
   }

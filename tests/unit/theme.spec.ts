@@ -433,3 +433,68 @@ describe('brand theme token source (regression guard)', () => {
     expect(extractBlock(css, ':root {')).toMatchSnapshot()
   })
 })
+
+/**
+ * ONE highlight, everywhere a row can be highlighted.
+ *
+ * An operator reported "some selects have an orange hover and I don't know
+ * why" — and the orange was ratified, contrast-tested and correct. What was
+ * wrong was that there were TWO oranges: `SelectItem` painted
+ * `--color-accent-dark` with white text, while every dropdown-menu row
+ * painted plain `--color-accent` with near-black. Two treatments of the same
+ * gesture, side by side in the same settings surface.
+ *
+ * Source-level, for the same reason the sibling above is: these class lists
+ * are static strings, and mounting a reka-ui menu row needs a live root
+ * context.
+ */
+describe('every highlighted row uses ONE highlight', () => {
+  const ROWS = [
+    'app/components/ui/select/SelectItem.vue',
+    'app/components/ui/dropdown-menu/DropdownMenuItem.vue',
+    'app/components/ui/dropdown-menu/DropdownMenuRadioItem.vue',
+    'app/components/ui/dropdown-menu/DropdownMenuCheckboxItem.vue',
+    'app/components/ui/dropdown-menu/DropdownMenuSubTrigger.vue',
+  ]
+
+  it.each(ROWS)('%s pairs --color-accent-dark with white', (file) => {
+    const source = readFileSync(resolve(__dirname, '../../', file), 'utf-8')
+
+    expect(source).toContain('focus:bg-accent-dark')
+    expect(source).toContain('focus:text-white')
+
+    // EVERY state variant, not just `focus:`. The first version of this
+    // guard tested `not.toContain('focus:bg-accent ')` — which missed
+    // `data-open:bg-accent` on the sub-trigger entirely, and leaned on a
+    // trailing space that `focus:bg-accent/90` or an end-of-string match
+    // would both slip past. Plain `--color-accent` with white is the 3.7:1
+    // failure the sibling assertion above measures.
+    const plainAccent = /(^|[\s'"])(?:[a-z-]+:)*bg-accent(?![-\w])/
+    expect(source).not.toMatch(plainAccent)
+
+    // `accent-foreground` on plain accent PASSES contrast; it is the other
+    // treatment, and the inconsistency is what this block is about.
+    expect(source).not.toContain('text-accent-foreground')
+
+    // Clickable rows show a pointer. `DESIGN.md` says vendored shadcn source
+    // is not exempt, and none of these match the global base selector —
+    // `role="menuitem"` with `tabindex="-1"` — while `cursor-default` is a
+    // utility that outranks `@layer base` anyway.
+    expect(source).toContain('cursor-pointer')
+    expect(source).not.toContain('cursor-default')
+
+    // And the OTHER half of the rule, on EVERY row including the
+    // sub-trigger. It was carved out on the claim that it "has no disabled
+    // state to style" — `reka-ui/dist/Menu/MenuSubTrigger.js` declares a
+    // `disabled` prop, guards on it three times, and renders through
+    // `MenuItemImpl`, which emits `data-disabled` and `aria-disabled`. The
+    // carve-out was a weakened assertion resting on a false premise.
+    //
+    // `pointer-events-none` used to sit alongside `opacity-50`, and an
+    // element that is not a pointer target resolves its cursor from an
+    // ancestor — so `not-allowed` could never render. reka-ui guards
+    // activation in JS, so dropping it costs no protection.
+    expect(source).toMatch(/data-\[?disabled\]?:cursor-not-allowed/)
+    expect(source).not.toMatch(/data-\[?disabled\]?:pointer-events-none/)
+  })
+})

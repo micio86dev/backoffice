@@ -290,8 +290,18 @@ test.describe('Profile page (user-profile-self-service)', () => {
 
     // Choosing a file no longer uploads it: it opens the crop dialog, and the
     // cropped result is what gets sent (image-upload-crop-field, D3).
+    // EXACTLY ONE control answers to the field's label. Two did — the
+    // dropzone button via `aria-labelledby` and the hidden input via the
+    // label's `for` — which is what made the locator below ambiguous in the
+    // first place. Switching to a testid fixed the locator and would have
+    // left the ambiguity untested, so assert the property directly.
+    await expect(page.getByLabel('Carica una foto profilo')).toHaveCount(1)
+
+    // The hidden input by testid, not by label: the label names the DROPZONE
+    // BUTTON, which is the operable control, and the input is deliberately
+    // out of the accessibility tree.
     await page
-      .getByLabel('Carica una foto profilo')
+      .getByTestId('profile-photo-input')
       .setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: ONE_PIXEL_PNG })
 
     await expect(page.getByTestId('image-crop-dialog')).toBeVisible()

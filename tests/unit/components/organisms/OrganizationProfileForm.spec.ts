@@ -7,8 +7,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { currentUserStub } from '../../support/abilities'
+import { realI18n } from '../../support/i18n'
 
 const tMock = (key: string) => key
+
+// `te` must answer from the real locale files. The global stub says true to
+// everything, so a missing key would still render its own name and the
+// assertion would pass on copy nobody wrote.
+vi.stubGlobal('useI18n', () => realI18n())
 const updateOrganizationMock = vi.fn()
 
 vi.mock('../../../../app/composables/useOrganization', () => ({
@@ -127,6 +133,50 @@ describe('OrganizationProfileForm', () => {
     expect(wrapper.get('[data-testid="organization-profile-name-error"]').text()).toContain(
       'That name is already in use.'
     )
+  })
+
+  it('translates the machine code the endpoint actually sends', async () => {
+    // The endpoint answers `name_too_long`, not a sentence. Assigning the wire
+    // value put "The name field must not be greater than 255 characters." into
+    // an Italian field error. The prose case above is the FALLBACK; this is
+    // the contract.
+    updateOrganizationMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { name: ['name_too_long'] } },
+      })
+    )
+
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="organization-profile-name"]').setValue('New Name')
+    await wrapper.get('[data-testid="organization-profile-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="organization-profile-name-error"]').text()).toContain(
+      'settings.organization.serverError.name_too_long'
+    )
+  })
+
+  it('does not stack the generic banner on top of a mapped field error', async () => {
+    // The operator already has the exact reason under the control. Adding
+    // "could not be saved, review the highlighted fields" on top invites a
+    // retry that will fail identically.
+    updateOrganizationMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { name: ['name_too_long'] } },
+      })
+    )
+
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="organization-profile-name"]').setValue('New Name')
+    await wrapper.get('[data-testid="organization-profile-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="organization-profile-name-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="organization-profile-banner"]').exists()).toBe(false)
   })
 
   // form-clarity-and-console-warnings — CRITICAL 1 fix. `slug` has no entry in

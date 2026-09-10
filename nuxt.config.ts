@@ -106,15 +106,21 @@ export default defineNuxtConfig({
     public: {
       apiBase: '',
       // C13 task 5.3 — analytics. EMPTY means the tool does not load at all,
-      // which is the correct default: these are per-deployment IDs, and a
+      // which is the correct default: this is a per-deployment ID, and a
       // committed one would have every developer's local session reported into
-      // a production property. Consent gates them independently
+      // a production property. Consent gates it independently
       // (app/utils/analytics-consent.ts) and defaults to denied.
+      //
+      // Microsoft Clarity is deliberately NOT configured here. It was removed
+      // from this app (openspec/specs/observability/spec.md, Microsoft
+      // Clarity — User Behavior Analytics): the backoffice is an internal
+      // admin tool that renders a candidate's transcript and BARS scores, and
+      // a third-party session recorder there is a privacy liability the
+      // frontend does not share. Clarity remains frontend-only.
       gaMeasurementId: '',
-      clarityProjectId: '',
       // C13 task 5.1 — Sentry. EMPTY means the SDK never initializes
       // (app/utils/sentry-init.ts's `enabled` gate), the same "unset ID"
-      // posture as Clarity/GA4 above. Unlike those two, Sentry is NOT
+      // posture as GA4 above. Unlike that one, Sentry is NOT
       // additionally gated on analytics consent — see
       // sentry.client.config.ts for why.
       sentryDsn: '',

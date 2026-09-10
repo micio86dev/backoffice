@@ -4,10 +4,13 @@
  * regardless of env.
  *
  * Extracted into a pure function — rather than left inline in
- * `sentry.client.config.ts` / `sentry.server.config.ts` — so "does an empty
- * DSN actually turn Sentry off" and "is PII pinned off no matter what" are
- * one-line assertions in a unit test, not something inferred from reading a
- * Nuxt plugin file and trusting it.
+ * `sentry.client.config.ts` — so "does an empty DSN actually turn Sentry off"
+ * and "is PII pinned off no matter what" are one-line assertions in a unit
+ * test, not something inferred from reading a Nuxt plugin file and trusting it.
+ * That reason is testability and it stands on its own; the extraction was
+ * originally justified by two config files sharing it, and there is now one —
+ * this app is `ssr: false`, so the server config was deleted rather than kept
+ * monitoring a runtime that does not exist.
  */
 export interface SentryPosture {
   dsn: string
@@ -21,13 +24,13 @@ export function sentryPosture(dsn: string, environment: string): SentryPosture {
     dsn,
     // OFF by default via an EMPTY DSN — a per-deployment credential that is
     // never committed (mirrors api/config/sentry.php, frontend's own
-    // sentry-init.ts, and the Clarity/GA4 IDs in this app's runtimeConfig).
+    // sentry-init.ts, and the GA4 ID in this app's runtimeConfig).
     // `enabled` makes that inertness the SDK's own decision rather than
     // trusting that `Sentry.init({ dsn: '' })` silently no-ops.
     //
     // NOT additionally gated on analytics consent (`beai.consent.analytics`)
     // — see sentry.client.config.ts for why.
-    enabled: dsn !== '',
+    enabled: dsn.trim() !== '',
     // Unset falls through to Sentry's own environment detection rather than
     // shipping a literal empty string — this app has no app-wide `appEnv`
     // concept the way `frontend` does, so an unconfigured deployment should

@@ -15,8 +15,9 @@ export default defineNuxtConfig({
   // Source-map upload is OFF unless a SENTRY_AUTH_TOKEN is present in the
   // deploy environment: an unattended `enabled: true` default would make
   // every local `nuxt generate` attempt an authenticated network call it has
-  // no credentials for. `sentry.client.config.ts` / `sentry.server.config.ts`
-  // hold the actual DSN/PII/scrubbing posture.
+  // no credentials for. `sentry.client.config.ts` holds the actual
+  // DSN/PII/scrubbing posture — there is no server config, because `ssr: false`
+  // above means there is no server runtime for one to load into.
   sentry: {
     sourceMapsUploadOptions: {
       enabled: Boolean(process.env['SENTRY_AUTH_TOKEN']),

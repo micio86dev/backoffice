@@ -103,12 +103,38 @@ const DENIED_KEYS = new Set([
   // calling system needed to resolve it.
   'email',
   'transcript',
+  'transcripts',
   'prompt',
+  'prompts',
   'answer',
+  'answers',
   'excerpt',
   'excerpts',
   'utterance',
+  'utterances',
   'content',
+  'contents',
+  // `text` is the name this PRODUCT uses for a candidate's transcribed speech —
+  // `utterances.text` in the schema, the validated field on the api's
+  // UtteranceController, and HeygenProvider's transcript shape. The list named
+  // five synonyms and missed the one the database uses.
+  //
+  // The cost is real, wider than it first looked, and accepted deliberately.
+  // Via the last-segment rule this also redacts `formMessage.text`,
+  // `errors.text`, `context_text` (a stack frame's source line), `status_text`
+  // (an HTTP status) and `error_messages`. None of those is candidate speech,
+  // and `context_text` is exactly the field that says where something broke —
+  // the outcome this module calls worse than a scrubbed one. The trade stands
+  // because the api denies `text` and this file's contract is to carry the
+  // api's EXACT denylist; a candidate's words under a key nobody named is the
+  // worse half. Pinned by test so the next reader sees it was chosen.
+  'text',
+  // The AI conversation as a JSON string — the api's AiIntegration json_encodes
+  // it, so it lands under one key with nothing inside to walk.
+  'messages',
+  // The LLM's behavioural rationale on `indicator_scores`. `payload` covers it
+  // on the webhook path; a bare `explanation` had nothing.
+  'explanation',
   'payload',
   // Backoffice-specific: the entry link IS a bearer credential — holding it
   // is sufficient to start a specific candidate's interview. Treated the
@@ -126,7 +152,18 @@ const REDACTED_CYCLE = '[circular]'
  * that can drift apart.
  */
 function toSnakeKey(key: string): string {
-  return key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+  // Hyphens and dots first: header names arrive as `X-Api-Key`, and
+  // OpenTelemetry attributes arrive dotted — `auth.token`, `user.content`,
+  // `request.transcript`. Every one of those trailing words is already denied;
+  // without this the normalizer simply cannot reach them.
+  //
+  // The second pattern is what a lone `/([a-z0-9])([A-Z])/` cannot do: `APIKey`
+  // and `SSOToken` have no lowercase character before the uppercase one.
+  return key
+    .replace(/[-.]/g, '_')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase()
 }
 
 function isDeniedKey(key: string): boolean {
@@ -136,12 +173,26 @@ function isDeniedKey(key: string): boolean {
     return true
   }
 
+  // The LAST SEGMENT, because a namespaced key names its field at the end:
+  // `http.request.header.authorization`, `user.content`, `request.transcript`.
+  // Each of those trailing words is already in the set; matching the whole
+  // normalised string alone could never see them.
+  const lastSegment = normalized.slice(normalized.lastIndexOf('_') + 1)
+
+  if (lastSegment !== normalized && DENIED_KEYS.has(lastSegment)) {
+    return true
+  }
+
   // Conventions, so a newly-named field (`sessionToken`, `signing_secret`,
   // `providerApiKey`) is covered without an edit here — enumerating every
   // future field name is impossible; a naming convention is not.
   return (
-    normalized.endsWith('_token') ||
-    normalized.endsWith('_secret') ||
+    // ONLY `_key`. `_token`, `_secret` and `_messages` were shadowed dead by the
+    // last-segment check above — `token`, `secret` and `messages` are all in the
+    // set, so that branch always decided first and these could never fire. `key`
+    // alone is NOT in the set (too generic to deny outright), which is why this
+    // one is still reachable. Keeping the dead clauses meant a future edit to
+    // the set would silently change which branch is live.
     normalized.endsWith('_key') ||
     // Any key NAMING an address, not merely one suffixed with it. The api half
     // considered `endsWith('_email')` and rejected it by name: it misses
@@ -360,7 +411,7 @@ const ABSOLUTE_URL_PATTERN = /https?:\/\/[^\s"'<>]+/gi
  * `scrubStacktrace` below already litigates and calls the worse outcome: not a
  * leak, just an error reporter that can no longer say where anything broke.
  */
-const EMAIL_PATTERN = /[\w.%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
+const EMAIL_PATTERN = /[\w.%+-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi
 
 export function redactFreeText(text: string): string {
   // The fast path is ONLY for a message that is a bare route and nothing else —

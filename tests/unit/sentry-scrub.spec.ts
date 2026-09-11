@@ -745,3 +745,109 @@ describe('an address in prose has no key for the denylist to catch', () => {
     )
   })
 })
+
+describe('namespaced keys must reach the denylist the api reaches', () => {
+  it('scrubs dotted OpenTelemetry keys', () => {
+    // The normalizer handled camelCase but never dots, so every OTel-style key
+    // missed both the set and the convention suffixes. `authorization`,
+    // `content` and `transcript` are all IN the set — the set knew, the
+    // normalizer could not reach them.
+    const scrubbed = scrubSentryEvent(
+      eventWith({
+        'auth.token': 'TOKENLEAK',
+        'user.content': 'CONTENTLEAK',
+        'request.transcript': 'TRANSCRIPTLEAK',
+        'http.request.header.authorization': 'AUTHLEAK',
+      })
+    )
+
+    expect(JSON.stringify(scrubbed.extra)).not.toContain('LEAK')
+  })
+
+  it('scrubs the AI conversation, which arrives as a JSON STRING', () => {
+    // The api's AiIntegration json_encodes the messages, so they land under one
+    // key with nothing inside for a key denylist to walk.
+    const scrubbed = scrubSentryEvent(
+      eventWith({
+        'gen_ai.input.messages': '[{"role":"user","content":"I led the migration"}]',
+        messages: '[{"content":"my answer"}]',
+      })
+    )
+
+    const encoded = JSON.stringify(scrubbed.extra)
+
+    expect(encoded).not.toContain('I led the migration')
+    expect(encoded).not.toContain('my answer')
+  })
+})
+
+describe('the normalizer shapes nothing in the suite had pinned', () => {
+  it('scrubs a hyphenated header key', () => {
+    // `X-Api-Key` lowercases to `x-api-key`: in no set, and `_key` cannot match
+    // across a hyphen. The `.replace(/[-.]/g, '_')` exists for this and nothing
+    // would have noticed if it were deleted.
+    const scrubbed = scrubSentryEvent(eventWith({ 'X-Api-Key': 'HEADERLEAK' }))
+
+    expect(JSON.stringify(scrubbed.extra)).not.toContain('HEADERLEAK')
+  })
+
+  it('scrubs an acronym-leading key', () => {
+    // `APIKey` and `SSOToken` have no lowercase character before the uppercase
+    // one, so `/([a-z0-9])([A-Z])/` never fires. The second pattern is the only
+    // thing that splits them, and it too was untested.
+    const scrubbed = scrubSentryEvent(
+      eventWith({ APIKey: 'ACRONYMLEAK', SSOToken: 'ACRONYMLEAK2' })
+    )
+
+    expect(JSON.stringify(scrubbed.extra)).not.toContain('ACRONYMLEAK')
+  })
+
+  it('keeps a multi-label domain address redacted', () => {
+    // The domain is a repeated label group now, not one class admitting `.`
+    // beside a literal dot. Subdomains must still match.
+    expect(redactFreeText('ping mario@mail.corp.example.com now')).not.toContain('mario@')
+  })
+
+  it('does not treat an empty domain label as an address', () => {
+    // THE distinguishing case. `mario@mail.corp.example.com` matched the old
+    // class-with-a-dot just as well, so the test above passes under either
+    // pattern and pins nothing. `(?:label\.)+` requires a non-empty label
+    // before every dot — which is precisely the ambiguity that made the old
+    // split point backtrack quadratically.
+    expect(redactFreeText('ping mario@..com now')).toContain('mario@..com')
+  })
+})
+
+describe('every confidential-content key is pinned, not just the ones with a rule', () => {
+  // Each of these normalises to ITSELF — its last segment is the whole key — so
+  // no other rule reaches it. Deleting any one line was a live leak with the
+  // whole suite still green.
+  it.each([
+    ['text', 'Nel mio ultimo progetto ho gestito un conflitto'],
+    ['explanation', 'The candidate de-escalated a peer dispute'],
+    ['transcripts', 'full transcript body'],
+    ['prompts', 'Score this answer'],
+    ['answers', 'I led the migration'],
+    ['utterances', 'ho gestito un conflitto'],
+    ['contents', 'spoken content body'],
+  ])('scrubs %s', (key, marker) => {
+    const scrubbed = scrubSentryEvent(eventWith({ [key]: marker }))
+
+    expect(JSON.stringify(scrubbed.extra)).not.toContain(marker)
+  })
+
+  it('pins what denying `text` costs, so the trade reads as chosen', () => {
+    // The last-segment rule reaches further than candidate speech:
+    // `context_text` is a stack frame's source line and `status_text` is an
+    // HTTP status. Neither is a candidate's words. The trade is deliberate —
+    // this file's contract is to carry the api's exact denylist — but an
+    // unusable error reporter is the outcome this module calls worse than a
+    // scrubbed one, so the cost is written down rather than discovered later.
+    const scrubbed = scrubSentryEvent(
+      eventWith({ context_text: 'const x = 1', status_text: 'Unprocessable Entity' })
+    )
+
+    expect((scrubbed.extra as Record<string, unknown>)['context_text']).toBe('[redacted]')
+    expect((scrubbed.extra as Record<string, unknown>)['status_text']).toBe('[redacted]')
+  })
+})

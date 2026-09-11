@@ -5,75 +5,50 @@ import { redactAnalyticsPath } from '~/utils/analytics-path'
 /**
  * What actually loads, and what it is allowed to send (C13, tasks 5.3 / 5.4).
  *
- * The decision is a pure function on purpose. Whether a third-party recorder
- * starts on a page showing a candidate's transcript and their BARS scores is
- * not something to discover by reading a plugin's control flow in a browser.
+ * The decision is a pure function on purpose. Whether GA4 starts for this
+ * visitor, and with what page path, is not something to discover by reading a
+ * plugin's control flow in a browser.
  */
 
-const ids = { gaMeasurementId: 'G-TEST123', clarityProjectId: 'clr123' }
+const ids = { gaMeasurementId: 'G-TEST123' }
+
+describe('analyticsPlan — Microsoft Clarity is not a backoffice tool', () => {
+  it('never returns a loadClarity field, under any input', () => {
+    // Clarity was removed from the backoffice (session replay over candidate
+    // PII was judged a privacy liability an internal admin tool must not
+    // carry — see openspec/specs/observability/spec.md). The absence is
+    // structural, not a value pinned to false: there is no field left to
+    // accidentally start reading, and no ID left to configure one back in.
+    const plan = analyticsPlan({ ...ids, consentGranted: true, path: '/participants/42' })
+
+    expect(plan).not.toHaveProperty('loadClarity')
+  })
+})
 
 describe('analyticsPlan — the default is OFF', () => {
-  it('loads nothing when no IDs are configured', () => {
-    const plan = analyticsPlan({
-      gaMeasurementId: '',
-      clarityProjectId: '',
-      consentGranted: true,
-      path: '/',
-    })
+  it('loads nothing when no ID is configured', () => {
+    const plan = analyticsPlan({ gaMeasurementId: '', consentGranted: true, path: '/' })
 
     expect(plan.loadGa).toBe(false)
-    expect(plan.loadClarity).toBe(false)
   })
 
-  it('loads nothing without consent, even with both IDs configured', () => {
+  it('loads nothing without consent, even with an ID configured', () => {
     const plan = analyticsPlan({ ...ids, consentGranted: false, path: '/' })
 
     // Consent defaults to denied and there is no UI yet to grant it — see
     // docs/observability.md. Same posture as the GDPR purge: built, correct,
     // and inert until a human decision exists.
     expect(plan.loadGa).toBe(false)
-    expect(plan.loadClarity).toBe(false)
   })
 
-  it('loads only the tool whose ID is present', () => {
-    const onlyGa = analyticsPlan({
-      gaMeasurementId: 'G-TEST123',
-      clarityProjectId: '',
-      consentGranted: true,
-      path: '/',
-    })
+  it('loads GA once consented and configured', () => {
+    const plan = analyticsPlan({ ...ids, consentGranted: true, path: '/' })
 
-    expect(onlyGa.loadGa).toBe(true)
-    expect(onlyGa.loadClarity).toBe(false)
+    expect(plan.loadGa).toBe(true)
   })
 })
 
-describe('analyticsPlan — candidate data is off limits to session replay', () => {
-  it('never loads Clarity on a participant page, even with consent and an ID', () => {
-    const plan = analyticsPlan({ ...ids, consentGranted: true, path: '/participants/42' })
-
-    // Not a setting. Clarity records the DOM, and on this page the DOM is a
-    // named person's transcript and their scored evaluation. There is no
-    // configuration of a session recorder that makes that acceptable, so the
-    // decision is made here rather than left to whoever fills in the env var.
-    expect(plan.loadClarity).toBe(false)
-  })
-
-  it('does not load Clarity on the participants list either', () => {
-    // The list shows display names and candidate references. "Only the detail
-    // page is sensitive" is wrong on its face.
-    expect(analyticsPlan({ ...ids, consentGranted: true, path: '/participants' }).loadClarity).toBe(
-      false
-    )
-    expect(
-      analyticsPlan({ ...ids, consentGranted: true, path: '/en/participants' }).loadClarity
-    ).toBe(false)
-  })
-
-  it('does not load Clarity on the login page', () => {
-    expect(analyticsPlan({ ...ids, consentGranted: true, path: '/login' }).loadClarity).toBe(false)
-  })
-
+describe('analyticsPlan — candidate data still redacted from GA', () => {
   it('still counts participant pages in GA, but only as a redacted path', () => {
     const plan = analyticsPlan({ ...ids, consentGranted: true, path: '/participants/42' })
 
@@ -83,10 +58,6 @@ describe('analyticsPlan — candidate data is off limits to session replay', () 
     expect(plan.loadGa).toBe(true)
     expect(plan.pagePath).toBe('/participants/:id')
     expect(plan.pagePath).not.toContain('42')
-  })
-
-  it('loads Clarity on ordinary pages', () => {
-    expect(analyticsPlan({ ...ids, consentGranted: true, path: '/' }).loadClarity).toBe(true)
   })
 })
 

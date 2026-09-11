@@ -53,23 +53,29 @@ ENV NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE}
 # matter what the deployment platform has configured.
 #
 # That is precisely what happened: only NUXT_PUBLIC_API_BASE was ever declared,
-# so Sentry, GA4 and Clarity shipped inert while their values sat correctly set
+# so Sentry and GA4 shipped inert while their values sat correctly set
 # on the platform — a silent no-op with no failing build and no error to read.
 #
 # UNLIKE the API base, these carry NO guard and NO default. Empty is a
-# legitimate, documented state for all four: nuxt.config.ts's runtimeConfig
+# legitimate, documented state for all three: nuxt.config.ts's runtimeConfig
 # comments define an unset ID as "the tool does not load at all", which is the
 # correct posture for a developer build and for any environment that has not
 # opted in. Requiring them would break every build that legitimately runs
 # without analytics.
+#
+# NUXT_PUBLIC_CLARITY_PROJECT_ID used to be declared here too. Microsoft
+# Clarity was removed from this app (openspec/specs/observability/spec.md,
+# Microsoft Clarity — User Behavior Analytics requirement) — the backoffice
+# renders a candidate's transcript and BARS scores, and a session recorder
+# there is a privacy liability the frontend does not share. Any deployment
+# platform that still has this variable set is now simply passing an unused
+# build arg: undeclared ARGs are silently ignored, not an error.
 ARG NUXT_PUBLIC_SENTRY_DSN
 ARG NUXT_PUBLIC_SENTRY_ENVIRONMENT
 ARG NUXT_PUBLIC_GA_MEASUREMENT_ID
-ARG NUXT_PUBLIC_CLARITY_PROJECT_ID
 ENV NUXT_PUBLIC_SENTRY_DSN=${NUXT_PUBLIC_SENTRY_DSN}
 ENV NUXT_PUBLIC_SENTRY_ENVIRONMENT=${NUXT_PUBLIC_SENTRY_ENVIRONMENT}
 ENV NUXT_PUBLIC_GA_MEASUREMENT_ID=${NUXT_PUBLIC_GA_MEASUREMENT_ID}
-ENV NUXT_PUBLIC_CLARITY_PROJECT_ID=${NUXT_PUBLIC_CLARITY_PROJECT_ID}
 
 # Sentry source-map upload credentials — BUILD-time only, and a different class
 # from everything above: these never reach the browser, they authenticate the

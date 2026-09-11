@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { isAnalyticsSafeRoute, redactAnalyticsPath } from '~/utils/analytics-path'
+import {
+  isAnalyticsSafeRoute,
+  redactAnalyticsPath,
+  redactEmbeddedPaths,
+} from '~/utils/analytics-path'
 
 /**
- * Nothing identifying reaches a third-party analytics sink (C13, task 5.4).
+ * Nothing identifying reaches GA4, and no tracking-consent dialog floats over
+ * a sensitive page (C13, task 5.4).
  *
- * The backoffice leaks differently from the candidate app, and arguably worse.
- * There is no token in the URL here — but `/participants/42` is a candidate
- * identifier, and the PAGE it names shows that candidate's transcript and their
- * scored evaluation.
- *
- * So a session replay of an operator's afternoon is a recording of several
- * named people's assessments, held by a third party, for as long as that third
- * party keeps it. Nobody consented to that, and nobody at BEAI can purge it.
+ * `/participants/42` is a candidate identifier, and the PAGE it names shows
+ * that candidate's transcript and their scored evaluation — `redactAnalyticsPath`
+ * is what stops the id itself reaching GA4. `isAnalyticsSafeRoute` is a
+ * separate, narrower control: it only decides where the consent banner may
+ * appear, not what may load — see `app/utils/analytics-path.ts` for why the
+ * two are not the same function.
  */
 
 describe('redactAnalyticsPath', () => {
@@ -61,21 +64,48 @@ describe('redactAnalyticsPath', () => {
       expect(redactAnalyticsPath(path)).toMatch(/\/participants\/:id$/)
     }
   })
+
+  it('redacts the id even under a nested route, not only at the end of the path', () => {
+    // A single-trailing-segment pattern only ever sees paths of the exact
+    // shape its own test corpus builds. Add one more segment and the id used
+    // to survive verbatim: /participants/42/transcript reached GA4 and
+    // Sentry unredacted, because the anchor required the id to be the LAST
+    // segment. There is no such route today, but a breadcrumb or a mistyped
+    // deep link does not need one to exist to reach this function.
+    expect(redactAnalyticsPath('/participants/42/transcript')).toBe('/participants/:id/transcript')
+    expect(redactAnalyticsPath('/en/participants/42/edit')).toBe('/en/participants/:id/edit')
+  })
+
+  it('redacts the id under the /api mount too, not only router paths', () => {
+    // nuxt.config.ts's runtimeConfig.public.apiBase MUST include the /api
+    // suffix (Dockerfile:26) — Laravel's CORS middleware only covers
+    // api/*, so every composable call is apiFetch('/participants/${id}')
+    // against a base that already ends in /api. The actual fetch/XHR URL
+    // Sentry captures as a breadcrumb is therefore /api/participants/42,
+    // not /participants/42 — a shape this pattern never matched, so the
+    // id reached Sentry verbatim through every real participant request
+    // (useParticipants, useTranscript, useEvaluationReport,
+    // useParticipantRecovery), exactly the leak class
+    // sentry-scrub.ts's own docblock names as closed.
+    expect(redactAnalyticsPath('/api/participants/42')).toBe('/api/participants/:id')
+    expect(redactAnalyticsPath('/api/participants/42/transcript')).toBe(
+      '/api/participants/:id/transcript'
+    )
+  })
 })
 
 describe('isAnalyticsSafeRoute', () => {
   it('marks participant pages as UNSAFE', () => {
-    // Session replay records the DOM, and on these pages the DOM is somebody's
-    // transcript and their BARS scores.
+    // The page renders somebody's transcript and their BARS scores; a
+    // tracking-consent dialog has no business floating over it.
     expect(isAnalyticsSafeRoute('/participants/42')).toBe(false)
     expect(isAnalyticsSafeRoute('/participants')).toBe(false)
     expect(isAnalyticsSafeRoute('/en/participants/42')).toBe(false)
   })
 
   it('marks the login page as UNSAFE', () => {
-    // Clarity masks input values by default, and defaults are exactly what a
-    // future dashboard setting can change without anyone touching this repo.
-    // A credential form is not worth the residual risk of a remote toggle.
+    // A cookie-consent dialog floating over a credential form is the wrong
+    // thing in the wrong place, whatever tool it is asking permission for.
     expect(isAnalyticsSafeRoute('/login')).toBe(false)
     expect(isAnalyticsSafeRoute('/en/login')).toBe(false)
   })
@@ -137,5 +167,38 @@ describe('redactAnalyticsPath — the password reset token', () => {
     ]) {
       expect(redactAnalyticsPath(path)).toMatch(/\/reset-password\/:token$/)
     }
+  })
+})
+
+describe('redactEmbeddedPaths — a path quoted inside free text, not the whole string', () => {
+  it('redacts a candidate id ofetch quotes inside its own error message', () => {
+    // ofetch builds its error message as `[${method}] ${JSON.stringify(url)}:
+    // ...` — the URL is embedded mid-sentence, not the whole string, so
+    // redactAnalyticsPath (which only recognises a path that IS the whole
+    // input) never sees it. This is what reaches Sentry through an
+    // unhandled FetchError's `exception.values[].value`.
+    expect(redactEmbeddedPaths('[GET] "/api/participants/42": 500 Internal Server Error')).toBe(
+      '[GET] "/api/participants/:id": 500 Internal Server Error'
+    )
+  })
+
+  it('redacts a bare relative path embedded in a console message', () => {
+    expect(redactEmbeddedPaths('Failed to load /participants/42')).toBe(
+      'Failed to load /participants/:id'
+    )
+  })
+
+  it('redacts the reset token the same way, prefix and all', () => {
+    expect(redactEmbeddedPaths('request to /api/reset-password/a-live-token failed')).toBe(
+      'request to /api/reset-password/:token failed'
+    )
+  })
+
+  it('leaves text with no participants/reset-password path untouched', () => {
+    expect(redactEmbeddedPaths('Vue warn: #app not found')).toBe('Vue warn: #app not found')
+  })
+
+  it('still redacts when the path IS the whole string, same as redactAnalyticsPath', () => {
+    expect(redactEmbeddedPaths('/participants/42')).toBe('/participants/:id')
   })
 })

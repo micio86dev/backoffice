@@ -693,3 +693,49 @@ describe('the open index signature the module argues about but never closes', ()
     expect(redactAnalyticsPath('/PARTICIPANTS/42')).not.toContain('42')
   })
 })
+
+describe('the suffix convention has to cover the address too', () => {
+  it('scrubs any field ending in _email, camelCase included', () => {
+    // Same reasoning the _token/_secret/_key suffixes already carry: enumerating
+    // every future field name is impossible, a naming convention is not. An
+    // address is the one candidate identifier that resolves to a person with no
+    // calling system in the loop.
+    const scrubbed = scrubSentryEvent(
+      eventWith({
+        // Addresses the PROSE pattern cannot match — no TLD run after the `@`.
+        // With a matchable address, deleting the `_email` rule still passed:
+        // `redactFreeText` reduced it to the same marker, so the test proved the
+        // free-text redactor and nothing about the key rule it is named after.
+        candidate_email: 'mario.rossi@localhost',
+        contactEmail: 'anna.bianchi@localhost',
+      })
+    )
+
+    const encoded = JSON.stringify(scrubbed.extra)
+
+    expect(encoded).not.toContain('mario.rossi@localhost')
+    expect(encoded).not.toContain('anna.bianchi@localhost')
+  })
+
+  it('leaves a scoped package path in a stack intact', () => {
+    // The address pattern must not eat `@sentry/vue`. `redactFreeText` runs on
+    // Error.stack, and a stack here is scoped packages all the way down — a
+    // broader local part turned every frame into `[redacted]`, which is the
+    // silent failure this module calls worse than a scrubbed one. Nothing
+    // pinned it and the suite stayed green while it happened.
+    const stack = 'at Module.render (/app/node_modules/@sentry/vue/esm/index.js:12:5)'
+
+    expect(redactFreeText(stack)).toBe(stack)
+  })
+})
+
+describe('an address in prose has no key for the denylist to catch', () => {
+  it('redacts an email embedded in a thrown message', () => {
+    // The exact argument ABSOLUTE_URL_PATTERN already makes: a free-text field
+    // carries no key, so the key denylist cannot see it. An address in an error
+    // message is the same leak class as an entry link in one.
+    expect(redactFreeText('invite to mario.rossi@example.test failed')).not.toContain(
+      'mario.rossi@example.test'
+    )
+  })
+})

@@ -140,7 +140,14 @@ function isDeniedKey(key: string): boolean {
   // `providerApiKey`) is covered without an edit here — enumerating every
   // future field name is impossible; a naming convention is not.
   return (
-    normalized.endsWith('_token') || normalized.endsWith('_secret') || normalized.endsWith('_key')
+    normalized.endsWith('_token') ||
+    normalized.endsWith('_secret') ||
+    normalized.endsWith('_key') ||
+    // `candidate_email`, `contactEmail`, `recoveryEmail` — the address is the
+    // one candidate identifier that resolves to a person with no calling system
+    // in the loop, so the convention has to reach the fields nobody has named
+    // yet, exactly as it does for credentials.
+    normalized.endsWith('_email')
   )
 }
 
@@ -336,6 +343,23 @@ export function redactUrl(url: string | undefined): string | undefined {
  */
 const ABSOLUTE_URL_PATTERN = /https?:\/\/[^\s"'<>]+/gi
 
+/**
+ * An address in prose, which no key denylist can reach.
+ *
+ * Exactly the argument `ABSOLUTE_URL_PATTERN` above already makes for entry
+ * links: a thrown message is free text, so `invite to x@y.test failed` carries
+ * the identifier with no key attached to deny.
+ *
+ * The classes are what an ADDRESS uses, not merely "not whitespace". A broader
+ * local part ate scoped package paths — `redactFreeText` runs on `Error.stack`,
+ * and a stack in this app is `@sentry/nuxt`, `@nuxtjs/i18n`, `@vue/*` and Vite's
+ * `/@fs/` all the way down, so `at Module.render (/app/node_modules/@sentry/…)`
+ * came back as `at Module.render [redacted])`. That is the silent failure
+ * `scrubStacktrace` below already litigates and calls the worse outcome: not a
+ * leak, just an error reporter that can no longer say where anything broke.
+ */
+const EMAIL_PATTERN = /[\w.%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
+
 export function redactFreeText(text: string): string {
   // The fast path is ONLY for a message that is a bare route and nothing else —
   // the Vue Router breadcrumb shape — because `redactAnalyticsPath` is the one
@@ -371,15 +395,17 @@ export function redactFreeText(text: string): string {
     }
   }
 
-  return redactEmbeddedPaths(text).replace(ABSOLUTE_URL_PATTERN, (match) => {
-    try {
-      const parsed = new URL(match)
+  return redactEmbeddedPaths(text)
+    .replace(EMAIL_PATTERN, REDACTED)
+    .replace(ABSOLUTE_URL_PATTERN, (match) => {
+      try {
+        const parsed = new URL(match)
 
-      return `${parsed.protocol}//${parsed.host}`
-    } catch {
-      return REDACTED
-    }
-  })
+        return `${parsed.protocol}//${parsed.host}`
+      } catch {
+        return REDACTED
+      }
+    })
 }
 
 export function scrubBreadcrumb(breadcrumb: ScrubbableBreadcrumb): ScrubbableBreadcrumb {

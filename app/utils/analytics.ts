@@ -1,45 +1,42 @@
-import { isAnalyticsSafeRoute, redactAnalyticsPath } from '~/utils/analytics-path'
+import { redactAnalyticsPath } from '~/utils/analytics-path'
 
 /**
  * Decides what analytics may load, and what it may send (C13, tasks 5.3 / 5.4).
  *
- * A pure function rather than logic inside the plugin, because "does a
- * third-party session recorder start on the page showing a candidate's
- * transcript and their BARS scores" should be answerable in one line of test —
- * not by reading control flow in a browser and hoping.
+ * A pure function rather than logic inside the plugin, because "does GA4 run
+ * for this visitor, and with what path" should be answerable in one line of
+ * test — not by reading control flow in a browser and hoping.
+ *
+ * Microsoft Clarity was removed from this app (openspec/specs/observability/spec.md,
+ * Microsoft Clarity — User Behavior Analytics): the backoffice is an internal
+ * admin tool that renders a candidate's transcript and BARS scores, and a
+ * third-party session recorder there is a privacy liability the frontend does
+ * not share. GA4 is the only tool left to plan for.
  */
 
 export interface AnalyticsOptions {
   gaMeasurementId: string
-  clarityProjectId: string
   consentGranted: boolean
   path: string
 }
 
 export interface AnalyticsPlan {
   loadGa: boolean
-  loadClarity: boolean
   pagePath: string
 }
 
 export function analyticsPlan(options: AnalyticsOptions): AnalyticsPlan {
-  const { gaMeasurementId, clarityProjectId, consentGranted, path } = options
-
-  // Two independent conditions, and BOTH default to off: an ID that was never
-  // configured, and a consent that was never granted. Neither is a fallback for
-  // the other — a missing ID is "this deployment does not use the tool", while
-  // missing consent is "this visitor has not agreed", and confusing them is how
-  // analytics ends up running for people who declined.
-  const enabled = consentGranted
+  const { gaMeasurementId, consentGranted, path } = options
 
   return {
-    loadGa: enabled && gaMeasurementId !== '',
-
-    // Clarity is additionally refused on the participants branch and the login
-    // page, whatever the configuration says. See isAnalyticsSafeRoute for why
-    // this is not left to whoever fills in the env var.
-    loadClarity: enabled && clarityProjectId !== '' && isAnalyticsSafeRoute(path),
-
+    // Two independent conditions, and BOTH default to off: an ID that was
+    // never configured, and a consent that was never granted. Neither is a
+    // fallback for the other — a missing ID is "this deployment does not use
+    // GA4", while missing consent is "this visitor has not agreed", and
+    // confusing them is how analytics ends up running for people who
+    // declined. (Used to gate Clarity too, through a shared `enabled`
+    // variable — inlined now that GA4 is the only thing left to gate.)
+    loadGa: consentGranted && gaMeasurementId !== '',
     pagePath: redactAnalyticsPath(path),
   }
 }
@@ -74,39 +71,6 @@ export function createGtagStub(target: { dataLayer?: unknown[] }): (...args: unk
     // eslint-disable-next-line prefer-rest-params
     target.dataLayer?.push(arguments)
   }
-}
-
-/**
- * Clarity's queue stub, which MUST exist BEFORE the tag script is injected.
- *
- * The tag script does not define `window.clarity` — it CALLS it, on its first
- * line, to queue its own initialisation. Injecting the tag without this stub
- * produces `TypeError: a[c] is not a function` inside a third-party file and
- * nothing else: no failing build, no visible symptom, and a recorder that
- * never records.
- *
- * `??=` rather than an unconditional assignment, because the real Clarity
- * replaces this stub once it loads and drains `.q`. Overwriting it afterwards
- * would throw away a live recorder and re-queue into an object nobody reads.
- *
- * Same contract as the gtag stub above, and dropped for the same reason: the
- * queue takes `arguments`, which is what a modernising rewrite deletes first.
- */
-export function createClarityStub(target: {
-  clarity?: ((...args: unknown[]) => void) & { q?: unknown[] }
-}): void {
-  target.clarity ??= Object.assign(
-    function clarity(): void {
-      const self = target.clarity
-      if (self === undefined) {
-        return
-      }
-      self.q ??= []
-      // eslint-disable-next-line prefer-rest-params
-      self.q.push(arguments)
-    },
-    { q: [] as unknown[] }
-  )
 }
 
 /**

@@ -14,7 +14,11 @@ import { checkA11y } from './fixtures/a11y'
  * traffic into a real property.
  */
 
-const THIRD_PARTY = /googletagmanager\.com|clarity\.ms|google-analytics\.com/
+// No clarity.ms here: Microsoft Clarity was removed from this app entirely
+// (openspec/specs/observability/spec.md, Microsoft Clarity — User Behavior
+// Analytics requirement) — it is frontend-only. GA4 is the only third-party
+// tool the backoffice can load.
+const THIRD_PARTY = /googletagmanager\.com|google-analytics\.com/
 
 /**
  * `/health` rather than `/`, and the reason is the product rather than the test.

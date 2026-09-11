@@ -1,30 +1,30 @@
-import {
-  analyticsPlan,
-  createClarityStub,
-  createGtagStub,
-  gaConfigPayload,
-} from '~/utils/analytics'
+import { analyticsPlan, createGtagStub, gaConfigPayload } from '~/utils/analytics'
 import { ANALYTICS_CONSENT_EVENT, readAnalyticsConsent } from '~/utils/analytics-consent'
 import { redactAnalyticsPath } from '~/utils/analytics-path'
 
 /**
- * Loads Microsoft Clarity and GA4 — if, and only if, they are allowed to run
- * (C13, tasks 5.3 / 5.4).
+ * Loads GA4 — if, and only if, it is allowed to run (C13, tasks 5.3 / 5.4).
  *
- * `.client` because both are browser SDKs, and because an SSR render has no
+ * `.client` because it is a browser SDK, and because an SSR render has no
  * consent to read: server-side loading would track everyone unconditionally.
  *
  * The plugin itself holds no policy. Every decision about what may load and
  * what may be sent lives in the pure functions it calls, so those decisions can
  * be asserted in unit tests instead of inferred from control flow. What is left
  * here is script injection and route subscription.
+ *
+ * Microsoft Clarity used to be loaded here too. It was removed from this app
+ * (openspec/specs/observability/spec.md, Microsoft Clarity — User Behavior
+ * Analytics): the backoffice is an internal admin tool that renders a
+ * candidate's transcript and BARS scores, and a third-party session recorder
+ * there is a privacy liability the frontend does not share. Clarity remains
+ * frontend-only.
  */
 
 declare global {
   interface Window {
     dataLayer?: unknown[]
     gtag?: (...args: unknown[]) => void
-    clarity?: (...args: unknown[]) => void
   }
 }
 
@@ -63,20 +63,11 @@ function startGa(measurementId: string, pagePath: string): void {
   window.gtag('config', measurementId, gaConfigPayload(pagePath))
 }
 
-function startClarity(projectId: string): void {
-  // The stub goes up FIRST. Clarity's tag calls `window.clarity` on its first
-  // line rather than defining it, so injecting the script alone throws inside
-  // a third-party file and the recorder silently never starts.
-  createClarityStub(window)
-  injectScript(`https://www.clarity.ms/tag/${projectId}`, 'beai-clarity')
-}
-
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
   const router = useRouter()
 
   const gaMeasurementId = String(config.public.gaMeasurementId ?? '')
-  const clarityProjectId = String(config.public.clarityProjectId ?? '')
 
   // Mutable, because consent can be granted mid-visit through the banner. It is
   // never revoked here: withdrawing consent has to unload third-party scripts
@@ -86,15 +77,21 @@ export default defineNuxtPlugin(() => {
     typeof window === 'undefined' ? undefined : window.localStorage
   )
 
+  // `injectScript` guards on the element id, so the SCRIPT loads once — and
+  // that guard reads as if it protected the whole of `startGa`. It protects one
+  // line of it. Without this flag a second consent grant re-runs `gtag('js')`,
+  // re-pushes the Consent Mode defaults and re-issues `config` against an
+  // already-initialised container. `startFor` is called on plugin init AND from
+  // the consent listener below, so the second call is a normal path, not an
+  // edge case.
+  let gaStarted = false
+
   function startFor(path: string): void {
-    const plan = analyticsPlan({ gaMeasurementId, clarityProjectId, consentGranted, path })
+    const plan = analyticsPlan({ gaMeasurementId, consentGranted, path })
 
-    if (plan.loadGa) {
+    if (plan.loadGa && !gaStarted) {
+      gaStarted = true
       startGa(gaMeasurementId, plan.pagePath)
-    }
-
-    if (plan.loadClarity) {
-      startClarity(clarityProjectId)
     }
   }
 
@@ -122,23 +119,5 @@ export default defineNuxtPlugin(() => {
       page_path: redactAnalyticsPath(to.fullPath),
       page_location: '',
     })
-  })
-
-  // Clarity is never STARTED on a participant or login route, but an operator
-  // navigating to one from the dashboard would already have it running.
-  // Stopping it is the difference between "we do not begin recording a
-  // candidate's evaluation" and "a candidate's evaluation is not recorded".
-  router.afterEach((to) => {
-    if (
-      window.clarity !== undefined &&
-      !analyticsPlan({
-        gaMeasurementId,
-        clarityProjectId,
-        consentGranted,
-        path: to.fullPath,
-      }).loadClarity
-    ) {
-      window.clarity('stop')
-    }
   })
 })

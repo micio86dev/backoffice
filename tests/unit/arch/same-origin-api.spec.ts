@@ -33,6 +33,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const DOCKERFILE = readFileSync(resolve(__dirname, '../../../Dockerfile'), 'utf-8')
+const ENV_EXAMPLE = readFileSync(resolve(__dirname, '../../../.env.example'), 'utf-8')
 
 describe('the same-origin API mechanism cannot be quietly removed', () => {
   it('nginx proxies /api/ from the backoffice origin', () => {
@@ -64,6 +65,21 @@ describe('the same-origin API mechanism cannot be quietly removed', () => {
   it('the build refuses an absolute NUXT_PUBLIC_API_BASE', () => {
     // The one environment variable that can undo all of the above.
     expect(DOCKERFILE).toContain('NUXT_PUBLIC_API_BASE must be RELATIVE')
+  })
+
+  it('.env.example carries a RELATIVE api base, like the value the build demands', () => {
+    // The Dockerfile check guards the BUILD ARG. It cannot see this file, which
+    // is the one a developer copies to .env on day one — so an absolute value
+    // here is a broken local setup that never reaches the gate that would
+    // explain it. It presents as a CORS failure (Laravel's CORS covers `api/*`
+    // only), which sends people hunting the wrong bug entirely.
+    const line = ENV_EXAMPLE.split('\n').find((l) => l.startsWith('NUXT_PUBLIC_API_BASE='))
+
+    expect(line, 'NUXT_PUBLIC_API_BASE missing from .env.example').toBeDefined()
+
+    const value = line!.slice('NUXT_PUBLIC_API_BASE='.length).trim()
+
+    expect(value, 'an absolute base makes the api a different SITE').toMatch(/^\//)
   })
 
   it('the proxy target is a required build arg, not an optional one', () => {

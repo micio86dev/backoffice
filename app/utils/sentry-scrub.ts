@@ -143,11 +143,13 @@ function isDeniedKey(key: string): boolean {
     normalized.endsWith('_token') ||
     normalized.endsWith('_secret') ||
     normalized.endsWith('_key') ||
-    // `candidate_email`, `contactEmail`, `recoveryEmail` — the address is the
-    // one candidate identifier that resolves to a person with no calling system
-    // in the loop, so the convention has to reach the fields nobody has named
-    // yet, exactly as it does for credentials.
-    normalized.endsWith('_email')
+    // Any key NAMING an address, not merely one suffixed with it. The api half
+    // considered `endsWith('_email')` and rejected it by name: it misses
+    // `email_address`, `emails` and `emailAddress`, and `excerpts` was already
+    // pluralised in the list above. This file's own contract at the top is that
+    // where a leak class exists on both sides it carries the api's EXACT
+    // denylist rather than inventing a second convention.
+    normalized.includes('email')
   )
 }
 

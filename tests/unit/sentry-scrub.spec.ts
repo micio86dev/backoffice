@@ -708,6 +708,10 @@ describe('the suffix convention has to cover the address too', () => {
         // free-text redactor and nothing about the key rule it is named after.
         candidate_email: 'mario.rossi@localhost',
         contactEmail: 'anna.bianchi@localhost',
+        // The plural and the compound, which a `_email` SUFFIX misses and the
+        // api's `str_contains` catches. The two halves must not disagree.
+        email_address: 'carla.verdi@localhost',
+        emails: ['dario.neri@localhost'],
       })
     )
 
@@ -715,6 +719,8 @@ describe('the suffix convention has to cover the address too', () => {
 
     expect(encoded).not.toContain('mario.rossi@localhost')
     expect(encoded).not.toContain('anna.bianchi@localhost')
+    expect(encoded).not.toContain('carla.verdi@localhost')
+    expect(encoded).not.toContain('dario.neri@localhost')
   })
 
   it('leaves a scoped package path in a stack intact', () => {

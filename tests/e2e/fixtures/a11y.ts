@@ -8,8 +8,44 @@ import AxeBuilder from '@axe-core/playwright'
  * @throws {Error} if any WCAG 2.1 AA violations are found
  */
 export async function checkA11y(page: Page): Promise<void> {
+  // Let every in-flight animation settle FIRST. Axe measures the pixels that
+  // are on screen at the instant it runs, and `toBeVisible()` resolves as soon
+  // as an element is in the layout — an enter transition may still be playing.
+  //
+  // Mid-fade, a dialog title composites to #dcdfe3 over #f6f8fa: contrast 1.25,
+  // reported as a serious colour-contrast violation against a dialog that is
+  // perfectly legible a frame later. The crop dialog failed exactly this way on
+  // WebKit, whose transition timing differs from Chromium's, while passing
+  // there — which is what made it read as a browser-specific design bug rather
+  // than a measurement taken too early. WCAG governs the settled interface, not
+  // the frames on the way to it.
+  // Infinite animations are FILTERED OUT rather than waited on. `animate-pulse`
+  // (Skeleton) and `animate-spin` (Button's pending state) never reach
+  // `finished`, so asking whether EVERY animation is done is permanently false
+  // on any page with a skeleton mounted — the wait would burn its timeout and
+  // axe would scan the same unsettled frame as before, with nothing going red to
+  // say so. The question is not "is everything finished" but "is anything still
+  // converging".
+  //
+  // The timeout is therefore NOT swallowed: with the loopers excluded, reaching
+  // it means a finite animation genuinely hung, and that is worth failing on.
+  await page.waitForFunction(
+    () =>
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .every((a) => a.playState === 'finished'),
+    null,
+    { timeout: 5_000 }
+  )
+
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+    // `wcag21a` included. Without it every rule axe tags as WCAG 2.1 Level A was
+    // skipped — `label-content-name-mismatch` (SC 2.5.3, Label in Name) among
+    // them — while the docblock above and the error thrown below both announced
+    // "WCAG 2.1 AA". AA conformance INCLUDES all Level A criteria, so the gate
+    // was lying in its own failure message.
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze()
 
   if (results.violations.length > 0) {

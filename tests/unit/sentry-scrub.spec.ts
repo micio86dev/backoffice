@@ -771,6 +771,67 @@ describe('an address in prose has no key for the denylist to catch', () => {
   })
 })
 
+describe('an embedded document is scanned with the delimiter spellings the normalizer folds', () => {
+  // The normalizer half of this rule was pinned; the SCANNER half was not.
+  // `EMBEDDED_KEY_PATTERN` matched keys with `[\w.-]+`, so a delimiter-bearing
+  // key inside a serialised body was never FOUND — the denylist never got the
+  // chance to refuse it.
+  //
+  // NO braces in the fixture: a balanced `{…}` is cut wholesale one pass
+  // earlier, so a document-shaped fixture proves nothing about this scanner. A
+  // TRUNCATED body — the ordinary shape once a provider message has been
+  // clipped — is what actually reaches it.
+  it('denies a delimiter-bearing key inside a truncated body', () => {
+    const body =
+      'HTTP 422 from provider: "candidate ref":"SPEECHLEAK", ' +
+      '"data[transcript]":"SPEECHLEAK", "user:candidate_ref":"REFLEAK"'
+
+    const extra = scrubSentryEvent({ extra: { provider_error: body } }).extra
+
+    expect(JSON.stringify(extra)).not.toContain('LEAK')
+  })
+})
+
+describe('a key path the normalizer cannot segment is a key path it cannot deny', () => {
+  // Measured leak: `toSnakeKey` folded `-`, `.` and whitespace and nothing else,
+  // so a BRACKET or COLON spelling never split into segments the walk reaches.
+  // `headers[authorization]` shipped a live bearer token and `data[transcript]`
+  // shipped candidate speech, both one character away from the same value being
+  // cut correctly. The api carried the identical `[-.\s]+` set, so this was a
+  // symmetric gap, not a mirror break — and symmetric is worse, not better.
+  it.each([
+    ['data[transcript]'],
+    ['form[answer_1]'],
+    ['headers[authorization]'],
+    ['user:candidate_ref'],
+    ['headers/authorization'],
+    ['user|candidate_ref'],
+    // A CLOSING delimiter leaves an empty trailing segment, and the single-word
+    // rule requires the denied word to BE the last one. `data[content]` folded
+    // to `data_content_` — parts `['data','content','']` — so `content` was
+    // never tested as the last segment and candidate speech walked. The six
+    // cases above were all blind to it: every one ends in a CONTENT WORD or a
+    // multi-word entry, both of which match in any position anyway, so the
+    // test was green on the half that already worked.
+    ['data[content]'],
+    ['user[content]'],
+    ['data[contents]'],
+  ])('denies %s', (key) => {
+    const extra = scrubSentryEvent({ extra: { [key]: 'LEAKED' } }).extra as Record<string, unknown>
+
+    expect(Object.values(extra)).toEqual(['[redacted]'])
+  })
+
+  it('still keeps a key whose segments are all benign', () => {
+    // The fold must not turn every punctuated key into a denial — that would be
+    // fail-closed by accident rather than by rule, and it would destroy the
+    // diagnostics this module exists to preserve.
+    const extra = scrubSentryEvent({ extra: { 'view[list]': 'PROJECTS' } }).extra
+
+    expect(extra).toEqual({ 'view[list]': 'PROJECTS' })
+  })
+})
+
 describe('namespaced keys must reach the denylist the api reaches', () => {
   it('scrubs dotted OpenTelemetry keys', () => {
     // The normalizer handled camelCase but never dots, so every OTel-style key

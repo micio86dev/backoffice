@@ -334,12 +334,24 @@ function toSnakeKey(key: string): string {
   // and `SSOToken` have no lowercase character before the uppercase one.
   return (
     key
-      // WHITESPACE folds too. `-` and `.` were folded so the denylist reaches
-      // `X-Api-Key` and `auth.token`; a space was not, so `{'candidate ref': …}`
-      // and `{'display name': …}` walked. Sentry's TAG charset would reject those,
-      // but `extra`, `contexts` and `breadcrumb.data` have no charset restriction
-      // at all.
-      .replace(/[-.\s]+/g, '_')
+      // EVERY non-word character folds, not a hand-kept list of three.
+      // `-`, `.` and whitespace were enumerated one leak at a time; brackets and
+      // colons were never added, so `headers[authorization]` shipped a live
+      // bearer token and `data[transcript]` shipped candidate speech — the same
+      // values the dotted spelling one character away had cut correctly. Both
+      // mirrors AND the api carried the identical three-delimiter set, so the
+      // gap was symmetric: no second copy was left to disagree and expose it.
+      //
+      // `\W` is `[^A-Za-z0-9_]`, and `_` is the segment separator itself, so the
+      // rule is now "a segment is a run of word characters" rather than a list
+      // that has to anticipate every producer's spelling.
+      .replace(/\W+/g, '_')
+      // The EMPTY trailing segment a CLOSING delimiter leaves. `data[content]`
+      // folded to `data_content_`, whose parts are `['data','content','']`, and
+      // the single-word rule requires the denied word to BE the last one — so
+      // `content` was never tested there and candidate speech walked, one
+      // character from `data.content` being cut. Leading too, for `[content]`.
+      .replace(/^_+|_+$/g, '')
       // The letter->DIGIT boundary too. Without it the normalizer produced
       // `answer1` as ONE segment: not in the list, not a run the walk can reach,
       // so `answer1` shipped while `answer_1` — the same field, one character
@@ -1301,7 +1313,18 @@ function redactEmbeddedDocuments(text: string): string {
 // — and a parse of a truncated document fails, which would hand the whole thing
 // back. An unterminated value here is redacted to the end of the string, which
 // is the fail-closed direction.
-const EMBEDDED_KEY_PATTERN = /\\?"([\w.-]+)\\?"\s*:\s*/g
+// The key class is `[^"\\]` — ANYTHING but a quote and a backslash, which is
+// exactly what a JSON key may hold — and not `[\w.-]`. The narrow class could
+// not see the delimiter spellings `toSnakeKey` can now segment, so an embedded
+// `{"candidate ref":…}`, `{"data[transcript]":…}` or `{"user:candidate_ref":…}`
+// was never even FOUND, let alone denied.
+//
+// Bounded by its own quotes, so it cannot run past its key. A prose value that
+// happens to contain `"…":` can be read as a key and denied — accepted, because
+// that direction is fail-closed and this module takes a false redaction over a
+// false disclosure everywhere else. Swept 184KB of quote-heavy prose on the api
+// twin: 0.1ms, no backtracking pathology, output length unchanged.
+const EMBEDDED_KEY_PATTERN = /\\?"([^"\\]+)\\?"\s*:\s*/g
 
 /**
  * The index just past the value starting at `from`, or the string length.
@@ -1497,28 +1520,24 @@ export function redactFreeText(rawText: string): string {
     // lived here too.
     const viaRoute = redactPath(text)
 
-    // Only RETURN on a hit. `redactAnalyticsPath`'s patterns are anchored at `^`
-    // behind `^(\/(?:[a-z]{2}\/)?participants)\/([^/]+)$`-shaped patterns, so anything they do not
-    // does not anticipate falls straight through — and returning here made that
-    // a leak rather than a miss: `/x/reset-password/TOKEN` came back verbatim,
-    // a live single-use credential, while the same string with a space in it
-    // redacted correctly via the unanchored general branch below. Same defect
-    // class as the `/api`-mount bug this change fixes: a function written
-    // against router paths, silently no-opping on a prefix it never saw.
+    // RETURNED UNCONDITIONALLY: `redactPath` ALREADY runs both passes — the
+    // anchored one and then `redactEmbeddedPaths` — so on a bare route there is
+    // nothing left for the fallthrough to add. Guarding on `viaRoute !== text`
+    // was equivalent, measured, and the MIRROR carried the same shape over a
+    // `redactPath` that DOES have a named-page guard, where falling through
+    // defeated it and collapsed `/interview/done` onto the token page. Fixed in
+    // both, identically, rather than in the one where it happened to bite.
     //
-    // Falling through on a miss is strictly stronger — no case gets worse, and
-    // the hit path is not redundant: the id class stops at `/`, so the
-    // general branch preserves a trailing segment too — the difference is a
-    // segment containing characters that class excludes, such as `/x/a;b`.
-    if (viaRoute !== text) {
-      // NOT returned raw. `redactAnalyticsPath` keeps the trailing remainder
-      // verbatim, so everything after the placeholder never reached the address
-      // or absolute-URL passes: `/participants/:id/notes/jane@acme.test` shipped
-      // the address, and `redactUrl` — the twin with the same threat model — cut
-      // it. Falling through on a MISS was already the rule; returning on a HIT
-      // was the half of it still open.
-      return redactTail(viaRoute)
-    }
+    // An earlier version of this comment claimed the guard was load-bearing for
+    // "a segment containing characters that class excludes, such as `/x/a;b`".
+    // Measured: `/x/a;b` never reaches this branch at all.
+    //
+    // NOT returned raw. `redactAnalyticsPath` keeps the trailing remainder
+    // verbatim, so everything after the placeholder never reached the address
+    // or absolute-URL passes: `/participants/:id/notes/jane@acme.test` shipped
+    // the address, and `redactUrl` — the twin with the same threat model — cut
+    // it.
+    return redactTail(viaRoute)
   }
 
   return redactTail(redactEmbeddedPaths(text))

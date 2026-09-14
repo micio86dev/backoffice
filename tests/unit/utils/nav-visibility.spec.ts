@@ -1,5 +1,17 @@
 /**
- * The sidebar for a superadmin who has not chosen a client.
+ * `visibleNavItemsFor` — the scope rule, tested directly.
+ *
+ * MOVED here from `tests/unit/components/organisms/SidebarNavSuperadmin.spec.ts`
+ * on 2026-09-14. Nothing about what it tests changed: it always imported
+ * `visibleNavItemsFor` and passed literal viewer objects, never mounting a
+ * component. Filed under `components/organisms/` it read as a SidebarNav spec,
+ * so `nav-visibility.ts` appeared to have no test of its own — and that module's
+ * own docblock says it was extracted "so the rule is testable on its own —
+ * burying it in a template makes it something you verify by reading rather than
+ * by running". A spec whose location hides it is the same problem one directory
+ * up. SidebarNav's component behaviour is covered by `SidebarNav.spec.ts`.
+ *
+ * The rule: the sidebar for a superadmin who has not chosen a client.
  *
  * Dashboard, Projects, Candidates and Reports are CLIENT data. A superadmin
  * with no client selected has no answer to "whose?" — and the product agrees
@@ -12,7 +24,7 @@
  * this extends the same rule to the state a superadmin can be in.
  */
 import { describe, it, expect } from 'vitest'
-import { visibleNavItemsFor } from '../../../../app/utils/nav-visibility'
+import { visibleNavItemsFor } from '../../../app/utils/nav-visibility'
 
 // This file tests `visibleNavItemsFor` DIRECTLY, with literal viewer objects.
 // It used to also carry a `vi.mock('@/composables/useCurrentUser')`, a `can`

@@ -101,17 +101,34 @@ function mockOrganizationNotFound() {
  * answers `false` to everything: fail-closed, the same way the real composable
  * does when it has no identity to read.
  */
-// `llmCredentials.viewAny` was here and is GONE: the credential vault is gated
-// on `user.is_superadmin` now, so the page asks for that ability nowhere. An
-// entry with no consumer is not harmless — it reads as coverage of a rule that
-// moved.
+/**
+ * The abilities an org ADMIN holds, and the ones no tenant role ever does.
+ *
+ * Two sets, because the server answers them from two different places and the
+ * mock must not flatten that. `ADMIN_ONLY` comes from org-scoped policies —
+ * `hasRole('admin')` in teams mode. `PLATFORM_ONLY` comes from
+ * `Gate::define('viewAnyClients' | 'viewPlatformSettings')` and
+ * `LlmCredentialPolicy`, all of which answer from `is_superadmin`: an org
+ * admin holds none of them no matter how many tenant roles they collect.
+ *
+ * Before the hotfix this distinction did not exist here, because the page read
+ * `user.is_superadmin` directly for those sections and asked the map nothing.
+ * Now the map is the only input, so a mock that got this wrong would hide a
+ * real regression.
+ */
 const ADMIN_ONLY = new Set(['organization.update', 'users.viewAny', 'apiClients.viewAny'])
+
+const PLATFORM_ONLY = new Set([
+  'llmCredentials.viewAny',
+  'platformSettings.viewAny',
+  'clients.viewAny',
+])
 
 function mockCurrentUser(role: 'admin' | 'operator' | 'superadmin' | null) {
   const isSuperadmin = role === 'superadmin'
-  // A superadmin also holds every org ability through `Gate::before`, so the
-  // ability answers below treat them as an admin — anything narrower would
-  // make the platform-section tests pass for the wrong reason.
+  // A superadmin also holds every ORG ability through `Gate::before`, so the
+  // tenant answers below treat them as an admin — anything narrower would make
+  // the platform-section tests pass for the wrong reason.
   const abilityRole = isSuperadmin ? 'admin' : role
 
   vi.doMock('../../../../app/composables/useCurrentUser', () => ({
@@ -120,12 +137,13 @@ function mockCurrentUser(role: 'admin' | 'operator' | 'superadmin' | null) {
         role === null
           ? vi.fn().mockRejectedValue(new Error('unauthenticated'))
           : vi.fn().mockResolvedValue({ roles: [abilityRole] }),
-      can: (ability: string) =>
-        abilityRole !== null && (abilityRole === 'admin' || !ADMIN_ONLY.has(ability)),
-      // The page reads `is_superadmin` for the PLATFORM section, which is
-      // gated on identity rather than on an ability: its rows belong to no
-      // organization, so no org-scoped policy can describe who may edit them.
-      // `null` for the unauthenticated case, so that path still fails closed.
+      can: (ability: string) => {
+        if (abilityRole === null) return false
+        if (PLATFORM_ONLY.has(ability)) return isSuperadmin
+        return abilityRole === 'admin' || !ADMIN_ONLY.has(ability)
+      },
+      // `user` is still published because other code reads `name`/`photo_url`
+      // from it — but NOT `is_superadmin` for any gate on this page any more.
       user: ref(role === null ? null : { is_superadmin: isSuperadmin }),
     }),
   }))
@@ -156,15 +174,17 @@ function mockCurrentUserAsync(role: 'admin' | 'operator' | 'superadmin') {
         loaded.value = true
         return { roles: ['admin'] }
       }),
-      // Fails closed until the identity lands — exactly like the real one.
-      //
-      // `!ADMIN_ONLY.has(ability) || true` was here, which is `true`: the gate
-      // collapsed to `loaded.value` and authorized EVERYTHING, in the one mock
-      // the two panel tests below depend on. A mock that grants every ability
-      // cannot fail on an ability-gating regression, which is the whole thing
-      // those tests exist to hold.
-      can: (ability: string) =>
-        loaded.value && (abilityRole === 'admin' || !ADMIN_ONLY.has(ability)),
+      // Fails closed until the identity lands — exactly like the real one —
+      // and answers PLATFORM_ONLY from `isSuperadmin`, exactly like the
+      // synchronous sibling. Reading only `ADMIN_ONLY` here granted an
+      // OPERATOR `llmCredentials.viewAny`, because that key is not in the
+      // org-scoped set: the two mocks have to model the same two sources or
+      // whichever tests use this one silently gate on nothing.
+      can: (ability: string) => {
+        if (!loaded.value) return false
+        if (PLATFORM_ONLY.has(ability)) return isSuperadmin
+        return abilityRole === 'admin' || !ADMIN_ONLY.has(ability)
+      },
       user,
     }),
   }))
@@ -309,6 +329,118 @@ describe('pages/settings/index.vue', () => {
     // Branding is admin-only for the reason the vault used to be: what every
     // candidate of an organization sees is not an operator-level decision.
     expect(wrapper.text()).toContain('settings.tabs.branding')
+  })
+
+  /**
+   * THE HOTFIX, stated as a test: the page reads the ANSWER, not the input.
+   *
+   * A viewer who IS a superadmin but whose published ability map says no must
+   * not see these sections. That combination is impossible today — both gates
+   * answer from `is_superadmin` server-side — and that is exactly why it is
+   * worth pinning: it is the only shape that distinguishes "reads the ability"
+   * from "re-derives the identity", and an identity gate passes every other
+   * case identically.
+   *
+   * It stops being hypothetical the moment `Gate::define('viewPlatformSettings')`
+   * or `LlmCredentialPolicy` grows a second condition — a maintenance lock, a
+   * platform permission, a disabled account. Under the old gate the rail kept
+   * rendering both sections and every action inside 403'd, with nothing red.
+   */
+  it('hides both platform sections from a superadmin the server has refused', async () => {
+    mockOrganizationNotFound()
+
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockResolvedValue({ roles: [] }),
+        // Superadmin identity, and the server says no to both platform
+        // abilities. `clients.viewAny` stays TRUE so the page still reads the
+        // 404 as structural — otherwise this would pass for the wrong reason,
+        // by falling into the error branch instead of the refusal.
+        can: (ability: string) => ability === 'clients.viewAny',
+        user: ref({ is_superadmin: true }),
+      }),
+    }))
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+    expect(wrapper.text()).not.toContain('settings.tabs.platform')
+  })
+
+  /**
+   * The two platform sections name DIFFERENT abilities, and this is the only
+   * test that can tell.
+   *
+   * Every other fixture answers both from one `isSuperadmin` flag, so swapping
+   * `platformSettings.viewAny` for `llmCredentials.viewAny` on the Platform
+   * section passes all 25 of them: the two are always equal, so the wrong one
+   * is indistinguishable from the right one. Granting exactly one is what
+   * separates them.
+   *
+   * Not hypothetical arithmetic either — they are resolved by two different
+   * server gates (`viewPlatformSettings` and `LlmCredentialPolicy::viewAny`),
+   * so the day either grows a condition the other does not, they diverge.
+   */
+  it('names a DIFFERENT ability per platform section', async () => {
+    mockOrganizationNotFound()
+
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockResolvedValue({ roles: [] }),
+        // Platform settings YES, credential vault NO — and `clients.viewAny`
+        // true so the 404 still reads as structural rather than as an error.
+        can: (ability: string) =>
+          ability === 'platformSettings.viewAny' || ability === 'clients.viewAny',
+        user: ref({ is_superadmin: true }),
+      }),
+    }))
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).toContain('settings.tabs.platform')
+    expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+  })
+
+  it("and the other way round, so neither section can borrow the other's gate", async () => {
+    mockOrganizationNotFound()
+
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockResolvedValue({ roles: [] }),
+        can: (ability: string) =>
+          ability === 'llmCredentials.viewAny' || ability === 'clients.viewAny',
+        user: ref({ is_superadmin: true }),
+      }),
+    }))
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).toContain('settings.tabs.llmCredentials')
+    expect(wrapper.text()).not.toContain('settings.tabs.platform')
+  })
+
+  /**
+   * The 404 branch reads `clients.viewAny`, not the identity.
+   *
+   * A viewer who IS a superadmin but whom the server has refused the estate
+   * must get the ERROR banner, not the silent "this is normal" path — because
+   * for them it is not normal. The identity version of this line answered
+   * "structural" for anyone holding the flag, whatever the server said.
+   */
+  it('treats a 404 as a real failure when the server refuses the estate', async () => {
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockResolvedValue({ roles: ['admin'] }),
+        // Every ability EXCEPT the estate one.
+        can: (ability: string) => ability !== 'clients.viewAny',
+        user: ref({ is_superadmin: true }),
+      }),
+    }))
+    mockOrganizationNotFound()
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.find('[data-testid="settings-error"]').exists()).toBe(true)
   })
 
   it('gives the credential vault to a superadmin, with or without a client selected', async () => {

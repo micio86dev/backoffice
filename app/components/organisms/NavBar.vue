@@ -17,7 +17,7 @@
       would put two answers in one topbar.
     -->
     <ClientSwitcher
-      v-if="isSuperadmin"
+      v-if="canSwitchClients && actingClientKnown"
       :clients="clients"
       :acting-client-id="actingClientId"
       @change="onSwitchClient"
@@ -58,7 +58,26 @@ import { useSuperadmin, type Client } from '@/composables/useSuperadmin'
 import ClientSwitcher from '@/components/organisms/ClientSwitcher.vue'
 
 const organizationName = ref<string | null>(null)
-const isSuperadmin = ref(false)
+/**
+ * Whether this viewer may operate the whole estate, read from the PUBLISHED
+ * ABILITY rather than from `user.is_superadmin`.
+ *
+ * Named for the capability it gates, not for the identity that happens to hold
+ * it today: `Gate::define('viewAnyClients')` is the server's decision, and if
+ * it ever grows a second condition this control follows it instead of
+ * disagreeing with it.
+ */
+const canSwitchClients = ref(false)
+
+/**
+ * Whether the acting-client SELECTION was actually read.
+ *
+ * Separate from `canSwitchClients` because they answer different questions:
+ * one is "may this viewer switch", the other is "do we know what they are
+ * currently switched to". Rendering the control needs BOTH — a switcher that
+ * does not know its own value shows the wrong one.
+ */
+const actingClientKnown = ref(false)
 const clients = ref<Client[]>([])
 const actingClientId = ref<number | null>(null)
 
@@ -88,13 +107,35 @@ onMounted(async () => {
     // The shell's identity contract, cached once per page load — so the
     // switcher exists before the first navigation rather than after a second
     // request.
-    const me = await useCurrentUser().ensureLoaded()
-    isSuperadmin.value = me.user.is_superadmin === true
+    await useCurrentUser().ensureLoaded()
 
-    if (isSuperadmin.value) {
+    // The published ABILITY, never `user.is_superadmin`. `Gate::define
+    // ('viewAnyClients')` is what decides server-side, and reading its ANSWER
+    // keeps this switcher from re-deriving the decision out of the same input
+    // — the moment that gate grows a second condition, an identity check here
+    // renders a control whose every request comes back 403.
+    canSwitchClients.value = useCurrentUser().can('clients.viewAny')
+
+    if (canSwitchClients.value) {
       const response = await useSuperadmin().fetchClients()
       clients.value = response.data
       actingClientId.value = response.acting_organization_id ?? null
+
+      // ONLY NOW is the switcher allowed to render. A FAILED read must never
+      // render as a state the operator could have chosen — the rule
+      // `SidebarNav`'s `actingClientKnown` already states one file over.
+      //
+      // Set before the await, this was a live tenancy lie: `fetchClients()`
+      // rejects, the catch swallows it, `actingClientId` stays null, and
+      // `ClientSwitcher` binds null to the `superadmin.allClients` option. A
+      // superadmin ACTING AS one client then reads "All clients" in the topbar
+      // while every list on the page is that client's data. The switcher is
+      // the one visible claim this shell makes about whose data you are
+      // looking at, and it was making it out of a read that failed.
+      //
+      // Hiding it on a failed read is the safe direction: no claim beats a
+      // false one, and the selection is server-side so nothing is lost.
+      actingClientKnown.value = true
 
       // A superadmin has no organization of their own, so there is no name to
       // fetch and the request below would 404 on every page load.

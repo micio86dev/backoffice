@@ -130,9 +130,12 @@ const PlatformSettingsPanel = defineAsyncComponent(
  * One settings section.
  *
  * Typed rather than inferred from `as const`, because the filter below has to
- * read `superadminOnly` on EVERY entry — and on an inferred literal tuple the
- * property exists only on the one entry that declares it, which is how the
- * filter came to branch on `requires === null` instead.
+ * read `requiresTenant` on EVERY entry — and on an inferred literal tuple the
+ * property exists only on the one entry that declares it.
+ *
+ * EVERY section now names an ability, including the two platform ones. There
+ * is no identity branch left: `requires` is non-nullable, so a section that
+ * declares nothing does not compile rather than quietly gating on nothing.
  */
 interface SettingsSection {
   value: string
@@ -141,10 +144,15 @@ interface SettingsSection {
   icon: Component
   component: Component
   needsOrganization: boolean
-  /** The ability this section needs, or null when identity decides instead. */
-  requires: AbilityKey | null
-  /** Platform-owned: gated on `is_superadmin`, never on an org-scoped policy. */
-  superadminOnly?: boolean
+  /**
+   * The ability this section needs. NON-NULLABLE on purpose.
+   *
+   * It was `AbilityKey | null`, and the null meant "identity decides instead"
+   * — the escape hatch the two platform sections used to gate themselves on
+   * `is_superadmin`. Removing the null removes the hatch: there is no way to
+   * declare a section the server has not published an ability for.
+   */
+  requires: AbilityKey
   /**
    * Meaningless outside ONE tenant — dropped in the all-clients view.
    *
@@ -220,8 +228,15 @@ const SECTIONS: readonly SettingsSection[] = [
   {
     // PLATFORM, like the section below it (RATIFIED 2026-09-14). These keys
     // stopped being an organization's bring-your-own credential and became
-    // BEAI's own — one set, serving every tenant — so this is now an IDENTITY
-    // question, not an ability one, and `superadminOnly` is the gate.
+    // BEAI's own — one set, serving every tenant.
+    //
+    // Gated on the published ABILITY, never on `is_superadmin`. The server is
+    // where platform identity lives and `LlmCredentialPolicy` still answers
+    // from that flag; what this page must not do is RE-DERIVE the decision
+    // from the same input. The moment that policy grows any condition beyond
+    // the flag — a maintenance lock, a platform permission — an identity gate
+    // keeps rendering the section while every action inside 403s, and nothing
+    // goes red.
     //
     // Deliberately NOT `requiresTenant`: unlike API keys, these rows mean the
     // same thing with no client selected, so the all-clients view is exactly
@@ -236,23 +251,24 @@ const SECTIONS: readonly SettingsSection[] = [
     icon: CpuChipIcon,
     component: LlmCredentialsPanel,
     needsOrganization: false,
-    requires: null,
-    superadminOnly: true,
+    requires: 'llmCredentials.viewAny',
   },
   {
-    // PLATFORM, not tenant. The only section gated on identity rather than on
-    // an ability, because it is not an ability question: these rows belong to
-    // BEAI and the superadmin — who belongs to no organization — is the only
-    // one who may write them. `superadminOnly` is what the filter reads;
-    // `requires: null` records that there is no ability to name.
+    // PLATFORM, not tenant: these rows belong to BEAI and the superadmin — who
+    // belongs to no organization — is the only one who may write them.
+    //
+    // `platformSettings.viewAny` is published for exactly this purpose. Its
+    // own definition in `AppServiceProvider` says so: the gate was added
+    // BECAUSE this section had to re-derive itself from `is_superadmin` "while
+    // deriving the neighbouring one from an ability". The section then went on
+    // reading the flag anyway. It reads the ability now.
     value: 'platform',
     labelKey: 'settings.tabs.platform',
     descriptionKey: 'settings.sectionDescription.platform',
     icon: AdjustmentsHorizontalIcon,
     component: PlatformSettingsPanel,
     needsOrganization: false,
-    requires: null,
-    superadminOnly: true,
+    requires: 'platformSettings.viewAny',
   },
 ]
 
@@ -330,18 +346,18 @@ function sectionProps(section: SettingsSection): Record<string, unknown> {
 // `can()` fails closed, so a transient `/auth/me` error hides sections rather
 // than offering ones whose every request would come back 403. Affordance only:
 // the endpoints behind each section authorize independently.
-const { can, user, ensureLoaded } = useCurrentUser()
+const { can, ensureLoaded } = useCurrentUser()
 
 // EVERY section is gated — none is unconditional. A section with no gate stays
 // on screen when `/auth/me` fails, which is the one moment the page knows least
 // about who is looking at it.
 //
-// Two KINDS of gate, and the distinction is not cosmetic. A tenant section
-// names an ABILITY, answered by the server's own policies. The platform section
-// names an IDENTITY: its rows belong to no organization, so no org-scoped
-// policy can describe who may edit them, and `is_superadmin` — which `/auth/me`
-// publishes as an explicit boolean for exactly this kind of question — is the
-// honest gate. Both fail closed. `user` and `ensureLoaded` come from the
+// ONE KIND of gate now: every section names an ABILITY, answered by the
+// server's own policies. The two platform sections used to name an IDENTITY
+// instead and read `user.is_superadmin`, and `user` was destructured here for
+// that. Both now name `platformSettings.viewAny` / `llmCredentials.viewAny`,
+// which the server publishes from those same policies — so the page reads the
+// ANSWER rather than recomputing it from the input. `ensureLoaded` comes from
 // destructure above — one call, since the composable's state is module-scoped
 // and three calls only made it look like three sources of truth.
 
@@ -370,12 +386,17 @@ const visibleSections = computed(() =>
       return false
     }
 
-    return section.superadminOnly === true
-      ? user.value?.is_superadmin === true
-      : // Fails closed on BOTH halves: a section naming neither an ability nor
-        // the platform identity is hidden rather than shown, so an incomplete
-        // declaration cannot grant access by accident.
-        section.requires !== null && can(section.requires)
+    // ONE gate for every section, and no identity branch beside it.
+    //
+    // The two platform sections used to read `user.is_superadmin` directly.
+    // That is the server's own input, re-derived on the client, so the two
+    // could disagree the moment the server's answer grew a second condition:
+    // the rail would keep rendering a section whose every action 403s, and no
+    // test could catch it because nothing read the published ability.
+    //
+    // `can()` fails closed on a missing identity, so a failed `/auth/me`
+    // narrows the page rather than opening it.
+    return can(section.requires)
   })
 )
 
@@ -428,9 +449,23 @@ async function load(): Promise<void> {
   } catch (error) {
     const state = resolveResourceErrorState(error)
 
+    // A 404 here is STRUCTURAL for a platform user and an error for everyone
+    // else, so the branch needs to know which one is asking — and it asks the
+    // ability map, not `user.is_superadmin`.
+    //
+    // `clients.viewAny` is the honest question: it is the ability to operate
+    // the estate rather than one organization, which is exactly the identity
+    // for which `/api/organization` has no row to return. `Gate::define
+    // ('viewAnyClients')` answers it, so client and server agree by
+    // construction instead of by two copies of the same rule.
+    //
+    // It fails CLOSED, and that matters more than the tidiness: `can()`
+    // answers false on a failed `/auth/me`, so an unknown viewer gets the
+    // error banner rather than being silently told this is normal.
+    //
     // Identity may still be in flight; `ensureLoaded()` is awaited in
-    // `onMounted` before this runs, so `user.value` is settled by now.
-    if (state === 'not-found' && user.value?.is_superadmin === true) {
+    // `onMounted` before this runs, so the map is settled by now.
+    if (state === 'not-found' && can('clients.viewAny')) {
       organization.value = null
       loadError.value = null
       noOrganizationInContext.value = true
@@ -448,7 +483,7 @@ async function onSaved(): Promise<void> {
 }
 
 onMounted(async () => {
-  // Identity FIRST, then the organization — `load()` asks `user.is_superadmin`
+  // Identity FIRST, then the organization — `load()` asks `can('clients.viewAny')`
   // whether a 404 is structural or a failure, and a null identity would answer
   // "failure" and put the banner back. Swallowed on failure for the reason it
   // always was: `can()` already answers false without it, so a failed identity

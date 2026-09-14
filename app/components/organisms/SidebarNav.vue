@@ -185,12 +185,12 @@ const visibleNavItems = computed(() =>
 
       return requires === undefined || can(requires)
     }),
-    // `isSuperadmin && actingClientKnown`: the narrowing is a claim about the
+    // `canSwitchClients && actingClientKnown`: the narrowing is a claim about the
     // SELECTION, so it may only be made when the selection was actually read.
     // Unknown falls to the unrestricted case, which is what the comment on
     // these refs always promised and what the code did not do.
     {
-      isSuperadmin: isSuperadmin.value && actingClientKnown.value,
+      canSwitchClients: canSwitchClients.value && actingClientKnown.value,
       actingClientId: actingClientId.value,
     }
   )
@@ -231,7 +231,16 @@ const { can } = useCurrentUser()
 // Whether the client pages have an answer yet. Both default to the
 // UNRESTRICTED case, so an ordinary operator is never briefly shown a
 // superadmin's stripped-down menu while identity is in flight.
-const isSuperadmin = ref(false)
+/**
+ * Whether this viewer may operate the whole estate, read from the PUBLISHED
+ * ABILITY rather than from `user.is_superadmin`.
+ *
+ * Named for the capability it gates, not for the identity that happens to hold
+ * it today: `Gate::define('viewAnyClients')` is the server's decision, and if
+ * it ever grows a second condition this control follows it instead of
+ * disagreeing with it.
+ */
+const canSwitchClients = ref(false)
 const actingClientId = ref<number | null>(null)
 
 /**
@@ -263,7 +272,9 @@ onMounted(async () => {
 
   try {
     user = (await useCurrentUser().ensureLoaded()).user
-    isSuperadmin.value = user.is_superadmin === true
+    // The published ABILITY, never `user.is_superadmin` — `Gate::define
+    // ('viewAnyClients')` is the server's decision and this reads its answer.
+    canSwitchClients.value = can('clients.viewAny')
     currentUserName.value = user.name
     currentUserPhotoUrl.value = user.photo_url
   } catch {
@@ -271,7 +282,7 @@ onMounted(async () => {
     currentUserPhotoUrl.value = null
   }
 
-  if (user === null || !isSuperadmin.value) return
+  if (user === null || !canSwitchClients.value) return
 
   try {
     // Read from the SERVER rather than remembered locally: the selection lives

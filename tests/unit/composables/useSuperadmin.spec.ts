@@ -54,4 +54,59 @@ describe('useSuperadmin', () => {
 
     expect(apiFetchMock).toHaveBeenCalledWith('/admin/organizations')
   })
+
+  /**
+   * SINGLE-FLIGHT — two concurrent callers, ONE request.
+   *
+   * `NavBar` and `SidebarNav` both call `fetchClients()` on mount, so every
+   * superadmin page load fired two identical `GET /admin/organizations`. This
+   * is the assertion that stops it coming back: drop the in-flight guard and
+   * the call count is 2.
+   */
+  it('fetchClients() shares one in-flight request between concurrent callers', async () => {
+    let resolveFetch: (value: unknown) => void = () => {}
+    const apiFetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve
+        })
+    )
+    vi.doMock('../../../app/composables/useApi', () => ({
+      useApi: () => ({ apiFetch: apiFetchMock }),
+    }))
+
+    const { useSuperadmin } = await import('../../../app/composables/useSuperadmin')
+
+    // Both started BEFORE either settles — the exact window the two shells
+    // mounting together creates.
+    const first = useSuperadmin().fetchClients()
+    const second = useSuperadmin().fetchClients()
+
+    resolveFetch({ data: [], acting_organization_id: null })
+    await Promise.all([first, second])
+
+    expect(apiFetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * And NOT a cache: a call after the first settles must hit the server again.
+   *
+   * The acting-client selection is precisely the thing that changes under you
+   * — `setActingClient()` is followed by a full page reload for that reason —
+   * so a settled cache would answer the next page with the previous
+   * selection, which is the failure the reload exists to prevent.
+   */
+  it('fetchClients() does NOT cache once the request has settled', async () => {
+    const apiFetchMock = vi.fn().mockResolvedValue({ data: [], acting_organization_id: null })
+    vi.doMock('../../../app/composables/useApi', () => ({
+      useApi: () => ({ apiFetch: apiFetchMock }),
+    }))
+
+    const { useSuperadmin } = await import('../../../app/composables/useSuperadmin')
+
+    await useSuperadmin().fetchClients()
+    await useSuperadmin().fetchClients()
+
+    expect(apiFetchMock).toHaveBeenCalledTimes(2)
+  })
 })

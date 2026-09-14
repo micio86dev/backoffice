@@ -318,6 +318,32 @@ describe('pages/settings/index.vue', () => {
    * section silently dropped from the registry would still leave every
    * `toContain` passing on the sections that remain.
    */
+  /**
+   * The selected section carries a NON-COLOUR cue.
+   *
+   * `AGENTS.md`: "Never convey meaning by colour alone. Every state needs a
+   * non-colour cue." Everything else marking selection on this rail is colour
+   * — `bg-primary/10`, a primary label, a primary icon — so a reader who
+   * cannot distinguish those two had nothing.
+   *
+   * Asserted on the CLASS rather than on rendered pixels because that is what
+   * a unit test can see, and asserted at all because the alternative is a
+   * design rule that lives only in prose. `role="tab"` + `aria-selected`
+   * already serve assistive tech; this is for the sighted reader.
+   *
+   * Weight, not a border: DESIGN.md §8.2.1 rules side stripes out explicitly.
+   */
+  it('marks the selected section with a non-colour cue, not colour alone', async () => {
+    mockOrganization()
+    mockCurrentUser('admin')
+
+    const wrapper = await mountSettings()
+    const trigger = wrapper.find('[role="tab"]')
+
+    expect(trigger.exists()).toBe(true)
+    expect(trigger.classes().join(' ')).toContain('data-active:[&_[data-part=label]]:font-semibold')
+  })
+
   it('gives an admin the branding section but NOT the credential vault', async () => {
     mockOrganization()
     mockCurrentUser('admin')

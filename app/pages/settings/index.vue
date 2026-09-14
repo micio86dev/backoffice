@@ -36,6 +36,23 @@
       data; only the three that take `organization` as a prop can be affected
       by its absence, and `visibleSections` drops precisely those.
     -->
+    <!--
+      `data-active:…font-semibold` is NOT decoration — it is the selected
+      state's NON-COLOUR cue, and the rail had none.
+      `AGENTS.md` states the rule outright ("Never convey meaning by colour
+      alone. Every state needs a non-colour cue"), and everything else here
+      that marks selection — `bg-primary/10`, the primary label, the primary
+      icon — is colour.
+
+      WEIGHT rather than a border, because DESIGN.md §8.2.1 rules side stripes
+      (`border-left` accents) out as a selected-state affordance explicitly.
+      That left weight as the cue that adds a second channel without
+      contradicting a ratified decision; §8.2.1 now names it.
+
+      `role="tab"` + `aria-selected` already carry this to assistive tech, so
+      the gap was never an AT failure — it was a sighted reader who cannot
+      distinguish the two colours.
+    -->
     <Tabs v-model="activeSection" orientation="vertical" class="items-start gap-8">
       <TabsList
         class="sticky top-6 w-64 shrink-0 items-stretch gap-1 rounded-none bg-transparent p-0"
@@ -44,7 +61,7 @@
           v-for="section in visibleSections"
           :key="section.value"
           :value="section.value"
-          class="h-auto w-full flex-none items-start justify-start gap-3 whitespace-normal rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-card data-active:bg-primary/10 [&_svg]:mt-0.5 data-active:[&_svg]:text-primary [&_[data-part=label]]:text-foreground data-active:[&_[data-part=label]]:text-primary"
+          class="h-auto w-full flex-none items-start justify-start gap-3 whitespace-normal rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-card data-active:bg-primary/10 [&_svg]:mt-0.5 data-active:[&_svg]:text-primary [&_[data-part=label]]:text-foreground data-active:[&_[data-part=label]]:text-primary data-active:[&_[data-part=label]]:font-semibold"
         >
           <component :is="section.icon" aria-hidden="true" />
           <span class="flex min-w-0 flex-col gap-0.5">

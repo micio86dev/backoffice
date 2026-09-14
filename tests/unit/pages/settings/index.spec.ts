@@ -1,19 +1,31 @@
 /**
  * pages/settings/index.vue (Unit 6, task 24.8 — RED)
  *
- * Seven sections, six of them reachable by an org admin (Organization profile,
- * Branding, API keys, Webhook defaults, Users & roles, LLM credentials) and the
- * seventh — Platform — gated on `is_superadmin` rather than on an ability. Each
- * tab panel mounts lazily (only the active tab, D10).
+ * Seven sections. FIVE are reachable by an org admin (Organization profile,
+ * Branding, API keys, Webhook defaults, Users & roles); TWO are platform-owned
+ * and gated on `is_superadmin` rather than on an ability — Platform settings,
+ * and since 2026-09-14 LLM credentials. Each tab panel mounts lazily (only the
+ * active tab, D10).
  *
- * The LLM credentials section is ADMIN-ONLY and is the only gated section on
- * this page. `/llm-credentials` is admin-only server-side
- * (`api/routes/api.php`, `LlmCredentialPolicy`), and the row it manages holds
- * a decryptable vendor API key — a tighter gate than the four ungated
- * sections, never a looser one. Same doctrine as `TemplatePortability`
- * (DESIGN.md §8.2.6): the section does not render at all for other roles,
- * because a control that appears and then 403s teaches the operator that the
- * product is broken rather than that they lack the right.
+ * LLM credentials USED to be the admin-only section described here. Those rows
+ * became BEAI's own — one set of keys serving every tenant — so the gate moved
+ * from an org-scoped ability to platform identity: `hasRole('admin')` is
+ * granted per organization (Spatie teams mode) and cannot describe who may
+ * touch a row that belongs to no organization. An admin who managed these
+ * yesterday is refused today, by `LlmCredentialPolicy` and by this rail.
+ *
+ * The doctrine behind hiding rather than disabling is unchanged
+ * (`TemplatePortability`, DESIGN.md §8.2.6): a control that appears and then
+ * 403s teaches the operator that the product is broken rather than that they
+ * lack the right.
+ *
+ * THREE GATES, and they are not the same question:
+ *   - `requires` — an ability the SERVER resolved from its own policies.
+ *   - `superadminOnly` — platform identity, for rows no org-scoped policy
+ *     can describe.
+ *   - `requiresTenant` — meaningless with no client selected (API keys).
+ *     Deliberately NOT dropped on a failed organization read; see the test
+ *     that pins it, which exists because that distinction was prose only.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -89,12 +101,11 @@ function mockOrganizationNotFound() {
  * answers `false` to everything: fail-closed, the same way the real composable
  * does when it has no identity to read.
  */
-const ADMIN_ONLY = new Set([
-  'organization.update',
-  'users.viewAny',
-  'llmCredentials.viewAny',
-  'apiClients.viewAny',
-])
+// `llmCredentials.viewAny` was here and is GONE: the credential vault is gated
+// on `user.is_superadmin` now, so the page asks for that ability nowhere. An
+// entry with no consumer is not harmless — it reads as coverage of a rule that
+// moved.
+const ADMIN_ONLY = new Set(['organization.update', 'users.viewAny', 'apiClients.viewAny'])
 
 function mockCurrentUser(role: 'admin' | 'operator' | 'superadmin' | null) {
   const isSuperadmin = role === 'superadmin'
@@ -276,23 +287,42 @@ describe('pages/settings/index.vue', () => {
     expect(head?.title?.()).toBe('head.title.settings')
   })
 
-  // The panel exists, is tested, and until now no route mounted it — an
-  // operator could not reach the vault at all. Reachability is the assertion.
-  it('gives an admin the credential vault and the branding section', async () => {
-    // Counted rather than merely present, because the number is the guard: a
-    // section silently dropped from the registry would still leave every
-    // `toContain` below passing on the sections that remain.
+  /**
+   * The credential vault LEFT this list on 2026-09-14, and that is the change.
+   *
+   * LLM credentials became BEAI's own platform rows, gated on `is_superadmin`,
+   * so an org admin no longer reaches them — the count drops from six sections
+   * to five. Branding stays admin-only for the reason it always was.
+   *
+   * Counted rather than merely present, because the number is the guard: a
+   * section silently dropped from the registry would still leave every
+   * `toContain` passing on the sections that remain.
+   */
+  it('gives an admin the branding section but NOT the credential vault', async () => {
     mockOrganization()
     mockCurrentUser('admin')
 
     const wrapper = await mountSettings()
 
-    expect(wrapper.findAll('[role="tab"]')).toHaveLength(6)
-    expect(wrapper.text()).toContain('settings.tabs.llmCredentials')
-    expect(wrapper.text()).toContain('settings.sectionDescription.llmCredentials')
-    // Branding is admin-only for the same reason the vault is: what every
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(5)
+    expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+    // Branding is admin-only for the reason the vault used to be: what every
     // candidate of an organization sees is not an operator-level decision.
     expect(wrapper.text()).toContain('settings.tabs.branding')
+  })
+
+  it('gives the credential vault to a superadmin, with or without a client selected', async () => {
+    // Unlike API keys, these rows mean the same thing in the all-clients view —
+    // they belong to no client — so the section is reachable in both states.
+    mockCurrentUser('superadmin')
+    mockOrganizationNotFound()
+
+    expect((await mountSettings()).text()).toContain('settings.tabs.llmCredentials')
+
+    mockCurrentUser('superadmin')
+    mockOrganization()
+
+    expect((await mountSettings()).text()).toContain('settings.tabs.llmCredentials')
   })
 
   it('hides branding from a non-admin', async () => {
@@ -394,6 +424,66 @@ describe('pages/settings/index.vue', () => {
     // And the tenant sections that fetch their own data.
     expect(wrapper.text()).toContain('settings.tabs.users')
     expect(wrapper.text()).toContain('settings.tabs.llmCredentials')
+  })
+
+  /**
+   * API keys are ONE TENANT'S, so the all-clients view has none to show.
+   *
+   * Fetching its own data is not the same as being meaningful without a
+   * client selected, and this section was on the wrong side of that line. An
+   * M2M key authenticates FOR an organization — `api_clients.organization_id`
+   * is NOT NULL — so with no client selected the list has nothing to list and
+   * the create has no owner to stamp: the endpoint answered an empty list and
+   * a 500 on the insert, and the rail offered both anyway.
+   *
+   * The API refuses on its own now (`ApiClientController`), which is where the
+   * control belongs. This is the affordance half: do not offer a superadmin a
+   * section whose every action is a refusal.
+   */
+  it('hides the API keys section when no client is selected', async () => {
+    mockCurrentUser('superadmin')
+    mockOrganizationNotFound()
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).not.toContain('settings.tabs.apiKeys')
+  })
+
+  /**
+   * A FAILED organization read must NOT take the API keys section away.
+   *
+   * The `requiresTenant` guard reads `noOrganizationInContext` alone, and that
+   * omission is the deliberate half: a 500 says nothing about whether a client
+   * is selected, so hiding this section on a transient failure would take the
+   * keys away from an ordinary admin whose unrelated request merely broke.
+   *
+   * Written because the claim existed only as a comment. Widening the guard to
+   * `(loadError.value !== null || noOrganizationInContext.value)` — the exact
+   * behaviour that comment calls wrong — left all 23 other specs green, so the
+   * regression would have shipped unnoticed. This is the case that dies.
+   */
+  it('keeps the API keys section when the organization read merely FAILS', async () => {
+    mockCurrentUser('admin')
+    vi.doMock('../../../../app/composables/useOrganization', () => ({
+      useOrganization: () => ({
+        fetchOrganization: vi.fn().mockRejectedValue({ status: 500 }),
+        updateOrganization: vi.fn(),
+      }),
+    }))
+
+    const wrapper = await mountSettings()
+
+    expect(wrapper.text()).toContain('settings.tabs.apiKeys')
+  })
+
+  it('shows the API keys section to a superadmin acting as a client', async () => {
+    // `TenantContext` scopes them to that organization and `/api/organization`
+    // answers 200 — the ordinary org surface, keys included.
+    mockCurrentUser('superadmin')
+    mockOrganization()
+
+    const wrapper = await mountSettings()
+
     expect(wrapper.text()).toContain('settings.tabs.apiKeys')
   })
 

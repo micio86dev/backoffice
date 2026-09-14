@@ -216,10 +216,17 @@ test.describe('Settings tabs (Unit 6)', () => {
  * that matters here, and only an E2E can make it — a component spec proves the
  * panel renders, never that anyone can get to it.
  *
- * The gate is tighter than the four ungated sections, never looser:
- * `/llm-credentials` is admin-only server-side (`LlmCredentialPolicy`) and the
- * row holds a decryptable vendor API key. The section does not render for
- * other roles at all (DESIGN.md §8.2.1, same doctrine as §8.2.6).
+ * The gate is tighter than the four ungated sections, never looser — and it
+ * got TIGHTER AGAIN on 2026-09-14. These rows became BEAI's own platform
+ * credentials, one set serving every tenant, so `LlmCredentialPolicy` answers
+ * every method from `is_superadmin === true`: an ORG ADMIN, who owned this
+ * surface until that day, is now refused. `hasRole('admin')` is granted per
+ * organization (Spatie teams mode) and cannot describe who may touch a row
+ * belonging to no organization.
+ *
+ * The section does not render for other roles at all (DESIGN.md §8.2.1, same
+ * doctrine as §8.2.6): a control that appears and then 403s teaches the
+ * operator that the product is broken rather than that they lack the right.
  */
 const CREDENTIAL = {
   id: 1,
@@ -231,12 +238,22 @@ const CREDENTIAL = {
   created_at: '2026-08-01T09:00:00Z',
 }
 
+/**
+ * `isSuperadmin` is explicit and defaults to FALSE, never inferred from roles.
+ *
+ * A superadmin holds NO Spatie role — `roles: []` — so anything deriving the
+ * flag from the role list would answer false for the one identity that has it.
+ * The payload previously omitted `is_superadmin` entirely, which read as false
+ * and was correct while every section here was ability-gated; the LLM
+ * credentials section is identity-gated now, so the key has to be real.
+ */
 async function mockIdentity(
   page: import('@playwright/test').Page,
   // , not `string[]`: the union exists to catch a typo
   // like 'oprator' falling through every branch to viewer-level abilities, and
   // `string[]` widened it straight back.
-  roles: readonly TenantRole[]
+  roles: readonly TenantRole[],
+  isSuperadmin = false
 ): Promise<void> {
   await page.route(
     (url) => url.pathname === '/auth/me',
@@ -249,10 +266,11 @@ async function mockIdentity(
               email: 'ada@example.com',
               locale: 'it',
               photo_url: null,
+              is_superadmin: isSuperadmin,
             },
             organization: { id: 1, name: 'Acme' },
             roles,
-            abilities: abilitiesFor(roles),
+            abilities: abilitiesFor({ roles, isSuperadmin }),
           })
         : route.continue()
   )
@@ -263,9 +281,9 @@ async function mockIdentity(
 }
 
 test.describe('Settings — conversation-LLM credentials', () => {
-  test('an admin can reach the credential vault from /settings', async ({ page }) => {
+  test('a superadmin can reach the credential vault from /settings', async ({ page }) => {
     await mockAdminApi(page)
-    await mockIdentity(page, ['admin'])
+    await mockIdentity(page, [], true)
     await login(page)
     await page.goto('/settings')
 
@@ -276,6 +294,28 @@ test.describe('Settings — conversation-LLM credentials', () => {
     // The panel is really mounted and really fetched, not just a rail entry.
     await expect(page.getByText('Gemini production')).toBeVisible()
     await expect(page.getByTestId('llm-credentials-new')).toBeVisible()
+  })
+
+  /**
+   * The gate NARROWED, and this is the case that proves it end to end.
+   *
+   * An org admin still reaches `/settings` — five sections are theirs — but the
+   * credential vault is not one of them any more. Asserting on an operator
+   * would prove nothing: they never had it. The interesting refusal is the role
+   * that did.
+   */
+  test('an org admin reaches /settings but NOT the credential vault', async ({ page }) => {
+    await mockAdminApi(page)
+    await mockIdentity(page, ['admin'])
+    await login(page)
+    await page.goto('/settings')
+
+    // The page is theirs...
+    await expect(page).toHaveURL('/settings')
+    await expect(page.getByRole('tab', { name: 'Chiavi API' })).toBeVisible()
+
+    // ...this section is not.
+    await expect(page.getByRole('tab', { name: 'Credenziali LLM di conversazione' })).toHaveCount(0)
   })
 
   test('a non-admin does not reach /settings AT ALL, not even by typing it', async ({ page }) => {
@@ -297,9 +337,17 @@ test.describe('Settings — conversation-LLM credentials', () => {
     await expect(page.getByRole('tab', { name: 'Credenziali LLM di conversazione' })).toHaveCount(0)
   })
 
+  /**
+   * The ONLY axe pass over `LlmCredentialsPanel` in the suite.
+   *
+   * Moved to a superadmin identity rather than deleted with the gate change:
+   * the panel did not become less reachable, it became reachable by someone
+   * else, and accessibility coverage that disappears because an actor changed
+   * is coverage lost rather than retired.
+   */
   test('the credential vault panel is WCAG 2.1 AA clean', async ({ page }) => {
     await mockAdminApi(page)
-    await mockIdentity(page, ['admin'])
+    await mockIdentity(page, [], true)
     await login(page)
     await page.goto('/settings')
 

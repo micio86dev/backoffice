@@ -41,9 +41,25 @@ interface AllowlistEntry {
   reason: string
 }
 
-// Empty by design, same as the sibling guards: a new violation is fixed, not
-// allowlisted. An entry needs a written reason.
-const ALLOWLIST: AllowlistEntry[] = []
+// A new violation is fixed, not allowlisted. An entry needs a written reason.
+//
+// ONE entry, and it is written now rather than later precisely because it is
+// one. The `is_superadmin` rule below was added on 2026-09-14, immediately
+// after the hotfix that removed four gates built on that flag — while the list
+// needed a single reason instead of five. That timing is the point: this
+// guard's own docblock says a scan is what catches the NEXT component, and a
+// scan added once the allowlist is long enough to be tedious is a scan nobody
+// adds.
+const ALLOWLIST: AllowlistEntry[] = [
+  {
+    path: 'pages/profile.vue',
+    reason:
+      "Renders the signed-in operator's access level as a BADGE LABEL — a fact about them, " +
+      'not a decision about what they may do. Same category as the `profile.role` exemption ' +
+      'documented below, and for the same reason: no ability answers "what are you called". ' +
+      'The read feeds a string, never a v-if, and the moment it feeds a boolean the rule fires.',
+  },
+]
 
 /**
  * A value being compared against a role NAME, or a role list being searched.
@@ -62,6 +78,32 @@ const RULES = [
     id: 'role-membership',
     pattern: /\broles\s*\.\s*includes\s*\(/,
     message: 'searches the role list',
+  },
+  /**
+   * `is_superadmin` is the SERVER's input, and reading it here re-derives a
+   * decision the server already published an answer for.
+   *
+   * It is not a role name, so neither rule above caught it — and four gates
+   * were built on it: the LLM-credentials and Platform-settings sections, and
+   * the client switcher in both shells. Every one had a published ability
+   * sitting unused beside it (`llmCredentials.viewAny`,
+   * `platformSettings.viewAny`, `clients.viewAny`). `AppServiceProvider`
+   * defined `viewPlatformSettings` BECAUSE of exactly this, and the section
+   * went on reading the flag anyway.
+   *
+   * The failure mode is the same permissive drift the docblock above
+   * describes, one input further back: the moment a policy grows a second
+   * condition — a maintenance lock, a platform permission, a disabled account
+   * — the server answers false while the flag still says true, and the control
+   * renders over an endpoint that 403s.
+   *
+   * Banned in `app/` only. The API must keep reading it: that is where
+   * platform identity lives and where these abilities are resolved FROM.
+   */
+  {
+    id: 'platform-identity',
+    pattern: /\bis_superadmin\b/,
+    message: 'reads is_superadmin instead of the published ability',
   },
 ] as const
 

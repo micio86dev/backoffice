@@ -11,22 +11,17 @@
  * `requires` gating already says so for the pages an operator cannot use;
  * this extends the same rule to the state a superadmin can be in.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { visibleNavItemsFor } from '../../../../app/utils/nav-visibility'
 
-const can = vi.fn()
-const isSuperadmin = { value: false }
-const actingClientId = { value: null as number | null }
-
-vi.mock('@/composables/useCurrentUser', () => ({
-  useCurrentUser: () => ({ can, ensureLoaded: vi.fn() }),
-}))
-
-beforeEach(() => {
-  can.mockReset().mockReturnValue(true)
-  isSuperadmin.value = false
-  actingClientId.value = null
-})
+// This file tests `visibleNavItemsFor` DIRECTLY, with literal viewer objects.
+// It used to also carry a `vi.mock('@/composables/useCurrentUser')`, a `can`
+// spy and two mutable refs that NO test body ever read — scaffolding for a
+// component mount that does not happen here. It was removed rather than wired
+// up: the component's own gate is covered where the component is mounted, and
+// dead scaffolding is worse than none because it reads as coverage. The
+// identity→ability rename passed straight through it without a single
+// assertion noticing, which is how it was found.
 
 const ITEMS = [
   { to: '/', scope: 'client' as const },
@@ -38,20 +33,20 @@ const ITEMS = [
 
 describe('nav visibility', () => {
   it('shows client pages to an ordinary operator', () => {
-    const visible = visibleNavItemsFor(ITEMS, { isSuperadmin: false, actingClientId: null })
+    const visible = visibleNavItemsFor(ITEMS, { canSwitchClients: false, actingClientId: null })
 
     expect(visible.map((i) => i.to)).toContain('/projects')
   })
 
   it('HIDES client pages from a superadmin with no client selected', () => {
-    const visible = visibleNavItemsFor(ITEMS, { isSuperadmin: true, actingClientId: null })
+    const visible = visibleNavItemsFor(ITEMS, { canSwitchClients: true, actingClientId: null })
 
     expect(visible.map((i) => i.to)).not.toContain('/projects')
     expect(visible.map((i) => i.to)).not.toContain('/')
   })
 
   it('shows them again once a client is selected', () => {
-    const visible = visibleNavItemsFor(ITEMS, { isSuperadmin: true, actingClientId: 7 })
+    const visible = visibleNavItemsFor(ITEMS, { canSwitchClients: true, actingClientId: 7 })
 
     expect(visible.map((i) => i.to)).toContain('/projects')
   })
@@ -60,8 +55,8 @@ describe('nav visibility', () => {
     // With or without a client: templates, LLM config and settings are what a
     // superadmin manages ABOVE the tenants, and hiding them would leave the
     // unscoped view with nothing in it at all.
-    const none = visibleNavItemsFor(ITEMS, { isSuperadmin: true, actingClientId: null })
-    const one = visibleNavItemsFor(ITEMS, { isSuperadmin: true, actingClientId: 7 })
+    const none = visibleNavItemsFor(ITEMS, { canSwitchClients: true, actingClientId: null })
+    const one = visibleNavItemsFor(ITEMS, { canSwitchClients: true, actingClientId: 7 })
 
     expect(none.map((i) => i.to)).toContain('/avatar-templates')
     expect(one.map((i) => i.to)).toContain('/avatar-templates')
@@ -73,7 +68,7 @@ describe('nav visibility', () => {
     // sees Clients and opens it"). Alongside Avatar Templates and Settings —
     // scope alone puts it there; the ability gate (SidebarNav.spec.ts) is
     // what would otherwise be the only thing missing.
-    const visible = visibleNavItemsFor(ITEMS, { isSuperadmin: true, actingClientId: null })
+    const visible = visibleNavItemsFor(ITEMS, { canSwitchClients: true, actingClientId: null })
 
     expect(visible.map((i) => i.to)).toEqual(
       expect.arrayContaining(['/clients', '/avatar-templates', '/settings'])

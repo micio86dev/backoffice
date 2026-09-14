@@ -19,8 +19,17 @@ export interface ScopedNavItem {
 }
 
 export interface Viewer {
-  isSuperadmin: boolean
-  /** Which client a superadmin is acting as, or null for the whole estate. */
+  /**
+   * Whether this viewer operates the whole ESTATE rather than one client.
+   *
+   * Renamed from `isSuperadmin`, and the rename is the point: the caller now
+   * answers it from the published `clients.viewAny` ability instead of from
+   * `user.is_superadmin`. This module never cared which identity held the
+   * capability — only that the viewer has no single client implied — so naming
+   * it after the identity invited exactly the re-derivation being removed.
+   */
+  canSwitchClients: boolean
+  /** Which client such a viewer is acting as, or null for the whole estate. */
   actingClientId: number | null
 }
 
@@ -41,7 +50,7 @@ export function visibleNavItemsFor<T extends ScopedNavItem>(
   items: readonly T[],
   viewer: Viewer
 ): T[] {
-  if (!viewer.isSuperadmin || viewer.actingClientId !== null) {
+  if (!viewer.canSwitchClients || viewer.actingClientId !== null) {
     return [...items]
   }
 

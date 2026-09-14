@@ -110,7 +110,13 @@ export function abilitiesForRole(input: MirroredIdentityInput | TenantRole): Abi
     organization: { view: viewer, update: admin },
     apiClients: { viewAny: admin, create: admin, delete: admin },
     users: { viewAny: admin, create: admin, update: admin, deactivate: admin, activate: admin },
-    llmCredentials: { viewAny: admin, create: admin, update: admin, delete: admin },
+    // PLATFORM since 2026-09-14, keyed off `isSuperadmin` and NOT off `admin`.
+    // These rows stopped being an organization's bring-your-own key and became
+    // BEAI's own, so `LlmCredentialPolicy` answers all five methods from
+    // `is_superadmin === true`. Leaving `admin` here would grant an org admin
+    // four abilities the API refuses — the exact permissive drift this file's
+    // own docblock describes for `avatarTemplates.create`, one group over.
+    llmCredentials: { viewAny: platform, create: platform, update: platform, delete: platform },
     avatarTemplates: {
       viewAny: admin,
       create: platform,

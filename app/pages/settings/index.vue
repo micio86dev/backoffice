@@ -145,6 +145,15 @@ interface SettingsSection {
   requires: AbilityKey | null
   /** Platform-owned: gated on `is_superadmin`, never on an org-scoped policy. */
   superadminOnly?: boolean
+  /**
+   * Meaningless outside ONE tenant — dropped in the all-clients view.
+   *
+   * Distinct from `needsOrganization`, which asks whether the section takes
+   * the organization as a PROP. A section can fetch its own data and still be
+   * unable to answer anything without a client selected; API keys are exactly
+   * that, and the two questions were conflated until they weren't.
+   */
+  requiresTenant?: boolean
 }
 
 // The rail and the panel headers read from the same source, so a section can
@@ -172,12 +181,22 @@ const SECTIONS: readonly SettingsSection[] = [
     requires: 'organization.update',
   },
   {
+    // `needsOrganization: false` — the panel fetches its own list and never
+    // touches the prop. `requiresTenant: true` — an M2M key authenticates FOR
+    // an organization (`api_clients.organization_id` is NOT NULL), so with no
+    // client selected there is nothing to list and nothing to own a new key.
+    // A superadmin holds `apiClients.viewAny` through `Gate::before` and was
+    // therefore shown this section in the all-clients view, where the list
+    // came back empty and creating a key hit the not-null constraint.
+    // `ApiClientController` refuses on its own now; this keeps the rail from
+    // offering a section whose every action is a refusal.
     value: 'apiKeys',
     labelKey: 'settings.tabs.apiKeys',
     descriptionKey: 'settings.sectionDescription.apiKeys',
     icon: KeyIcon,
     component: ApiKeysPanel,
     needsOrganization: false,
+    requiresTenant: true,
     requires: 'apiClients.viewAny',
   },
   {
@@ -199,15 +218,26 @@ const SECTIONS: readonly SettingsSection[] = [
     requires: 'users.viewAny',
   },
   {
+    // PLATFORM, like the section below it (RATIFIED 2026-09-14). These keys
+    // stopped being an organization's bring-your-own credential and became
+    // BEAI's own — one set, serving every tenant — so this is now an IDENTITY
+    // question, not an ability one, and `superadminOnly` is the gate.
+    //
+    // Deliberately NOT `requiresTenant`: unlike API keys, these rows mean the
+    // same thing with no client selected, so the all-clients view is exactly
+    // where a superadmin manages them.
+    //
+    // What this manages is still a decryptable vendor API key, which is why
+    // the gate got NARROWER here rather than wider: a tenant admin who could
+    // reach this yesterday cannot today.
     value: 'llmCredentials',
     labelKey: 'settings.tabs.llmCredentials',
     descriptionKey: 'settings.sectionDescription.llmCredentials',
     icon: CpuChipIcon,
     component: LlmCredentialsPanel,
     needsOrganization: false,
-    // What this manages is a decryptable vendor API key, so it is the last
-    // section anyone should be shown speculatively.
-    requires: 'llmCredentials.viewAny',
+    requires: null,
+    superadminOnly: true,
   },
   {
     // PLATFORM, not tenant. The only section gated on identity rather than on
@@ -327,6 +357,16 @@ const visibleSections = computed(() =>
     // `noOrganizationInContext` is the ordinary shape of a superadmin's page
     // and gets no banner at all. Both drop the section; only one is an error.
     if (section.needsOrganization && (loadError.value !== null || noOrganizationInContext.value)) {
+      return false
+    }
+
+    // Tenant-scoped but self-fetching: no `loadError` half, deliberately. A
+    // FAILED organization read says nothing about whether a client is
+    // selected, and hiding this section on a transient 500 would take the keys
+    // away from an ordinary admin whose unrelated request happened to break.
+    // Only `noOrganizationInContext` — a 404 for a superadmin, the exact shape
+    // of the all-clients view — drops it.
+    if (section.requiresTenant === true && noOrganizationInContext.value) {
       return false
     }
 

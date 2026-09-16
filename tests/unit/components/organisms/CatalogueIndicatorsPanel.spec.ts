@@ -178,6 +178,70 @@ describe('CatalogueIndicatorsPanel', () => {
     expect(wrapper.emitted('refresh-revision')).toBeTruthy()
   })
 
+  it('disables the move buttons while a move is in flight', async () => {
+    // R3-indicator-move-no-inflight-guard: the multi-request position swap
+    // (3 sequential PATCHes) left both move buttons enabled throughout, so a
+    // second click mid-swap could fire an overlapping move computed from the
+    // same pre-move positions.
+    let releaseFirstPatch: (value: { data: unknown }) => void = () => {}
+    updateBarsIndicator.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirstPatch = resolve
+        })
+    )
+
+    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    const moveDown = wrapper.get('[data-testid="indicator-move-down-1"]')
+    await moveDown.trigger('click')
+
+    // Asserts directly on the button element that carries the `disabled`
+    // attribute/property itself — this component has no `<fieldset>`, so
+    // there is no ancestor-to-descendant propagation involved at all.
+    expect((moveDown.element as HTMLButtonElement).disabled).toBe(true)
+
+    releaseFirstPatch({ data: {} })
+    await flushPromises()
+
+    expect((moveDown.element as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('guards the move handler itself against a double-click, independent of the disabled attribute', async () => {
+    // The `:disabled="... || moving"` binding (proven above) already stops
+    // an ordinary click from reaching `onMove` a second time. This test
+    // proves the handler's OWN `if (moving.value) return` guard, by
+    // dispatching two raw click events back-to-back with no `await` between
+    // them — Vue's DOM patch for the `disabled` attribute is scheduled on
+    // the microtask queue, so neither dispatch has seen it flip yet, and
+    // both genuinely reach the `@click` listener. Deleting the handler
+    // guard while keeping the template's `:disabled` binding makes this
+    // fail with 6 calls instead of 3, which `trigger()`-based double-clicks
+    // (blocked by the DOM before ever reaching the handler) cannot catch.
+    let releaseFirstPatch: (value: { data: unknown }) => void = () => {}
+    updateBarsIndicator.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirstPatch = resolve
+        })
+    )
+
+    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    const moveDown = wrapper.get('[data-testid="indicator-move-down-1"]').element
+    moveDown.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }))
+    moveDown.dispatchEvent(new Event('click', { bubbles: true, cancelable: true }))
+
+    releaseFirstPatch({ data: {} })
+    await flushPromises()
+
+    // One move is exactly 3 PATCH calls; an overlapping second move would
+    // double that to 6.
+    expect(updateBarsIndicator).toHaveBeenCalledTimes(3)
+  })
+
   it('reports a failed reorder and reloads rather than trusting a local rollback', async () => {
     updateBarsIndicator.mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
 

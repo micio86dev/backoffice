@@ -60,7 +60,7 @@
                   <Button
                     variant="outline"
                     size="sm"
-                    :disabled="index === 0"
+                    :disabled="index === 0 || moving"
                     :data-testid="`indicator-move-up-${item.id}`"
                     :aria-label="$t('catalogue.indicators.moveUp')"
                     @click="onMove(pair, index, -1)"
@@ -70,7 +70,7 @@
                   <Button
                     variant="outline"
                     size="sm"
-                    :disabled="index === pair.items.length - 1"
+                    :disabled="index === pair.items.length - 1 || moving"
                     :data-testid="`indicator-move-down-${item.id}`"
                     :aria-label="$t('catalogue.indicators.moveDown')"
                     @click="onMove(pair, index, 1)"
@@ -185,6 +185,15 @@ const saving = ref(false)
 const deleteTarget = ref<CatalogueBarsIndicator | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
 const actionError = ref<{ kind: FormMessageKind; text: string } | null>(null)
+/**
+ * True for the whole duration of `onMove`'s 3-step PATCH dance (RoleCompetenciesForm.vue's
+ * `saving` guards its own double-submission the same way). Every move button
+ * — not just the pair being moved — is disabled while this is true: a second
+ * click on ANY row before this one's dance finishes would compute its own
+ * temp/final positions from the same not-yet-reloaded `indicators`, racing
+ * the in-flight PATCH sequence.
+ */
+const moving = ref(false)
 
 interface PairGroup {
   key: string
@@ -305,6 +314,13 @@ async function onConfirmDelete(): Promise<void> {
  * either row's real position, in either direction, by construction.
  */
 async function onMove(pair: PairGroup, index: number, direction: -1 | 1): Promise<void> {
+  // Belt-and-suspenders with the template's `:disabled="... || moving"`: the
+  // buttons already keep a click from reaching here while a move is in
+  // flight, but guarding the handler itself means a stray double-dispatch
+  // can never start a second 3-step dance from the same pre-move positions
+  // (R3-indicator-move-no-inflight-guard).
+  if (moving.value) return
+
   const otherIndex = index + direction
   if (otherIndex < 0 || otherIndex >= pair.items.length) return
 
@@ -317,6 +333,8 @@ async function onMove(pair: PairGroup, index: number, direction: -1 | 1): Promis
   const aPosition = a.position
   const bPosition = b.position
   const tempPosition = Math.max(...pair.items.map((i) => i.position)) + 1
+
+  moving.value = true
 
   try {
     await updateBarsIndicator(a.id, { position: tempPosition })
@@ -337,6 +355,8 @@ async function onMove(pair: PairGroup, index: number, direction: -1 | 1): Promis
     // says so honestly rather than asserting a state nobody confirmed.
     await load()
     actionError.value = actionErrorMessage(error, t, 'catalogue.indicators.reorderError')
+  } finally {
+    moving.value = false
   }
 }
 

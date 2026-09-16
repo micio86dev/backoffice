@@ -194,6 +194,39 @@ describe('RoleCompetenciesForm', () => {
     wrapper.unmount()
   })
 
+  it('confirms before a save that would silently drop a competency the "competencies" prop no longer carries', async () => {
+    // `props.role.competency_ids` is the server's own record of what is
+    // assigned; `props.competencies` is a separately-fetched list that can
+    // legitimately disagree with it (e.g. a competency deleted or retyped
+    // concurrently). The initial dangling-id filter that keeps `selectedIds`
+    // index-safe for `move()` must NOT also shrink the DETACH baseline: a
+    // save that never touches anything still sends `competency_ids: [11, 22]`
+    // — silently dropping 99 — and that is a real detach the operator was
+    // never asked to confirm (gga review finding, R3-role-competencies-
+    // silent-detach).
+    const wrapper = mount(RoleCompetenciesForm, {
+      props: {
+        role: { ...ROLE, competency_ids: [11, 22, 99] },
+        competencies: COMPETENCIES,
+      },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+
+    await wrapper.get('[data-testid="role-competencies-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateRoleCompetenciesMock).not.toHaveBeenCalled()
+    expect(document.body.querySelector('[data-testid="confirm-dialog-confirm"]')).not.toBeNull()
+
+    confirmDialog()
+    await flushPromises()
+
+    expect(updateRoleCompetenciesMock).toHaveBeenCalledWith(1, { competency_ids: [11, 22] })
+
+    wrapper.unmount()
+  })
+
   it('never saves a detach when the confirm dialog is cancelled', async () => {
     const wrapper = mount(RoleCompetenciesForm, {
       props: { role: ROLE, competencies: COMPETENCIES },

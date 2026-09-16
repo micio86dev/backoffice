@@ -217,7 +217,17 @@ const { t, te } = useI18n()
 const selectedIds = ref<number[]>(
   props.role.competency_ids.filter((id) => props.competencies.some((c) => c.id === id))
 )
-const originalIds = [...selectedIds.value]
+// The FULL server-assigned set, taken from `props.role.competency_ids`
+// directly rather than from the filtered `selectedIds` above —
+// `detachedIds()` compares against this to decide whether Save is
+// destructive. Deriving it from `selectedIds` instead would silently drop
+// any id `props.competencies` does not carry (e.g. a competency deleted or
+// retyped concurrently) from BOTH sides of that comparison at once, so a
+// save that never touched anything would detach it from the real payload
+// with zero confirmation — the same class of "confirmation computed from
+// stale state" defect this form exists to prevent (gga review finding,
+// R3-role-competencies-silent-detach).
+const originalIds = [...props.role.competency_ids]
 
 const pendingAddId = ref('')
 

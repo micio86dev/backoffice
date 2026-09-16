@@ -34,6 +34,26 @@ const CatalogueIndicatorsPanel = (
   await import('../../../../app/components/organisms/CatalogueIndicatorsPanel.vue')
 ).default
 
+/** Drives a REAL reka-ui Select, same helper as `BarsIndicatorForm.spec.ts`. */
+async function selectOption(triggerTestId: string, optionText: string): Promise<void> {
+  const trigger = document.body.querySelector(`[data-testid="${triggerTestId}"]`)
+  if (!trigger) throw new Error(`Select trigger ${triggerTestId} not found`)
+
+  trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  await waitFor(
+    () => (document.body.textContent ?? '').includes(optionText),
+    `the ${triggerTestId} popup to render its options`
+  )
+
+  const option = Array.from(document.body.querySelectorAll('[role="option"]')).find((el) =>
+    (el.textContent ?? '').includes(optionText)
+  )
+  if (!option) throw new Error(`Option "${optionText}" not found in ${triggerTestId}`)
+
+  option.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+  await flushPromises()
+}
+
 const COMPETENCIES = [
   { id: 11, code: 'COL', revision_id: 1, type: 'standard', name: {}, definition: {} },
 ]
@@ -195,7 +215,7 @@ describe('CatalogueIndicatorsPanel', () => {
     wrapper.unmount()
   })
 
-  it('opens the create drawer and creates an indicator, then reloads and emits refresh-revision', async () => {
+  it('opens the create drawer without creating anything yet', async () => {
     const wrapper = mount(CatalogueIndicatorsPanel, {
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
@@ -208,7 +228,69 @@ describe('CatalogueIndicatorsPanel', () => {
       'the indicator form to mount inside the drawer'
     )
 
+    expect(createBarsIndicator).not.toHaveBeenCalled()
     expect(wrapper.emitted('refresh-revision')).toBeFalsy()
+
+    wrapper.unmount()
+  })
+
+  it('creates an indicator through the drawer, then reloads and emits refresh-revision', async () => {
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="indicators-new"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="bars-indicator-form"]'),
+      'the indicator form to mount inside the drawer'
+    )
+
+    await selectOption('bars-indicator-form-competency', 'COL')
+    await selectOption('bars-indicator-form-role', 'ICO')
+
+    function fill(testId: string, value: string): void {
+      const field = document.body.querySelector<HTMLTextAreaElement>(`[data-testid="${testId}"]`)
+      if (!field) throw new Error(`Field ${testId} not found`)
+      field.value = value
+      field.dispatchEvent(new Event('input'))
+    }
+
+    fill('bars-indicator-form-text-en', 'Third indicator')
+    fill('bars-indicator-form-anchor5-en', 'A5')
+    fill('bars-indicator-form-anchor3-en', 'A3')
+    fill('bars-indicator-form-anchor1-en', 'A1')
+    await flushPromises()
+
+    listBarsIndicators.mockClear()
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(() => createBarsIndicator.mock.calls.length > 0, 'the create call to fire')
+    await flushPromises()
+
+    // Both existing indicators sit in the (competency 11, role 1) pair at
+    // positions 0 and 1 — `max(position) + 1` places the new one at 2.
+    expect(createBarsIndicator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        competency_id: 11,
+        role_id: 1,
+        position: 2,
+        text: { en: 'Third indicator', it: undefined },
+        anchor_5: { en: 'A5', it: undefined },
+        anchor_3: { en: 'A3', it: undefined },
+        anchor_1: { en: 'A1', it: undefined },
+      })
+    )
+    // The drawer's own `@saved` handler (`onFormSaved`) reloads the panel and
+    // emits the same `refresh-revision` signal delete/reorder already do —
+    // this is the assertion the pre-fix test never made, so a broken create
+    // path (a rejected payload, a missing `position`, a create that never
+    // reloads) would still have shown green here.
+    expect(listBarsIndicators).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('refresh-revision')).toBeTruthy()
+    expect(document.body.querySelector('[data-testid="bars-indicator-form"]')).toBeNull()
 
     wrapper.unmount()
   })

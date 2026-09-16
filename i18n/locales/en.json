@@ -1365,7 +1365,8 @@
       "title": "Default questions",
       "description": "The questions copied into a project the first time it selects each competency. Editing one here never changes a project that already has its own copy.",
       "noCompetencies": "The open revision has no competencies yet.",
-      "reorderError": "Could not finish reordering the questions. The list has been reloaded to show what actually saved."
+      "reorderError": "Could not finish reordering the questions. The list has been reloaded to show what actually saved.",
+      "removeError": "Could not remove the default question."
     }
   }
 }

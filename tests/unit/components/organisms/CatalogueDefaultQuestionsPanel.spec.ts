@@ -230,6 +230,45 @@ describe('CatalogueDefaultQuestionsPanel', () => {
     expect(wrapper.find('[data-testid="catalogue-default-questions-banner"]').exists()).toBe(false)
   })
 
+  it('bases the temporary parking slot on the group’s own current highest position, not a fixed constant', async () => {
+    // A previous reorder that failed PARTWAY can leave a row stranded at a
+    // temporary position — the API places no upper bound on `position`, so
+    // that value survives a reload. A fixed parking constant risks landing
+    // on exactly that leftover; deriving it from `max(position) + 1` cannot,
+    // because it is always strictly above whatever the group currently
+    // holds, stray row included.
+    const held = new Map<number, number>([
+      [1, 0],
+      [2, 1],
+      // The stray leftover — already occupies the fixed constant an
+      // earlier, non-derived implementation would have reused.
+      [3, 1_000_000],
+    ])
+
+    updateDefaultQuestion.mockImplementation(async (id: number, payload: { position: number }) => {
+      const collidesWithAnotherRow = [...held.entries()].some(
+        ([otherId, otherPosition]) => otherId !== id && otherPosition === payload.position
+      )
+
+      if (collidesWithAnotherRow) throw Object.assign(new Error('422'), { status: 422 })
+
+      held.set(id, payload.position)
+
+      return { data: defaultQuestion({ id }) }
+    })
+
+    const wrapper = await mountPanel([
+      defaultQuestion({ id: 1, competency_id: 11, position: 0 }),
+      defaultQuestion({ id: 2, competency_id: 11, position: 1 }),
+      defaultQuestion({ id: 3, competency_id: 11, position: 1_000_000 }),
+    ])
+
+    await wrapper.findAllComponents({ name: 'QuestionList' })[0]?.vm.$emit('reorder', [2, 1, 3])
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="catalogue-default-questions-banner"]').exists()).toBe(false)
+  })
+
   it('reflects a reorder in the local list after success, so reversing it sends fresh PATCHes', async () => {
     // gga review finding: without reloading after success, the two rows kept
     // their PRE-reorder `position` in memory forever, so dragging back to
@@ -305,7 +344,7 @@ describe('CatalogueDefaultQuestionsPanel', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="catalogue-default-questions-banner"]').text()).toContain(
-      'projectQuestions.removeError'
+      'catalogue.defaultQuestions.removeError'
     )
     expect(wrapper.find('[data-testid="question-row-7"]').exists()).toBe(true)
   })

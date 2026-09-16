@@ -174,24 +174,32 @@ async function onReorder(ids: number[]): Promise<void> {
     .map((id, position) => ({ id, position }))
     .filter(({ id, position }) => byId.get(id)?.position !== position)
 
-  // A permutation of `changes` among itself: every target slot one of these
-  // rows wants is, by construction, currently held by ANOTHER row in this
-  // same set (their `position`s are the exact same 0..n-1 set before and
-  // after — only the id↔position pairing changes). `UpdateDefaultQuestionRequest`
-  // (`api`) validates `position` uniqueness PER REQUEST against whatever is
-  // in the database right now, not deferred to commit — so a same-competency
-  // swap sent as two ordinary PATCHes (A: 0→1, B: 1→0) has its first request
+  // Every target slot a row in `changes` wants is, by construction,
+  // currently held by ANOTHER member of the group — including, possibly, a
+  // row NOT in `changes` at all: nothing compacts positions on delete (see
+  // the create path's own comment), so the group's positions are not
+  // necessarily a clean `0..n-1` run. `UpdateDefaultQuestionRequest` (`api`)
+  // validates `position` uniqueness PER REQUEST against whatever is in the
+  // database right now, not deferred to commit — so a same-competency swap
+  // sent as two ordinary PATCHes (A: 0→1, B: 1→0) has its first request
   // refused outright: B still holds slot 1 (gga review finding on an earlier
   // "just make it sequential" attempt, which only fixed a DIFFERENT race and
   // left this one). Two phases avoid it structurally: park every changing
-  // row at a TEMPORARY position no real row could ever hold, THEN place each
-  // at its real final position — every slot phase 2 could want was vacated
-  // in phase 1.
-  const TEMP_POSITION_OFFSET = 1_000_000
+  // row at a TEMPORARY position no real row in the group could hold, THEN
+  // place each at its real final position — every slot phase 2 could want
+  // was vacated in phase 1.
+  //
+  // The temporary base is DERIVED from the group's own current highest
+  // position, never a fixed constant: a fixed value risks colliding with a
+  // row a PREVIOUS reorder attempt left parked there after failing partway
+  // (the API places no upper bound on `position`, so a stranded temporary
+  // value survives a reload).
+  const highestPosition = Math.max(0, ...previous.map((q) => q.position))
+  const tempPositionBase = highestPosition + 1
 
   try {
     for (const [index, { id }] of changes.entries()) {
-      await updateDefaultQuestion(id, { position: TEMP_POSITION_OFFSET + index })
+      await updateDefaultQuestion(id, { position: tempPositionBase + index })
     }
 
     for (const { id, position } of changes) {
@@ -214,7 +222,7 @@ async function onRemove(id: number): Promise<void> {
     questions.value = questions.value.filter((q) => q.id !== id)
     message.value = null
   } catch (error) {
-    message.value = actionErrorMessage(error, t, 'projectQuestions.removeError')
+    message.value = actionErrorMessage(error, t, 'catalogue.defaultQuestions.removeError')
   }
 }
 

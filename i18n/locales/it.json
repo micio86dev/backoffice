@@ -1365,7 +1365,8 @@
       "title": "Domande predefinite",
       "description": "Le domande copiate in un progetto la prima volta che seleziona ciascuna competenza. Modificarne una qui non cambia mai un progetto che ha già la propria copia.",
       "noCompetencies": "La revisione aperta non ha ancora competenze.",
-      "reorderError": "Non è stato possibile completare il riordino delle domande. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato."
+      "reorderError": "Non è stato possibile completare il riordino delle domande. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato.",
+      "removeError": "Non è stato possibile rimuovere la domanda predefinita."
     }
   }
 }

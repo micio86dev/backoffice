@@ -113,6 +113,7 @@
     "logout": "Log out",
     "avatarTemplates": "Avatar templates",
     "clients": "Clients",
+    "catalogue": "Catalogue",
     "profileLabel": "{name}'s profile"
   },
   "dashboard": {
@@ -1334,6 +1335,37 @@
       "cancel": "Cancel",
       "confirm": "Apply",
       "exportError": "The image could not be processed. Try another file."
+    }
+  },
+  "catalogue": {
+    "title": "Catalogue",
+    "intro": "The framework catalogue every project draws from: competencies, roles, BARS indicators and default questions. Edits open a draft revision; publishing freezes it.",
+    "sections": {
+      "competencies": "Competencies",
+      "competenciesDescription": "The scored competencies, standard and potential.",
+      "roles": "Roles",
+      "rolesDescription": "The five standard assessment roles.",
+      "indicators": "Indicators",
+      "indicatorsDescription": "The BARS indicators behind each competency.",
+      "defaultQuestions": "Default questions",
+      "defaultQuestionsDescription": "The template a project copies its predefined questions from.",
+      "notYetAvailable": "This section is not available in the backoffice yet."
+    },
+    "revision": {
+      "draft": "Draft",
+      "published": "Published",
+      "untitled": "Untitled revision",
+      "publish": "Publish",
+      "confirmPublishTitle": "Publish this revision?",
+      "confirmPublishBody": "Once published, this revision — and every row in it — becomes permanently frozen. No further edit, addition or removal will be possible; changes after this point require a new draft.",
+      "publishError": "Could not publish this revision.",
+      "none": "No revision is open yet."
+    },
+    "defaultQuestions": {
+      "title": "Default questions",
+      "description": "The questions copied into a project the first time it selects each competency. Editing one here never changes a project that already has its own copy.",
+      "noCompetencies": "The open revision has no competencies yet.",
+      "reorderError": "Could not finish reordering the questions. The list has been reloaded to show what actually saved."
     }
   }
 }

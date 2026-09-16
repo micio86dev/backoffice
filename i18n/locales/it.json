@@ -113,6 +113,7 @@
     "logout": "Esci",
     "avatarTemplates": "Template avatar",
     "clients": "Clienti",
+    "catalogue": "Catalogo",
     "profileLabel": "Profilo di {name}"
   },
   "dashboard": {
@@ -1334,6 +1335,37 @@
       "cancel": "Annulla",
       "confirm": "Applica",
       "exportError": "Non è stato possibile elaborare l'immagine. Prova con un altro file."
+    }
+  },
+  "catalogue": {
+    "title": "Catalogo",
+    "intro": "Il catalogo del framework da cui attinge ogni progetto: competenze, ruoli, indicatori BARS e domande predefinite. Le modifiche aprono una revisione in bozza; la pubblicazione la blocca definitivamente.",
+    "sections": {
+      "competencies": "Competenze",
+      "competenciesDescription": "Le competenze valutate, standard e di potenziale.",
+      "roles": "Ruoli",
+      "rolesDescription": "I cinque ruoli di valutazione standard.",
+      "indicators": "Indicatori",
+      "indicatorsDescription": "Gli indicatori BARS di ciascuna competenza.",
+      "defaultQuestions": "Domande predefinite",
+      "defaultQuestionsDescription": "Il modello da cui un progetto copia le proprie domande predefinite.",
+      "notYetAvailable": "Questa sezione non è ancora disponibile nel backoffice."
+    },
+    "revision": {
+      "draft": "Bozza",
+      "published": "Pubblicata",
+      "untitled": "Revisione senza titolo",
+      "publish": "Pubblica",
+      "confirmPublishTitle": "Pubblicare questa revisione?",
+      "confirmPublishBody": "Una volta pubblicata, questa revisione — e ogni sua riga — diventa permanentemente bloccata. Non sarà più possibile modificarla, aggiungere o rimuovere nulla: le modifiche successive richiedono una nuova bozza.",
+      "publishError": "Non è stato possibile pubblicare questa revisione.",
+      "none": "Nessuna revisione ancora aperta."
+    },
+    "defaultQuestions": {
+      "title": "Domande predefinite",
+      "description": "Le domande copiate in un progetto la prima volta che seleziona ciascuna competenza. Modificarne una qui non cambia mai un progetto che ha già la propria copia.",
+      "noCompetencies": "La revisione aperta non ha ancora competenze.",
+      "reorderError": "Non è stato possibile completare il riordino delle domande. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato."
     }
   }
 }

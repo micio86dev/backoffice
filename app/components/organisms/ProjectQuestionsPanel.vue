@@ -56,6 +56,7 @@ import { ref, computed, onMounted } from 'vue'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import QuestionListEditor from '@/components/organisms/QuestionListEditor.vue'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
+import { actionErrorMessage } from '@/utils/action-error-message'
 import { useProjectQuestions, type ProjectQuestion } from '@/composables/useProjectQuestions'
 import type { QuestionEditorCompetency, QuestionEditorSubmission } from '@/types/question-editor'
 
@@ -95,7 +96,7 @@ const cap = ref<number | null>(null)
 const message = ref<{ kind: FormMessageKind; text: string } | null>(null)
 const saving = ref(false)
 /** The raw rejection from the last submit attempt — `QuestionListEditor` maps it. */
-const submitError = ref<unknown | null>(null)
+const submitError = ref<unknown>(null)
 
 const editorRef = ref<InstanceType<typeof QuestionListEditor> | null>(null)
 
@@ -174,7 +175,7 @@ async function onReorder(ids: number[]): Promise<void> {
     message.value = null
   } catch (error) {
     questions.value = previous
-    message.value = actionErrorMessage(error, 'projectQuestions.reorderError')
+    message.value = actionErrorMessage(error, t, 'projectQuestions.reorderError')
   }
 }
 
@@ -186,28 +187,7 @@ async function onRemove(id: number): Promise<void> {
   } catch (error) {
     // A failed DELETE, said as one. It claimed the save failed, which is a
     // sentence about an action the operator did not take.
-    message.value = actionErrorMessage(error, 'projectQuestions.removeError')
-  }
-}
-
-/**
- * A rejection with no distinguishable HTTP state (`resolveResourceErrorState`
- * falls through to `'error'`) keeps this ACTION's own specific copy — "could
- * not remove the question" says more than the generic fallback. A 403, 404 or
- * 409 renders as ITSELF instead (D4, `error-state.ts`): a permission refusal
- * is not "could not remove", and a 409 is `waiting`, not `error` at all.
- */
-function actionErrorMessage(
-  error: unknown,
-  fallbackKey: string
-): { kind: FormMessageKind; text: string } {
-  const state = resolveResourceErrorState(error)
-
-  if (state === 'error') return { kind: 'error', text: t(fallbackKey) }
-
-  return {
-    kind: state === 'not-ready' ? 'waiting' : 'error',
-    text: t(resourceErrorKey(state, 'message')),
+    message.value = actionErrorMessage(error, t, 'projectQuestions.removeError')
   }
 }
 

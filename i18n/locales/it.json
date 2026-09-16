@@ -1405,7 +1405,6 @@
       "anchor1EnRequired": "Inserire il testo dell'ancora 1 in inglese.",
       "competencyRequired": "Selezionare una competenza.",
       "roleRequired": "Selezionare un ruolo, oppure contrassegnare l'indicatore come senza ruolo per una competenza di potenziale.",
-      "forbidden": "Non si dispone dell'autorizzazione necessaria.",
       "saveError": "Non è stato possibile salvare. Verificare i campi evidenziati."
     },
     "serverError": {
@@ -1442,7 +1441,8 @@
         "name": "Nome",
         "type": "Tipo",
         "actions": "Azioni",
-        "empty": "Ancora nessuna competenza nella revisione aperta."
+        "empty": "Ancora nessuna competenza nella revisione aperta.",
+        "noName": "Nome non ancora redatto"
       }
     },
     "roles": {

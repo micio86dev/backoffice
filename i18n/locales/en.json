@@ -1405,7 +1405,6 @@
       "anchor1EnRequired": "Enter the English anchor 1 text.",
       "competencyRequired": "Select a competency.",
       "roleRequired": "Select a role, or mark this indicator as role-less for a potential competency.",
-      "forbidden": "You do not have permission to do that.",
       "saveError": "This could not be saved. Please review the highlighted fields."
     },
     "serverError": {
@@ -1442,7 +1441,8 @@
         "name": "Name",
         "type": "Type",
         "actions": "Actions",
-        "empty": "No competencies in the open revision yet."
+        "empty": "No competencies in the open revision yet.",
+        "noName": "No name authored yet"
       }
     },
     "roles": {

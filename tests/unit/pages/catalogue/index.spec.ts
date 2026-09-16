@@ -43,13 +43,26 @@ function revision(overrides: Record<string, unknown> = {}) {
   }
 }
 
+// PR10b's three sections are stubbed here too — their own CRUD is each
+// panel's own spec file's job (`CatalogueCompetenciesPanel.spec.ts`,
+// `CatalogueRolesPanel.spec.ts`, `CatalogueIndicatorsPanel.spec.ts`); this
+// file owns the revision header, the rail shape, and the publish outcome
+// only. Harmless for every test ABOVE this PR10b addition too: the rail's
+// lazy panel mounting (reka-ui Tabs) never renders a non-active section's
+// panel, and every existing test here leaves `defaultQuestions` selected.
+const PR10B_STUBS = {
+  CatalogueCompetenciesPanel: { template: '<div data-testid="stub-competencies" />' },
+  CatalogueRolesPanel: { template: '<div data-testid="stub-roles" />' },
+  CatalogueIndicatorsPanel: { template: '<div data-testid="stub-indicators" />' },
+}
+
 async function mountPage() {
   const { default: CataloguePage } = await import('../../../../app/pages/catalogue/index.vue')
 
   const wrapper = mount(CataloguePage, {
     global: {
       mocks: { $t: tMock },
-      stubs: { CatalogueDefaultQuestionsPanel: true },
+      stubs: { CatalogueDefaultQuestionsPanel: true, ...PR10B_STUBS },
     },
     attachTo: document.body,
   })
@@ -191,5 +204,135 @@ describe('pages/catalogue/index.vue', () => {
 
     expect(wrapper.find('[data-testid="catalogue-revision-none"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="catalogue-publish"]').exists()).toBe(false)
+  })
+
+  it('renders a 409 LOAD failure without the destructive style, unlike a 403', async () => {
+    fetchCurrentRevision.mockRejectedValueOnce(Object.assign(new Error('409'), { status: 409 }))
+    const notReady = await mountPage()
+
+    expect(notReady.get('[data-testid="catalogue-error"]').classes().join(' ')).not.toContain(
+      'destructive'
+    )
+
+    fetchCurrentRevision.mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }))
+    const forbidden = await mountPage()
+
+    expect(forbidden.get('[data-testid="catalogue-error"]').classes().join(' ')).toContain(
+      'destructive'
+    )
+  })
+
+  // framework-catalogue-authoring PR10b, task 39b.5: the three placeholder
+  // rail sections above now mount the real panels, and a publish 422
+  // renders the full violations list instead of the generic banner.
+  describe('PR10b — real panels and the publish violations list', () => {
+    it('mounts the real Competencies/Roles/Indicators panels, not the old placeholder', async () => {
+      fetchCurrentRevision.mockResolvedValue({ data: revision() })
+      const wrapper = await mountPage()
+
+      await wrapper.setData({ activeSection: 'competencies' })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="stub-competencies"]').exists()).toBe(true)
+      expect(
+        wrapper.find('[data-testid="catalogue-section-placeholder-competencies"]').exists()
+      ).toBe(false)
+
+      await wrapper.setData({ activeSection: 'roles' })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="stub-roles"]').exists()).toBe(true)
+
+      await wrapper.setData({ activeSection: 'indicators' })
+      await flushPromises()
+      expect(wrapper.find('[data-testid="stub-indicators"]').exists()).toBe(true)
+    })
+
+    it('renders the full violations list on a 422 refusal, not the generic banner', async () => {
+      fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+      publishRevision.mockRejectedValueOnce(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: {
+            violations: [
+              {
+                rule: 'roles_closed_set',
+                subject: 'revision:1',
+                detail: 'expected at most 5 roles, found 6',
+              },
+              {
+                rule: 'exactly_three_indicators',
+                subject: 'role:1 competency:2',
+                detail: 'expected exactly 3 indicators, found 4',
+              },
+            ],
+          },
+        })
+      )
+
+      const wrapper = await mountPage()
+
+      await wrapper.get('[data-testid="catalogue-publish"]').trigger('click')
+      await confirmDialog('confirm')
+
+      const list = wrapper.get('[data-testid="catalogue-publish-violations"]')
+      expect(list.text()).toContain('expected at most 5 roles, found 6')
+      expect(list.text()).toContain('expected exactly 3 indicators, found 4')
+      expect(list.text()).toContain('revision:1')
+      expect(list.text()).toContain('role:1 competency:2')
+      expect(wrapper.find('[data-testid="catalogue-publish-error"]').exists()).toBe(false)
+    })
+
+    it('translates a known violation rule name, falling back to the raw rule otherwise', async () => {
+      fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+      publishRevision.mockRejectedValueOnce(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: {
+            violations: [
+              { rule: 'roles_closed_set', subject: 'revision:1', detail: 'x' },
+              { rule: 'some_future_rule_this_page_has_no_copy_for', subject: 'y', detail: 'z' },
+            ],
+          },
+        })
+      )
+
+      const wrapper = await mountPage()
+
+      await wrapper.get('[data-testid="catalogue-publish"]').trigger('click')
+      await confirmDialog('confirm')
+
+      // `realI18n()`'s own `t` is identity, so a rule WITH copy renders the
+      // full, namespaced key (proving `te` found it and `t` ran), while a
+      // rule with none renders its bare, un-namespaced name instead.
+      const list = wrapper.get('[data-testid="catalogue-publish-violations"]')
+      expect(list.text()).toContain('catalogue.revision.violationRule.roles_closed_set')
+      expect(list.text()).toContain('some_future_rule_this_page_has_no_copy_for')
+      expect(list.text()).not.toContain(
+        'catalogue.revision.violationRule.some_future_rule_this_page_has_no_copy_for'
+      )
+    })
+
+    it('clears a stale violations list once a later publish succeeds', async () => {
+      fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+      publishRevision
+        .mockRejectedValueOnce(
+          Object.assign(new Error('422'), {
+            status: 422,
+            data: {
+              violations: [{ rule: 'roles_closed_set', subject: 'revision:1', detail: 'x' }],
+            },
+          })
+        )
+        .mockResolvedValueOnce({ data: revision({ state: 'published' }) })
+
+      const wrapper = await mountPage()
+
+      await wrapper.get('[data-testid="catalogue-publish"]').trigger('click')
+      await confirmDialog('confirm')
+      expect(wrapper.find('[data-testid="catalogue-publish-violations"]').exists()).toBe(true)
+
+      await wrapper.get('[data-testid="catalogue-publish"]').trigger('click')
+      await confirmDialog('confirm')
+      expect(wrapper.find('[data-testid="catalogue-publish-violations"]').exists()).toBe(false)
+    })
   })
 })

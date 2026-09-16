@@ -1359,7 +1359,19 @@
       "confirmPublishTitle": "Publish this revision?",
       "confirmPublishBody": "Once published, this revision — and every row in it — becomes permanently frozen. No further edit, addition or removal will be possible; changes after this point require a new draft.",
       "publishError": "Could not publish this revision.",
-      "none": "No revision is open yet."
+      "none": "No revision is open yet.",
+      "violationsTitle": "Publish was refused — fix the following before trying again:",
+      "violationRule": {
+        "roles_closed_set": "Too many roles",
+        "exactly_three_indicators": "Wrong indicator count",
+        "pair_must_be_anchored": "Declared pair with no indicators",
+        "potential_competency_not_in_pivot": "Potential competency assigned to a role",
+        "potential_indicator_must_be_role_less": "Potential indicator carries a role",
+        "indicator_pair_not_declared": "Indicators exist for an undeclared pair",
+        "standard_indicator_must_have_role": "Standard indicator missing a role",
+        "cross_role_duplicate_anchor_new_to_revision": "Duplicate anchor text across roles",
+        "revision_already_published": "Already published"
+      }
     },
     "defaultQuestions": {
       "title": "Default questions",
@@ -1367,6 +1379,105 @@
       "noCompetencies": "The open revision has no competencies yet.",
       "reorderError": "Could not finish reordering the questions. The list has been reloaded to show what actually saved.",
       "removeError": "Could not remove the default question."
+    },
+    "form": {
+      "nameEn": "Name (English)",
+      "nameIt": "Name (Italian)",
+      "definitionEn": "Definition (English)",
+      "definitionIt": "Definition (Italian)",
+      "responsibilitiesEn": "Responsibilities (English)",
+      "responsibilitiesIt": "Responsibilities (Italian)",
+      "textEn": "Text (English)",
+      "textIt": "Text (Italian)",
+      "anchor5En": "Anchor 5 (English)",
+      "anchor5It": "Anchor 5 (Italian)",
+      "anchor3En": "Anchor 3 (English)",
+      "anchor3It": "Anchor 3 (Italian)",
+      "anchor1En": "Anchor 1 (English)",
+      "anchor1It": "Anchor 1 (Italian)",
+      "codeRequired": "Enter a code.",
+      "codeInvalid": "Use up to 16 uppercase letters, digits and underscores.",
+      "nameEnRequired": "Enter the English name.",
+      "definitionEnRequired": "Enter the English definition.",
+      "textEnRequired": "Enter the English text.",
+      "anchor5EnRequired": "Enter the English anchor 5 text.",
+      "anchor3EnRequired": "Enter the English anchor 3 text.",
+      "anchor1EnRequired": "Enter the English anchor 1 text.",
+      "competencyRequired": "Select a competency.",
+      "roleRequired": "Select a role, or mark this indicator as role-less for a potential competency.",
+      "forbidden": "You do not have permission to do that.",
+      "saveError": "This could not be saved. Please review the highlighted fields."
+    },
+    "serverError": {
+      "code_required": "Enter a code.",
+      "code_invalid": "Use up to 16 uppercase letters, digits and underscores.",
+      "code_taken": "That code is already used in this draft.",
+      "type_required": "Select a type.",
+      "type_invalid": "Select a valid type.",
+      "framework_roles_closed_set": "The five roles are a closed set — a sixth role cannot be created.",
+      "bars_indicator_pair_full": "This role/competency pair already has 3 indicators.",
+      "position_taken_for_pair": "That position is already used within this role/competency pair.",
+      "position_taken_for_competency": "That position is already used within this competency.",
+      "competency_not_found_in_draft": "That competency does not belong to the open draft.",
+      "role_not_found_in_draft": "That role does not belong to the open draft.",
+      "competency_id_required": "Select a competency.",
+      "position_required": "A position is required."
+    },
+    "competencies": {
+      "description": "The scored competencies of the open revision, standard and potential.",
+      "new": "New competency",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDeleteTitle": "Delete this competency?",
+      "confirmDeleteBody": "This removes it from the open draft revision. Publishing removes it from the platform's live catalogue as well.",
+      "deleteError": "Could not delete this competency.",
+      "code": "Code",
+      "type": "Type",
+      "typeOption": {
+        "standard": "Standard",
+        "potential": "Potential"
+      },
+      "table": {
+        "code": "Code",
+        "name": "Name",
+        "type": "Type",
+        "actions": "Actions",
+        "empty": "No competencies in the open revision yet."
+      }
+    },
+    "roles": {
+      "description": "The five standard assessment roles of the open revision.",
+      "new": "New role",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDeleteTitle": "Delete this role?",
+      "confirmDeleteBody": "This removes it from the open draft revision. Publishing removes it from the platform's live catalogue as well.",
+      "deleteError": "Could not delete this role.",
+      "assignmentNote": "Which competencies belong to a role is not editable here — the catalogue API does not yet expose role-to-competency assignment as a write. BARS indicators still name their own role/competency pair directly, in the Indicators section.",
+      "table": {
+        "code": "Code",
+        "name": "Name",
+        "actions": "Actions",
+        "empty": "No roles in the open revision yet."
+      }
+    },
+    "indicators": {
+      "description": "The BARS indicators behind each competency, grouped by role. Each role/competency pair carries exactly 3 indicators once published — the publish action reports any pair that does not.",
+      "new": "New indicator",
+      "edit": "Edit",
+      "delete": "Delete",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "confirmDeleteTitle": "Delete this indicator?",
+      "confirmDeleteBody": "This removes it from the open draft revision. A pair with fewer than 3 indicators cannot be published until it is fixed.",
+      "deleteError": "Could not delete this indicator.",
+      "reorderError": "Could not finish reordering these indicators. The list has been reloaded to show what actually saved.",
+      "roleless": "Potential (role-less)",
+      "noCompetencies": "The open revision has no competencies yet.",
+      "empty": "No indicators for this pair yet.",
+      "roleOption": {
+        "none": "None — role-less (potential competency only)"
+      }
     }
   }
 }

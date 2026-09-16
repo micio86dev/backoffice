@@ -1359,7 +1359,19 @@
       "confirmPublishTitle": "Pubblicare questa revisione?",
       "confirmPublishBody": "Una volta pubblicata, questa revisione — e ogni sua riga — diventa permanentemente bloccata. Non sarà più possibile modificarla, aggiungere o rimuovere nulla: le modifiche successive richiedono una nuova bozza.",
       "publishError": "Non è stato possibile pubblicare questa revisione.",
-      "none": "Nessuna revisione ancora aperta."
+      "none": "Nessuna revisione ancora aperta.",
+      "violationsTitle": "Pubblicazione rifiutata — correggere quanto segue prima di riprovare:",
+      "violationRule": {
+        "roles_closed_set": "Troppi ruoli",
+        "exactly_three_indicators": "Numero di indicatori errato",
+        "pair_must_be_anchored": "Coppia dichiarata senza indicatori",
+        "potential_competency_not_in_pivot": "Competenza di potenziale assegnata a un ruolo",
+        "potential_indicator_must_be_role_less": "Indicatore di potenziale con un ruolo",
+        "indicator_pair_not_declared": "Indicatori presenti per una coppia non dichiarata",
+        "standard_indicator_must_have_role": "Indicatore standard senza ruolo",
+        "cross_role_duplicate_anchor_new_to_revision": "Testo dell'ancora duplicato tra ruoli",
+        "revision_already_published": "Già pubblicata"
+      }
     },
     "defaultQuestions": {
       "title": "Domande predefinite",
@@ -1367,6 +1379,105 @@
       "noCompetencies": "La revisione aperta non ha ancora competenze.",
       "reorderError": "Non è stato possibile completare il riordino delle domande. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato.",
       "removeError": "Non è stato possibile rimuovere la domanda predefinita."
+    },
+    "form": {
+      "nameEn": "Nome (inglese)",
+      "nameIt": "Nome (italiano)",
+      "definitionEn": "Definizione (inglese)",
+      "definitionIt": "Definizione (italiano)",
+      "responsibilitiesEn": "Responsabilità (inglese)",
+      "responsibilitiesIt": "Responsabilità (italiano)",
+      "textEn": "Testo (inglese)",
+      "textIt": "Testo (italiano)",
+      "anchor5En": "Ancora 5 (inglese)",
+      "anchor5It": "Ancora 5 (italiano)",
+      "anchor3En": "Ancora 3 (inglese)",
+      "anchor3It": "Ancora 3 (italiano)",
+      "anchor1En": "Ancora 1 (inglese)",
+      "anchor1It": "Ancora 1 (italiano)",
+      "codeRequired": "Inserire un codice.",
+      "codeInvalid": "Usare fino a 16 lettere maiuscole, cifre e trattini bassi.",
+      "nameEnRequired": "Inserire il nome in inglese.",
+      "definitionEnRequired": "Inserire la definizione in inglese.",
+      "textEnRequired": "Inserire il testo in inglese.",
+      "anchor5EnRequired": "Inserire il testo dell'ancora 5 in inglese.",
+      "anchor3EnRequired": "Inserire il testo dell'ancora 3 in inglese.",
+      "anchor1EnRequired": "Inserire il testo dell'ancora 1 in inglese.",
+      "competencyRequired": "Selezionare una competenza.",
+      "roleRequired": "Selezionare un ruolo, oppure contrassegnare l'indicatore come senza ruolo per una competenza di potenziale.",
+      "forbidden": "Non si dispone dell'autorizzazione necessaria.",
+      "saveError": "Non è stato possibile salvare. Verificare i campi evidenziati."
+    },
+    "serverError": {
+      "code_required": "Inserire un codice.",
+      "code_invalid": "Usare fino a 16 lettere maiuscole, cifre e trattini bassi.",
+      "code_taken": "Quel codice è già usato in questa bozza.",
+      "type_required": "Selezionare un tipo.",
+      "type_invalid": "Selezionare un tipo valido.",
+      "framework_roles_closed_set": "I cinque ruoli sono un insieme chiuso — non è possibile crearne un sesto.",
+      "bars_indicator_pair_full": "Questa coppia ruolo/competenza ha già 3 indicatori.",
+      "position_taken_for_pair": "Quella posizione è già usata in questa coppia ruolo/competenza.",
+      "position_taken_for_competency": "Quella posizione è già usata in questa competenza.",
+      "competency_not_found_in_draft": "Quella competenza non appartiene alla bozza aperta.",
+      "role_not_found_in_draft": "Quel ruolo non appartiene alla bozza aperta.",
+      "competency_id_required": "Selezionare una competenza.",
+      "position_required": "È richiesta una posizione."
+    },
+    "competencies": {
+      "description": "Le competenze valutate della revisione aperta, standard e di potenziale.",
+      "new": "Nuova competenza",
+      "edit": "Modifica",
+      "delete": "Elimina",
+      "confirmDeleteTitle": "Eliminare questa competenza?",
+      "confirmDeleteBody": "Viene rimossa dalla bozza aperta. La pubblicazione la rimuove anche dal catalogo pubblicato della piattaforma.",
+      "deleteError": "Non è stato possibile eliminare questa competenza.",
+      "code": "Codice",
+      "type": "Tipo",
+      "typeOption": {
+        "standard": "Standard",
+        "potential": "Potenziale"
+      },
+      "table": {
+        "code": "Codice",
+        "name": "Nome",
+        "type": "Tipo",
+        "actions": "Azioni",
+        "empty": "Ancora nessuna competenza nella revisione aperta."
+      }
+    },
+    "roles": {
+      "description": "I cinque ruoli di valutazione standard della revisione aperta.",
+      "new": "Nuovo ruolo",
+      "edit": "Modifica",
+      "delete": "Elimina",
+      "confirmDeleteTitle": "Eliminare questo ruolo?",
+      "confirmDeleteBody": "Viene rimosso dalla bozza aperta. La pubblicazione lo rimuove anche dal catalogo pubblicato della piattaforma.",
+      "deleteError": "Non è stato possibile eliminare questo ruolo.",
+      "assignmentNote": "Quali competenze appartengono a un ruolo non è modificabile qui — l'API del catalogo non espone ancora l'assegnazione ruolo-competenza come scrittura. Gli indicatori BARS indicano comunque la propria coppia ruolo/competenza direttamente, nella sezione Indicatori.",
+      "table": {
+        "code": "Codice",
+        "name": "Nome",
+        "actions": "Azioni",
+        "empty": "Ancora nessun ruolo nella revisione aperta."
+      }
+    },
+    "indicators": {
+      "description": "Gli indicatori BARS di ciascuna competenza, raggruppati per ruolo. Ogni coppia ruolo/competenza porta esattamente 3 indicatori una volta pubblicata — la pubblicazione segnala ogni coppia che non li ha.",
+      "new": "Nuovo indicatore",
+      "edit": "Modifica",
+      "delete": "Elimina",
+      "moveUp": "Sposta su",
+      "moveDown": "Sposta giù",
+      "confirmDeleteTitle": "Eliminare questo indicatore?",
+      "confirmDeleteBody": "Viene rimosso dalla bozza aperta. Una coppia con meno di 3 indicatori non può essere pubblicata finché non viene corretta.",
+      "deleteError": "Non è stato possibile eliminare questo indicatore.",
+      "reorderError": "Non è stato possibile completare il riordino di questi indicatori. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato.",
+      "roleless": "Potenziale (senza ruolo)",
+      "noCompetencies": "La revisione aperta non ha ancora competenze.",
+      "empty": "Ancora nessun indicatore per questa coppia.",
+      "roleOption": {
+        "none": "Nessuno — senza ruolo (solo competenze di potenziale)"
+      }
     }
   }
 }

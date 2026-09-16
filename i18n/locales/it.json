@@ -1453,12 +1453,14 @@
       "confirmDeleteTitle": "Eliminare questo ruolo?",
       "confirmDeleteBody": "Viene rimosso dalla bozza aperta. La pubblicazione lo rimuove anche dal catalogo pubblicato della piattaforma.",
       "deleteError": "Non è stato possibile eliminare questo ruolo.",
+      "code": "Codice",
       "assignmentNote": "Quali competenze appartengono a un ruolo non è modificabile qui — l'API del catalogo non espone ancora l'assegnazione ruolo-competenza come scrittura. Gli indicatori BARS indicano comunque la propria coppia ruolo/competenza direttamente, nella sezione Indicatori.",
       "table": {
         "code": "Codice",
         "name": "Nome",
         "actions": "Azioni",
-        "empty": "Ancora nessun ruolo nella revisione aperta."
+        "empty": "Ancora nessun ruolo nella revisione aperta.",
+        "noName": "Nome non ancora redatto"
       }
     },
     "indicators": {

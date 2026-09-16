@@ -1453,12 +1453,14 @@
       "confirmDeleteTitle": "Delete this role?",
       "confirmDeleteBody": "This removes it from the open draft revision. Publishing removes it from the platform's live catalogue as well.",
       "deleteError": "Could not delete this role.",
+      "code": "Code",
       "assignmentNote": "Which competencies belong to a role is not editable here — the catalogue API does not yet expose role-to-competency assignment as a write. BARS indicators still name their own role/competency pair directly, in the Indicators section.",
       "table": {
         "code": "Code",
         "name": "Name",
         "actions": "Actions",
-        "empty": "No roles in the open revision yet."
+        "empty": "No roles in the open revision yet.",
+        "noName": "No name authored yet"
       }
     },
     "indicators": {

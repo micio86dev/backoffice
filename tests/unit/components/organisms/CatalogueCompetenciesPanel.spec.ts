@@ -174,6 +174,62 @@ describe('CatalogueCompetenciesPanel', () => {
     wrapper.unmount()
   })
 
+  it('clears a stale delete-error banner once a later create succeeds', async () => {
+    deleteCompetency.mockRejectedValueOnce(Object.assign(new Error('409'), { status: 409 }))
+
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="competency-delete-1"]').trigger('click')
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')
+      ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => document.body.querySelector('[data-testid="competencies-action-error"]'),
+      'the delete-error banner to render'
+    )
+
+    await wrapper.get('[data-testid="competencies-new"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="competency-form"]'),
+      'the competency form to mount inside the drawer'
+    )
+    document.body.querySelector<HTMLInputElement>('[data-testid="competency-form-code"]')!.value =
+      'INN'
+    document.body
+      .querySelector<HTMLInputElement>('[data-testid="competency-form-code"]')
+      ?.dispatchEvent(new Event('input'))
+    document.body.querySelector<HTMLInputElement>(
+      '[data-testid="competency-form-name-en"]'
+    )!.value = 'Innovation'
+    document.body
+      .querySelector<HTMLInputElement>('[data-testid="competency-form-name-en"]')
+      ?.dispatchEvent(new Event('input'))
+    document.body.querySelector<HTMLTextAreaElement>(
+      '[data-testid="competency-form-definition-en"]'
+    )!.value = 'Brings new ideas.'
+    document.body
+      .querySelector<HTMLTextAreaElement>('[data-testid="competency-form-definition-en"]')
+      ?.dispatchEvent(new Event('input'))
+    await flushPromises()
+
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(() => createCompetency.mock.calls.length > 0, 'the create call to fire')
+    await flushPromises()
+
+    expect(document.body.querySelector('[data-testid="competencies-action-error"]')).toBeNull()
+
+    wrapper.unmount()
+  })
+
   it('reports a failed delete through the action-error banner', async () => {
     deleteCompetency.mockRejectedValueOnce(Object.assign(new Error('409'), { status: 409 }))
 

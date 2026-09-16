@@ -173,6 +173,7 @@ async function load(): Promise<void> {
 
 async function onFormSaved(): Promise<void> {
   editing.value = null
+  actionError.value = null
   await load()
   emit('refresh-revision')
 }

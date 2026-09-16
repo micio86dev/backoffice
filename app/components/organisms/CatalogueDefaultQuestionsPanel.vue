@@ -84,6 +84,15 @@ import {
 } from '@/composables/useCatalogueDefaultQuestions'
 import type { QuestionEditorCompetency, QuestionEditorSubmission } from '@/types/question-editor'
 
+// Same signal `CatalogueCompetenciesPanel`/`CatalogueRolesPanel`/
+// `CatalogueIndicatorsPanel` already emit on every successful write: a
+// default-question create/edit/remove/reorder can be the write that
+// auto-opens a draft (PR3's `store()`/`update()`/`destroy()` all open one on
+// first edit if none is open), so the page's revision header must resync the
+// same way it does for the other three rail sections — gga review finding,
+// this container was the one panel that never emitted it.
+const emit = defineEmits<{ (e: 'refresh-revision'): void }>()
+
 const { listCompetencies } = useCatalogue()
 const {
   fetchDefaultQuestions,
@@ -208,6 +217,7 @@ async function onReorder(ids: number[]): Promise<void> {
     }
 
     await load()
+    emit('refresh-revision')
   } catch (error) {
     // `load()` runs FIRST and, on its own success, sets `message.value =
     // null` — so the reorder failure has to be applied AFTER it, or the
@@ -222,6 +232,7 @@ async function onRemove(id: number): Promise<void> {
     await deleteDefaultQuestion(id)
     questions.value = questions.value.filter((q) => q.id !== id)
     message.value = null
+    emit('refresh-revision')
   } catch (error) {
     message.value = actionErrorMessage(error, t, 'catalogue.defaultQuestions.removeError')
   }
@@ -279,6 +290,7 @@ async function onSubmit(payload: QuestionEditorSubmission): Promise<void> {
     message.value = null
     editorRef.value?.closeEditor()
     await load()
+    emit('refresh-revision')
   } catch (error) {
     submitError.value = error
   } finally {

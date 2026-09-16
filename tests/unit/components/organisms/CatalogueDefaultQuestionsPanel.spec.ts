@@ -447,6 +447,72 @@ describe('CatalogueDefaultQuestionsPanel', () => {
     )
   })
 
+  it('emits refresh-revision after a successful create — a write can auto-open a draft', async () => {
+    createDefaultQuestion.mockResolvedValue({ data: defaultQuestion({ id: 9, competency_id: 22 }) })
+
+    const wrapper = await mountPanel([defaultQuestion({ id: 1, competency_id: 22, position: 0 })])
+
+    await wrapper.find('[data-testid="question-add-22"]').trigger('click')
+    await wrapper.find('[data-testid="question-text-en"]').setValue('A new default.')
+    await wrapper.find('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('refresh-revision')).toBeTruthy()
+  })
+
+  it('emits refresh-revision after a successful edit', async () => {
+    updateDefaultQuestion.mockResolvedValue({
+      data: defaultQuestion({ id: 7, competency_id: 11, text: { en: 'Edited.' } }),
+    })
+
+    const wrapper = await mountPanel([defaultQuestion({ id: 7, competency_id: 11 })])
+
+    await wrapper.find('[data-testid="question-edit-7"]').trigger('click')
+    await wrapper.find('[data-testid="question-text-en"]').setValue('Edited.')
+    await wrapper.find('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('refresh-revision')).toBeTruthy()
+  })
+
+  it('emits refresh-revision after a successful remove', async () => {
+    deleteDefaultQuestion.mockResolvedValue(undefined)
+
+    const wrapper = await mountPanel([defaultQuestion({ id: 7, competency_id: 11 })])
+
+    await wrapper.findComponent({ name: 'QuestionListEditor' }).vm.$emit('remove', 7)
+    await flushPromises()
+
+    expect(wrapper.emitted('refresh-revision')).toBeTruthy()
+  })
+
+  it('emits refresh-revision after a successful reorder', async () => {
+    updateDefaultQuestion.mockResolvedValue({ data: defaultQuestion() })
+
+    const wrapper = await mountPanel([
+      defaultQuestion({ id: 1, competency_id: 11, position: 0 }),
+      defaultQuestion({ id: 2, competency_id: 11, position: 1 }),
+    ])
+
+    await wrapper.findAllComponents({ name: 'QuestionList' })[0]?.vm.$emit('reorder', [2, 1])
+    await flushPromises()
+
+    expect(wrapper.emitted('refresh-revision')).toBeTruthy()
+  })
+
+  it('never emits refresh-revision on a failed write', async () => {
+    createDefaultQuestion.mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }))
+
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="question-add-11"]').trigger('click')
+    await wrapper.get('[data-testid="question-text-en"]').setValue('A default.')
+    await wrapper.get('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('refresh-revision')).toBeFalsy()
+  })
+
   it('shows a placeholder when the open revision has no competencies yet', async () => {
     listCompetencies.mockResolvedValue({ data: [] })
     fetchDefaultQuestions.mockResolvedValue({ data: [] })

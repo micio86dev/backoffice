@@ -146,7 +146,10 @@
             v-else-if="section.value === 'indicators'"
             @refresh-revision="load"
           />
-          <CatalogueDefaultQuestionsPanel v-else-if="section.value === 'defaultQuestions'" />
+          <CatalogueDefaultQuestionsPanel
+            v-else-if="section.value === 'defaultQuestions'"
+            @refresh-revision="load"
+          />
         </TabsContent>
       </div>
     </Tabs>

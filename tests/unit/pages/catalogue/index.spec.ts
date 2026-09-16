@@ -198,6 +198,39 @@ describe('pages/catalogue/index.vue', () => {
     )
   })
 
+  it('refreshes the revision header when the default-questions panel signals a write', async () => {
+    // A default-question write (create/edit/remove/reorder) can auto-open a
+    // draft the same way the other three rail sections already do
+    // (CatalogueCompetenciesPanel/CatalogueRolesPanel/CatalogueIndicatorsPanel
+    // all wire `@refresh-revision="load"`) — this panel was the one section
+    // left out (gga review finding).
+    fetchCurrentRevision.mockResolvedValue({ data: revision() })
+
+    const { default: CataloguePage } = await import('../../../../app/pages/catalogue/index.vue')
+
+    const wrapper = mount(CataloguePage, {
+      global: {
+        mocks: { $t: tMock },
+        stubs: {
+          CatalogueDefaultQuestionsPanel: {
+            template:
+              '<button data-testid="stub-default-questions-refresh" @click="$emit(\'refresh-revision\')" />',
+          },
+          ...PR10B_STUBS,
+        },
+      },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(fetchCurrentRevision).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="stub-default-questions-refresh"]').trigger('click')
+    await flushPromises()
+
+    expect(fetchCurrentRevision).toHaveBeenCalledTimes(2)
+  })
+
   it('shows the "no open revision" state when none has ever been opened', async () => {
     fetchCurrentRevision.mockResolvedValue({ data: null })
     const wrapper = await mountPage()

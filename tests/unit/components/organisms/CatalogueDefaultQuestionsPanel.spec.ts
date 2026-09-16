@@ -513,6 +513,28 @@ describe('CatalogueDefaultQuestionsPanel', () => {
     expect(wrapper.emitted('refresh-revision')).toBeFalsy()
   })
 
+  it('does not claim the catalogue has no competencies when the load itself failed', async () => {
+    // R3-default-questions-load-failure-claims-empty: `competencies` stays
+    // empty on a rejected load (nothing ever populates it), so the "no
+    // competencies" placeholder rendered right alongside the D4 error
+    // banner — telling the operator both "something went wrong" and
+    // "there is nothing here" for the exact same failure.
+    listCompetencies.mockReset().mockRejectedValue(Object.assign(new Error('500'), { status: 500 }))
+    fetchDefaultQuestions.mockResolvedValue({ data: [] })
+
+    const { default: CatalogueDefaultQuestionsPanel } =
+      await import('../../../../app/components/organisms/CatalogueDefaultQuestionsPanel.vue')
+
+    const wrapper = mount(CatalogueDefaultQuestionsPanel, {
+      global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="catalogue-default-questions-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="catalogue-default-questions-none"]').exists()).toBe(false)
+  })
+
   it('shows a placeholder when the open revision has no competencies yet', async () => {
     listCompetencies.mockResolvedValue({ data: [] })
     fetchDefaultQuestions.mockResolvedValue({ data: [] })

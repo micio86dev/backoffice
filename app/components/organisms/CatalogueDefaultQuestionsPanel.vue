@@ -35,7 +35,19 @@
       @unmapped-error="onUnmappedError"
     />
 
-    <p v-else class="text-muted-foreground text-sm" data-testid="catalogue-default-questions-none">
+    <!--
+      Gated on `message === null` (not just on an empty competency list): a
+      failed `load()` also leaves `competencies` empty, and rendering this
+      placeholder on top of the error banner above would claim the catalogue
+      has no competencies when the real cause is unknown (D4 doctrine —
+      `resolveResourceErrorState`/`resourceErrorKey`, same distinction every
+      sibling panel keeps between an empty result and a load failure).
+    -->
+    <p
+      v-else-if="message === null"
+      class="text-muted-foreground text-sm"
+      data-testid="catalogue-default-questions-none"
+    >
       {{ $t('catalogue.defaultQuestions.noCompetencies') }}
     </p>
   </section>

@@ -54,6 +54,8 @@ export type CreateRolePayload =
 export type UpdateRolePayload = NonNullable<
   paths['/catalogue/roles/{role}']['patch']['requestBody']
 >['content']['application/json']
+export type UpdateRoleCompetenciesPayload =
+  paths['/catalogue/roles/{role}/competencies']['put']['requestBody']['content']['application/json']
 
 export type CatalogueBarsIndicatorsResponse =
   paths['/catalogue/bars-indicators']['get']['responses']['200']['content']['application/json']
@@ -133,6 +135,23 @@ export function useCatalogue() {
     await apiFetch(`/catalogue/roles/${id}`, { method: 'DELETE' })
   }
 
+  /**
+   * `PUT /catalogue/roles/{role}/competencies` (framework-catalogue-
+   * authoring PR8b/PR10c) — replaces the role's ENTIRE competency set in
+   * one idempotent write. Attach, detach and reorder are the same call:
+   * the caller always sends the full ORDERED `competency_ids` list, never
+   * a partial diff.
+   */
+  async function updateRoleCompetencies(
+    id: number,
+    payload: UpdateRoleCompetenciesPayload
+  ): Promise<CatalogueRoleResponse> {
+    return apiFetch<CatalogueRoleResponse>(`/catalogue/roles/${id}/competencies`, {
+      method: 'PUT',
+      body: payload,
+    })
+  }
+
   async function listBarsIndicators(): Promise<CatalogueBarsIndicatorsResponse> {
     return apiFetch<CatalogueBarsIndicatorsResponse>('/catalogue/bars-indicators')
   }
@@ -170,6 +189,7 @@ export function useCatalogue() {
     listRoles,
     createRole,
     updateRole,
+    updateRoleCompetencies,
     deleteRole,
     listBarsIndicators,
     createBarsIndicator,

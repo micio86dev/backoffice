@@ -99,6 +99,16 @@ describe('useCatalogue', () => {
     expect(apiFetch).toHaveBeenCalledWith('/catalogue/roles/3', { method: 'DELETE' })
   })
 
+  it("replaces a role's whole competency set with one PUT", async () => {
+    const payload = { competency_ids: [5, 2, 9] }
+    await useCatalogue().updateRoleCompetencies(3, payload)
+
+    expect(apiFetch).toHaveBeenCalledWith('/catalogue/roles/3/competencies', {
+      method: 'PUT',
+      body: payload,
+    })
+  })
+
   it('lists BARS indicators from the collection endpoint', async () => {
     await useCatalogue().listBarsIndicators()
 

@@ -1420,7 +1420,10 @@
       "competency_not_found_in_draft": "That competency does not belong to the open draft.",
       "role_not_found_in_draft": "That role does not belong to the open draft.",
       "competency_id_required": "Select a competency.",
-      "position_required": "A position is required."
+      "position_required": "A position is required.",
+      "competency_ids_required": "The competency list is required.",
+      "competency_id_duplicated": "A competency cannot be selected twice.",
+      "competency_not_found_or_not_standard": "That competency is not a standard competency in the open draft."
     },
     "competencies": {
       "description": "The scored competencies of the open revision, standard and potential.",
@@ -1454,13 +1457,28 @@
       "confirmDeleteBody": "This removes it from the open draft revision. Publishing removes it from the platform's live catalogue as well.",
       "deleteError": "Could not delete this role.",
       "code": "Code",
-      "assignmentNote": "Which competencies belong to a role is not editable here — the catalogue API does not yet expose role-to-competency assignment as a write. BARS indicators still name their own role/competency pair directly, in the Indicators section.",
+      "assignmentNote": "Use \"Competencies\" on a row to attach, detach and reorder that role's competency set. BARS indicators still name their own role/competency pair directly, in the Indicators section.",
+      "manageCompetencies": "Competencies",
       "table": {
         "code": "Code",
         "name": "Name",
         "actions": "Actions",
         "empty": "No roles in the open revision yet.",
         "noName": "No name authored yet"
+      },
+      "competencies": {
+        "title": "{role} — competencies",
+        "assignedTitle": "Assigned competencies",
+        "empty": "No competencies assigned yet.",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "addLabel": "Add a competency",
+        "add": "Add",
+        "noneAvailable": "Every standard competency in this draft is already assigned.",
+        "confirmDetachTitle": "Detach these competencies?",
+        "confirmDetachBody": "Saving detaches every competency removed from the list below. A competency whose role/competency pair still carries BARS indicators in this draft cannot be detached — the save is refused, naming it, until those indicators are removed first.",
+        "saveError": "Could not save this role's competencies."
       }
     },
     "indicators": {

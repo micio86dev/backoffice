@@ -1420,7 +1420,10 @@
       "competency_not_found_in_draft": "Quella competenza non appartiene alla bozza aperta.",
       "role_not_found_in_draft": "Quel ruolo non appartiene alla bozza aperta.",
       "competency_id_required": "Selezionare una competenza.",
-      "position_required": "È richiesta una posizione."
+      "position_required": "È richiesta una posizione.",
+      "competency_ids_required": "L'elenco delle competenze è obbligatorio.",
+      "competency_id_duplicated": "Una competenza non può essere selezionata due volte.",
+      "competency_not_found_or_not_standard": "Quella competenza non è una competenza standard della bozza aperta."
     },
     "competencies": {
       "description": "Le competenze valutate della revisione aperta, standard e di potenziale.",
@@ -1454,13 +1457,28 @@
       "confirmDeleteBody": "Viene rimosso dalla bozza aperta. La pubblicazione lo rimuove anche dal catalogo pubblicato della piattaforma.",
       "deleteError": "Non è stato possibile eliminare questo ruolo.",
       "code": "Codice",
-      "assignmentNote": "Quali competenze appartengono a un ruolo non è modificabile qui — l'API del catalogo non espone ancora l'assegnazione ruolo-competenza come scrittura. Gli indicatori BARS indicano comunque la propria coppia ruolo/competenza direttamente, nella sezione Indicatori.",
+      "assignmentNote": "Usare \"Competenze\" su una riga per aggiungere, rimuovere e riordinare le competenze di quel ruolo. Gli indicatori BARS indicano comunque la propria coppia ruolo/competenza direttamente, nella sezione Indicatori.",
+      "manageCompetencies": "Competenze",
       "table": {
         "code": "Codice",
         "name": "Nome",
         "actions": "Azioni",
         "empty": "Ancora nessun ruolo nella revisione aperta.",
         "noName": "Nome non ancora redatto"
+      },
+      "competencies": {
+        "title": "{role} — competenze",
+        "assignedTitle": "Competenze assegnate",
+        "empty": "Ancora nessuna competenza assegnata.",
+        "moveUp": "Sposta su",
+        "moveDown": "Sposta giù",
+        "remove": "Rimuovi",
+        "addLabel": "Aggiungi una competenza",
+        "add": "Aggiungi",
+        "noneAvailable": "Ogni competenza standard di questa bozza è già assegnata.",
+        "confirmDetachTitle": "Rimuovere queste competenze?",
+        "confirmDetachBody": "Il salvataggio rimuove ogni competenza tolta dall'elenco sottostante. Una competenza la cui coppia ruolo/competenza ha ancora indicatori BARS in questa bozza non può essere rimossa — il salvataggio viene rifiutato, indicandola, finché quegli indicatori non vengono rimossi prima.",
+        "saveError": "Non è stato possibile salvare le competenze di questo ruolo."
       }
     },
     "indicators": {

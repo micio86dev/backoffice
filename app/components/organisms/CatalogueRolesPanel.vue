@@ -6,11 +6,9 @@
           {{ $t('catalogue.roles.description') }}
         </p>
         <!--
-          The honest limitation, stated where the superadmin is actually
-          looking for the control that does not exist (catalogue-authoring
-          PR3's own `RoleController::store()` scope note): neither
-          `CatalogueRoleResource` nor `StoreRoleRequest`/`UpdateRoleRequest`
-          carries a competency list, so there is nothing here to edit.
+          Points at the control that now exists (framework-catalogue-
+          authoring PR10c, PR8b's `PUT .../competencies`) — the "not
+          supported yet" copy this note carried through PR10b is gone.
         -->
         <p class="text-muted-foreground text-xs" data-testid="roles-assignment-note">
           {{ $t('catalogue.roles.assignmentNote') }}
@@ -62,6 +60,14 @@
             <Button
               variant="outline"
               size="sm"
+              :data-testid="`role-competencies-${role.id}`"
+              @click="managingCompetencies = role"
+            >
+              {{ $t('catalogue.roles.manageCompetencies') }}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               :data-testid="`role-edit-${role.id}`"
               @click="editing = role.id"
             >
@@ -95,6 +101,26 @@
       />
     </FormDrawer>
 
+    <FormDrawer
+      :open="managingCompetencies !== null"
+      :title="
+        managingCompetencies
+          ? $t('catalogue.roles.competencies.title', { role: managingCompetencies.code })
+          : ''
+      "
+      form-id="role-competencies-form"
+      :pending="competenciesSaving"
+      @update:open="(open) => !open && (managingCompetencies = null)"
+    >
+      <RoleCompetenciesForm
+        v-if="managingCompetencies !== null"
+        :role="managingCompetencies"
+        :competencies="standardCompetencies"
+        @update:pending="(value) => (competenciesSaving = value)"
+        @saved="onCompetenciesSaved"
+      />
+    </FormDrawer>
+
     <ConfirmDialog
       :open="deleteTarget !== null"
       variant="destructive"
@@ -110,12 +136,13 @@
 <script setup lang="ts">
 /**
  * Superadmin CRUD over catalogue roles (framework-catalogue-authoring
- * PR10b, DESIGN.md §8.2.10). Same table + `FormDrawer` + `ConfirmDialog`
+ * PR10b/PR10c, DESIGN.md §8.2.10). Same table + `FormDrawer` + `ConfirmDialog`
  * shape as `CatalogueCompetenciesPanel.vue`/`UsersPanel.vue`.
  *
- * Deliberately carries NO role→competency assignment UI — see `RoleForm`'s
- * own docblock and `roles.assignmentNote` for why the contract has nothing
- * to call.
+ * A second `FormDrawer` per row mounts `RoleCompetenciesForm` (PR10c,
+ * 39c.2), which owns the role→competency assignment editing itself — this
+ * container only loads the standard competency list it needs and reloads
+ * roles after a save (`competency_ids` changed).
  */
 import { ref, computed, onMounted } from 'vue'
 import {
@@ -131,23 +158,36 @@ import { Button } from '@/components/ui/button'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import RoleForm from '@/components/organisms/RoleForm.vue'
+import RoleCompetenciesForm from '@/components/organisms/RoleCompetenciesForm.vue'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
-import { useCatalogue, type CatalogueRole } from '@/composables/useCatalogue'
+import {
+  useCatalogue,
+  type CatalogueCompetency,
+  type CatalogueRole,
+} from '@/composables/useCatalogue'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { actionErrorMessage } from '@/utils/action-error-message'
 import type { ResourceErrorState } from '@/utils/error-state'
 
 const emit = defineEmits<{ (e: 'refresh-revision'): void }>()
 
-const { listRoles, deleteRole } = useCatalogue()
+const { listRoles, deleteRole, listCompetencies } = useCatalogue()
 const { t, locale } = useI18n()
 
 const roles = ref<CatalogueRole[]>([])
+const competencies = ref<CatalogueCompetency[]>([])
 const editing = ref<'new' | number | null>(null)
 const saving = ref(false)
+const managingCompetencies = ref<CatalogueRole | null>(null)
+const competenciesSaving = ref(false)
 const deleteTarget = ref<CatalogueRole | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
 const actionError = ref<{ kind: FormMessageKind; text: string } | null>(null)
+
+/** Never `type === 'potential'` — see `RoleCompetenciesForm`'s own docblock. */
+const standardCompetencies = computed<CatalogueCompetency[]>(() =>
+  competencies.value.filter((competency) => competency.type === 'standard')
+)
 
 const editingRole = computed<CatalogueRole | null>(() => {
   if (editing.value === null || editing.value === 'new') return null
@@ -163,16 +203,28 @@ async function load(): Promise<void> {
   loadError.value = null
 
   try {
-    const response = await listRoles()
-    roles.value = response.data
+    const [rolesResponse, competenciesResponse] = await Promise.all([
+      listRoles(),
+      listCompetencies(),
+    ])
+    roles.value = rolesResponse.data
+    competencies.value = competenciesResponse.data
   } catch (error) {
     roles.value = []
+    competencies.value = []
     loadError.value = resolveResourceErrorState(error)
   }
 }
 
 async function onFormSaved(): Promise<void> {
   editing.value = null
+  actionError.value = null
+  await load()
+  emit('refresh-revision')
+}
+
+async function onCompetenciesSaved(): Promise<void> {
+  managingCompetencies.value = null
   actionError.value = null
   await load()
   emit('refresh-revision')

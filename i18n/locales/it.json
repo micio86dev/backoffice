@@ -1477,6 +1477,8 @@
       "roleless": "Potenziale (senza ruolo)",
       "noCompetencies": "La revisione aperta non ha ancora competenze.",
       "empty": "Ancora nessun indicatore per questa coppia.",
+      "competencyLabel": "Competenza",
+      "roleLabel": "Ruolo",
       "roleOption": {
         "none": "Nessuno — senza ruolo (solo competenze di potenziale)"
       }

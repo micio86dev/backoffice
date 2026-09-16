@@ -1477,6 +1477,8 @@
       "roleless": "Potential (role-less)",
       "noCompetencies": "The open revision has no competencies yet.",
       "empty": "No indicators for this pair yet.",
+      "competencyLabel": "Competency",
+      "roleLabel": "Role",
       "roleOption": {
         "none": "None — role-less (potential competency only)"
       }

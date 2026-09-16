@@ -175,12 +175,13 @@ async function onReorder(ids: number[]): Promise<void> {
     .filter(({ id, position }) => byId.get(id)?.position !== position)
 
   // Every target slot a row in `changes` wants is, by construction,
-  // currently held by ANOTHER member of the group — including, possibly, a
-  // row NOT in `changes` at all: nothing compacts positions on delete (see
-  // the create path's own comment), so the group's positions are not
-  // necessarily a clean `0..n-1` run. `UpdateDefaultQuestionRequest` (`api`)
-  // validates `position` uniqueness PER REQUEST against whatever is in the
-  // database right now, not deferred to commit — so a same-competency swap
+  // currently held by ANOTHER member of `changes` — never a row excluded
+  // from it: `ids` is the group's full new order, a permutation of the SAME
+  // members, so a row NOT in `changes` sits at the same position both
+  // before and after, and no other row in that same final arrangement can
+  // also want the one position it never gave up. `UpdateDefaultQuestionRequest`
+  // (`api`) validates `position` uniqueness PER REQUEST against whatever is
+  // in the database right now, not deferred to commit — so a same-competency swap
   // sent as two ordinary PATCHes (A: 0→1, B: 1→0) has its first request
   // refused outright: B still holds slot 1 (gga review finding on an earlier
   // "just make it sequential" attempt, which only fixed a DIFFERENT race and
@@ -265,7 +266,14 @@ async function onSubmit(payload: QuestionEditorSubmission): Promise<void> {
         position,
       })
     } else {
-      await updateDefaultQuestion(payload.id, { text: payload.text })
+      // Same `it` default as create, and for the same reason:
+      // `UpdateDefaultQuestionRequest` marks `text.it` `required_with:text`
+      // — whenever `text` is present in the payload at all (which it always
+      // is here, since `QuestionListEditor` never submits an edit with no
+      // text), `it` must be too, blank or not.
+      await updateDefaultQuestion(payload.id, {
+        text: { en: payload.text.en, it: payload.text.it ?? '' },
+      })
     }
 
     message.value = null

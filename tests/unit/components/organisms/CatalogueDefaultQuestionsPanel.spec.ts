@@ -393,6 +393,27 @@ describe('CatalogueDefaultQuestionsPanel', () => {
     expect(wrapper.find('[data-testid="question-editor"]').exists()).toBe(false)
   })
 
+  it('sends `it` as an empty string on edit too, never omitted', async () => {
+    // `UpdateDefaultQuestionRequest` marks `text.it` `required_with:text` —
+    // whenever `text` is present at all (always, on this editor's submit),
+    // `it` must be too. Clearing the Italian field and saving must still
+    // reach the server as `it: ''`, matching the create path's own fix.
+    updateDefaultQuestion.mockResolvedValue({
+      data: defaultQuestion({ id: 7, competency_id: 11, text: { en: 'English only.' } }),
+    })
+
+    const wrapper = await mountPanel([defaultQuestion({ id: 7, competency_id: 11 })])
+
+    await wrapper.find('[data-testid="question-edit-7"]').trigger('click')
+    await wrapper.find('[data-testid="question-text-it"]').setValue('')
+    await wrapper.find('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateDefaultQuestion).toHaveBeenCalledWith(7, {
+      text: { en: 'An existing default.', it: '' },
+    })
+  })
+
   it('surfaces a create failure through the submitError channel, mapped to the banner', async () => {
     createDefaultQuestion.mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }))
 

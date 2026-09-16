@@ -83,6 +83,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   BuildingOffice2Icon,
+  BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import { computed, onMounted, ref } from 'vue'
 import {
@@ -158,7 +159,7 @@ const navItems = [
   {
     to: '/catalogue',
     labelKey: 'nav.catalogue',
-    icon: Cog6ToothIcon,
+    icon: BookOpenIcon,
     requires: 'catalogue.manage',
     scope: 'platform',
   },

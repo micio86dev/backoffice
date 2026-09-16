@@ -38,7 +38,18 @@ interface AllowlistEntry {
 // Empty by design (design.md D5): a new violation must be fixed, not
 // allowlisted away. A future entry needs a written reason, same shape as
 // form-contract.spec.ts's allowlists.
-const R1_ALLOWLIST: AllowlistEntry[] = []
+const R1_ALLOWLIST: AllowlistEntry[] = [
+  {
+    path: 'backoffice/components/organisms/ProjectQuestionsPanel.vue',
+    reason:
+      'framework-catalogue-authoring D11: the confirmation gesture moved INTO ' +
+      'QuestionListEditor.vue, which this file mounts and never touches directly ' +
+      '— its own ConfirmDialog opens before QuestionListEditor ever emits `remove`, ' +
+      'so this file only reaches deleteQuestion() after the operator has already ' +
+      'confirmed. A regex scoped to one file cannot see across that boundary; ' +
+      'QuestionListEditor.spec.ts proves the dialog gates the emit.',
+  },
+]
 const R2_ALLOWLIST: AllowlistEntry[] = []
 
 function isAllowlisted(list: AllowlistEntry[], relativePath: string): boolean {

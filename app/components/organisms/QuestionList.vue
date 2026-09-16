@@ -132,10 +132,10 @@
  */
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import type { ProjectQuestion } from '@/composables/useProjectQuestions'
+import type { QuestionListEntry } from '@/types/question-editor'
 
 const props = defineProps<{
-  questions: ProjectQuestion[]
+  questions: QuestionListEntry[]
   /** The PROJECT's language — the interview's, not the operator's. */
   locale: string
 }>()
@@ -166,13 +166,13 @@ const draggingIndex = ref<number | null>(null)
  * has to be. English is the fallback because the API requires it and every
  * question therefore has one.
  */
-function display(q: ProjectQuestion): string {
+function display(q: QuestionListEntry): string {
   const text = (q.text ?? {}) as Record<string, string | null | undefined>
 
   return text[props.locale] || text.en || ''
 }
 
-function emitOrder(list: ProjectQuestion[]): void {
+function emitOrder(list: QuestionListEntry[]): void {
   emit(
     'reorder',
     list.map((q) => q.id)
@@ -209,7 +209,7 @@ function onDrop(index: number): void {
  * whose whole job is index arithmetic. Filtering by identity says the same
  * thing without the claim.
  */
-function reordered(from: number, to: number): ProjectQuestion[] {
+function reordered(from: number, to: number): QuestionListEntry[] {
   const moved = props.questions[from]
 
   if (moved === undefined) return [...props.questions]

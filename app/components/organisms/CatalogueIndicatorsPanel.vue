@@ -55,7 +55,7 @@
             <TableBody>
               <TableRow v-for="(item, index) in pair.items" :key="item.id">
                 <TableCell class="w-10">{{ item.position }}</TableCell>
-                <TableCell class="max-w-xs truncate">{{ item.text?.en ?? '' }}</TableCell>
+                <TableCell class="max-w-xs truncate">{{ indicatorText(item) }}</TableCell>
                 <TableCell class="flex justify-end gap-1">
                   <Button
                     variant="outline"
@@ -173,7 +173,7 @@ const {
   deleteBarsIndicator,
   updateBarsIndicator,
 } = useCatalogue()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const competencies = ref<CatalogueCompetency[]>([])
 const roles = ref<CatalogueRole[]>([])
@@ -202,6 +202,16 @@ interface CompetencyGroup {
 function roleLabel(roleId: number | null): string {
   if (roleId === null) return t('catalogue.indicators.roleless')
   return roles.value.find((r) => r.id === roleId)?.code ?? String(roleId)
+}
+
+/**
+ * Operator UI locale first, English fallback — same rule as
+ * `CatalogueCompetenciesPanel`/`CatalogueRolesPanel` (gga review finding:
+ * this previously always showed `text.en`, so an Italian operator read
+ * English indicator text even when an Italian one existed).
+ */
+function indicatorText(indicator: CatalogueBarsIndicator): string {
+  return indicator.text?.[locale.value] ?? indicator.text?.en ?? ''
 }
 
 const competencyGroups = computed<CompetencyGroup[]>(() =>
@@ -298,6 +308,8 @@ async function onMove(pair: PairGroup, index: number, direction: -1 | 1): Promis
   const otherIndex = index + direction
   if (otherIndex < 0 || otherIndex >= pair.items.length) return
 
+  actionError.value = null
+
   const a = pair.items[index]
   const b = pair.items[otherIndex]
   if (!a || !b) return
@@ -311,7 +323,18 @@ async function onMove(pair: PairGroup, index: number, direction: -1 | 1): Promis
     await updateBarsIndicator(b.id, { position: aPosition })
     await updateBarsIndicator(a.id, { position: bPosition })
     await load()
+    emit('refresh-revision')
   } catch (error) {
+    // Reloads from the server rather than attempting a local rollback — the
+    // SAME deliberate choice `CatalogueDefaultQuestionsPanel.vue`'s own
+    // `onReorder` docblock explains: a failure can land midway through this
+    // 3-step dance (row A already parked at `tempPosition`, or already moved
+    // to B's old slot), and a rollback issued from HERE would be guessing
+    // whether that PATCH actually committed — the exact same "claims the
+    // previous order was kept when it might not have been" risk that
+    // sibling panel's docblock names. `load()` shows whatever the server
+    // actually holds, which may include a position gap; the banner below
+    // says so honestly rather than asserting a state nobody confirmed.
     await load()
     actionError.value = actionErrorMessage(error, t, 'catalogue.indicators.reorderError')
   }

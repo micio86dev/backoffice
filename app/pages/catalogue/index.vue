@@ -5,7 +5,18 @@
       <p class="mt-1 max-w-2xl text-sm text-muted-foreground">{{ $t('catalogue.intro') }}</p>
     </div>
 
-    <Alert v-if="loadError" variant="destructive" data-testid="catalogue-error">
+    <!--
+      A 409 ("not ready yet", D4) is temporal and self-resolving — it must
+      never render in the same destructive red as a genuine 403/404/error
+      (gga review finding: this previously always rendered `destructive`,
+      disagreeing with every panel below it, which already makes this exact
+      distinction via `FormMessage`'s `kind`).
+    -->
+    <Alert
+      v-if="loadError"
+      :variant="loadError === 'not-ready' ? 'default' : 'destructive'"
+      data-testid="catalogue-error"
+    >
       <AlertTitle>{{ $t(resourceErrorKey(loadError, 'title')) }}</AlertTitle>
       <AlertDescription>{{ $t(resourceErrorKey(loadError, 'message')) }}</AlertDescription>
     </Alert>
@@ -50,8 +61,40 @@
       {{ $t('catalogue.revision.none') }}
     </p>
 
+    <!--
+      Publish refusal (39b.5): the sweep's full violations list
+      (`PublishRevision::violations()`, design D3), not the generic banner
+      PR10 left as a known limitation — each rule NAME is translated where
+      copy exists (`violationRuleLabel`) and shown verbatim otherwise.
+
+      `subject`/`detail` are NEVER translated, and that is deliberate, not
+      an oversight: `PublishRevision.php` computes them at publish time from
+      live row ids/counts ("expected exactly 3 indicators, found 4") — there
+      is no fixed catalogue of strings to carry `{en, it}` copy for, the same
+      reason DESIGN.md §8.3 renders BARS transcript excerpts verbatim
+      (`--font-mono`) instead of attempting to translate them. The
+      translated rule label is what tells the superadmin WHAT kind of
+      problem this is; `subject`/`detail` are the server's own computed
+      diagnostic locator for THIS occurrence of it — monospaced here for the
+      same "this is verbatim server output, not authored copy" reason.
+    -->
+    <div
+      v-if="publishViolations !== null && publishViolations.length > 0"
+      data-testid="catalogue-publish-violations"
+      class="rounded-lg border border-destructive/50 bg-destructive/5 p-4"
+    >
+      <p class="text-sm font-medium text-destructive">
+        {{ $t('catalogue.revision.violationsTitle') }}
+      </p>
+      <ul class="mt-2 flex flex-col gap-1 text-sm text-destructive">
+        <li v-for="(violation, index) in publishViolations" :key="index">
+          <span class="font-medium">{{ violationRuleLabel(violation.rule) }}</span>
+          — <span class="font-mono text-xs">{{ violation.subject }}: {{ violation.detail }}</span>
+        </li>
+      </ul>
+    </div>
     <FormMessage
-      v-if="publishError"
+      v-else-if="publishError"
       :kind="publishError.kind"
       :text="publishError.text"
       test-id="catalogue-publish-error"
@@ -94,23 +137,16 @@
           :value="section.value"
           class="flex flex-col gap-5"
         >
-          <CatalogueDefaultQuestionsPanel v-if="section.value === 'defaultQuestions'" />
-          <!--
-            Competencies/Roles/Indicators: no CRUD surface in this PR —
-            design.md's own PR10 file list names only QuestionListEditor,
-            the page shell and CatalogueDefaultQuestionsPanel. Rather than
-            invent an unrequested read/write surface for three more resource
-            types, this section says so honestly. Flagged in the apply
-            report as a real DESIGN.md/design.md/tasks.md gap, not silently
-            resolved.
-          -->
-          <p
-            v-else
-            class="text-muted-foreground text-sm"
-            :data-testid="`catalogue-section-placeholder-${section.value}`"
-          >
-            {{ $t('catalogue.sections.notYetAvailable') }}
-          </p>
+          <CatalogueCompetenciesPanel
+            v-if="section.value === 'competencies'"
+            @refresh-revision="load"
+          />
+          <CatalogueRolesPanel v-else-if="section.value === 'roles'" @refresh-revision="load" />
+          <CatalogueIndicatorsPanel
+            v-else-if="section.value === 'indicators'"
+            @refresh-revision="load"
+          />
+          <CatalogueDefaultQuestionsPanel v-else-if="section.value === 'defaultQuestions'" />
         </TabsContent>
       </div>
     </Tabs>
@@ -150,7 +186,19 @@ import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMe
 import { useCatalogue, type CatalogueRevision } from '@/composables/useCatalogue'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { actionErrorMessage } from '@/utils/action-error-message'
+import { getErrorStatus } from '@/utils/http-error'
+import { extractPublishViolations, type PublishViolation } from '@/utils/publish-violations'
+import { translateServerCode } from '@/utils/server-message'
 
+const CatalogueCompetenciesPanel = defineAsyncComponent(
+  () => import('@/components/organisms/CatalogueCompetenciesPanel.vue')
+)
+const CatalogueRolesPanel = defineAsyncComponent(
+  () => import('@/components/organisms/CatalogueRolesPanel.vue')
+)
+const CatalogueIndicatorsPanel = defineAsyncComponent(
+  () => import('@/components/organisms/CatalogueIndicatorsPanel.vue')
+)
 const CatalogueDefaultQuestionsPanel = defineAsyncComponent(
   () => import('@/components/organisms/CatalogueDefaultQuestionsPanel.vue')
 )
@@ -186,7 +234,7 @@ const SECTIONS: readonly CatalogueSection[] = [
 
 definePageMeta({ name: 'catalogue' })
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 useHead({
   title: () => t('catalogue.title'),
@@ -210,6 +258,14 @@ const loading = ref(true)
 const publishTarget = ref(false)
 const publishError = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
+/**
+ * `null` before any publish attempt or after a non-422 failure (those
+ * render through `publishError` instead); an EMPTY array for a 422 whose
+ * body carried no violation this shape recognizes (never reachable from the
+ * real API today, but the parse below fails closed rather than assuming).
+ */
+const publishViolations = ref<PublishViolation[] | null>(null)
+
 const activeSection = ref<CatalogueSection['value']>('defaultQuestions')
 
 async function load(): Promise<void> {
@@ -225,9 +281,22 @@ async function load(): Promise<void> {
   }
 }
 
+/**
+ * Translated when `catalogue.revision.violationRule.{rule}` exists (the
+ * closed, named set `PublishRevision::violations()` actually emits today),
+ * the raw rule name otherwise — never a silent blank for a rule this page
+ * has not been taught the copy for yet. `translateServerCode` already
+ * implements exactly this fallback (`server-message.ts`); reused here
+ * rather than re-implemented.
+ */
+function violationRuleLabel(rule: string): string {
+  return translateServerCode({ t, te }, 'catalogue.revision.violationRule', rule)
+}
+
 async function onPublishConfirmed(): Promise<void> {
   publishTarget.value = false
   publishError.value = null
+  publishViolations.value = null
 
   try {
     const response = await publishRevision()
@@ -235,16 +304,19 @@ async function onPublishConfirmed(): Promise<void> {
     revision.value = response.data
   } catch (error) {
     // `actionErrorMessage` still tells a genuine 403/404/409 apart from "the
-    // sweep refused" (D4) — a 422 falls to the generic `error` state and the
+    // sweep refused" (D4). A 422 is checked FIRST for a recognizable
+    // violations list (39b.5, replacing PR10's own generic-banner known
+    // limitation) — only when none is found does it fall through to the
     // catalogue-specific fallback copy below.
-    //
-    // KNOWN LIMITATION, not silently dropped: the full violations list
-    // (`PublishRevision::violations()`, design D3) rides in the 422 body
-    // under `violations` as a discriminated tuple keyed by rule name — not
-    // the flat `{field: [message]}` shape `actionErrorMessage`/
-    // `applyServerFieldErrors` understand — so this banner names ONLY that a
-    // publish was refused, not which rule(s) blocked it. Rendering the full
-    // per-rule breakdown is future work, out of this PR's assigned scope.
+    if (getErrorStatus(error) === 422) {
+      const violations = extractPublishViolations(error)
+
+      if (violations.length > 0) {
+        publishViolations.value = violations
+        return
+      }
+    }
+
     publishError.value = actionErrorMessage(error, t, 'catalogue.revision.publishError')
   }
 }

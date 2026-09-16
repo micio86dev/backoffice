@@ -84,6 +84,19 @@ describe('CatalogueIndicatorsPanel', () => {
     expect(competencyGroup.text()).toContain('Second')
   })
 
+  it('shows the indicator text in the operator’s own UI locale, not always English', async () => {
+    listBarsIndicators.mockResolvedValue({
+      data: [indicator({ id: 1, position: 0, text: { en: 'English text', it: 'Testo italiano' } })],
+    })
+
+    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    // The global i18n stub (tests/unit/setup.ts) reports the UI locale as 'it'.
+    expect(wrapper.text()).toContain('Testo italiano')
+    expect(wrapper.text()).not.toContain('English text')
+  })
+
   it('shows a per-competency empty note when it has no indicators yet', async () => {
     listBarsIndicators.mockResolvedValue({ data: [] })
     const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
@@ -140,6 +153,9 @@ describe('CatalogueIndicatorsPanel', () => {
     expect(updateBarsIndicator).toHaveBeenNthCalledWith(2, 2, { position: 0 })
     expect(updateBarsIndicator).toHaveBeenNthCalledWith(3, 1, { position: 1 })
     expect(listBarsIndicators).toHaveBeenCalledTimes(2)
+    // A successful reorder emits the same refresh-revision signal create and
+    // delete already do — a write is a write, whichever section made it.
+    expect(wrapper.emitted('refresh-revision')).toBeTruthy()
   })
 
   it('reports a failed reorder and reloads rather than trusting a local rollback', async () => {

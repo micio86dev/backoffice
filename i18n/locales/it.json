@@ -1116,6 +1116,18 @@
           "1": "Lascia vuota un'impostazione per accettare il valore predefinito del servizio.",
           "2": "I template sono configurazione, non archivio: modificarne uno influenza tutti i colloqui futuri che lo usano."
         }
+      },
+      "catalogue": {
+        "title": "Catalogo",
+        "summary": "Il framework comune a tutta la piattaforma da cui attinge ogni progetto: competenze, ruoli, indicatori BARS e domande predefinite.",
+        "steps": {
+          "0": "La revisione pubblicata è il catalogo in uso ed è mostrata in sola lettura. Premi Crea bozza per ottenerne una copia modificabile; esiste sempre al massimo una bozza alla volta.",
+          "1": "Nella bozza modifica le competenze, poi i ruoli: usa Competenze su un ruolo per aggiungere, rimuovere e riordinare le competenze che valuta.",
+          "2": "Ogni coppia ruolo e competenza richiede esattamente 3 indicatori BARS, e ogni indicatore richiede le ancore per i punteggi 5, 3 e 1.",
+          "3": "Le domande predefinite appartengono a una competenza, in inglese e in italiano. Sono ciò che un nuovo progetto copia quando ne vengono selezionate le competenze.",
+          "4": "Pubblica congela la bozza in modo definitivo. Se viene rifiutata, l'elenco mostrato indica tutti i problemi insieme; correggili nella bozza e pubblica di nuovo.",
+          "5": "I progetti mantengono le domande che hanno già copiato, quindi le modifiche successive al catalogo non cambiano i progetti esistenti. Dopo una pubblicazione, il comando beai:backfill-project-questions aggiunge le domande che mancano a un progetto esistente."
+        }
       }
     },
     "glossary": {
@@ -1186,6 +1198,10 @@
       "llmCost": {
         "term": "costo LLM di conversazione",
         "definition": "Quanto costa il modello linguistico che sta dietro all'intervista. È stimato dai turni e dai caratteri effettivamente scambiati, mai letto da una fattura del fornitore. Non viene mai espresso al minuto: a ogni turno il modello riceve di nuovo l'intera conversazione, quindi il ventesimo minuto costa diverse volte il primo, e moltiplicare un valore al minuto per la durata della sessione dà un risultato sbagliato. È fatturato da un fornitore diverso da quello dei minuti dell'avatar e non va mai sommato a essi."
+      },
+      "catalogueRevision": {
+        "term": "Revisione del catalogo",
+        "definition": "Una versione dell'intero catalogo. Una bozza è modificabile e non viene mai usata dai progetti; una revisione pubblicata non può più essere modificata, e l'ultima è quella usata dai nuovi progetti."
       }
     }
   },

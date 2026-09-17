@@ -1116,6 +1116,18 @@
           "1": "Leave a setting empty to accept the service default.",
           "2": "Templates are configuration, not records: changing one affects every future interview that uses it."
         }
+      },
+      "catalogue": {
+        "title": "Catalogue",
+        "summary": "The platform-wide framework every project draws from: competencies, roles, BARS indicators and default questions.",
+        "steps": {
+          "0": "The published revision is the live catalogue and is shown read-only. Press Create draft to get an editable copy of it; there is only ever one draft at a time.",
+          "1": "In the draft, edit competencies, then roles — use Competencies on a role to attach, detach and reorder the competencies it assesses.",
+          "2": "Each role and competency pair needs exactly 3 BARS indicators, and each indicator needs its anchors for scores 5, 3 and 1.",
+          "3": "Default questions belong to a competency, in both English and Italian. They are what a new project copies when its competencies are selected.",
+          "4": "Publish freezes the draft for good. If it is refused, the list shown names every problem at once; fix them in the draft and publish again.",
+          "5": "Projects keep the questions they already copied, so later catalogue edits do not change existing projects. After a publish, the beai:backfill-project-questions command fills in questions an existing project is missing."
+        }
       }
     },
     "glossary": {
@@ -1186,6 +1198,10 @@
       "llmCost": {
         "term": "conversation LLM cost",
         "definition": "What the language model behind the interview costs. It is estimated from the turns and characters actually exchanged, never read off a vendor invoice. It is never expressed per minute: the model is re-sent the whole conversation on every turn, so the twentieth minute costs several times the first, and multiplying a per-minute figure by a session length gives a wrong answer. It is billed by a different vendor than the avatar minutes and is never added to them."
+      },
+      "catalogueRevision": {
+        "term": "Catalogue revision",
+        "definition": "One version of the whole catalogue. A draft can be edited and is never used by projects; a published revision can no longer be changed, and the latest one is what new projects use."
       }
     }
   },

@@ -124,6 +124,22 @@ const WARNING_KEY_PATHS = [
   'avatar_templates.warning.llm_config_failed',
 ] as const
 
+// The /catalogue help topic. `HelpSheet.vue` registers it as
+// `topicOf('catalogue', 6, …)` and renders every step with a bare `$t()`, so
+// a step missing from either locale would show its key to the superadmin.
+const CATALOGUE_HELP_KEY_PATHS = [
+  'help.topics.catalogue.title',
+  'help.topics.catalogue.summary',
+  ...[0, 1, 2, 3, 4, 5].map((step) => `help.topics.catalogue.steps.${step}`),
+  'help.glossary.catalogueRevision.term',
+  'help.glossary.catalogueRevision.definition',
+  'catalogue.revision.createDraft',
+  'catalogue.revision.createDraftError',
+  'catalogue.revision.readOnlyNotice',
+  'catalogue.roles.table.competencies',
+  'catalogue.roles.table.noCompetencies',
+]
+
 function get(obj: unknown, path: string): unknown {
   return path
     .split('.')
@@ -274,5 +290,14 @@ describe('help.glossary.bars.definition describes the real 1–5 scale', () => {
   it('says an unassessable indicator is left out of the average', () => {
     expect(definition(EN)).toMatch(/average/i)
     expect(definition(IT)).toMatch(/media/i)
+  })
+})
+
+describe('catalogue help and read-only copy — locale key parity', () => {
+  it.each(CATALOGUE_HELP_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
   })
 })

@@ -12,228 +12,24 @@
       test-id="project-questions-banner"
     />
 
-    <!--
-      One block per competency, and the editor lives INSIDE the block it
-      belongs to.
+    <QuestionListEditor
+      v-if="competencies.length > 0"
+      ref="editorRef"
+      :competencies="editorCompetencies"
+      :questions="editorQuestions"
+      :locale="locale"
+      :cap="cap"
+      :saving="saving"
+      :submit-error="submitError"
+      @reorder="onReorder"
+      @remove="onRemove"
+      @submit="onSubmit"
+      @unmapped-error="onUnmappedError"
+    />
 
-      It used to render once, after every group. Pressing "Add" on the first of
-      eight competencies opened a form below all eight: nothing happened where
-      the operator clicked, and when they scrolled down to find it, nothing on
-      it said which competency they were writing for. Position is now the
-      primary answer to "which one is this?" — the form is attached to the
-      thing it edits — and the heading below states it in words as well,
-      because layout alone is exactly what could not be seen.
-    -->
-    <div
-      v-for="group in groups"
-      :key="group.competencyId"
-      class="flex flex-col gap-2"
-      :data-testid="`question-group-${group.competencyId}`"
-    >
-      <h4 class="text-sm font-medium">{{ group.label }}</h4>
-
-      <QuestionList
-        :questions="group.questions"
-        :locale="locale"
-        @reorder="(ids) => onReorder(ids)"
-        @remove="(id) => onRemove(id)"
-        @edit="(id) => onEdit(id)"
-      />
-
-      <!--
-        Both languages, side by side, and always — never one field that follows
-        the operator's locale. The API stores a map and the interview reads the
-        PROJECT's language, so an editor showing one would let somebody save a
-        question the candidate never hears.
-      -->
-      <form
-        v-if="draft && draft.competencyId === group.competencyId"
-        ref="editorFormEl"
-        data-testid="question-editor"
-        class="border-primary/30 bg-primary/[0.03] flex flex-col gap-3 rounded-lg border p-4"
-        novalidate
-        @submit.prevent="onSubmit"
-      >
-        <!--
-          The competency, named. The form sits under its group already, which
-          is the primary answer to "which one is this?"; this is the answer
-          that survives a screen reader, a narrow window, and an operator who
-          scrolled in from somewhere else.
-
-          Tinted rather than plain-bordered: it is a transient surface opening
-          inside an already-bordered list, and a second neutral box reads as
-          one more row instead of as something that just appeared.
-        -->
-        <h5
-          ref="editorTitleEl"
-          class="text-foreground text-sm font-semibold"
-          data-testid="question-editor-title"
-        >
-          {{
-            $t(draft.id === null ? 'projectQuestions.newFor' : 'projectQuestions.editFor', {
-              competency: group.label,
-            })
-          }}
-        </h5>
-        <!--
-          The house Field/FieldLabel/Textarea, not raw elements: the vendored
-          FieldLabel wires `for`/`id` through Reka UI context, which is what
-          `vuejs-accessibility/label-has-for` is checking for and what every
-          other form here already uses. Hand-rolling the pair passed the eye and
-          failed the linter, correctly.
-        -->
-        <!--
-          Ids SCOPED to the competency, not fixed strings. This editor lives
-          inside `v-for="group in groups"`, and only one draft can be open
-          today — an invariant this component happens to hold and nothing
-          enforces, which is the same reason its refs were scoped. A `for`
-          that resolves to the wrong element is silent.
-        -->
-        <Field :data-invalid="Boolean(errors.text)">
-          <FieldLabel :for="`question-en-${group.competencyId}`">{{
-            $t('projectQuestions.textEn')
-          }}</FieldLabel>
-          <Textarea
-            :id="`question-en-${group.competencyId}`"
-            v-model="draft.en"
-            rows="2"
-            required
-            :aria-invalid="Boolean(errors.text)"
-            :aria-describedby="errors.text ? `question-en-error-${group.competencyId}` : undefined"
-            data-testid="question-text-en"
-          />
-          <!--
-            `role="alert"` announces this ONCE, when it appears. A user who
-            tabs back to the field afterwards hears "invalid" and nothing
-            about why — which is what `aria-describedby` is for, and what
-            every field in ProjectForm already wires by hand.
-          -->
-          <FieldError
-            v-if="errors.text"
-            :id="`question-en-error-${group.competencyId}`"
-            data-testid="question-text-error"
-            >{{ errors.text }}</FieldError
-          >
-        </Field>
-
-        <Field :data-invalid="Boolean(errors.textIt)">
-          <FieldLabel :for="`question-it-${group.competencyId}`">{{
-            $t('projectQuestions.textIt')
-          }}</FieldLabel>
-          <Textarea
-            :id="`question-it-${group.competencyId}`"
-            v-model="draft.it"
-            rows="2"
-            :aria-invalid="Boolean(errors.textIt)"
-            :aria-describedby="
-              errors.textIt ? `question-it-error-${group.competencyId}` : undefined
-            "
-            data-testid="question-text-it"
-          />
-          <!--
-            The Italian field had no error path at all: a 422 keyed on
-            `text.it` mapped to nothing, fell into `unmapped`, and landed in
-            the panel banner with no indication of which field it was about.
-          -->
-          <FieldError
-            v-if="errors.textIt"
-            :id="`question-it-error-${group.competencyId}`"
-            data-testid="question-text-it-error"
-            >{{ errors.textIt }}</FieldError
-          >
-        </Field>
-
-        <!--
-          The competency error stands ALONE, outside both text Fields.
-
-          It used to wrap the Italian one, so a refusal about the COMPETENCY
-          ("a standard project allows at most one question per competency")
-          marked "Text (Italian)" invalid and printed itself under that label.
-          There is genuinely no control to attach it to — the competency is
-          decided by which Add was pressed — and that is the argument for a
-          field-less message, not for borrowing the nearest field's.
-        -->
-        <FieldError
-          v-if="errors.competency"
-          :id="`question-competency-error-${group.competencyId}`"
-          data-testid="question-competency-error"
-          >{{ errors.competency }}</FieldError
-        >
-
-        <div class="flex gap-2">
-          <Button type="submit" :loading="saving" data-testid="question-save">
-            {{ $t('projects.action.save') }}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            data-testid="question-cancel"
-            @click="closeEditor()"
-          >
-            {{ $t('projects.action.cancel') }}
-          </Button>
-        </div>
-      </form>
-
-      <!--
-        Withdrawn while THIS group's editor is open. Pressing it again would
-        re-seed the draft and silently discard whatever had been typed — a
-        destructive no-op wearing the label of the action that opened the form.
-        The other groups keep theirs: switching competency mid-draft is a
-        legitimate thing to want, and it is the same single-draft swap that has
-        always happened.
-      -->
-      <div v-if="!draft || draft.competencyId !== group.competencyId">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          :disabled="atCap(group)"
-          :aria-describedby="atCap(group) ? `question-cap-${group.competencyId}` : undefined"
-          :data-testid="`question-add-${group.competencyId}`"
-          @click="startNew(group.competencyId)"
-        >
-          {{ $t('projectQuestions.add') }}
-        </Button>
-
-        <!--
-          The reason, next to the disabled control. A button that stops
-          responding and says nothing teaches the operator the page is broken;
-          the cap is a real limit and it has a number.
-        -->
-        <p
-          v-if="atCap(group)"
-          :id="`question-cap-${group.competencyId}`"
-          class="text-muted-foreground mt-1.5 text-xs"
-          :data-testid="`question-cap-${group.competencyId}`"
-        >
-          {{ $t('projectQuestions.atCap', { max: cap }) }}
-        </p>
-      </div>
-    </div>
-
-    <p
-      v-if="groups.length === 0"
-      class="text-muted-foreground text-sm"
-      data-testid="project-questions-none"
-    >
+    <p v-else class="text-muted-foreground text-sm" data-testid="project-questions-none">
       {{ $t('projectQuestions.noCompetencies') }}
     </p>
-
-    <!--
-      Confirmed even though the delete is SOFT. The operator cannot tell the
-      difference from here, the question disappears from their list either
-      way, and there is no undo in this UI — so the dialog is the only place
-      the decision can be reconsidered.
-    -->
-    <ConfirmDialog
-      :open="removingId !== null"
-      :title="$t('projectQuestions.confirmRemoveTitle')"
-      :description="$t('projectQuestions.confirmRemoveBody')"
-      :confirm-label="$t('projectQuestions.remove')"
-      @confirm="confirmRemove"
-      @cancel="removingId = null"
-    />
   </section>
 </template>
 
@@ -241,26 +37,28 @@
 /**
  * The container for a project's predefined questions.
  *
- * Owns the network so `QuestionList` can stay presentational and testable
- * without one. Rendered only for a SAVED project — a question needs a
- * `project_id`, so offering the editor while creating one would collect input
- * with nowhere to put it.
+ * Owns the network so `QuestionListEditor` can stay presentational and
+ * testable without one. Rendered only for a SAVED project — a question needs
+ * a `project_id`, so offering the editor while creating one would collect
+ * input with nowhere to put it.
  *
- * Questions are grouped by competency because that is the unit the domain
- * counts in: `standard` allows one per competency and `potential` requires
- * four, and a flat list would hide which competency is still short.
+ * A THIN container (framework-catalogue-authoring D11): every rendering and
+ * editing decision this file used to make directly — the competency grouping,
+ * the dual-locale editor, drag reorder, the per-competency cap, client and
+ * server-side validation, and the removal `ConfirmDialog` — now lives in
+ * `QuestionListEditor`, extracted rather than duplicated so it can also back
+ * `CatalogueDefaultQuestionsPanel` without becoming a second editor that
+ * drifts from this one. This file only ever reaches `deleteQuestion()` after
+ * `QuestionListEditor` has already emitted `remove`, which it does not do
+ * until its OWN `ConfirmDialog` confirms.
  */
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
-import QuestionList from '@/components/organisms/QuestionList.vue'
+import { ref, computed, onMounted } from 'vue'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
-import { Button } from '@/components/ui/button'
-import { Field, FieldError, FieldLabel } from '@/components/ui/field'
-import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
-import { applyServerFieldErrors } from '@/utils/http-error'
-import { translateServerCodeOrFallback } from '@/utils/server-message'
+import QuestionListEditor from '@/components/organisms/QuestionListEditor.vue'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
-import { Textarea } from '@/components/ui/textarea'
+import { actionErrorMessage } from '@/utils/action-error-message'
 import { useProjectQuestions, type ProjectQuestion } from '@/composables/useProjectQuestions'
+import type { QuestionEditorCompetency, QuestionEditorSubmission } from '@/types/question-editor'
 
 const props = defineProps<{
   projectId: number
@@ -279,7 +77,7 @@ const props = defineProps<{
 
 const { fetchQuestions, createQuestion, updateQuestion, deleteQuestion, reorderQuestions } =
   useProjectQuestions()
-const { t, te } = useI18n()
+const { t } = useI18n()
 
 const questions = ref<ProjectQuestion[]>([])
 
@@ -296,100 +94,21 @@ const questions = ref<ProjectQuestion[]>([])
  */
 const cap = ref<number | null>(null)
 const message = ref<{ kind: FormMessageKind; text: string } | null>(null)
-
 const saving = ref(false)
-const removingId = ref<number | null>(null)
-const errors = ref<{ text?: string; textIt?: string; competency?: string }>({})
+/** The raw rejection from the last submit attempt — `QuestionListEditor` maps it. */
+const submitError = ref<unknown>(null)
 
-/**
- * The question being written. `id: null` means a new one.
- *
- * A single draft rather than one editor per row: two open at once invites
- * saving the wrong one, and the list is short enough that the operator never
- * needs both.
- */
-const draft = ref<{ id: number | null; competencyId: number; en: string; it: string } | null>(null)
+const editorRef = ref<InstanceType<typeof QuestionListEditor> | null>(null)
 
-/**
- * Bring the editor into view and put the cursor in it.
- *
- * The panel renders inside `FormDrawer`, whose body scrolls independently, so
- * a group near the bottom of a long competency list can open its editor just
- * off the visible edge — the same "where did it go" the old bottom-of-panel
- * layout caused, arrived at by a different route.
- *
- * `block: 'nearest'` rather than `'center'`: if the editor is ALREADY visible
- * — the common case now that it opens where the operator clicked — nearest
- * scrolls nothing at all, while center yanks the list under their hands for no
- * reason.
- *
- * Both calls are optional-chained on the ELEMENT, not on the method: the
- * element is genuinely absent for a tick after the draft opens, while the
- * methods themselves always exist — the test environment is happy-dom
- * (`vitest.config.ts`), which implements `scrollIntoView`, so an earlier
- * comment claiming jsdom lacked it was wrong on both counts and was the excuse
- * for leaving this untested. It is tested now.
- */
-// An ARRAY, because the ref sits inside `v-for` and Vue compiles that with
-// `ref_for: true` regardless of how many elements actually render. Typed as a
-// single element it was always null, and the `?.` on the method call swallowed
-// the miss — so the scroll documented above never once ran, `typecheck` stayed
-// green. The "defensive" optional call on the METHOD was what hid it — the
-// environment is happy-dom and implements `scrollIntoView`, so a test could
-// always have seen this; there simply was not one.
-const editorTitleEl = ref<HTMLElement[]>([])
+const editorCompetencies = computed<QuestionEditorCompetency[]>(() =>
+  props.competencies.map((competency) => ({ id: competency.id, label: competency.code }))
+)
 
-/**
- * The English textarea, by template ref rather than by document lookup.
- *
- * `document.querySelector('[data-testid=question-text-en]')` worked only
- * because exactly one editor can be open at a time — an invariant this
- * component happens to hold today and nothing enforces. A ref says the same
- * thing without depending on it, and an ARRAY for the same `ref_for` reason as
- * the title above.
- */
-const editorFormEl = ref<HTMLFormElement[]>([])
-
-/**
- * The first control of the open editor, found WITHIN that editor.
- *
- * The previous version reached for `document.querySelector`, which worked only
- * because exactly one editor can be open — an invariant this component happens
- * to hold and nothing enforces. Scoping the lookup to the form says the same
- * thing without depending on it. An array for the same `ref_for` reason as the
- * title ref above.
- */
-function editorField(): HTMLTextAreaElement | null {
-  return editorFormEl.value[0]?.querySelector('[data-testid="question-text-en"]') ?? null
-}
-
-watch(draft, async (value) => {
-  if (value === null) return
-
-  await nextTick()
-
-  // Not `?.scrollIntoView?.()`: a missing method here is a broken assumption,
-  // and it must throw rather than quietly do nothing.
-  editorTitleEl.value[0]?.scrollIntoView({ block: 'nearest' })
-  editorField()?.focus()
-})
-
-/**
- * A group is at the cap when it holds `cap` questions.
- *
- * False while `cap` is null — an unknown limit must not disable the control,
- * because the server is still the enforcement and a wrongly-disabled button
- * is a feature the operator simply cannot reach.
- */
-function atCap(group: { questions: ProjectQuestion[] }): boolean {
-  return cap.value !== null && group.questions.length >= cap.value
-}
-
-const groups = computed(() =>
-  props.competencies.map((competency) => ({
-    competencyId: competency.id,
-    label: competency.code,
-    questions: questions.value.filter((q) => q.competency_id === competency.id),
+const editorQuestions = computed(() =>
+  questions.value.map((q) => ({
+    id: q.id,
+    competencyId: q.competency_id,
+    text: (q.text ?? {}) as Record<string, string | null | undefined>,
   }))
 )
 
@@ -436,15 +155,10 @@ async function onReorder(ids: number[]): Promise<void> {
 
   // SPLICED back into place, never rebuilt from `ids`.
   //
-  // `QuestionList` renders once per competency and emits the ids of ITS OWN
-  // group. Rebuilding the whole list from that subset dropped every other
-  // group's questions from the rendered state — permanently, because the
-  // success path clears the banner and never reloads. The bug was invisible
-  // when the server succeeded and self-healed when it failed, which is the
-  // worst possible pair.
-  //
-  // The reordered ids take the SLOTS the same ids currently occupy, so
-  // questions belonging to other competencies keep their positions untouched.
+  // `QuestionListEditor` re-emits ids for ONE competency's group. Rebuilding
+  // the whole list from that subset would drop every other group's questions
+  // from the rendered state — permanently, because the success path clears
+  // the banner and never reloads.
   const moving = new Set(ids)
   const reordered = ids
     .map((id) => byId.get(id))
@@ -459,160 +173,52 @@ async function onReorder(ids: number[]): Promise<void> {
   try {
     await reorderQuestions(props.projectId, ids)
     message.value = null
-  } catch {
+  } catch (error) {
     questions.value = previous
-    message.value = { kind: 'error', text: t('projectQuestions.reorderError') }
+    message.value = actionErrorMessage(error, t, 'projectQuestions.reorderError')
   }
 }
 
-function onRemove(id: number): void {
-  removingId.value = id
-}
-
-async function confirmRemove(): Promise<void> {
-  const id = removingId.value
-  removingId.value = null
-
-  if (id === null) return
-
+async function onRemove(id: number): Promise<void> {
   try {
     await deleteQuestion(props.projectId, id)
     questions.value = questions.value.filter((q) => q.id !== id)
     message.value = null
-  } catch {
+  } catch (error) {
     // A failed DELETE, said as one. It claimed the save failed, which is a
     // sentence about an action the operator did not take.
-    message.value = { kind: 'error', text: t('projectQuestions.removeError') }
+    message.value = actionErrorMessage(error, t, 'projectQuestions.removeError')
   }
 }
 
-function onEdit(id: number): void {
-  errors.value = {}
-
-  const q = questions.value.find((item) => item.id === id)
-
-  if (q === undefined) return
-
-  const text = (q.text ?? {}) as Record<string, string | null | undefined>
-
-  draft.value = {
-    id: q.id,
-    competencyId: q.competency_id,
-    en: text.en ?? '',
-    it: text.it ?? '',
-  }
-}
-
-/** Start a new question for a competency that already has at least one. */
 /**
- * Close the editor AND drop its errors.
- *
- * `errors` used to be cleared only inside `onSubmit`, so opening, closing or
- * switching drafts carried them: press Add on COL, submit empty, cancel, press
- * Add on INN, and a brand-new untouched editor rendered COL's message. Worse
- * with a server refusal — "at most one question per competency" stayed pinned
- * under a competency that had none. A message has to be true of what is on
- * screen.
+ * `QuestionListEditor` owns the field-error mapping and its own D4 state
+ * resolution for a submit failure with no field-shaped body; this is the one
+ * channel back for whatever that produced.
  */
-function closeEditor(): void {
-  draft.value = null
-  errors.value = {}
+function onUnmappedError(payload: { kind: FormMessageKind; text: string } | null): void {
+  message.value = payload
 }
 
-function startNew(competencyId: number): void {
-  errors.value = {}
-
-  draft.value = { id: null, competencyId, en: '', it: '' }
-}
-
-async function onSubmit(): Promise<void> {
-  const current = draft.value
-
-  if (current === null) return
-
-  // Say so, rather than returning in silence.
-  //
-  // The form is `novalidate`, so the `required` on the English field renders
-  // nothing native, and this branch used to just `return`: the operator
-  // pressed Save and nothing happened at all — no message, no focus, no way to
-  // find out why. `errors.text` was only ever written from a server response
-  // that this path never reached.
-  if (current.en.trim() === '') {
-    errors.value = { text: t('projectQuestions.textEnRequired') }
-
-    return
-  }
-
+async function onSubmit(payload: QuestionEditorSubmission): Promise<void> {
   saving.value = true
-  errors.value = {}
+  submitError.value = null
 
   try {
-    // `it` is sent only when written. An empty string would store a blank
-    // Italian that silently beats the English fallback, so the candidate would
-    // be asked nothing at all.
-    const text = { en: current.en.trim(), ...(current.it.trim() ? { it: current.it.trim() } : {}) }
-
-    if (current.id === null) {
-      await createQuestion(props.projectId, { competency_id: current.competencyId, text })
+    if (payload.id === null) {
+      await createQuestion(props.projectId, {
+        competency_id: payload.competencyId,
+        text: payload.text,
+      })
     } else {
-      await updateQuestion(props.projectId, current.id, text)
+      await updateQuestion(props.projectId, payload.id, payload.text)
     }
 
-    draft.value = null
     message.value = null
+    editorRef.value?.closeEditor()
     await load()
-  } catch (submitError) {
-    // Server field errors land on the FIELD, not only in the banner: the
-    // refusals this endpoint issues are specific ("a standard project allows
-    // at most 1 question per competency", "competency is type=standard"), and
-    // a generic banner would make the operator hunt for what to change.
-    const unmapped = applyServerFieldErrors(
-      submitError,
-      {
-        text: 'text',
-        'text.en': 'text',
-        'text.it': 'textIt',
-        competency_id: 'competency',
-      } as const,
-      (key, serverMessage) => {
-        // NEVER the wire value. The shape rules answer with machine codes;
-        // the per-competency cap answers with authored English prose composed
-        // around a number, and printing that under an Italian label is the
-        // defect the i18n mandate exists to stop. An operator who hits the cap
-        // already has the localized sentence beside the disabled Add button.
-        errors.value[key] = translateServerCodeOrFallback(
-          { t, te },
-          'projectQuestions.serverError',
-          serverMessage,
-          'projectQuestions.saveError'
-        )
-      }
-    )
-
-    // The banner is for what the FIELDS could not say. When the 422 mapped
-    // cleanly the operator already has the exact reason under the control,
-    // and adding "the question could not be saved" on top invites a retry
-    // that will fail identically. Same guard BrandingForm applies.
-    const mapped = Object.values(errors.value).some((value) => value !== undefined)
-
-    message.value =
-      unmapped && unmapped.length > 0
-        ? {
-            kind: 'error',
-            text: unmapped
-              .map((value) =>
-                translateServerCodeOrFallback(
-                  { t, te },
-                  'projectQuestions.serverError',
-                  value,
-                  'projectQuestions.saveError'
-                )
-              )
-              .join(' '),
-          }
-        : mapped
-          ? null
-          : { kind: 'error', text: t('projectQuestions.saveError') }
+  } catch (error) {
+    submitError.value = error
   } finally {
     saving.value = false
   }
@@ -620,5 +226,5 @@ async function onSubmit(): Promise<void> {
 
 onMounted(load)
 
-defineExpose({ load, startNew })
+defineExpose({ load, startNew: (competencyId: number) => editorRef.value?.startNew(competencyId) })
 </script>

@@ -278,6 +278,118 @@ describe('ProjectQuestionsPanel', () => {
 
     expect(createQuestion).toHaveBeenCalledWith(5, expect.objectContaining({ competency_id: 22 }))
   })
+
+  it('removes a question once QuestionListEditor has already confirmed it', async () => {
+    // The confirmation gesture itself lives in QuestionListEditor now
+    // (QuestionListEditor.spec.ts proves the dialog gates the emit) — this
+    // panel only has to prove it reaches `deleteQuestion` once that emit
+    // arrives, and updates the list on success.
+    deleteQuestion.mockResolvedValue(undefined)
+    const wrapper = await mountPanel([question({ id: 7, competency_id: 11 })])
+
+    await wrapper.findComponent({ name: 'QuestionListEditor' }).vm.$emit('remove', 7)
+    await flushPromises()
+
+    expect(deleteQuestion).toHaveBeenCalledWith(5, 7)
+    expect(wrapper.find('[data-testid="question-row-7"]').exists()).toBe(false)
+  })
+
+  it('reports a failed remove instead of silently leaving the row', async () => {
+    deleteQuestion.mockRejectedValueOnce(new Error('500'))
+    const wrapper = await mountPanel([question({ id: 7, competency_id: 11 })])
+
+    await wrapper.findComponent({ name: 'QuestionListEditor' }).vm.$emit('remove', 7)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-questions-banner"]').text()).toContain(
+      'projectQuestions.removeError'
+    )
+    expect(wrapper.find('[data-testid="question-row-7"]').exists()).toBe(true)
+  })
+
+  it('renders a 409 on remove as waiting, not as the generic remove failure', async () => {
+    // D4 (error-state.ts): a 409 is temporal and self-resolving, never an
+    // `error` — collapsing it into "could not remove the question" invites a
+    // retry that was never actually refused, only asked to wait.
+    deleteQuestion.mockRejectedValueOnce(Object.assign(new Error('409'), { status: 409 }))
+    const wrapper = await mountPanel([question({ id: 7, competency_id: 11 })])
+
+    await wrapper.findComponent({ name: 'QuestionListEditor' }).vm.$emit('remove', 7)
+    await flushPromises()
+
+    const banner = wrapper.get('[data-testid="project-questions-banner"]')
+
+    expect(banner.text()).toContain('errors.states.notReady.message')
+    expect(banner.text()).not.toContain('projectQuestions.removeError')
+  })
+
+  it('rolls the optimistic reorder back on a failed write', async () => {
+    reorderQuestions.mockRejectedValueOnce(new Error('500'))
+
+    const wrapper = await mountPanel([
+      question({ id: 1, competency_id: 11, position: 0 }),
+      question({ id: 2, competency_id: 11, position: 1 }),
+    ])
+
+    await wrapper.findAllComponents({ name: 'QuestionList' })[0]?.vm.$emit('reorder', [2, 1])
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-questions-banner"]').text()).toContain(
+      'projectQuestions.reorderError'
+    )
+  })
+
+  it('saves an edit through updateQuestion and closes the editor', async () => {
+    updateQuestion.mockResolvedValue({
+      data: question({ id: 7, competency_id: 11, text: { en: 'Edited.' } }),
+    })
+
+    const wrapper = await mountPanel([question({ id: 7, competency_id: 11 })])
+
+    await wrapper.find('[data-testid="question-edit-7"]').trigger('click')
+    await wrapper.find('[data-testid="question-text-en"]').setValue('Edited.')
+    await wrapper.find('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateQuestion).toHaveBeenCalledWith(5, 7, expect.objectContaining({ en: 'Edited.' }))
+    expect(wrapper.find('[data-testid="question-editor"]').exists()).toBe(false)
+  })
+
+  it('resolves a submit failure with no field errors through the shared D4 state mapper', async () => {
+    // QuestionListEditor owns this resolution now (D4, error-state.ts) — a
+    // dead network or an unrecognised status is the generic `error` state,
+    // the SAME copy `load()`'s own failures use elsewhere on this panel,
+    // never the machine code and never a made-up "could not save".
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="question-add-11"]').trigger('click')
+    await wrapper.get('[data-testid="question-text-en"]').setValue('A question.')
+
+    createQuestion.mockRejectedValueOnce(Object.assign(new Error('network down'), { status: 0 }))
+
+    await wrapper.get('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-questions-banner"]').text()).toContain(
+      'errors.states.error.message'
+    )
+  })
+
+  it('renders a 403 on submit as forbidden, distinct from the generic save failure', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="question-add-11"]').trigger('click')
+    await wrapper.get('[data-testid="question-text-en"]').setValue('A question.')
+
+    createQuestion.mockRejectedValueOnce(Object.assign(new Error('403'), { status: 403 }))
+
+    await wrapper.get('[data-testid="question-editor"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-questions-banner"]').text()).toContain(
+      'errors.states.forbidden.message'
+    )
+  })
 })
 
 describe('the per-competency cap', () => {

@@ -13,6 +13,7 @@
  * ship under exactly the green test it exists to prevent — the same failure
  * one language further along.
  */
+import { ref } from 'vue'
 import en from '../../../i18n/locales/en.json'
 import it from '../../../i18n/locales/it.json'
 
@@ -32,7 +33,15 @@ function has(key: string): boolean {
  * `t` stays the identity on the KEY — assertions read better against a key
  * than against copy a translator may reword tomorrow. `te` is the half that
  * has to be real.
+ *
+ * `locale` is a genuine Vue `ref`, not a plain `{ value: 'it' }` object with
+ * the same shape: vue-i18n's real `locale` IS a ref, and a component that
+ * binds it straight into a child prop (`:locale="locale"`, relying on
+ * `<script setup>`'s top-level-ref template auto-unwrap — a real ref only,
+ * `isRef()`-checked) needs this stub to unwrap the same way in a test as it
+ * does in production, or the child receives the wrapper object instead of
+ * the string.
  */
 export function realI18n() {
-  return { t: (key: string) => key, te: has, locale: { value: 'it' } }
+  return { t: (key: string) => key, te: has, locale: ref('it') }
 }

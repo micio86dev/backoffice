@@ -40,6 +40,7 @@ const REQUIRED: Record<string, AbilityKey> = {
   settings: 'users.viewAny',
   'avatar-templates': 'avatarTemplates.viewAny',
   clients: 'clients.viewAny',
+  catalogue: 'catalogue.manage',
 }
 
 /**

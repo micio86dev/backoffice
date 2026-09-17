@@ -356,6 +356,27 @@ describe('SidebarNav — pages the user may not use are not offered', () => {
     const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
     expect(hrefs).toContain('/clients')
   })
+
+  it('never shows Catalogue to a non-superadmin (scope: platform is not the gate — the ability is)', async () => {
+    canMock.mockReset().mockImplementation((ability: string) => ability !== 'catalogue.manage')
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
+    expect(hrefs).not.toContain('/catalogue')
+    expect(canMock).toHaveBeenCalledWith('catalogue.manage')
+  })
+
+  it('shows Catalogue once the server grants catalogue.manage', async () => {
+    canMock.mockReset().mockImplementation(() => true)
+
+    const wrapper = mountSidebarNav('/')
+    await flushPromises()
+
+    const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))
+    expect(hrefs).toContain('/catalogue')
+  })
   it('keeps the footer identity when the superadmin client list fails to load', async () => {
     // The identity assignment used to sit AFTER the superadmin-only await
     // inside ONE try, so a rejected `fetchClients()` jumped to the catch and

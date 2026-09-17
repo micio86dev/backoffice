@@ -23,6 +23,7 @@
       <QuestionList
         :questions="group.questions"
         :locale="locale"
+        :readonly="readonly"
         @reorder="(ids) => emit('reorder', ids)"
         @remove="(id) => (removingId = id)"
         @edit="(id) => onEdit(id)"
@@ -145,7 +146,7 @@
         legitimate thing to want, and it is the same single-draft swap that has
         always happened.
       -->
-      <div v-if="!draft || draft.competencyId !== group.competencyId">
+      <div v-if="!readonly && (!draft || draft.competencyId !== group.competencyId)">
         <Button
           type="button"
           variant="outline"
@@ -254,6 +255,8 @@ const props = defineProps<{
   saving: boolean
   /** The raw rejection from the container's last submit attempt, or `null`. */
   submitError: unknown | null
+  /** No add, edit, reorder or remove control — see `QuestionList`'s own prop. */
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -416,6 +419,18 @@ function closeEditor(): void {
   draft.value = null
   errors.value = {}
 }
+
+/**
+ * A list that turns read-only while a draft is open (the catalogue page
+ * publishes in place) discards that draft: its Save would target content
+ * that no longer accepts writes.
+ */
+watch(
+  () => props.readonly,
+  (readonly) => {
+    if (readonly) closeEditor()
+  }
+)
 
 function startNew(competencyId: number): void {
   errors.value = {}

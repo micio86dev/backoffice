@@ -10,11 +10,15 @@
           authoring PR10c, PR8b's `PUT .../competencies`) — the "not
           supported yet" copy this note carried through PR10b is gone.
         -->
-        <p class="text-muted-foreground text-xs" data-testid="roles-assignment-note">
+        <p
+          v-if="editable"
+          class="text-muted-foreground text-xs"
+          data-testid="roles-assignment-note"
+        >
           {{ $t('catalogue.roles.assignmentNote') }}
         </p>
       </div>
-      <Button data-testid="roles-new" @click="editing = 'new'">
+      <Button v-if="editable" data-testid="roles-new" @click="editing = 'new'">
         {{ $t('catalogue.roles.new') }}
       </Button>
     </div>
@@ -38,13 +42,14 @@
         <TableRow>
           <TableHead>{{ $t('catalogue.roles.table.code') }}</TableHead>
           <TableHead>{{ $t('catalogue.roles.table.name') }}</TableHead>
+          <TableHead>{{ $t('catalogue.roles.table.competencies') }}</TableHead>
           <TableHead>
             <span class="sr-only">{{ $t('catalogue.roles.table.actions') }}</span>
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableEmpty v-if="roles.length === 0" :colspan="3">
+        <TableEmpty v-if="roles.length === 0" :colspan="4">
           {{ $t('catalogue.roles.table.empty') }}
         </TableEmpty>
         <TableRow v-for="role in roles" :key="role.id">
@@ -56,31 +61,36 @@
               <span aria-hidden="true">—</span>
             </template>
           </TableCell>
+          <TableCell :data-testid="`role-competency-codes-${role.id}`">
+            {{ competencyCodes(role) || $t('catalogue.roles.table.noCompetencies') }}
+          </TableCell>
           <TableCell class="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              :data-testid="`role-competencies-${role.id}`"
-              @click="managingCompetencies = role"
-            >
-              {{ $t('catalogue.roles.manageCompetencies') }}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              :data-testid="`role-edit-${role.id}`"
-              @click="editing = role.id"
-            >
-              {{ $t('catalogue.roles.edit') }}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              :data-testid="`role-delete-${role.id}`"
-              @click="deleteTarget = role"
-            >
-              {{ $t('catalogue.roles.delete') }}
-            </Button>
+            <template v-if="editable">
+              <Button
+                variant="outline"
+                size="sm"
+                :data-testid="`role-competencies-${role.id}`"
+                @click="managingCompetencies = role"
+              >
+                {{ $t('catalogue.roles.manageCompetencies') }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                :data-testid="`role-edit-${role.id}`"
+                @click="editing = role.id"
+              >
+                {{ $t('catalogue.roles.edit') }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                :data-testid="`role-delete-${role.id}`"
+                @click="deleteTarget = role"
+              >
+                {{ $t('catalogue.roles.delete') }}
+              </Button>
+            </template>
           </TableCell>
         </TableRow>
       </TableBody>
@@ -169,6 +179,11 @@ import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state
 import { actionErrorMessage } from '@/utils/action-error-message'
 import type { ResourceErrorState } from '@/utils/error-state'
 
+defineProps<{
+  /** See `CatalogueCompetenciesPanel`'s own prop — identical here. */
+  editable: boolean
+}>()
+
 const emit = defineEmits<{ (e: 'refresh-revision'): void }>()
 
 const { listRoles, deleteRole, listCompetencies } = useCatalogue()
@@ -193,6 +208,19 @@ const editingRole = computed<CatalogueRole | null>(() => {
   if (editing.value === null || editing.value === 'new') return null
   return roles.value.find((r) => r.id === editing.value) ?? null
 })
+
+/**
+ * The role's competency set in its assigned order, as codes — shown in both
+ * modes, since the read-only view has no drawer to reveal it.
+ */
+function competencyCodes(role: CatalogueRole): string {
+  const codeById = new Map(competencies.value.map((competency) => [competency.id, competency.code]))
+
+  return role.competency_ids
+    .map((id) => codeById.get(id))
+    .filter((code): code is string => code !== undefined)
+    .join(', ')
+}
 
 /** Operator UI locale first, English fallback — same rule as the competencies panel. */
 function displayName(role: CatalogueRole): string | null {

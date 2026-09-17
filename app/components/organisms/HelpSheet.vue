@@ -106,6 +106,7 @@ const TOPICS: Record<string, HelpTopic> = {
   reports: topicOf('reports', 3, ['bars', 'competency', 'reliability']),
   settings: topicOf('settings', 4, ['apiKey', 'ability', 'webhook']),
   'avatar-templates': topicOf('avatarTemplates', 3, ['avatarTemplate']),
+  catalogue: topicOf('catalogue', 6, ['catalogueRevision', 'bars', 'indicator']),
 }
 
 const route = useRoute()

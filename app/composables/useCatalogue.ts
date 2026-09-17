@@ -1,8 +1,8 @@
 /**
  * useCatalogue — the platform-superadmin read/write surface over the
  * framework catalogue (framework-catalogue-authoring, catalogue-authoring
- * spec): the open revision, and CRUD over its roles, competencies and BARS
- * indicators.
+ * spec): the revision the catalogue shows, opening a draft, and CRUD over
+ * its roles, competencies and BARS indicators.
  *
  * Thin wiring over `useApi().apiFetch`, same shape as `useAvatarTemplates.ts`
  * — no caching, since a superadmin editing the catalogue elsewhere (another
@@ -12,8 +12,10 @@
  * regenerates from `openapi.json`, so a shape change server-side becomes a
  * type error here rather than an `undefined` at runtime.
  *
- * Create requests open the draft revision on first write (PR3's
- * `OpenDraftRevision`, via each `store()` action); update/delete never do —
+ * The page opens the draft explicitly (`openDraftRevision`) before any
+ * panel offers an edit control; create requests would also open one on
+ * first write (PR3's `OpenDraftRevision`, via each `store()` action).
+ * Update/delete never do —
  * the target either already belongs to an existing open draft or does not
  * exist to touch (PR3's `RoleController`/`CompetencyController`/
  * `BarsIndicatorController` docblocks). Every write can answer 409 when a
@@ -27,6 +29,9 @@ import { useApi } from './useApi'
 export type CatalogueRevisionResponse =
   paths['/catalogue/revisions/current']['get']['responses']['200']['content']['application/json']
 export type CatalogueRevision = NonNullable<CatalogueRevisionResponse['data']>
+
+export type OpenDraftRevisionResponse =
+  paths['/catalogue/revisions/draft']['post']['responses']['200']['content']['application/json']
 
 export type PublishRevisionResponse =
   paths['/catalogue/revisions/publish']['post']['responses']['200']['content']['application/json']
@@ -71,9 +76,23 @@ export type UpdateBarsIndicatorPayload = NonNullable<
 export function useCatalogue() {
   const { apiFetch } = useApi()
 
-  /** `data: null` when no revision has ever been opened on this platform. */
+  /**
+   * The revision every catalogue list currently returns: the open draft
+   * (`editable: true`), otherwise the latest published revision
+   * (`editable: false`, rows are a read-only view). `data: null` only
+   * before anything has ever been published.
+   */
   async function fetchCurrentRevision(): Promise<CatalogueRevisionResponse> {
     return apiFetch<CatalogueRevisionResponse>('/catalogue/revisions/current')
+  }
+
+  /**
+   * Opens a draft cloned from the latest published revision, or returns the
+   * one already open (idempotent server-side). The lists return the draft's
+   * own row ids afterwards, so every panel must reload before editing.
+   */
+  async function openDraftRevision(): Promise<OpenDraftRevisionResponse> {
+    return apiFetch<OpenDraftRevisionResponse>('/catalogue/revisions/draft', { method: 'POST' })
   }
 
   /**
@@ -181,6 +200,7 @@ export function useCatalogue() {
 
   return {
     fetchCurrentRevision,
+    openDraftRevision,
     publishRevision,
     listCompetencies,
     createCompetency,

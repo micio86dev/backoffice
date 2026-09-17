@@ -143,3 +143,22 @@ describe('QuestionList', () => {
     })
   })
 })
+
+describe('QuestionList — read-only', () => {
+  it('renders the rows with no grip, move, edit or remove control', () => {
+    const wrapper = mount(QuestionList, {
+      props: {
+        questions: [question(1, 'first', 0), question(2, 'second', 1)],
+        locale: 'it',
+        readonly: true,
+      },
+      global: {
+        mocks: { $t: tMock },
+        stubs: { Button: { template: '<button><slot /></button>' } },
+      },
+    })
+
+    expect(wrapper.text()).toContain('first (it)')
+    expect(wrapper.find('button').exists()).toBe(false)
+  })
+})

@@ -22,36 +22,58 @@
     </Alert>
 
     <!--
-      Revision header (DESIGN.md §8.2.10): state, label, and a Publish action
-      that is irreversible — a published revision never accepts another
-      write, additive or otherwise — so it sits behind the same
-      `ConfirmDialog` gate every other destructive action in this product
-      uses.
+      Revision header (DESIGN.md §8.2.10): state, label, and the one action
+      that state allows. A draft offers Publish, which is irreversible — a
+      published revision never accepts another write, additive or otherwise
+      — so it sits behind the same `ConfirmDialog` gate every other
+      destructive action in this product uses. A published revision is the
+      live catalogue shown read-only, and offers Create draft instead: the
+      panels below hide every edit control until a draft exists, because the
+      write endpoints only ever accept a draft's own row ids.
     -->
     <div
       v-if="revision"
       data-testid="catalogue-revision-header"
-      class="flex items-center justify-between gap-4 rounded-lg border border-border p-4"
+      class="flex flex-col gap-3 rounded-lg border border-border p-4"
     >
-      <div>
-        <p class="text-sm font-medium text-foreground" data-testid="catalogue-revision-state">
-          {{
-            revision.state === 'draft'
-              ? $t('catalogue.revision.draft')
-              : $t('catalogue.revision.published')
-          }}
-        </p>
-        <p class="text-muted-foreground text-sm" data-testid="catalogue-revision-label">
-          {{ revision.label ?? $t('catalogue.revision.untitled') }}
-        </p>
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium text-foreground" data-testid="catalogue-revision-state">
+            {{
+              revision.state === 'draft'
+                ? $t('catalogue.revision.draft')
+                : $t('catalogue.revision.published')
+            }}
+          </p>
+          <p class="text-muted-foreground text-sm" data-testid="catalogue-revision-label">
+            {{ revision.label ?? $t('catalogue.revision.untitled') }}
+          </p>
+        </div>
+        <Button v-if="editable" data-testid="catalogue-publish" @click="publishTarget = true">
+          {{ $t('catalogue.revision.publish') }}
+        </Button>
+        <Button
+          v-else
+          data-testid="catalogue-create-draft"
+          :loading="creatingDraft"
+          @click="onCreateDraft"
+        >
+          {{ $t('catalogue.revision.createDraft') }}
+        </Button>
       </div>
-      <Button
-        v-if="revision.state === 'draft'"
-        data-testid="catalogue-publish"
-        @click="publishTarget = true"
+      <p
+        v-if="!editable"
+        class="text-muted-foreground text-sm"
+        data-testid="catalogue-read-only-notice"
       >
-        {{ $t('catalogue.revision.publish') }}
-      </Button>
+        {{ $t('catalogue.revision.readOnlyNotice') }}
+      </p>
+      <FormMessage
+        v-if="createDraftError"
+        :kind="createDraftError.kind"
+        :text="createDraftError.text"
+        test-id="catalogue-create-draft-error"
+      />
     </div>
     <p
       v-else-if="!loading && !loadError"
@@ -130,7 +152,15 @@
         </TabsTrigger>
       </TabsList>
 
-      <div class="min-w-0 flex-1">
+      <!--
+        Keyed on the revision the panels show, so opening a draft remounts
+        them and they reload the draft's own row ids — the ids the published
+        view listed are never writable. A write that implicitly opens a draft
+        changes the id too, and the remount picks that up the same way.
+        Nothing mounts before the first revision read settles, so a panel is
+        never shown editable on a guess.
+      -->
+      <div v-if="!loading" :key="panelsKey" class="min-w-0 flex-1">
         <TabsContent
           v-for="section in SECTIONS"
           :key="section.value"
@@ -139,15 +169,22 @@
         >
           <CatalogueCompetenciesPanel
             v-if="section.value === 'competencies'"
+            :editable="editable"
             @refresh-revision="load"
           />
-          <CatalogueRolesPanel v-else-if="section.value === 'roles'" @refresh-revision="load" />
+          <CatalogueRolesPanel
+            v-else-if="section.value === 'roles'"
+            :editable="editable"
+            @refresh-revision="load"
+          />
           <CatalogueIndicatorsPanel
             v-else-if="section.value === 'indicators'"
+            :editable="editable"
             @refresh-revision="load"
           />
           <CatalogueDefaultQuestionsPanel
             v-else-if="section.value === 'defaultQuestions'"
+            :editable="editable"
             @refresh-revision="load"
           />
         </TabsContent>
@@ -180,7 +217,7 @@
  * page therefore runs no ability check of its own — by the time it mounts,
  * only a superadmin could have reached it.
  */
-import { defineAsyncComponent, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -244,21 +281,33 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-const { fetchCurrentRevision, publishRevision } = useCatalogue()
+const { fetchCurrentRevision, openDraftRevision, publishRevision } = useCatalogue()
 
 const revision = ref<CatalogueRevision | null>(null)
 const loadError = ref<ReturnType<typeof resolveResourceErrorState> | null>(null)
 /**
  * `true` until the first `fetchCurrentRevision()` settles.
  *
- * Distinct from `revision === null`, which is also the shape of "no
- * revision has ever been opened" — without this, the page shows that
+ * Distinct from `revision === null`, which is also the shape of "nothing
+ * has ever been published" — without this, the page shows that
  * confident "nothing here" copy for every visitor during the one tick
  * before the fetch actually resolves (D4: a load in flight must never
  * render as an answer).
  */
 const loading = ref(true)
 const publishTarget = ref(false)
+const creatingDraft = ref(false)
+const createDraftError = ref<{ kind: FormMessageKind; text: string } | null>(null)
+
+/**
+ * The server's own answer, never inferred from `state`: `false` for a
+ * published revision and for no revision at all, so a failed or empty read
+ * never exposes an edit control.
+ */
+const editable = computed(() => revision.value?.editable === true)
+
+/** Changes only when the revision the panels show changes — see the template. */
+const panelsKey = computed(() => revision.value?.id ?? 'none')
 const publishError = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 /**
@@ -294,6 +343,26 @@ async function load(): Promise<void> {
  */
 function violationRuleLabel(rule: string): string {
   return translateServerCode({ t, te }, 'catalogue.revision.violationRule', rule)
+}
+
+/**
+ * Idempotent server-side: a draft another superadmin opened meanwhile is
+ * returned rather than duplicated, and either way the header switches to
+ * it and the panels remount against its ids.
+ */
+async function onCreateDraft(): Promise<void> {
+  creatingDraft.value = true
+  createDraftError.value = null
+
+  try {
+    const response = await openDraftRevision()
+
+    revision.value = response.data
+  } catch (error) {
+    createDraftError.value = actionErrorMessage(error, t, 'catalogue.revision.createDraftError')
+  } finally {
+    creatingDraft.value = false
+  }
 }
 
 async function onPublishConfirmed(): Promise<void> {

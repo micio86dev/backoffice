@@ -102,14 +102,18 @@ async function mockOrgAdmin(page: Page): Promise<void> {
   )
 }
 
+/** `editable` follows `state`, as `CatalogueRevisionResource` computes it. */
 function revision(overrides: Record<string, unknown> = {}) {
+  const state = overrides['state'] ?? 'published'
+
   return {
     id: 1,
-    state: 'published',
+    state,
     is_baseline: true,
     label: null,
     published_at: '2026-01-01T00:00:00Z',
     parent_revision_id: null,
+    editable: state === 'draft',
     ...overrides,
   }
 }
@@ -194,50 +198,66 @@ test.describe('Catalogue — reachability and the security half', () => {
   })
 })
 
-test.describe('Catalogue — default questions can auto-open a draft', () => {
-  test('editing a default question opens a draft and the revision header shows it', async ({
+test.describe('Catalogue — the published revision is read-only until a draft is opened', () => {
+  test('shows the published content read-only, and Create draft makes it editable', async ({
     page,
   }) => {
-    // A default-question write can be the FIRST catalogue write on the
-    // platform, which auto-opens a draft server-side (PR3's
-    // `OpenDraftRevision`, via `DefaultQuestionController::update()`'s own
-    // `ResolvesOpenDraftRevision` trait) — the page's own revision header
-    // must resync to show it (the fix this PR12 slice exercises end to end:
-    // `CatalogueDefaultQuestionsPanel` now emits `refresh-revision`).
+    // With no draft open, every list returns the latest published
+    // revision's rows; `POST /catalogue/revisions/draft` clones them into a
+    // draft with NEW ids, and only those ids are writable.
     const revisionBox: { value: Record<string, unknown> | null } = { value: revision() }
+    const published = {
+      competencies: [
+        { id: 11, code: 'COL', revision_id: 1, type: 'standard', name: {}, definition: {} },
+      ],
+      questions: [
+        {
+          id: 201,
+          revision_id: 1,
+          competency_id: 11,
+          position: 0,
+          text: { en: 'Published default question.', it: 'Domanda predefinita pubblicata.' },
+        },
+      ],
+    }
+    const draft = {
+      competencies: [
+        { id: 12, code: 'COL', revision_id: 2, type: 'standard', name: {}, definition: {} },
+      ],
+      questions: [
+        {
+          id: 202,
+          revision_id: 2,
+          competency_id: 12,
+          position: 0,
+          text: { en: 'Published default question.', it: 'Domanda predefinita pubblicata.' },
+        },
+      ],
+    }
+    const current = () => (revisionBox.value?.['state'] === 'draft' ? draft : published)
 
     await injectSession(page)
     await mockSuperadmin(page)
     await mockRevision(page, revisionBox)
-    await mockCompetencies(page, [
-      { id: 11, code: 'COL', revision_id: 1, type: 'standard', name: {}, definition: {} },
-    ])
-    await mockDefaultQuestions(page, [
-      {
-        id: 201,
-        revision_id: 1,
-        competency_id: 11,
-        position: 0,
-        text: { en: 'Existing default question.', it: 'Domanda predefinita esistente.' },
-      },
-    ])
     await page.route(
-      (url) => url.pathname === '/catalogue/default-questions/201',
+      (url) => url.pathname === '/catalogue/competencies',
+      (route) =>
+        isDataRequest(route) ? jsonRoute(route, { data: current().competencies }) : route.continue()
+    )
+    await page.route(
+      (url) => url.pathname === '/catalogue/default-questions',
+      (route) =>
+        isDataRequest(route) ? jsonRoute(route, { data: current().questions }) : route.continue()
+    )
+
+    let draftRequests = 0
+    await page.route(
+      (url) => url.pathname === '/catalogue/revisions/draft',
       (route) => {
-        if (route.request().method() !== 'PATCH') return route.continue()
-        // The write that opens the draft — the server flips the platform's
-        // current revision, which the NEXT `/catalogue/revisions/current`
-        // fetch (triggered by the panel's own `refresh-revision` emit) picks up.
+        if (route.request().method() !== 'POST') return route.continue()
+        draftRequests += 1
         revisionBox.value = DRAFT_REVISION
-        return jsonRoute(route, {
-          data: {
-            id: 201,
-            revision_id: 2,
-            competency_id: 11,
-            position: 0,
-            text: { en: 'Edited default question.', it: 'Domanda predefinita esistente.' },
-          },
-        })
+        return jsonRoute(route, { data: DRAFT_REVISION }, 201)
       }
     )
 
@@ -245,12 +265,22 @@ test.describe('Catalogue — default questions can auto-open a draft', () => {
     await dismissConsent(page)
 
     await expect(page.getByTestId('catalogue-revision-state')).toContainText('Pubblicata')
+    await expect(page.getByTestId('catalogue-read-only-notice')).toBeVisible()
+    await expect(page.getByTestId('catalogue-publish')).toHaveCount(0)
+    await expect(page.getByTestId('question-row-201')).toBeVisible()
+    await expect(page.getByTestId('question-edit-201')).toHaveCount(0)
+    await expect(page.getByTestId('question-add-11')).toHaveCount(0)
 
-    await page.getByTestId('question-edit-201').click()
-    await page.getByTestId('question-text-en').fill('Edited default question.')
-    await page.getByTestId('question-save').click()
+    await page.getByTestId('catalogue-create-draft').click()
 
     await expect(page.getByTestId('catalogue-revision-state')).toContainText('Bozza')
+    await expect(page.getByTestId('catalogue-read-only-notice')).toHaveCount(0)
+    await expect(page.getByTestId('catalogue-publish')).toBeVisible()
+    // The panel reloaded against the draft: its own row ids, now editable.
+    await expect(page.getByTestId('question-edit-202')).toBeVisible()
+    await expect(page.getByTestId('question-add-12')).toBeVisible()
+    await expect(page.getByTestId('question-row-201')).toHaveCount(0)
+    expect(draftRequests).toBe(1)
   })
 })
 
@@ -475,9 +505,7 @@ test.describe('Catalogue — BARS indicator create', () => {
 })
 
 test.describe('Catalogue — publish', () => {
-  test('publishing succeeds and the revision is frozen — a subsequent edit is refused', async ({
-    page,
-  }) => {
+  test('publishing succeeds and the revision turns read-only', async ({ page }) => {
     const revisionBox: { value: Record<string, unknown> | null } = { value: DRAFT_REVISION }
     const indicators = [
       {
@@ -516,13 +544,6 @@ test.describe('Catalogue — publish', () => {
       (url) => url.pathname === '/catalogue/bars-indicators/101',
       (route) => {
         if (route.request().method() !== 'PATCH') return route.continue()
-        // Once the revision is published there is no open draft left for
-        // this row to belong to — the controller's own `findOrFail` scoped
-        // to the open draft 404s (PR3's docblock on
-        // `BarsIndicatorController::update()`).
-        if (revisionBox.value?.['state'] === 'published') {
-          return jsonRoute(route, { message: 'Not Found' }, 404)
-        }
         const indicator = indicators[0]
         if (indicator) indicator.anchor_5 = { en: 'Edited A5' }
         return jsonRoute(route, { data: indicator })
@@ -562,17 +583,13 @@ test.describe('Catalogue — publish', () => {
     await expect(page.getByTestId('catalogue-revision-state')).toContainText('Pubblicata')
     await expect(page.getByTestId('catalogue-publish')).toHaveCount(0)
 
-    // Frozen: a subsequent write attempt against the now-published revision
-    // is refused — the form banner shows it, the drawer stays open, and the
-    // edit never applies.
-    await page.getByTestId('indicator-edit-101').click()
-    await page.getByTestId('bars-indicator-form-anchor5-en').fill('Should never save')
-    await page.getByTestId('form-drawer-save').click()
-
-    await expect(page.getByTestId('bars-indicator-form-banner')).toContainText(
-      'Questa risorsa non è stata trovata.'
-    )
-    await expect(page.getByTestId('bars-indicator-form')).toBeVisible()
+    // Frozen: the published rows are shown read-only — no edit control is
+    // offered, and Create draft is the way back to editing. (The API itself
+    // refuses a write against a published row id; that is covered server-side.)
+    await expect(page.getByTestId('catalogue-read-only-notice')).toBeVisible()
+    await expect(page.getByTestId('catalogue-create-draft')).toBeVisible()
+    await expect(page.getByTestId('indicator-edit-101')).toHaveCount(0)
+    await expect(page.getByTestId('indicators-new')).toHaveCount(0)
   })
 
   test('a failing publish sweep lists every violation and leaves the revision a draft', async ({

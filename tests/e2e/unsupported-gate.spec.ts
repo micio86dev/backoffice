@@ -70,14 +70,15 @@ test.describe('SA-11 — every admin route redirects at a mobile viewport (task 
   // needed for this assertion). The report viewer (B3) doesn't exist yet —
   // it must be added here when that PR lands, so SA-11 coverage doesn't
   // silently go stale. `/clients` (superadmin-clients-console, task 14.2)
-  // added here rather than in `clients.spec.ts`: `playwright.config.ts`'s
-  // `mobile` project restricts `testMatch` to THIS file, and the apply scope
-  // for that change forbade touching anything outside `tests/e2e/` — which
-  // includes the repo-root `playwright.config.ts`. A scenario living only in
-  // `clients.spec.ts` would never actually run under the `mobile` project;
-  // this list is the existing, already-`mobile`-covered mechanism for the
-  // same assertion.
-  const ADMIN_ROUTES = ['/', '/login', '/participants', '/participants/1', '/clients']
+  // and `/catalogue` (framework-catalogue-authoring PR12, task 43.2) are
+  // added here rather than in their own spec files: `playwright.config.ts`'s
+  // `mobile` project restricts `testMatch` to THIS file, and PR12's own task
+  // list originally named a standalone `catalogue-unsupported-gate.spec.ts`
+  // — a scenario living only there would never actually run under the
+  // `mobile` project (the exact gap `/clients` already documents here, one
+  // route up); this list is the existing, already-`mobile`-covered
+  // mechanism for the same assertion.
+  const ADMIN_ROUTES = ['/', '/login', '/participants', '/participants/1', '/clients', '/catalogue']
 
   for (const route of ADMIN_ROUTES) {
     test(`${route} renders /unsupported at a mobile viewport when unauthenticated`, async ({

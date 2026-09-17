@@ -83,6 +83,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   BuildingOffice2Icon,
+  BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import { computed, onMounted, ref } from 'vue'
 import {
@@ -150,6 +151,16 @@ const navItems = [
     labelKey: 'nav.settings',
     icon: Cog6ToothIcon,
     requires: 'users.viewAny',
+    scope: 'platform',
+  },
+  // framework-catalogue-authoring PR10 (D11). `catalogue.manage` is the
+  // SAME ability `middleware/03.abilities.global.ts` guards the route with,
+  // so the link and the guard cannot disagree about who may go there.
+  {
+    to: '/catalogue',
+    labelKey: 'nav.catalogue',
+    icon: BookOpenIcon,
+    requires: 'catalogue.manage',
     scope: 'platform',
   },
 ] as const satisfies readonly NavItem[]

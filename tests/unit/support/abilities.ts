@@ -132,6 +132,11 @@ export function abilitiesForRole(input: MirroredIdentityInput | TenantRole): Abi
     // false for these two.
     clients: { viewAny: platform },
     platformSettings: { viewAny: platform },
+    // PLATFORM, keyed off `isSuperadmin` — `Gate::define('manageCatalogue', fn
+    // (User $u) => $u->is_superadmin === true)` (framework-catalogue-authoring
+    // D12). No subject: the question is about the caller, not a row, so there
+    // is no tenant-scoped policy an org admin could ever satisfy.
+    catalogue: { manage: platform },
   }
 }
 

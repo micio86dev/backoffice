@@ -136,4 +136,24 @@ describe('03.abilities.global.ts', () => {
 
     expect(navigateToMock).toHaveBeenCalled()
   })
+
+  it('guards the catalogue page by its own ability', async () => {
+    canMock.mockReturnValue(true)
+    vi.stubGlobal('navigateTo', vi.fn())
+
+    await run('/catalogue')
+
+    expect(canMock).toHaveBeenCalledWith('catalogue.manage')
+    expect(canMock).not.toHaveBeenCalledWith('users.viewAny')
+  })
+
+  it('redirects a non-superadmin away from the catalogue page, keyed by first segment', async () => {
+    canMock.mockReturnValue(false)
+    const navigateToMock = vi.fn()
+    vi.stubGlobal('navigateTo', navigateToMock)
+
+    await run('/en/catalogue')
+
+    expect(navigateToMock).toHaveBeenCalledWith('/')
+  })
 })

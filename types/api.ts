@@ -5693,7 +5693,6 @@ export interface operations {
                     display_name: string;
                     role_code?: string | null;
                     language?: string | null;
-                    status?: string | null;
                 };
             };
         };
@@ -5708,6 +5707,18 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                        /** @enum {string|null} */
+                        reason: "duplicate_candidate_ref" | "duplicate_email" | null;
+                    };
+                };
+            };
             422: components["responses"]["ValidationException"];
         };
     };
@@ -7470,6 +7481,17 @@ export interface operations {
                 };
             };
             422: components["responses"]["ValidationException"];
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        error: "utterance_lock_timeout";
+                    };
+                };
+            };
         };
     };
     "m2m.whoami": {

@@ -255,6 +255,37 @@ describe('pages/catalogue/index.vue', () => {
     )
   })
 
+  /**
+   * `wrapper.setData({ activeSection: ... })` never reaches `<script
+   * setup>` state through any documented Vue Test Utils contract — Vitest
+   * happens to run with the dev-mode `exposeSetupStateOnRenderContext`
+   * bridge enabled, which quietly makes the write land anyway, but that
+   * bridge is a devtools/HMR side channel, is compiled out of production
+   * builds, and is not something a test may rely on (R3-catalogue-page-
+   * setdata-script-setup, review finding). It also cannot regress: if the
+   * bridge ever stops firing, `setData` silently no-ops and the assertions
+   * below would still read the panel that was already mounted for
+   * `defaultQuestions`. Driving the real `[role="tab"]` elements through
+   * the same pointer sequence `settings/index.spec.ts`'s `openUsersTab`
+   * already uses for this exact reka-ui `Tabs` primitive proves the rail
+   * actually switches sections, the way a candidate superadmin does.
+   */
+  async function selectSection(
+    wrapper: Awaited<ReturnType<typeof mountPage>>,
+    labelKey: string
+  ): Promise<void> {
+    const tab = wrapper
+      .findAll('[role="tab"]')
+      .find((candidate) => candidate.text().includes(labelKey))
+
+    expect(tab, `the ${labelKey} tab is not on this page`).toBeTruthy()
+
+    tab!.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    tab!.element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    tab!.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+  }
+
   // framework-catalogue-authoring PR10b, task 39b.5: the three placeholder
   // rail sections above now mount the real panels, and a publish 422
   // renders the full violations list instead of the generic banner.
@@ -263,19 +294,13 @@ describe('pages/catalogue/index.vue', () => {
       fetchCurrentRevision.mockResolvedValue({ data: revision() })
       const wrapper = await mountPage()
 
-      await wrapper.setData({ activeSection: 'competencies' })
-      await flushPromises()
+      await selectSection(wrapper, 'catalogue.sections.competencies')
       expect(wrapper.find('[data-testid="stub-competencies"]').exists()).toBe(true)
-      expect(
-        wrapper.find('[data-testid="catalogue-section-placeholder-competencies"]').exists()
-      ).toBe(false)
 
-      await wrapper.setData({ activeSection: 'roles' })
-      await flushPromises()
+      await selectSection(wrapper, 'catalogue.sections.roles')
       expect(wrapper.find('[data-testid="stub-roles"]').exists()).toBe(true)
 
-      await wrapper.setData({ activeSection: 'indicators' })
-      await flushPromises()
+      await selectSection(wrapper, 'catalogue.sections.indicators')
       expect(wrapper.find('[data-testid="stub-indicators"]').exists()).toBe(true)
     })
 

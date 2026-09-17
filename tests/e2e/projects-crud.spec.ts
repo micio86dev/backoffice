@@ -96,6 +96,29 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
           })
         : route.continue()
   )
+  // The project form needs this list too — `framework_version_id` is a
+  // required pin resolved from `GET /framework/versions`. Unmocked, the
+  // picker renders empty and nothing auto-selects, which reads as "the form
+  // is stuck" when it is the missing fixture.
+  await page.route(
+    (url) => url.pathname === '/framework/versions',
+    (route) =>
+      isDataRequest(route)
+        ? jsonRoute(route, {
+            data: [
+              {
+                id: 3,
+                organization_id: 1,
+                version: 'v1.0',
+                label: 'Initial',
+                is_locked: false,
+                created_at: null,
+                updated_at: null,
+              },
+            ],
+          })
+        : route.continue()
+  )
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -209,10 +232,9 @@ test.describe('Projects CRUD (Unit 2b)', () => {
     await page.getByRole('button', { name: 'Nuovo progetto' }).click()
     await page.getByLabel('Nome').fill('New E2E Project')
     await page.getByLabel('Slug').fill('new-e2e-project')
-    // The framework pin is required too. It used to ship as `Number('')`, i.e.
-    // 0, and be refused by the server with the message landing in the banner;
-    // the form refuses it up front now.
-    await page.getByLabel('Versione del framework').fill('1')
+    // The framework pin is required too, but needs no manual selection: it is
+    // a <select> that auto-picks the mocked organization's one available
+    // version on mount (mirroring the avatar-template picker above).
 
     // A standard assessment needs a role and at least one competency. Filling
     // only name and slug used to leave the form correctly refusing to submit —

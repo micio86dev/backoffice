@@ -565,3 +565,44 @@ describe('a failed load', () => {
     expect(banner).not.toContain('projectQuestions.loadError')
   })
 })
+
+describe('unsaved competencies', () => {
+  it('forwards unsavedCompetencyIds to the editor, disabling Add for that group only', async () => {
+    fetchQuestions.mockResolvedValue({ data: [], meta: { max_questions_per_competency: 4 } })
+
+    const { default: ProjectQuestionsPanel } =
+      await import('../../../../app/components/organisms/ProjectQuestionsPanel.vue')
+
+    const wrapper = mount(ProjectQuestionsPanel, {
+      props: { projectId: 5, competencies: COMPETENCIES, unsavedCompetencyIds: [11], locale: 'en' },
+      global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(
+      (wrapper.get('[data-testid="question-add-11"]').element as HTMLButtonElement).disabled
+    ).toBe(true)
+    expect(
+      (wrapper.get('[data-testid="question-add-22"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
+  })
+
+  it('defaults to none unsaved when the prop is omitted', async () => {
+    fetchQuestions.mockResolvedValue({ data: [], meta: { max_questions_per_competency: 4 } })
+
+    const { default: ProjectQuestionsPanel } =
+      await import('../../../../app/components/organisms/ProjectQuestionsPanel.vue')
+
+    const wrapper = mount(ProjectQuestionsPanel, {
+      props: { projectId: 5, competencies: COMPETENCIES, locale: 'en' },
+      global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(
+      (wrapper.get('[data-testid="question-add-11"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
+  })
+})

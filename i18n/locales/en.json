@@ -74,7 +74,6 @@
       "resetPassword": "Choose a new password",
       "participants": "Candidates",
       "participantDetail": "Candidate detail",
-      "unsupported": "Unsupported browser",
       "projects": "Projects",
       "reports": "Reports",
       "settings": "Settings",
@@ -403,7 +402,8 @@
         "webhook_url_too_long": "The webhook URL is too long."
       },
       "competenciesLoadError": "The competency list could not be loaded. Please try again.",
-      "templatesLoadError": "The avatar template list could not be loaded. Please try again."
+      "templatesLoadError": "The avatar template list could not be loaded. Please try again.",
+      "frameworkVersionsLoadError": "The framework version list could not be loaded. Please try again."
     },
     "secret": {
       "notSet": "No secret configured.",
@@ -509,10 +509,6 @@
       "evaluation": "Download evaluation (JSON)",
       "downloading": "Downloading…"
     }
-  },
-  "unsupported": {
-    "title": "Unsupported Browser",
-    "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."
   },
   "settings": {
     "title": "Settings",
@@ -1298,6 +1294,7 @@
     "loadError": "Could not load the questions.",
     "removeError": "Could not remove the question.",
     "atCap": "At most {max} per competency. Remove one to add another.",
+    "unsavedCompetency": "Save the project's competency selection before adding a question for this one.",
     "serverError": {
       "text_required": "Write the question text.",
       "text_invalid": "The question text is not valid.",
@@ -1390,6 +1387,10 @@
       },
       "createDraft": "Create draft",
       "createDraftError": "Could not create a draft.",
+      "discardDraft": "Discard draft",
+      "confirmDiscardTitle": "Discard this draft?",
+      "confirmDiscardBody": "Every uncommitted role, competency, BARS indicator and default question in this draft is permanently lost. The catalogue reverts to the last published revision. This cannot be undone.",
+      "discardError": "Could not discard this draft.",
       "readOnlyNotice": "This is the published revision, shown read-only. Create a draft to edit it."
     },
     "defaultQuestions": {

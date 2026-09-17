@@ -8,9 +8,6 @@ import { checkA11y } from './fixtures/a11y'
  * - The /health page is reachable and returns HTTP 200
  * - The page renders the text "ok"
  * - No WCAG 2.1 AA violations (D29)
- *
- * This spec is intentionally excluded from the `mobile` project
- * (mobile only runs unsupported-gate.spec.ts — SA-11 gate).
  */
 test.describe('Health page', () => {
   test('renders "ok" on the /health page', async ({ page }) => {

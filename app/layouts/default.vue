@@ -12,9 +12,9 @@
 
 <script setup lang="ts">
 // Admin shell layout (DESIGN.md §8.1): sidebar + top nav + fluid content area.
-// Applied to every page EXCEPT /login and /unsupported, which opt out via
-// definePageMeta({ layout: false }) — those are pre-auth/pre-gate surfaces
-// and must never render the authenticated nav chrome.
+// Applied to every page EXCEPT /login, which opts out via
+// definePageMeta({ layout: false }) — that is a pre-auth surface and must
+// never render the authenticated nav chrome.
 import { onMounted } from 'vue'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import SidebarNav from '@/components/organisms/SidebarNav.vue'

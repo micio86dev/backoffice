@@ -41,6 +41,12 @@ describe('useCatalogue', () => {
     expect(apiFetch).toHaveBeenCalledWith('/catalogue/revisions/publish', { method: 'POST' })
   })
 
+  it('discards the open draft with DELETE and no body', async () => {
+    await useCatalogue().discardDraftRevision()
+
+    expect(apiFetch).toHaveBeenCalledWith('/catalogue/revisions/draft', { method: 'DELETE' })
+  })
+
   it('lists competencies from the collection endpoint', async () => {
     await useCatalogue().listCompetencies()
 

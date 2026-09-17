@@ -99,6 +99,13 @@
             :model-value="assessmentType"
             :disabled="lockedWhenLive"
             data-testid="project-form-assessment-type"
+            :aria-describedby="
+              describedBy(
+                'project-form-assessment-type',
+                false,
+                lockedWhenLive ? ['project-form-assessment-type-immutable'] : []
+              )
+            "
             @update:model-value="onAssessmentTypeChange"
           >
             <ToggleGroupItem value="standard">
@@ -116,8 +123,10 @@
           scenario). `immutableWhenLive` below keeps its own gate: it is a
           DIFFERENT statement ("this is now locked"), not a duplicate.
         -->
-          <FieldDescription>{{ $t('projects.form.help.assessmentTypeFreezes') }}</FieldDescription>
-          <FieldDescription v-if="lockedWhenLive">
+          <FieldDescription id="project-form-assessment-type-help">{{
+            $t('projects.form.help.assessmentTypeFreezes')
+          }}</FieldDescription>
+          <FieldDescription v-if="lockedWhenLive" id="project-form-assessment-type-immutable">
             {{ $t('projects.form.immutableWhenLive') }}
           </FieldDescription>
         </FieldSet>
@@ -130,7 +139,13 @@
               id="project-form-role-code"
               data-testid="project-form-role-code"
               :aria-invalid="Boolean(errors.roleCode)"
-              :aria-describedby="describedBy('project-form-role-code', Boolean(errors.roleCode))"
+              :aria-describedby="
+                describedBy(
+                  'project-form-role-code',
+                  Boolean(errors.roleCode),
+                  lockedWhenLive ? ['project-form-role-code-immutable'] : []
+                )
+              "
             >
               <SelectValue :placeholder="$t('projects.form.roleCode')" />
             </SelectTrigger>
@@ -161,7 +176,7 @@
           >
             {{ errors.roleCode }}
           </FieldError>
-          <FieldDescription v-if="lockedWhenLive">
+          <FieldDescription v-if="lockedWhenLive" id="project-form-role-code-immutable">
             {{ $t('projects.form.immutableWhenLive') }}
           </FieldDescription>
         </Field>
@@ -170,20 +185,25 @@
           <FieldLabel for="project-form-framework-version">
             {{ $t('projects.form.frameworkVersion') }}
           </FieldLabel>
-          <Input
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <select
             id="project-form-framework-version"
-            v-model="frameworkVersionId"
-            type="number"
-            min="1"
+            data-testid="project-form-framework-version"
             autocomplete="off"
+            :class="formSelectClass"
+            :value="frameworkVersionId === null ? '' : String(frameworkVersionId)"
             :disabled="isEditing"
             :aria-invalid="Boolean(errors.frameworkVersionId)"
             :aria-describedby="
               describedBy('project-form-framework-version', Boolean(errors.frameworkVersionId))
             "
-            data-testid="project-form-framework-version"
+            @change="onFrameworkVersionChange"
             @blur="validateFrameworkVersion"
-          />
+          >
+            <option v-for="version in frameworkVersions" :key="version.id" :value="version.id">
+              {{ version.label ? `${version.label} — ${version.version}` : version.version }}
+            </option>
+          </select>
           <!--
             The help text was rendered and never referenced, so a
             screen-reader user was never told the field is immutable — every
@@ -199,6 +219,18 @@
             data-testid="project-form-framework-version-error"
             >{{ errors.frameworkVersionId }}</FieldError
           >
+
+          <!--
+            A failed load, stated — same reasoning as the avatar-template
+            list below: the field is required and now offers nothing to
+            choose, which is a network failure, not the operator's mistake.
+          -->
+          <FormMessage
+            v-if="frameworkVersionsError"
+            kind="error"
+            :text="$t('projects.form.frameworkVersionsLoadError')"
+            test-id="project-form-framework-version-load-error"
+          />
         </Field>
 
         <CompetencyPicker
@@ -500,8 +532,10 @@ import CompetencyPicker, {
 import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
+import { useFrameworkVersions } from '@/composables/useFrameworkVersions'
 import { formSelectClass } from '@/components/ui/form-control'
 import type { TemplateOption } from '@/types/avatar-template'
+import type { FrameworkVersion } from '@/types/framework-version'
 import {
   isNudgeMinCharsValid,
   isProjectUrlValid,
@@ -509,6 +543,7 @@ import {
   PROJECT_FIELD_BOUNDS,
 } from '@/utils/project-field-specs'
 import { applyServerFieldErrors, serverErrorCode } from '@/utils/http-error'
+import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { translateServerCodeOrFallback } from '@/utils/server-message'
 
 const ROLE_CODES = ['ICO', 'FLL', 'MLL', 'BUL', 'SRX'] as const
@@ -561,6 +596,7 @@ type AvatarTemplateOption = TemplateOption
 const { createProject, updateProject } = useProjects()
 const { fetchRoleCompetencies, fetchPotentialCompetencies } = useFrameworkRoles()
 const { listTemplateOptions } = useAvatarTemplates()
+const { listVersions } = useFrameworkVersions()
 
 const isEditing = computed(() => props.project !== null)
 
@@ -569,7 +605,7 @@ const slug = ref(props.project?.slug ?? '')
 const language = ref(props.project?.language ?? 'en')
 const assessmentType = ref<'standard' | 'potential'>(props.project?.assessment_type ?? 'standard')
 const roleCode = ref(props.project?.role_code ?? '')
-const frameworkVersionId = ref(props.project?.framework_version_id ?? '')
+const frameworkVersionId = ref<number | null>(props.project?.framework_version_id ?? null)
 // Hydrated from the project's CURRENT competencies (D2's scope finding).
 // Submission below MUST land together with this hydration: submitting
 // competency_ids while this still initialised to [] would make the next
@@ -584,6 +620,7 @@ const exitRedirectUrl = ref(props.project?.exit_redirect_url ?? '')
 // state rather than sending a value the API would reject with a generic error.
 const avatarTemplateId = ref<number | null>(props.project?.avatar_template_id ?? null)
 const avatarTemplates = ref<AvatarTemplateOption[]>([])
+const frameworkVersions = ref<FrameworkVersion[]>([])
 const webhookUrl = ref(props.project?.webhook_url ?? '')
 const webhookSecret = ref<string | undefined>(undefined)
 
@@ -632,6 +669,9 @@ const optionsError = ref(false)
  * one blocks creation and has to say why. */
 const templatesError = ref(false)
 
+/** The same again, for the framework-version list. */
+const frameworkVersionsError = ref(false)
+
 /**
  * Resolved against the OPTIONS, so the panel gets codes and not bare ids.
  *
@@ -669,10 +709,14 @@ watch(
 /**
  * Joins a field's error id (when invalid) with its help-text id (form-clarity-
  * and-console-warnings, D6) — a control is described by whichever of the two
- * currently apply, never just one at the expense of the other.
+ * currently apply, never just one at the expense of the other. `extra`
+ * appends further conditional description ids (e.g. an immutability notice
+ * that only renders once the project is live) — a description rendered on
+ * screen but never referenced here is invisible to a screen-reader user,
+ * exactly the defect `project-form-framework-version-help` was fixed for.
  */
-function describedBy(baseId: string, hasError: boolean): string {
-  const ids = [hasError ? `${baseId}-error` : null, `${baseId}-help`].filter(
+function describedBy(baseId: string, hasError: boolean, extra: (string | null)[] = []): string {
+  const ids = [hasError ? `${baseId}-error` : null, `${baseId}-help`, ...extra].filter(
     (id): id is string => id !== null
   )
 
@@ -709,12 +753,6 @@ const nextTransition = computed<'active' | 'archived' | null>(() => {
 /**
  * The pin is required on create, and nothing checked it.
  *
- * `frameworkVersionId` starts as `''`, and `Number('')` is `0` — so a blank
- * required field shipped as a valid-looking integer, the server refused it,
- * and the refusal landed in the banner because the field had no mapping.
- * "Could not save", nothing highlighted, for a field the operator can see
- * they left empty.
- *
  * Only on CREATE: the control is disabled while editing, and the value is
  * whatever the project was pinned to.
  */
@@ -725,12 +763,10 @@ function validateFrameworkVersion(): boolean {
     return true
   }
 
-  const value = Number(frameworkVersionId.value)
-
   errors.value.frameworkVersionId =
-    frameworkVersionId.value !== '' && Number.isInteger(value) && value > 0
-      ? undefined
-      : t('projects.form.serverError.framework_version_required')
+    frameworkVersionId.value === null
+      ? t('projects.form.serverError.framework_version_required')
+      : undefined
 
   return errors.value.frameworkVersionId === undefined
 }
@@ -925,30 +961,39 @@ function applyServerErrors(error: unknown): void {
   })
 
   if (unmapped === null) {
-    // No field errors at all. That is not always "the payload was fine" — a
-    // 422 can also refuse for a reason no control on this form can fix, and
-    // it says so with a machine `code` beside its prose (e.g.
-    // POTENTIAL_CATALOG_INCOMPLETE, when a `potential` project is created
-    // against a catalogue with no MTG/LAT seeded). Sending the operator to
-    // "check the highlighted fields" then points them at fields that were
-    // never the problem, with nothing highlighted to check.
+    // No field-shaped body at all. Two different things produce this:
+    //
+    //   - a 422 that refuses for a reason no control on this form can fix,
+    //     and says so with a machine `code` beside its prose (e.g.
+    //     POTENTIAL_CATALOG_INCOMPLETE, when a `potential` project is
+    //     created against a catalogue with no MTG/LAT seeded);
+    //   - a 403/404/409/network rejection with no body at all, which the
+    //     shared D4 state resolver already maps — a 409 is temporal and
+    //     self-resolving (e.g. a concurrent status change) and must never
+    //     render in the same destructive red as a genuine error, exactly
+    //     the distinction ProjectQuestionsPanel/QuestionListEditor and
+    //     catalogue/index.vue already draw for the same rejection shapes.
     const code = serverErrorCode(error)
 
+    if (code !== null) {
+      formMessage.value = {
+        kind: 'error',
+        text: translateServerCodeOrFallback(
+          { t, te },
+          'projects.form.serverError',
+          code,
+          'projects.form.saveError'
+        ),
+      }
+
+      return
+    }
+
+    const state = resolveResourceErrorState(error)
+
     formMessage.value = {
-      kind: 'error',
-      // The same guard the two paths below use. `translateServerCode` falls
-      // back to the RAW CODE by design — a fine module-level safety net, and
-      // the wrong answer here, where it is the only path in this function
-      // that can put `POTENTIAL_CATALOG_INCOMPLETE` in front of an Italian
-      // operator while every sibling path is protected.
-      text: code
-        ? translateServerCodeOrFallback(
-            { t, te },
-            'projects.form.serverError',
-            code,
-            'projects.form.saveError'
-          )
-        : t('projects.form.saveError'),
+      kind: state === 'not-ready' ? 'waiting' : 'error',
+      text: t(resourceErrorKey(state, 'message')),
     }
 
     return
@@ -1009,8 +1054,8 @@ async function onSubmit(): Promise<void> {
     return
   }
 
-  // Narrowed by `templateOk` above — the payload type says `number`, and it is
-  // one by the time we get here.
+  // Narrowed by `templateOk`/`frameworkOk` above — the payload type says
+  // `number`, and each is one by the time we get here.
   const avatarTemplate = avatarTemplateId.value as number
 
   saving.value = true
@@ -1037,7 +1082,8 @@ async function onSubmit(): Promise<void> {
       })
     } else {
       await createProject({
-        framework_version_id: Number(frameworkVersionId.value),
+        // Narrowed by `frameworkOk` above.
+        framework_version_id: frameworkVersionId.value as number,
         slug: slug.value,
         name: name.value,
         assessment_type: assessmentType.value,
@@ -1099,7 +1145,48 @@ async function onArchiveConfirmed(): Promise<void> {
 onMounted(() => {
   void loadCompetencyOptions()
   void loadAvatarTemplates()
+  void loadFrameworkVersions()
 })
+
+/**
+ * The organization's framework versions, for the per-project pin.
+ *
+ * On CREATE the operator picked one by typing a raw database id into a bare
+ * number field, with nothing on screen telling them which ids were valid for
+ * their organization — the exact avatar-template picker mistake this endpoint
+ * was already meant to fix, before this select existed and called it.
+ */
+async function loadFrameworkVersions(): Promise<void> {
+  try {
+    const response = await listVersions()
+    frameworkVersions.value = response.data
+    applyDefaultFrameworkVersion()
+  } catch {
+    frameworkVersions.value = []
+    frameworkVersionsError.value = true
+  }
+}
+
+/**
+ * Pre-select a version for a NEW project that has not chosen one.
+ *
+ * Mirrors `applyDefaultTemplate()`: NEVER overwrites an existing pin — the
+ * field is immutable after creation, so this only ever runs while creating.
+ * There is no "active" version to prefer the way a template has one; the
+ * first one the endpoint returns is as good a default as any single-version
+ * organization (the common case) needs, and any other organization simply
+ * sees it pre-selected and changes it.
+ */
+function applyDefaultFrameworkVersion(): void {
+  if (isEditing.value || frameworkVersionId.value !== null) return
+
+  frameworkVersionId.value = frameworkVersions.value[0]?.id ?? null
+}
+
+function onFrameworkVersionChange(event: Event): void {
+  const select = event.target as HTMLSelectElement
+  frameworkVersionId.value = select.value === '' ? null : Number(select.value)
+}
 
 /**
  * The organization's avatar templates, for the per-project pin.

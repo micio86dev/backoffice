@@ -21,12 +21,14 @@ vi.stubGlobal('useI18n', () => realI18n())
 const fetchCurrentRevision = vi.fn()
 const openDraftRevision = vi.fn()
 const publishRevision = vi.fn()
+const discardDraftRevision = vi.fn()
 
 vi.mock('../../../../app/composables/useCatalogue', () => ({
   useCatalogue: () => ({
     fetchCurrentRevision,
     openDraftRevision,
     publishRevision,
+    discardDraftRevision,
     listCompetencies: vi.fn(),
     listRoles: vi.fn(),
     listBarsIndicators: vi.fn(),
@@ -128,6 +130,66 @@ describe('pages/catalogue/index.vue', () => {
     await confirmDialog('confirm')
 
     expect(publishRevision).toHaveBeenCalledOnce()
+  })
+
+  it('shows Discard draft only while the revision is a draft', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'published' }) })
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('[data-testid="catalogue-discard-draft"]').exists()).toBe(false)
+  })
+
+  it('gates Discard draft behind ConfirmDialog and calls discardDraftRevision only once confirmed', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+    discardDraftRevision.mockResolvedValue({
+      data: revision({ state: 'published', id: 1, is_baseline: true }),
+    })
+
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="catalogue-discard-draft"]').trigger('click')
+
+    expect(discardDraftRevision).not.toHaveBeenCalled()
+    expect(document.body.querySelector('[role="alertdialog"]')).not.toBeNull()
+
+    await confirmDialog('confirm')
+
+    expect(discardDraftRevision).toHaveBeenCalledOnce()
+    // The header now shows whatever the response says — the published
+    // baseline the draft reverted to, not the discarded draft.
+    expect(wrapper.get('[data-testid="catalogue-revision-state"]').text()).toContain(
+      'catalogue.revision.published'
+    )
+  })
+
+  it('cancelling the Discard confirmation leaves the draft untouched', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="catalogue-discard-draft"]').trigger('click')
+    await confirmDialog('cancel')
+
+    expect(discardDraftRevision).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="catalogue-revision-state"]').text()).toContain(
+      'catalogue.revision.draft'
+    )
+  })
+
+  it('shows a discard failure inline and leaves the revision a draft', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+    discardDraftRevision.mockRejectedValue(Object.assign(new Error('500'), { status: 500 }))
+
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="catalogue-discard-draft"]').trigger('click')
+    await confirmDialog('confirm')
+
+    expect(wrapper.get('[data-testid="catalogue-discard-error"]').text()).toContain(
+      'catalogue.revision.discardError'
+    )
+    expect(wrapper.get('[data-testid="catalogue-revision-state"]').text()).toContain(
+      'catalogue.revision.draft'
+    )
   })
 
   it('shows a publish failure inline and leaves the revision a draft', async () => {

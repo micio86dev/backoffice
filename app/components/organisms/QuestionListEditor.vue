@@ -420,6 +420,18 @@ function closeEditor(): void {
   errors.value = {}
 }
 
+/**
+ * A list that turns read-only while a draft is open (the catalogue page
+ * publishes in place) discards that draft: its Save would target content
+ * that no longer accepts writes.
+ */
+watch(
+  () => props.readonly,
+  (readonly) => {
+    if (readonly) closeEditor()
+  }
+)
+
 function startNew(competencyId: number): void {
   errors.value = {}
 

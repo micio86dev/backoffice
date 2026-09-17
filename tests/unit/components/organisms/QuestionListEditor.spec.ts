@@ -50,6 +50,7 @@ async function mountEditor(
     cap: number | null
     saving: boolean
     submitError: unknown | null
+    readonly: boolean
   }> = {}
 ) {
   const { default: QuestionListEditor } =
@@ -332,5 +333,31 @@ describe('QuestionListEditor', () => {
 
       expect(wrapper.find('[data-testid="question-editor"]').exists()).toBe(false)
     })
+  })
+})
+
+describe('QuestionListEditor — becoming read-only', () => {
+  beforeEach(() => {
+    vi.stubGlobal('useI18n', () => realI18n())
+    document.body.innerHTML = ''
+  })
+
+  it('closes an editor that was open when the list turns read-only', async () => {
+    // The catalogue page flips `readonly` in place when a draft is
+    // published: an inline form left open would still save into a revision
+    // that no longer accepts writes.
+    const wrapper = await mountEditor({ questions: [item()] })
+
+    await wrapper.get('[data-testid="question-edit-1"]').trigger('click')
+    expect(wrapper.find('[data-testid="question-editor"]').exists()).toBe(true)
+
+    await wrapper.setProps({ readonly: true })
+
+    expect(wrapper.find('[data-testid="question-editor"]').exists()).toBe(false)
+
+    // Nothing reopens it once the list is writable again.
+    await wrapper.setProps({ readonly: false })
+
+    expect(wrapper.find('[data-testid="question-editor"]').exists()).toBe(false)
   })
 })

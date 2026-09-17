@@ -806,6 +806,10 @@ export interface paths {
          *     (4d) DB failure after provider success → teardown(in-memory token) + 500.
          *
          *     RESUME in_corso:
+         *       - Harvest the outgoing transcript, then compose: the opening re-asks the
+         *         pending primary verbatim. A composition failure answers 422, as on a
+         *         fresh start, and ends the outgoing provider session on its way out —
+         *         nothing else would, and it bills until the provider's own ceiling.
          *       - issue() FRESH token.
          *       - Teardown OLD session via ProviderToken::fromRef($session->provider, $session->provider_session_ref).
          *       - Persist new ref.
@@ -855,17 +859,17 @@ export interface paths {
          *
          *     WHY THAT IS CHEAP RATHER THAN DRASTIC
          *     -------------------------------------
-         *     This is the FIRST HALF of `handleResumeInCorso()`, which already exists
-         *     and is already relied upon: harvest the outgoing transcript while it is
-         *     still readable, close the live-clock stretch, tear the provider session
-         *     down. The second half — issuing a fresh token — is what `/start` does,
-         *     and `OpeningTextComposer` already carries a `resume` variant written for
-         *     exactly this.
+         *     This is the FIRST HALF of the resume path `/start` already runs:
+         *     harvest the outgoing transcript while it is still readable, close the
+         *     live-clock stretch, tear the provider session down. The second half —
+         *     issuing a fresh token whose opening re-asks the pending primary — is
+         *     what `/start` does.
          *
          *     So resume needs no new endpoint. Suspend leaves the session `in_corso`
          *     with a NULL ref, which is precisely the state `/start` already resumes:
-         *     `handleResumeInCorso()` guards its harvest and teardown with
-         *     `$oldRef !== null`, so it skips straight to issuing.
+         *     both the harvest in `start()` and the teardown in
+         *     `handleResumeInCorso()` are guarded by a non-null ref, so it skips
+         *     straight to issuing.
          *
          *     WHAT IT DELIBERATELY DOES NOT TOUCH
          *     -----------------------------------

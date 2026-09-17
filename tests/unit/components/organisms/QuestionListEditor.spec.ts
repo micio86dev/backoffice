@@ -46,6 +46,7 @@ async function mountEditor(
   props: Partial<{
     competencies: QuestionEditorCompetency[]
     questions: QuestionEditorItem[]
+    unsavedCompetencyIds: number[]
     locale: string
     cap: number | null
     saving: boolean
@@ -164,6 +165,43 @@ describe('QuestionListEditor', () => {
 
       expect(add.disabled).toBe(false)
       expect(wrapper.find('[data-testid="question-cap-11"]').exists()).toBe(false)
+    })
+  })
+
+  describe('unsaved competency', () => {
+    it('disables Add for a competency ticked but not yet saved, with an explanation', async () => {
+      const wrapper = await mountEditor({ unsavedCompetencyIds: [11] })
+
+      const add = wrapper.get('[data-testid="question-add-11"]').element as HTMLButtonElement
+
+      expect(add.disabled).toBe(true)
+      expect(wrapper.get('[data-testid="question-unsaved-11"]').text()).toContain(
+        'projectQuestions.unsavedCompetency'
+      )
+    })
+
+    it('leaves every OTHER competency unaffected', async () => {
+      const wrapper = await mountEditor({ unsavedCompetencyIds: [11] })
+
+      const add = wrapper.get('[data-testid="question-add-22"]').element as HTMLButtonElement
+
+      expect(add.disabled).toBe(false)
+      expect(wrapper.find('[data-testid="question-unsaved-22"]').exists()).toBe(false)
+    })
+
+    it('behaves exactly as before when nothing is unsaved (default: no prop passed)', async () => {
+      const wrapper = await mountEditor({
+        questions: [item({ id: 1, competencyId: 11 }), item({ id: 2, competencyId: 11 })],
+        cap: 2,
+      })
+
+      const add = wrapper.get('[data-testid="question-add-11"]').element as HTMLButtonElement
+
+      expect(add.disabled).toBe(true)
+      expect(wrapper.find('[data-testid="question-unsaved-11"]').exists()).toBe(false)
+      expect(wrapper.get('[data-testid="question-cap-11"]').text()).toContain(
+        'projectQuestions.atCap'
+      )
     })
   })
 

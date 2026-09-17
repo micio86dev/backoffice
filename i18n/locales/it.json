@@ -74,7 +74,6 @@
       "resetPassword": "Scegli una nuova password",
       "participants": "Candidati",
       "participantDetail": "Dettaglio candidato",
-      "unsupported": "Browser non supportato",
       "projects": "Progetti",
       "reports": "Report",
       "settings": "Impostazioni",
@@ -403,7 +402,8 @@
         "webhook_url_too_long": "L'URL del webhook è troppo lungo."
       },
       "competenciesLoadError": "L'elenco delle competenze non è stato caricato. Riprova.",
-      "templatesLoadError": "L'elenco dei template avatar non è stato caricato. Riprova."
+      "templatesLoadError": "L'elenco dei template avatar non è stato caricato. Riprova.",
+      "frameworkVersionsLoadError": "L'elenco delle versioni del framework non è stato caricato. Riprova."
     },
     "secret": {
       "notSet": "Nessun segreto configurato.",
@@ -509,10 +509,6 @@
       "evaluation": "Scarica valutazione (JSON)",
       "downloading": "Download in corso…"
     }
-  },
-  "unsupported": {
-    "title": "Browser non supportato",
-    "message": "Questa applicazione richiede un browser desktop supportato (Chrome, Edge, Safari). Per favore accedi da un computer."
   },
   "settings": {
     "title": "Impostazioni",
@@ -1298,6 +1294,7 @@
     "loadError": "Non è stato possibile caricare le domande.",
     "removeError": "Non è stato possibile rimuovere la domanda.",
     "atCap": "Al massimo {max} per competenza. Rimuovine una per aggiungerne un’altra.",
+    "unsavedCompetency": "Salva prima la selezione delle competenze del progetto per poter aggiungere una domanda su questa.",
     "serverError": {
       "text_required": "Scrivi il testo della domanda.",
       "text_invalid": "Il testo della domanda non è valido.",
@@ -1390,6 +1387,10 @@
       },
       "createDraft": "Crea bozza",
       "createDraftError": "Impossibile creare una bozza.",
+      "discardDraft": "Scarta bozza",
+      "confirmDiscardTitle": "Scartare questa bozza?",
+      "confirmDiscardBody": "Ogni ruolo, competenza, indicatore BARS e domanda predefinita non ancora pubblicati in questa bozza andranno persi definitivamente. Il catalogo tornerà all'ultima revisione pubblicata. L'operazione non è reversibile.",
+      "discardError": "Impossibile scartare questa bozza.",
       "readOnlyNotice": "Questa è la revisione pubblicata, mostrata in sola lettura. Crea una bozza per modificarla."
     },
     "defaultQuestions": {

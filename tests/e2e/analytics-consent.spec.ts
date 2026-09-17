@@ -25,8 +25,8 @@ const THIRD_PARTY = /googletagmanager\.com|google-analytics\.com/
  *
  * The backoffice sends every unauthenticated visitor to `/login`, and the
  * banner deliberately stands down there — so an unauthenticated E2E has exactly
- * three reachable routes (`/login`, `/unsupported`, `/health`) and only one of
- * them is a page the banner is allowed to appear on.
+ * two reachable routes (`/login`, `/health`) and only one of them is a page
+ * the banner is allowed to appear on.
  *
  * The consequence is worth stating plainly: in this app an operator meets the
  * banner AFTER signing in, on their first real page. That is the correct

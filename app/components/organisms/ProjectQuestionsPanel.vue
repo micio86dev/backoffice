@@ -17,6 +17,7 @@
       ref="editorRef"
       :competencies="editorCompetencies"
       :questions="editorQuestions"
+      :unsaved-competency-ids="unsavedCompetencyIds ?? []"
       :locale="locale"
       :cap="cap"
       :saving="saving"
@@ -71,6 +72,13 @@ const props = defineProps<{
    * project starts in.
    */
   competencies: { id: number; code: string }[]
+  /**
+   * Which of `competencies` the server does not know about yet — ticked in
+   * the form's picker but not yet saved. Forwarded to `QuestionListEditor`,
+   * which disables "Add" for these with an explanation rather than letting
+   * the operator reach a confusing `competency_invalid` 422.
+   */
+  unsavedCompetencyIds?: number[]
   /** The PROJECT's language — what the candidate will hear. */
   locale: string
 }>()

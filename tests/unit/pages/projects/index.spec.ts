@@ -86,6 +86,26 @@ describe('pages/projects/index.vue', () => {
         }),
       }),
     }))
+    // Same reasoning as the avatar-template mock above, for the
+    // framework-version pin: unmocked, the composable reaches for the
+    // network and the select stays empty with nothing to auto-select.
+    vi.doMock('../../../../app/composables/useFrameworkVersions', () => ({
+      useFrameworkVersions: () => ({
+        listVersions: vi.fn().mockResolvedValue({
+          data: [
+            {
+              id: 3,
+              organization_id: 1,
+              version: 'v1.0',
+              label: 'Initial',
+              is_locked: false,
+              created_at: null,
+              updated_at: null,
+            },
+          ],
+        }),
+      }),
+    }))
     useHeadMock = vi.fn()
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', useHeadMock)
@@ -236,17 +256,13 @@ describe('pages/projects/index.vue', () => {
       const slugInput = document.body.querySelector<HTMLInputElement>(
         '[data-testid="project-form-slug"]'
       )
-      // REQUIRED on create. It used to ship as `Number('') === 0` and be
-      // refused by the server; the form refuses it now.
-      const frameworkInput = document.body.querySelector<HTMLInputElement>(
-        '[data-testid="project-form-framework-version"]'
-      )
+      // The framework-version pin is REQUIRED on create, but needs no manual
+      // input here: it is a select that auto-picks the mocked organization's
+      // one available version on mount.
       nameInput!.value = 'Demo'
       nameInput!.dispatchEvent(new Event('input'))
       slugInput!.value = 'demo'
       slugInput!.dispatchEvent(new Event('input'))
-      frameworkInput!.value = '1'
-      frameworkInput!.dispatchEvent(new Event('input'))
       // `potential`, so the submit is not also blocked by the role/competency
       // cross-field rules a `standard` project carries.
       document.body
@@ -463,16 +479,12 @@ describe('pages/projects/index.vue', () => {
       const slugInput = dialogBody().querySelector<HTMLInputElement>(
         '[data-testid="project-form-slug"]'
       )
-      // REQUIRED on create — see the sibling test above.
-      const frameworkInput = dialogBody().querySelector<HTMLInputElement>(
-        '[data-testid="project-form-framework-version"]'
-      )
+      // The framework-version pin is REQUIRED on create — see the sibling
+      // test above — but needs no manual input; it auto-selects.
       nameInput!.value = 'New Demo'
       nameInput!.dispatchEvent(new Event('input'))
       slugInput!.value = 'new-demo'
       slugInput!.dispatchEvent(new Event('input'))
-      frameworkInput!.value = '1'
-      frameworkInput!.dispatchEvent(new Event('input'))
       dialogBody()
         .querySelector<HTMLButtonElement>(
           '[data-testid="project-form-assessment-type"] button:last-child'
@@ -745,6 +757,44 @@ describe('pages/projects/index.vue', () => {
       wrapper.unmount()
     })
 
+    it('flags a live-ticked competency as unsaved until it matches the persisted set', async () => {
+      // The persisted set is `PRS` (id 99, from the mocked project above).
+      const wrapper = await mountWith({ update: true, delete: false })
+
+      await waitFor(
+        () => document.body.querySelector('[data-testid="project-form"]'),
+        'the project form to mount inside the drawer'
+      )
+      await flushPromises()
+
+      const form = wrapper
+        .findAllComponents({ name: 'ProjectForm' })
+        .find((component) => component.exists())
+
+      // Ticked COL (id 11) alongside the persisted PRS (id 99): COL is
+      // unsaved, PRS is not.
+      form!.vm.$emit('update:competencies', [
+        { id: 99, code: 'PRS' },
+        { id: 11, code: 'COL' },
+      ])
+      await flushPromises()
+
+      expect(
+        wrapper.findComponent({ name: 'ProjectQuestionsPanel' }).props('unsavedCompetencyIds')
+      ).toEqual([11])
+
+      // Publishing exactly the persisted set again (e.g. after a save
+      // reloads the project) leaves nothing unsaved.
+      form!.vm.$emit('update:competencies', [{ id: 99, code: 'PRS' }])
+      await flushPromises()
+
+      expect(
+        wrapper.findComponent({ name: 'ProjectQuestionsPanel' }).props('unsavedCompetencyIds')
+      ).toEqual([])
+
+      wrapper.unmount()
+    })
+
     it('offers no deletion when the API says the project cannot be deleted', async () => {
       // `can.delete` carries the admin-only policy AND the not-while-active
       // state rule. A button that always earns a 409 is worse than none.
@@ -805,6 +855,55 @@ describe('pages/projects/index.vue', () => {
       const error = document.body.querySelector('[data-testid="project-delete-error"]')
       expect(error?.textContent).toContain('projects.delete.stillActive')
       expect(error?.textContent).not.toContain('projects.delete.error')
+
+      wrapper.unmount()
+    })
+
+    it('renders a 403 delete failure distinctly from a 404, not both as the generic fallback', async () => {
+      const deleteProject = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('403'), { status: 403 }))
+
+      const wrapper = await mountWith({ update: true, delete: true }, deleteProject)
+
+      document.body.querySelector<HTMLButtonElement>('[data-testid="project-delete"]')!.click()
+      await waitFor(
+        () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+        'the confirmation to open'
+      )
+      document.body
+        .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')!
+        .click()
+      await flushPromises()
+
+      const error = document.body.querySelector('[data-testid="project-delete-error"]')
+      expect(error?.textContent).toContain('errors.states.forbidden.message')
+      expect(error?.textContent).not.toContain('projects.delete.error')
+      expect(error?.textContent).not.toContain('projects.delete.stillActive')
+
+      wrapper.unmount()
+    })
+
+    it('renders a 404 delete failure distinctly from a 403', async () => {
+      const deleteProject = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('404'), { status: 404 }))
+
+      const wrapper = await mountWith({ update: true, delete: true }, deleteProject)
+
+      document.body.querySelector<HTMLButtonElement>('[data-testid="project-delete"]')!.click()
+      await waitFor(
+        () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+        'the confirmation to open'
+      )
+      document.body
+        .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]')!
+        .click()
+      await flushPromises()
+
+      const error = document.body.querySelector('[data-testid="project-delete-error"]')
+      expect(error?.textContent).toContain('errors.states.notFound.message')
+      expect(error?.textContent).not.toContain('errors.states.forbidden.message')
 
       wrapper.unmount()
     })

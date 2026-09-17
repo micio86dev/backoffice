@@ -50,7 +50,7 @@ describe('redactAnalyticsPath', () => {
   it('passes ordinary pages through unchanged', () => {
     expect(redactAnalyticsPath('/')).toBe('/')
     expect(redactAnalyticsPath('/login')).toBe('/login')
-    expect(redactAnalyticsPath('/unsupported')).toBe('/unsupported')
+    expect(redactAnalyticsPath('/health')).toBe('/health')
   })
 
   it('never returns a bare numeric or uuid-looking segment after /participants/', () => {
@@ -112,7 +112,7 @@ describe('isAnalyticsSafeRoute', () => {
 
   it('marks the remaining pages as safe', () => {
     expect(isAnalyticsSafeRoute('/')).toBe(true)
-    expect(isAnalyticsSafeRoute('/unsupported')).toBe(true)
+    expect(isAnalyticsSafeRoute('/health')).toBe(true)
   })
 
   // Same reasoning as /login, one step stronger: /reset-password is where a

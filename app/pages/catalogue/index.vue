@@ -49,9 +49,18 @@
             {{ revision.label ?? $t('catalogue.revision.untitled') }}
           </p>
         </div>
-        <Button v-if="editable" data-testid="catalogue-publish" @click="publishTarget = true">
-          {{ $t('catalogue.revision.publish') }}
-        </Button>
+        <div v-if="editable" class="flex items-center gap-2">
+          <Button
+            variant="outline"
+            data-testid="catalogue-discard-draft"
+            @click="discardTarget = true"
+          >
+            {{ $t('catalogue.revision.discardDraft') }}
+          </Button>
+          <Button data-testid="catalogue-publish" @click="publishTarget = true">
+            {{ $t('catalogue.revision.publish') }}
+          </Button>
+        </div>
         <Button
           v-else
           data-testid="catalogue-create-draft"
@@ -73,6 +82,12 @@
         :kind="createDraftError.kind"
         :text="createDraftError.text"
         test-id="catalogue-create-draft-error"
+      />
+      <FormMessage
+        v-if="discardError"
+        :kind="discardError.kind"
+        :text="discardError.text"
+        test-id="catalogue-discard-error"
       />
     </div>
     <p
@@ -199,6 +214,15 @@
       @confirm="onPublishConfirmed"
       @cancel="publishTarget = false"
     />
+    <ConfirmDialog
+      :open="discardTarget"
+      variant="destructive"
+      :title="$t('catalogue.revision.confirmDiscardTitle')"
+      :description="$t('catalogue.revision.confirmDiscardBody')"
+      :confirm-label="$t('catalogue.revision.discardDraft')"
+      @confirm="onDiscardConfirmed"
+      @cancel="discardTarget = false"
+    />
   </div>
 </template>
 
@@ -281,7 +305,8 @@ useHead({
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 })
 
-const { fetchCurrentRevision, openDraftRevision, publishRevision } = useCatalogue()
+const { fetchCurrentRevision, openDraftRevision, publishRevision, discardDraftRevision } =
+  useCatalogue()
 
 const revision = ref<CatalogueRevision | null>(null)
 const loadError = ref<ReturnType<typeof resolveResourceErrorState> | null>(null)
@@ -296,8 +321,10 @@ const loadError = ref<ReturnType<typeof resolveResourceErrorState> | null>(null)
  */
 const loading = ref(true)
 const publishTarget = ref(false)
+const discardTarget = ref(false)
 const creatingDraft = ref(false)
 const createDraftError = ref<{ kind: FormMessageKind; text: string } | null>(null)
+const discardError = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 /**
  * The server's own answer, never inferred from `state`: `false` for a
@@ -390,6 +417,24 @@ async function onPublishConfirmed(): Promise<void> {
     }
 
     publishError.value = actionErrorMessage(error, t, 'catalogue.revision.publishError')
+  }
+}
+
+/**
+ * Irreversible, same as `onPublishConfirmed` — it destroys unpublished work
+ * rather than shipping it, which is the opposite direction of the same kind
+ * of decision, and the same `ConfirmDialog` gate applies.
+ */
+async function onDiscardConfirmed(): Promise<void> {
+  discardTarget.value = false
+  discardError.value = null
+
+  try {
+    const response = await discardDraftRevision()
+
+    revision.value = response.data
+  } catch (error) {
+    discardError.value = actionErrorMessage(error, t, 'catalogue.revision.discardError')
   }
 }
 

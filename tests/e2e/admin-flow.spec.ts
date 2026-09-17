@@ -5,8 +5,7 @@ import { checkA11y } from './fixtures/a11y'
  * Admin flow: login → participant list → participant detail (task 18.2).
  *
  * The Playwright webServer serves a statically generated SPA with no live
- * backend attached (same documented constraint as unsupported-gate.spec.ts:
- * "No live API in this environment"). API calls are intercepted at the
+ * backend attached — "No live API in this environment". API calls are intercepted at the
  * network layer with fixtures shaped exactly like the real
  * ParticipantResource/ParticipantDetailResource/login response — the
  * contract itself is enforced separately by `bun run codegen:check` (D13)

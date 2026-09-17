@@ -151,8 +151,14 @@
           type="button"
           variant="outline"
           size="sm"
-          :disabled="atCap(group)"
-          :aria-describedby="atCap(group) ? `question-cap-${group.competencyId}` : undefined"
+          :disabled="group.unsaved || atCap(group)"
+          :aria-describedby="
+            group.unsaved
+              ? `question-unsaved-${group.competencyId}`
+              : atCap(group)
+                ? `question-cap-${group.competencyId}`
+                : undefined
+          "
           :data-testid="`question-add-${group.competencyId}`"
           @click="startNew(group.competencyId)"
         >
@@ -160,12 +166,27 @@
         </Button>
 
         <!--
+          Checked FIRST, and mutually exclusive with the cap message below: a
+          competency that is not saved yet cannot also be "at its cap" in any
+          way the operator can act on — save it, THEN it may or may not have
+          room for another question.
+        -->
+        <p
+          v-if="group.unsaved"
+          :id="`question-unsaved-${group.competencyId}`"
+          class="text-muted-foreground mt-1.5 text-xs"
+          :data-testid="`question-unsaved-${group.competencyId}`"
+        >
+          {{ $t('projectQuestions.unsavedCompetency') }}
+        </p>
+
+        <!--
           The reason, next to the disabled control. A button that stops
           responding and says nothing teaches the operator the page is broken;
           the cap is a real limit and it has a number.
         -->
         <p
-          v-if="atCap(group)"
+          v-else-if="atCap(group)"
           :id="`question-cap-${group.competencyId}`"
           class="text-muted-foreground mt-1.5 text-xs"
           :data-testid="`question-cap-${group.competencyId}`"
@@ -239,25 +260,35 @@ import type {
   QuestionEditorSubmission,
 } from '@/types/question-editor'
 
-const props = defineProps<{
-  competencies: QuestionEditorCompetency[]
-  questions: QuestionEditorItem[]
-  /** The interview's language — what the candidate will hear, not the operator's. */
-  locale: string
-  /**
-   * The per-competency maximum, or `null` when there is none to enforce (an
-   * unknown cap, or a surface with genuinely no ceiling — e.g. the catalogue's
-   * own default questions, which `ApplyCompetencySelection` only ever copies
-   * FROM). Either way `null` must never disable Add: a wrongly-disabled button
-   * is a feature the operator simply cannot reach.
-   */
-  cap: number | null
-  saving: boolean
-  /** The raw rejection from the container's last submit attempt, or `null`. */
-  submitError: unknown | null
-  /** No add, edit, reorder or remove control — see `QuestionList`'s own prop. */
-  readonly?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    competencies: QuestionEditorCompetency[]
+    questions: QuestionEditorItem[]
+    /**
+     * Competency ids ticked in the project form but not yet saved.
+     * `CatalogueDefaultQuestionsPanel` never passes this — there is no
+     * "unsaved" concept on the catalogue's own competency set — so it
+     * defaults to none disabled, exactly today's behavior.
+     */
+    unsavedCompetencyIds?: number[]
+    /** The interview's language — what the candidate will hear, not the operator's. */
+    locale: string
+    /**
+     * The per-competency maximum, or `null` when there is none to enforce (an
+     * unknown cap, or a surface with genuinely no ceiling — e.g. the catalogue's
+     * own default questions, which `ApplyCompetencySelection` only ever copies
+     * FROM). Either way `null` must never disable Add: a wrongly-disabled button
+     * is a feature the operator simply cannot reach.
+     */
+    cap: number | null
+    saving: boolean
+    /** The raw rejection from the container's last submit attempt, or `null`. */
+    submitError: unknown | null
+    /** No add, edit, reorder or remove control — see `QuestionList`'s own prop. */
+    readonly?: boolean
+  }>(),
+  { unsavedCompetencyIds: () => [] }
+)
 
 const emit = defineEmits<{
   (e: 'reorder', ids: number[]): void
@@ -393,6 +424,7 @@ const groups = computed(() =>
     competencyId: competency.id,
     label: competency.label,
     questions: props.questions.filter((q) => q.competencyId === competency.id),
+    unsaved: props.unsavedCompetencyIds.includes(competency.id),
   }))
 )
 
@@ -452,6 +484,16 @@ function onSubmit(): void {
 
   if (current === null) return
 
+  // English required, Italian optional, REGARDLESS of `locale` (the
+  // project's own language) — matching StoreProjectQuestionRequest's
+  // identical server-side rule and, more importantly, matching what the
+  // interview actually plays: InterviewController::primaryQuestionsFor()
+  // resolves `text[project.language] ?? text[fallback_locale] ?? <first
+  // non-empty>`, so the PROJECT'S language already wins whenever the
+  // operator wrote it. English here is the guaranteed-non-empty ANCHOR for
+  // the rare case they did not, not a preferred read order — it is what
+  // stops a predefined question from silently vanishing from the interview
+  // rather than what the candidate is meant to hear instead.
   if (current.en.trim() === '') {
     errors.value = { text: t('projectQuestions.textEnRequired') }
 

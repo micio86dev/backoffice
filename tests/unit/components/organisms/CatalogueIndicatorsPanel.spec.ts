@@ -94,7 +94,10 @@ describe('CatalogueIndicatorsPanel', () => {
   })
 
   it('groups indicators by competency, then by role', async () => {
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     const competencyGroup = wrapper.get('[data-testid="indicators-competency-11"]')
@@ -109,7 +112,10 @@ describe('CatalogueIndicatorsPanel', () => {
       data: [indicator({ id: 1, position: 0, text: { en: 'English text', it: 'Testo italiano' } })],
     })
 
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     // The global i18n stub (tests/unit/setup.ts) reports the UI locale as 'it'.
@@ -119,7 +125,10 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('shows a per-competency empty note when it has no indicators yet', async () => {
     listBarsIndicators.mockResolvedValue({ data: [] })
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.get('[data-testid="indicators-competency-11"]').text()).toContain(
@@ -129,7 +138,10 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('shows a placeholder when the open revision has no competencies', async () => {
     listCompetencies.mockResolvedValue({ data: [] })
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.find('[data-testid="indicators-no-competencies"]').exists()).toBe(true)
@@ -137,14 +149,20 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('surfaces a load failure through the shared D4 banner', async () => {
     listCompetencies.mockRejectedValue(Object.assign(new Error('403'), { status: 403 }))
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.get('[data-testid="indicators-load-error"]').text()).toContain('forbidden')
   })
 
   it('disables Move up on the first row and Move down on the last', async () => {
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(
@@ -159,7 +177,10 @@ describe('CatalogueIndicatorsPanel', () => {
   })
 
   it('swaps two rows via a 3-step PATCH dance, never a direct 2-call swap', async () => {
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     await wrapper.get('[data-testid="indicator-move-down-1"]').trigger('click')
@@ -191,7 +212,10 @@ describe('CatalogueIndicatorsPanel', () => {
         })
     )
 
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     const moveDown = wrapper.get('[data-testid="indicator-move-down-1"]')
@@ -227,7 +251,10 @@ describe('CatalogueIndicatorsPanel', () => {
         })
     )
 
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     const moveDown = wrapper.get('[data-testid="indicator-move-down-1"]').element
@@ -245,7 +272,10 @@ describe('CatalogueIndicatorsPanel', () => {
   it('reports a failed reorder and reloads rather than trusting a local rollback', async () => {
     updateBarsIndicator.mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
 
-    const wrapper = mount(CatalogueIndicatorsPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     await wrapper.get('[data-testid="indicator-move-down-1"]').trigger('click')
@@ -259,6 +289,7 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('deletes only after ConfirmDialog confirms, never below 3 client-side', async () => {
     const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -281,6 +312,7 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('opens the create drawer without creating anything yet', async () => {
     const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -300,6 +332,7 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('creates an indicator through the drawer, then reloads and emits refresh-revision', async () => {
     const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -361,6 +394,7 @@ describe('CatalogueIndicatorsPanel', () => {
 
   it('edits an indicator through the drawer', async () => {
     const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -379,5 +413,36 @@ describe('CatalogueIndicatorsPanel', () => {
     ).toBe('First')
 
     wrapper.unmount()
+  })
+})
+
+describe('CatalogueIndicatorsPanel — read-only (published revision)', () => {
+  beforeEach(() => {
+    listCompetencies.mockReset().mockResolvedValue({ data: COMPETENCIES })
+    listRoles.mockReset().mockResolvedValue({ data: ROLES })
+    listBarsIndicators.mockReset().mockResolvedValue({
+      data: [
+        indicator({ id: 1, position: 0, text: { en: 'First' } }),
+        indicator({ id: 2, position: 1, text: { en: 'Second' } }),
+      ],
+    })
+  })
+
+  it('lists the indicators but offers no add, move, edit or delete control', async () => {
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: false },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('First')
+    expect(wrapper.text()).toContain('Second')
+    expect(wrapper.find('[data-testid="indicators-new"]').exists()).toBe(false)
+    for (const id of [1, 2]) {
+      expect(wrapper.find(`[data-testid="indicator-move-up-${id}"]`).exists()).toBe(false)
+      expect(wrapper.find(`[data-testid="indicator-move-down-${id}"]`).exists()).toBe(false)
+      expect(wrapper.find(`[data-testid="indicator-edit-${id}"]`).exists()).toBe(false)
+      expect(wrapper.find(`[data-testid="indicator-delete-${id}"]`).exists()).toBe(false)
+    }
   })
 })

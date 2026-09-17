@@ -35,6 +35,7 @@ describe('HelpSheet', () => {
     ['/settings', 'help.topics.settings.title'],
     ['/participants', 'help.topics.participants.title'],
     ['/avatar-templates', 'help.topics.avatarTemplates.title'],
+    ['/catalogue', 'help.topics.catalogue.title'],
     ['/', 'help.topics.dashboard.title'],
   ])('opens the topic for %s', async (path, expectedTitleKey) => {
     const wrapper = mountAt(path)

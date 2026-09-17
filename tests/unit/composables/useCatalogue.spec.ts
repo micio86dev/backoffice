@@ -29,6 +29,12 @@ describe('useCatalogue', () => {
     expect(apiFetch).toHaveBeenCalledWith('/catalogue/revisions/current')
   })
 
+  it('opens a draft with POST and no body', async () => {
+    await useCatalogue().openDraftRevision()
+
+    expect(apiFetch).toHaveBeenCalledWith('/catalogue/revisions/draft', { method: 'POST' })
+  })
+
   it('publishes with POST and no body', async () => {
     await useCatalogue().publishRevision()
 

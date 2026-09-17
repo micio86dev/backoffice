@@ -29,6 +29,7 @@
       :cap="null"
       :saving="saving"
       :submit-error="submitError"
+      :readonly="!editable"
       @reorder="onReorder"
       @remove="onRemove"
       @submit="onSubmit"
@@ -103,6 +104,11 @@ import type { QuestionEditorCompetency, QuestionEditorSubmission } from '@/types
 // first edit if none is open), so the page's revision header must resync the
 // same way it does for the other three rail sections — gga review finding,
 // this container was the one panel that never emitted it.
+defineProps<{
+  /** See `CatalogueCompetenciesPanel`'s own prop — identical here. */
+  editable: boolean
+}>()
+
 const emit = defineEmits<{ (e: 'refresh-revision'): void }>()
 
 const { listCompetencies } = useCatalogue()

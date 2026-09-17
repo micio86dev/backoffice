@@ -48,7 +48,10 @@ describe('CatalogueCompetenciesPanel', () => {
   })
 
   it('lists competencies with their code, name and type', async () => {
-    const wrapper = mount(CatalogueCompetenciesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.text()).toContain('COL')
@@ -70,7 +73,10 @@ describe('CatalogueCompetenciesPanel', () => {
       ],
     })
 
-    const wrapper = mount(CatalogueCompetenciesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     // The global i18n stub (tests/unit/setup.ts) reports the UI locale as
@@ -85,7 +91,10 @@ describe('CatalogueCompetenciesPanel', () => {
       data: [{ id: 3, code: 'NEW', revision_id: 1, type: 'standard', name: {}, definition: {} }],
     })
 
-    const wrapper = mount(CatalogueCompetenciesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.text()).toContain('catalogue.competencies.table.noName')
@@ -93,7 +102,10 @@ describe('CatalogueCompetenciesPanel', () => {
 
   it('shows the empty-state row when the open revision has no competencies', async () => {
     listCompetencies.mockResolvedValue({ data: [] })
-    const wrapper = mount(CatalogueCompetenciesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.text()).toContain('catalogue.competencies.table.empty')
@@ -101,7 +113,10 @@ describe('CatalogueCompetenciesPanel', () => {
 
   it('surfaces a load failure through the shared D4 banner', async () => {
     listCompetencies.mockRejectedValue(Object.assign(new Error('403'), { status: 403 }))
-    const wrapper = mount(CatalogueCompetenciesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.get('[data-testid="competencies-load-error"]').text()).toContain('forbidden')
@@ -109,6 +124,7 @@ describe('CatalogueCompetenciesPanel', () => {
 
   it('opens the drawer and creates a competency, then reloads and emits refresh-revision', async () => {
     const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -154,6 +170,7 @@ describe('CatalogueCompetenciesPanel', () => {
 
   it('deletes only after ConfirmDialog confirms, never on the first click', async () => {
     const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -178,6 +195,7 @@ describe('CatalogueCompetenciesPanel', () => {
     deleteCompetency.mockRejectedValueOnce(Object.assign(new Error('409'), { status: 409 }))
 
     const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -234,6 +252,7 @@ describe('CatalogueCompetenciesPanel', () => {
     deleteCompetency.mockRejectedValueOnce(Object.assign(new Error('409'), { status: 409 }))
 
     const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -257,5 +276,47 @@ describe('CatalogueCompetenciesPanel', () => {
     ).toContain('errors.states.notReady.message')
 
     wrapper.unmount()
+  })
+})
+
+describe('CatalogueCompetenciesPanel — read-only (published revision)', () => {
+  beforeEach(() => {
+    listCompetencies.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          code: 'COL',
+          revision_id: 1,
+          type: 'standard',
+          name: { en: 'Collaboration' },
+          definition: { en: 'Works well with others.' },
+        },
+      ],
+    })
+  })
+
+  it('lists the rows but offers no add, edit or delete control', async () => {
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: false },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('COL')
+    expect(wrapper.find('[data-testid="competencies-new"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="competency-edit-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="competency-delete-1"]').exists()).toBe(false)
+  })
+
+  it('shows every control once the panel is editable', async () => {
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="competencies-new"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="competency-edit-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="competency-delete-1"]').exists()).toBe(true)
   })
 })

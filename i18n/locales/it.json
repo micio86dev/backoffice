@@ -74,7 +74,6 @@
       "resetPassword": "Scegli una nuova password",
       "participants": "Candidati",
       "participantDetail": "Dettaglio candidato",
-      "unsupported": "Browser non supportato",
       "projects": "Progetti",
       "reports": "Report",
       "settings": "Impostazioni",
@@ -510,10 +509,6 @@
       "evaluation": "Scarica valutazione (JSON)",
       "downloading": "Download in corso…"
     }
-  },
-  "unsupported": {
-    "title": "Browser non supportato",
-    "message": "Questa applicazione richiede un browser desktop supportato (Chrome, Edge, Safari). Per favore accedi da un computer."
   },
   "settings": {
     "title": "Impostazioni",

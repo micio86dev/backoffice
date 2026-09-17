@@ -26,7 +26,6 @@ describe('HealthPage', () => {
     const tMock = vi.fn((key: string) => {
       const translations: Record<string, string> = {
         welcome: 'Benvenuto',
-        'unsupported.title': 'Browser non supportato',
       }
       return translations[key] ?? key
     })

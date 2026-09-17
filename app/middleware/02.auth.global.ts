@@ -1,16 +1,13 @@
 /**
  * 02.auth.global.ts — Auth route guard (D11).
  *
- * Redirects an unauthenticated visitor to /login. Numeric filename prefix
- * (`02.`) makes Nuxt's global-middleware execution order explicit: this runs
- * AFTER `01.browser-gate.global.ts`, so a mobile/unsupported visitor lands on
- * `/unsupported` rather than `/login`.
+ * Redirects an unauthenticated visitor to /login.
  *
- * Belt-and-braces (D11): this middleware ALSO early-returns on `/login` and
- * `/unsupported` directly, regardless of filename ordering — correctness does
- * not depend on execution order alone. Without this, a mobile visitor whose
- * browser-gate check somehow didn't fire first would be redirected to /login
- * instead of /unsupported, breaking SA-11.
+ * The backoffice has NO browser/viewport gate (removed — it blocked mobile,
+ * tablet and Firefox admins from a plain CRUD SPA that needs no camera, no
+ * microphone and no desktop-only capability; that gate belongs to the
+ * candidate-facing `frontend` app, which actually runs the avatar interview
+ * and needs those devices). This file no longer coordinates with one.
  *
  * `/health` is also exempt: it is a machine-readable infra health check
  * (C1), never a gated admin view, and must stay reachable without a session.
@@ -35,13 +32,7 @@ import { useAuth } from '@/composables/useAuth'
  * reached, by definition, by someone with no session — a guard that bounces
  * them to /login is a recovery flow nobody can enter.
  */
-const PUBLIC_ROOTS = new Set([
-  'unsupported',
-  'login',
-  'health',
-  'forgot-password',
-  'reset-password',
-])
+const PUBLIC_ROOTS = new Set(['login', 'health', 'forgot-password', 'reset-password'])
 
 /**
  * The route's own first segment, skipping an `@nuxtjs/i18n` locale prefix.

@@ -1,14 +1,17 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Playwright E2E configuration — 3 required browser projects per D14.
+ * Playwright E2E configuration — 2 required browser projects.
  *
  * Projects:
  *   chromium  — Desktop Chromium, full suite (all E2E specs)
  *   webkit    — Desktop Safari/WebKit, full suite (all E2E specs)
- *   mobile    — Mobile device viewport, SA-11 gate spec ONLY (asserts unsupported-experience)
  *
- * Firefox is intentionally excluded per NFR (product is desktop Chrome/Edge/Safari only).
+ * No mobile project and no Firefox/viewport exclusion here: the backoffice is
+ * a plain admin CRUD SPA with no camera/microphone requirement, so it carries
+ * no browser or viewport gate — unlike the candidate-facing `frontend` app,
+ * which runs the avatar interview and keeps its own SA-11 gate + dedicated
+ * mobile Playwright project for that reason.
  * E2E is a required, blocking tier and must run 100% green (D15).
  * SPA mode (ssr: false): `nuxt generate` → static output served with SPA fallback.
  */
@@ -57,12 +60,6 @@ export default defineConfig({
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
-    },
-    {
-      // SA-11 — mobile viewport: asserts the unsupported-experience gate ONLY.
-      name: 'mobile',
-      use: { ...devices['Pixel 7'] },
-      testMatch: ['**/unsupported-gate.spec.ts'],
     },
   ],
 

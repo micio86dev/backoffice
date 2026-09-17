@@ -74,7 +74,6 @@
       "resetPassword": "Choose a new password",
       "participants": "Candidates",
       "participantDetail": "Candidate detail",
-      "unsupported": "Unsupported browser",
       "projects": "Projects",
       "reports": "Reports",
       "settings": "Settings",
@@ -510,10 +509,6 @@
       "evaluation": "Download evaluation (JSON)",
       "downloading": "Downloading…"
     }
-  },
-  "unsupported": {
-    "title": "Unsupported Browser",
-    "message": "This application requires a supported desktop browser (Chrome, Edge, Safari). Please access from a desktop computer."
   },
   "settings": {
     "title": "Settings",

@@ -61,6 +61,7 @@ async function mountPanel(questions: ReturnType<typeof defaultQuestion>[] = []) 
     await import('../../../../app/components/organisms/CatalogueDefaultQuestionsPanel.vue')
 
   const wrapper = mount(CatalogueDefaultQuestionsPanel, {
+    props: { editable: true },
     global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
     attachTo: document.body,
   })
@@ -437,6 +438,7 @@ describe('CatalogueDefaultQuestionsPanel', () => {
       await import('../../../../app/components/organisms/CatalogueDefaultQuestionsPanel.vue')
 
     const wrapper = mount(CatalogueDefaultQuestionsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
       attachTo: document.body,
     })
@@ -526,6 +528,7 @@ describe('CatalogueDefaultQuestionsPanel', () => {
       await import('../../../../app/components/organisms/CatalogueDefaultQuestionsPanel.vue')
 
     const wrapper = mount(CatalogueDefaultQuestionsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
       attachTo: document.body,
     })
@@ -543,11 +546,41 @@ describe('CatalogueDefaultQuestionsPanel', () => {
       await import('../../../../app/components/organisms/CatalogueDefaultQuestionsPanel.vue')
 
     const wrapper = mount(CatalogueDefaultQuestionsPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
       attachTo: document.body,
     })
     await flushPromises()
 
     expect(wrapper.find('[data-testid="catalogue-default-questions-none"]').exists()).toBe(true)
+  })
+})
+
+describe('CatalogueDefaultQuestionsPanel — read-only (published revision)', () => {
+  it('lists the questions but offers no add, edit, reorder or remove control', async () => {
+    listCompetencies.mockResolvedValue({ data: COMPETENCIES })
+    fetchDefaultQuestions.mockResolvedValue({
+      data: [
+        defaultQuestion({ id: 1, position: 0 }),
+        defaultQuestion({ id: 2, position: 1, text: { en: 'Second.', it: 'Seconda.' } }),
+      ],
+    })
+
+    const { default: CatalogueDefaultQuestionsPanel } =
+      await import('../../../../app/components/organisms/CatalogueDefaultQuestionsPanel.vue')
+
+    const wrapper = mount(CatalogueDefaultQuestionsPanel, {
+      props: { editable: false },
+      global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="question-row-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="question-row-2"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="question-add-11"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="question-edit-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="question-remove-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="question-up-2"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="question-grip-1"]').exists()).toBe(false)
   })
 })

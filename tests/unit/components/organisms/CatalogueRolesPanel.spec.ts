@@ -66,7 +66,10 @@ describe('CatalogueRolesPanel', () => {
   })
 
   it('lists roles with their code and name', async () => {
-    const wrapper = mount(CatalogueRolesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.text()).toContain('ICO')
@@ -74,7 +77,10 @@ describe('CatalogueRolesPanel', () => {
   })
 
   it('names how to reach role→competency assignment rather than a dead-end note', async () => {
-    const wrapper = mount(CatalogueRolesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.get('[data-testid="roles-assignment-note"]').text()).toContain(
@@ -84,6 +90,7 @@ describe('CatalogueRolesPanel', () => {
 
   it('opens the competencies drawer, edits the set and saves it, then reloads', async () => {
     const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -132,7 +139,10 @@ describe('CatalogueRolesPanel', () => {
 
   it('shows the empty-state row when the open revision has no roles', async () => {
     listRoles.mockResolvedValue({ data: [] })
-    const wrapper = mount(CatalogueRolesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.text()).toContain('catalogue.roles.table.empty')
@@ -140,7 +150,10 @@ describe('CatalogueRolesPanel', () => {
 
   it('surfaces a load failure through the shared D4 banner', async () => {
     listRoles.mockRejectedValue(Object.assign(new Error('403'), { status: 403 }))
-    const wrapper = mount(CatalogueRolesPanel, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
     await flushPromises()
 
     expect(wrapper.get('[data-testid="roles-load-error"]').text()).toContain('forbidden')
@@ -148,6 +161,7 @@ describe('CatalogueRolesPanel', () => {
 
   it('opens the drawer and creates a role, then reloads and emits refresh-revision', async () => {
     const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -187,6 +201,7 @@ describe('CatalogueRolesPanel', () => {
 
   it('deletes only after ConfirmDialog confirms, never on the first click', async () => {
     const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
       global: { mocks: { $t: tMock } },
       attachTo: document.body,
     })
@@ -205,5 +220,67 @@ describe('CatalogueRolesPanel', () => {
     expect(deleteRole).toHaveBeenCalledWith(1)
 
     wrapper.unmount()
+  })
+})
+
+describe('CatalogueRolesPanel — read-only (published revision)', () => {
+  beforeEach(() => {
+    listRoles.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          code: 'ICO',
+          revision_id: 1,
+          name: { en: 'Individual Contributor' },
+          responsibilities: {},
+          competency_ids: [22, 11],
+        },
+        {
+          id: 2,
+          code: 'FLL',
+          revision_id: 1,
+          name: { en: 'First Line Leader' },
+          responsibilities: {},
+          competency_ids: [],
+        },
+      ],
+    })
+    listCompetencies.mockReset().mockResolvedValue({
+      data: [
+        { id: 11, code: 'COL', revision_id: 1, type: 'standard', name: {}, definition: {} },
+        { id: 22, code: 'STG', revision_id: 1, type: 'standard', name: {}, definition: {} },
+      ],
+    })
+  })
+
+  it('lists roles with their competency codes in assigned order, and no edit control', async () => {
+    const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: false },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="role-competency-codes-1"]').text()).toBe('STG, COL')
+    expect(wrapper.get('[data-testid="role-competency-codes-2"]').text()).toBe(
+      'catalogue.roles.table.noCompetencies'
+    )
+    expect(wrapper.find('[data-testid="roles-new"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="roles-assignment-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="role-competencies-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="role-edit-1"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="role-delete-1"]').exists()).toBe(false)
+  })
+
+  it('shows the assignment and edit controls once the panel is editable', async () => {
+    const wrapper = mount(CatalogueRolesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="roles-new"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="role-competencies-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="role-edit-1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="role-delete-1"]').exists()).toBe(true)
   })
 })

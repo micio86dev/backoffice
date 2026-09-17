@@ -4,7 +4,7 @@
       <p class="text-muted-foreground text-sm" data-testid="competencies-scope">
         {{ $t('catalogue.competencies.description') }}
       </p>
-      <Button data-testid="competencies-new" @click="editing = 'new'">
+      <Button v-if="editable" data-testid="competencies-new" @click="editing = 'new'">
         {{ $t('catalogue.competencies.new') }}
       </Button>
     </div>
@@ -49,22 +49,24 @@
           </TableCell>
           <TableCell>{{ $t(`catalogue.competencies.typeOption.${competency.type}`) }}</TableCell>
           <TableCell class="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              :data-testid="`competency-edit-${competency.id}`"
-              @click="editing = competency.id"
-            >
-              {{ $t('catalogue.competencies.edit') }}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              :data-testid="`competency-delete-${competency.id}`"
-              @click="deleteTarget = competency"
-            >
-              {{ $t('catalogue.competencies.delete') }}
-            </Button>
+            <template v-if="editable">
+              <Button
+                variant="outline"
+                size="sm"
+                :data-testid="`competency-edit-${competency.id}`"
+                @click="editing = competency.id"
+              >
+                {{ $t('catalogue.competencies.edit') }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                :data-testid="`competency-delete-${competency.id}`"
+                @click="deleteTarget = competency"
+              >
+                {{ $t('catalogue.competencies.delete') }}
+              </Button>
+            </template>
           </TableCell>
         </TableRow>
       </TableBody>
@@ -130,6 +132,15 @@ import { useCatalogue, type CatalogueCompetency } from '@/composables/useCatalog
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { actionErrorMessage } from '@/utils/action-error-message'
 import type { ResourceErrorState } from '@/utils/error-state'
+
+defineProps<{
+  /**
+   * The page's answer from the revision it shows: `false` for the published
+   * revision's read-only view, where every add/edit/delete control is
+   * hidden — those rows' ids are never writable.
+   */
+  editable: boolean
+}>()
 
 const emit = defineEmits<{ (e: 'refresh-revision'): void }>()
 

@@ -4,7 +4,7 @@
       <p class="text-muted-foreground text-sm" data-testid="indicators-scope">
         {{ $t('catalogue.indicators.description') }}
       </p>
-      <Button data-testid="indicators-new" @click="creating = true">
+      <Button v-if="editable" data-testid="indicators-new" @click="creating = true">
         {{ $t('catalogue.indicators.new') }}
       </Button>
     </div>
@@ -56,7 +56,7 @@
               <TableRow v-for="(item, index) in pair.items" :key="item.id">
                 <TableCell class="w-10">{{ item.position }}</TableCell>
                 <TableCell class="max-w-xs truncate">{{ indicatorText(item) }}</TableCell>
-                <TableCell class="flex justify-end gap-1">
+                <TableCell v-if="editable" class="flex justify-end gap-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -163,6 +163,11 @@ import {
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { actionErrorMessage } from '@/utils/action-error-message'
 import type { ResourceErrorState } from '@/utils/error-state'
+
+defineProps<{
+  /** See `CatalogueCompetenciesPanel`'s own prop — identical here. */
+  editable: boolean
+}>()
 
 const emit = defineEmits<{ (e: 'refresh-revision'): void }>()
 

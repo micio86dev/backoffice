@@ -36,7 +36,7 @@
           on an inoperable control is worse than no name.
         -->
         <button
-          v-if="reorderable"
+          v-if="reorderable && !readonly"
           type="button"
           tabindex="-1"
           draggable="true"
@@ -52,7 +52,7 @@
 
         <p class="flex-1 text-sm">{{ display(q) }}</p>
 
-        <div class="flex shrink-0 items-center gap-1">
+        <div v-if="!readonly" class="flex shrink-0 items-center gap-1">
           <!--
             DISABLED at the ends rather than hidden: a control that disappears
             changes the row's width as the list is reordered, and the operator
@@ -138,6 +138,12 @@ const props = defineProps<{
   questions: QuestionListEntry[]
   /** The PROJECT's language — the interview's, not the operator's. */
   locale: string
+  /**
+   * Renders the rows with no grip, move, edit or remove control — for a
+   * list whose content cannot be written (a published catalogue revision).
+   * Hidden rather than disabled: there is no state in which they would work.
+   */
+  readonly?: boolean
 }>()
 
 /**

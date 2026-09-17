@@ -1339,7 +1339,7 @@
   },
   "catalogue": {
     "title": "Catalogue",
-    "intro": "The framework catalogue every project draws from: competencies, roles, BARS indicators and default questions. Edits open a draft revision; publishing freezes it.",
+    "intro": "The framework catalogue every project draws from: competencies, roles, BARS indicators and default questions. The published revision is shown read-only; create a draft to edit it, then publish the draft.",
     "sections": {
       "competencies": "Competencies",
       "competenciesDescription": "The scored competencies, standard and potential.",
@@ -1359,7 +1359,7 @@
       "confirmPublishTitle": "Publish this revision?",
       "confirmPublishBody": "Once published, this revision — and every row in it — becomes permanently frozen. No further edit, addition or removal will be possible; changes after this point require a new draft.",
       "publishError": "Could not publish this revision.",
-      "none": "No revision is open yet.",
+      "none": "No catalogue revision has been published yet.",
       "violationsTitle": "Publish was refused — fix the following before trying again:",
       "violationRule": {
         "roles_closed_set": "Too many roles",
@@ -1371,12 +1371,15 @@
         "standard_indicator_must_have_role": "Standard indicator missing a role",
         "cross_role_duplicate_anchor_new_to_revision": "Duplicate anchor text across roles",
         "revision_already_published": "Already published"
-      }
+      },
+      "createDraft": "Create draft",
+      "createDraftError": "Could not create a draft.",
+      "readOnlyNotice": "This is the published revision, shown read-only. Create a draft to edit it."
     },
     "defaultQuestions": {
       "title": "Default questions",
       "description": "The questions copied into a project the first time it selects each competency. Editing one here never changes a project that already has its own copy.",
-      "noCompetencies": "The open revision has no competencies yet.",
+      "noCompetencies": "This revision has no competencies yet.",
       "reorderError": "Could not finish reordering the questions. The list has been reloaded to show what actually saved.",
       "removeError": "Could not remove the default question."
     },
@@ -1426,7 +1429,7 @@
       "competency_not_found_or_not_standard": "That competency is not a standard competency in the open draft."
     },
     "competencies": {
-      "description": "The scored competencies of the open revision, standard and potential.",
+      "description": "The scored competencies of this revision, standard and potential.",
       "new": "New competency",
       "edit": "Edit",
       "delete": "Delete",
@@ -1444,12 +1447,12 @@
         "name": "Name",
         "type": "Type",
         "actions": "Actions",
-        "empty": "No competencies in the open revision yet.",
+        "empty": "No competencies in this revision yet.",
         "noName": "No name authored yet"
       }
     },
     "roles": {
-      "description": "The five standard assessment roles of the open revision.",
+      "description": "The five standard assessment roles of this revision.",
       "new": "New role",
       "edit": "Edit",
       "delete": "Delete",
@@ -1463,8 +1466,10 @@
         "code": "Code",
         "name": "Name",
         "actions": "Actions",
-        "empty": "No roles in the open revision yet.",
-        "noName": "No name authored yet"
+        "empty": "No roles in this revision yet.",
+        "noName": "No name authored yet",
+        "competencies": "Competencies",
+        "noCompetencies": "None assigned"
       },
       "competencies": {
         "title": "{role} — competencies",
@@ -1493,7 +1498,7 @@
       "deleteError": "Could not delete this indicator.",
       "reorderError": "Could not finish reordering these indicators. The list has been reloaded to show what actually saved.",
       "roleless": "Potential (role-less)",
-      "noCompetencies": "The open revision has no competencies yet.",
+      "noCompetencies": "This revision has no competencies yet.",
       "empty": "No indicators for this pair yet.",
       "competencyLabel": "Competency",
       "roleLabel": "Role",

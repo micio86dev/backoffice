@@ -1339,7 +1339,7 @@
   },
   "catalogue": {
     "title": "Catalogo",
-    "intro": "Il catalogo del framework da cui attinge ogni progetto: competenze, ruoli, indicatori BARS e domande predefinite. Le modifiche aprono una revisione in bozza; la pubblicazione la blocca definitivamente.",
+    "intro": "Il catalogo del framework da cui attinge ogni progetto: competenze, ruoli, indicatori BARS e domande predefinite. La revisione pubblicata è mostrata in sola lettura; crea una bozza per modificarla, poi pubblica la bozza.",
     "sections": {
       "competencies": "Competenze",
       "competenciesDescription": "Le competenze valutate, standard e di potenziale.",
@@ -1359,7 +1359,7 @@
       "confirmPublishTitle": "Pubblicare questa revisione?",
       "confirmPublishBody": "Una volta pubblicata, questa revisione — e ogni sua riga — diventa permanentemente bloccata. Non sarà più possibile modificarla, aggiungere o rimuovere nulla: le modifiche successive richiedono una nuova bozza.",
       "publishError": "Non è stato possibile pubblicare questa revisione.",
-      "none": "Nessuna revisione ancora aperta.",
+      "none": "Nessuna revisione del catalogo è stata ancora pubblicata.",
       "violationsTitle": "Pubblicazione rifiutata — correggere quanto segue prima di riprovare:",
       "violationRule": {
         "roles_closed_set": "Troppi ruoli",
@@ -1371,12 +1371,15 @@
         "standard_indicator_must_have_role": "Indicatore standard senza ruolo",
         "cross_role_duplicate_anchor_new_to_revision": "Testo dell'ancora duplicato tra ruoli",
         "revision_already_published": "Già pubblicata"
-      }
+      },
+      "createDraft": "Crea bozza",
+      "createDraftError": "Impossibile creare una bozza.",
+      "readOnlyNotice": "Questa è la revisione pubblicata, mostrata in sola lettura. Crea una bozza per modificarla."
     },
     "defaultQuestions": {
       "title": "Domande predefinite",
       "description": "Le domande copiate in un progetto la prima volta che seleziona ciascuna competenza. Modificarne una qui non cambia mai un progetto che ha già la propria copia.",
-      "noCompetencies": "La revisione aperta non ha ancora competenze.",
+      "noCompetencies": "Questa revisione non ha ancora competenze.",
       "reorderError": "Non è stato possibile completare il riordino delle domande. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato.",
       "removeError": "Non è stato possibile rimuovere la domanda predefinita."
     },
@@ -1426,7 +1429,7 @@
       "competency_not_found_or_not_standard": "Quella competenza non è una competenza standard della bozza aperta."
     },
     "competencies": {
-      "description": "Le competenze valutate della revisione aperta, standard e di potenziale.",
+      "description": "Le competenze valutate di questa revisione, standard e di potenziale.",
       "new": "Nuova competenza",
       "edit": "Modifica",
       "delete": "Elimina",
@@ -1444,12 +1447,12 @@
         "name": "Nome",
         "type": "Tipo",
         "actions": "Azioni",
-        "empty": "Ancora nessuna competenza nella revisione aperta.",
+        "empty": "Ancora nessuna competenza in questa revisione.",
         "noName": "Nome non ancora redatto"
       }
     },
     "roles": {
-      "description": "I cinque ruoli di valutazione standard della revisione aperta.",
+      "description": "I cinque ruoli di valutazione standard di questa revisione.",
       "new": "Nuovo ruolo",
       "edit": "Modifica",
       "delete": "Elimina",
@@ -1463,8 +1466,10 @@
         "code": "Codice",
         "name": "Nome",
         "actions": "Azioni",
-        "empty": "Ancora nessun ruolo nella revisione aperta.",
-        "noName": "Nome non ancora redatto"
+        "empty": "Ancora nessun ruolo in questa revisione.",
+        "noName": "Nome non ancora redatto",
+        "competencies": "Competenze",
+        "noCompetencies": "Nessuna assegnata"
       },
       "competencies": {
         "title": "{role} — competenze",
@@ -1493,7 +1498,7 @@
       "deleteError": "Non è stato possibile eliminare questo indicatore.",
       "reorderError": "Non è stato possibile completare il riordino di questi indicatori. L'elenco è stato ricaricato per mostrare cosa è stato effettivamente salvato.",
       "roleless": "Potenziale (senza ruolo)",
-      "noCompetencies": "La revisione aperta non ha ancora competenze.",
+      "noCompetencies": "Questa revisione non ha ancora competenze.",
       "empty": "Ancora nessun indicatore per questa coppia.",
       "competencyLabel": "Competenza",
       "roleLabel": "Ruolo",

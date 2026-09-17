@@ -19,11 +19,13 @@ const tMock = (key: string, params?: Record<string, unknown>) =>
 vi.stubGlobal('useI18n', () => realI18n())
 
 const fetchCurrentRevision = vi.fn()
+const openDraftRevision = vi.fn()
 const publishRevision = vi.fn()
 
 vi.mock('../../../../app/composables/useCatalogue', () => ({
   useCatalogue: () => ({
     fetchCurrentRevision,
+    openDraftRevision,
     publishRevision,
     listCompetencies: vi.fn(),
     listRoles: vi.fn(),
@@ -32,13 +34,16 @@ vi.mock('../../../../app/composables/useCatalogue', () => ({
 }))
 
 function revision(overrides: Record<string, unknown> = {}) {
+  const state = overrides.state ?? 'draft'
+
   return {
     id: 1,
-    state: 'draft',
+    state,
     is_baseline: false,
     label: 'September revision',
     published_at: null,
     parent_revision_id: null,
+    editable: state === 'draft',
     ...overrides,
   }
 }
@@ -285,6 +290,119 @@ describe('pages/catalogue/index.vue', () => {
     tab!.element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await flushPromises()
   }
+
+  describe('published revision — read-only view and Create draft', () => {
+    /** Panel stub that surfaces the `editable` prop and its own mount count. */
+    const mounts = { count: 0 }
+    const EditableProbe = {
+      props: { editable: { type: Boolean, required: true } },
+      setup() {
+        mounts.count += 1
+      },
+      template: '<div data-testid="stub-default-questions" :data-editable="String(editable)" />',
+    }
+
+    async function mountWithProbe() {
+      const { default: CataloguePage } = await import('../../../../app/pages/catalogue/index.vue')
+
+      const wrapper = mount(CataloguePage, {
+        global: {
+          mocks: { $t: tMock },
+          stubs: { CatalogueDefaultQuestionsPanel: EditableProbe, ...PR10B_STUBS },
+        },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      return wrapper
+    }
+
+    beforeEach(() => {
+      mounts.count = 0
+    })
+
+    it('shows the published revision read-only, with Create draft instead of Publish', async () => {
+      fetchCurrentRevision.mockResolvedValue({
+        data: revision({ id: 1, state: 'published', is_baseline: true }),
+      })
+      const wrapper = await mountWithProbe()
+
+      expect(wrapper.get('[data-testid="catalogue-revision-state"]').text()).toContain(
+        'catalogue.revision.published'
+      )
+      expect(wrapper.get('[data-testid="catalogue-read-only-notice"]').text()).toContain(
+        'catalogue.revision.readOnlyNotice'
+      )
+      expect(wrapper.find('[data-testid="catalogue-create-draft"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="catalogue-publish"]').exists()).toBe(false)
+      expect(
+        wrapper.get('[data-testid="stub-default-questions"]').attributes('data-editable')
+      ).toBe('false')
+    })
+
+    it('trusts the server editable flag over the state name', async () => {
+      fetchCurrentRevision.mockResolvedValue({
+        data: revision({ state: 'draft', editable: false }),
+      })
+      const wrapper = await mountWithProbe()
+
+      expect(wrapper.find('[data-testid="catalogue-publish"]').exists()).toBe(false)
+      expect(
+        wrapper.get('[data-testid="stub-default-questions"]').attributes('data-editable')
+      ).toBe('false')
+    })
+
+    it('opens a draft, then remounts the panels as editable against it', async () => {
+      fetchCurrentRevision.mockResolvedValue({ data: revision({ id: 1, state: 'published' }) })
+      openDraftRevision.mockResolvedValue({
+        data: revision({ id: 2, state: 'draft', parent_revision_id: 1 }),
+      })
+      const wrapper = await mountWithProbe()
+
+      const mountsBefore = mounts.count
+
+      await wrapper.get('[data-testid="catalogue-create-draft"]').trigger('click')
+      await flushPromises()
+
+      expect(openDraftRevision).toHaveBeenCalledOnce()
+      expect(wrapper.get('[data-testid="catalogue-revision-state"]').text()).toContain(
+        'catalogue.revision.draft'
+      )
+      expect(wrapper.find('[data-testid="catalogue-publish"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="catalogue-read-only-notice"]').exists()).toBe(false)
+      // A fresh mount, so the panel reloads the draft's own row ids.
+      expect(mounts.count).toBeGreaterThan(mountsBefore)
+      expect(
+        wrapper.get('[data-testid="stub-default-questions"]').attributes('data-editable')
+      ).toBe('true')
+    })
+
+    it('keeps the read-only view and reports a failed Create draft through D4', async () => {
+      fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'published' }) })
+      openDraftRevision.mockRejectedValue(Object.assign(new Error('409'), { status: 409 }))
+      const wrapper = await mountWithProbe()
+
+      await wrapper.get('[data-testid="catalogue-create-draft"]').trigger('click')
+      await flushPromises()
+
+      const banner = wrapper
+        .findAllComponents({ name: 'FormMessage' })
+        .find((component) => component.attributes('data-testid') === 'catalogue-create-draft-error')
+
+      expect(banner?.props('kind')).toBe('waiting')
+      expect(wrapper.find('[data-testid="catalogue-publish"]').exists()).toBe(false)
+      expect(
+        wrapper.get('[data-testid="stub-default-questions"]').attributes('data-editable')
+      ).toBe('false')
+    })
+
+    it('mounts no panel before the first revision read settles', async () => {
+      fetchCurrentRevision.mockReturnValue(new Promise(() => {}))
+      const wrapper = await mountWithProbe()
+
+      expect(wrapper.find('[data-testid="stub-default-questions"]').exists()).toBe(false)
+    })
+  })
 
   // framework-catalogue-authoring PR10b, task 39b.5: the three placeholder
   // rail sections above now mount the real panels, and a publish 422

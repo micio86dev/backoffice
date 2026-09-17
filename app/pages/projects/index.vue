@@ -62,6 +62,7 @@
         <ProjectQuestionsPanel
           :project-id="editingProject.id"
           :competencies="panelCompetencies"
+          :unsaved-competency-ids="unsavedCompetencyIds"
           :locale="editingProject.language"
         />
 
@@ -95,8 +96,8 @@
 
             <FormMessage
               v-if="deleteError"
-              kind="error"
-              :text="deleteError"
+              :kind="deleteError.kind"
+              :text="deleteError.text"
               test-id="project-delete-error"
             />
           </div>
@@ -128,8 +129,9 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
-import FormMessage from '@/components/molecules/FormMessage.vue'
+import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { getErrorStatus } from '@/utils/http-error'
+import { actionErrorMessage } from '@/utils/action-error-message'
 import { Separator } from '@/components/ui/separator'
 import ProjectTable from '@/components/organisms/ProjectTable.vue'
 import { useProjects, type Project } from '@/composables/useProjects'
@@ -226,6 +228,24 @@ const panelCompetencies = computed(
 )
 
 /**
+ * Which of `panelCompetencies` the server does NOT know about yet.
+ *
+ * Exactly the gap that let an operator open the question editor for a
+ * competency they had just ticked but never saved: the panel shows it (by
+ * design, above), but `project_competencies` has no row for it until the
+ * form is actually submitted, so a question submitted against it 422s with
+ * `competency_invalid` — true, but confusing, since the operator can see the
+ * competency right there. Empty whenever `liveCompetencies` is null: the
+ * panel is then showing the persisted set itself, so nothing in it can be
+ * "unsaved".
+ */
+const unsavedCompetencyIds = computed(() => {
+  const persistedIds = new Set((editingProject.value?.competencies ?? []).map((c) => c.id))
+
+  return panelCompetencies.value.filter((c) => !persistedIds.has(c.id)).map((c) => c.id)
+})
+
+/**
  * Closing forgets the form's published set.
  *
  * It is scoped to the project that published it; leaving it behind means
@@ -240,7 +260,7 @@ function closeDrawer(): void {
 
 const confirmingDelete = ref(false)
 const deleting = ref(false)
-const deleteError = ref<string | null>(null)
+const deleteError = ref<{ kind: FormMessageKind; text: string } | null>(null)
 
 /**
  * Delete, then close and reload.
@@ -264,11 +284,16 @@ async function onDeleteConfirmed(): Promise<void> {
     closeDrawer()
     await load()
   } catch (error) {
-    // The 409 the endpoint answers while a project is live has its own
-    // sentence. Anything else gets the generic one, because there is nothing
-    // more specific that is also true.
+    // The 409 the endpoint answers while a project is live has its own,
+    // more specific sentence than the generic D4 "not ready yet" copy — kept
+    // as a bespoke case. Everything else (403, 404, a dead network) goes
+    // through the shared mapper instead of collapsing into one fallback: a
+    // permission refusal and a vanished project are different outcomes and
+    // must not read the same.
     deleteError.value =
-      getErrorStatus(error) === 409 ? t('projects.delete.stillActive') : t('projects.delete.error')
+      getErrorStatus(error) === 409
+        ? { kind: 'waiting', text: t('projects.delete.stillActive') }
+        : actionErrorMessage(error, t, 'projects.delete.error')
   } finally {
     deleting.value = false
   }

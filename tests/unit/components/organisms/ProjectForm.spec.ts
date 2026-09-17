@@ -25,6 +25,7 @@ const updateProjectMock = vi.fn()
 const fetchRoleCompetenciesMock = vi.fn()
 const fetchPotentialCompetenciesMock = vi.fn()
 const listTemplatesMock = vi.fn()
+const listVersionsMock = vi.fn()
 
 vi.mock('../../../../app/composables/useProjects', () => ({
   useProjects: () => ({ createProject: createProjectMock, updateProject: updateProjectMock }),
@@ -39,6 +40,10 @@ vi.mock('../../../../app/composables/useFrameworkRoles', () => ({
 
 vi.mock('../../../../app/composables/useAvatarTemplates', () => ({
   useAvatarTemplates: () => ({ listTemplateOptions: listTemplatesMock }),
+}))
+
+vi.mock('../../../../app/composables/useFrameworkVersions', () => ({
+  useFrameworkVersions: () => ({ listVersions: listVersionsMock }),
 }))
 
 const ProjectForm = (await import('../../../../app/components/organisms/ProjectForm.vue')).default
@@ -88,14 +93,32 @@ describe('ProjectForm', () => {
     listTemplatesMock.mockReset().mockResolvedValue({
       data: [{ id: 7, name: 'Default template', provider: 'heygen', is_active: true }],
     })
+    // At least one version, ALWAYS, same reasoning as the template list above
+    // — id 1, matching every `.setValue('1')` call in this file. Tests about
+    // an EMPTY version list (no org versions to pin) override this locally.
+    listVersionsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          organization_id: 1,
+          version: 'v1.0',
+          label: 'Initial',
+          is_locked: false,
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    })
   })
 
   describe('the framework pin is a required field with a control', () => {
-    it('refuses a blank pin on create, on the FIELD', async () => {
-      // `frameworkVersionId` starts as `''` and `Number('')` is `0`, so a blank
-      // required field shipped as a valid-looking integer. The server refused
-      // it, the key was excluded from the field map, and the refusal collapsed
-      // to "could not save" with nothing highlighted.
+    it('refuses a blank pin on create when the org has no framework version, on the FIELD', async () => {
+      // No versions to choose from means no default to pre-select either — the
+      // select stays empty, and the server refused it before this select
+      // existed at all: the key was excluded from the field map, and the
+      // refusal collapsed to "could not save" with nothing highlighted.
+      listVersionsMock.mockReset().mockResolvedValue({ data: [] })
+
       const wrapper = mount(ProjectForm, {
         props: { project: null },
         global: { mocks: { $t: tMock } },
@@ -151,6 +174,126 @@ describe('ProjectForm', () => {
     })
   })
 
+  /**
+   * Per-project framework version pin.
+   *
+   * Before this control existed the operator typed a raw database id into a
+   * bare number field, with nothing on screen telling them which ids were
+   * valid for their organization — the exact avatar-template picker mistake
+   * this endpoint was already meant to fix.
+   */
+  describe('framework version selection', () => {
+    it('offers every version, and pre-selects the one the project pinned', async () => {
+      listVersionsMock.mockResolvedValue({
+        data: [
+          {
+            id: 3,
+            organization_id: 1,
+            version: 'v1.0',
+            label: 'Initial',
+            is_locked: true,
+            created_at: null,
+            updated_at: null,
+          },
+          {
+            id: 4,
+            organization_id: 1,
+            version: 'v2.0',
+            label: null,
+            is_locked: false,
+            created_at: null,
+            updated_at: null,
+          },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ framework_version_id: 4 }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      const select = wrapper.get('[data-testid="project-form-framework-version"]')
+      expect((select.element as HTMLSelectElement).value).toBe('4')
+      expect(select.findAll('option')).toHaveLength(2)
+    })
+
+    it('pre-selects the first version when creating, without overriding an explicit choice', async () => {
+      listVersionsMock.mockResolvedValue({
+        data: [
+          {
+            id: 5,
+            organization_id: 1,
+            version: 'v1.0',
+            label: 'Only version',
+            is_locked: false,
+            created_at: null,
+            updated_at: null,
+          },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        (wrapper.get('[data-testid="project-form-framework-version"]').element as HTMLSelectElement)
+          .value
+      ).toBe('5')
+    })
+
+    it('sends the pinned version on create', async () => {
+      listVersionsMock.mockResolvedValue({
+        data: [
+          {
+            id: 6,
+            organization_id: 1,
+            version: 'v1.0',
+            label: null,
+            is_locked: false,
+            created_at: null,
+            updated_at: null,
+          },
+        ],
+      })
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+      await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+      await wrapper
+        .get('[data-testid="project-form-assessment-type"] button:last-child')
+        .trigger('click')
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+
+      expect(createProjectMock).toHaveBeenCalledWith(
+        expect.objectContaining({ framework_version_id: 6 })
+      )
+    })
+
+    it('says a failed framework-version load FAILED', async () => {
+      listVersionsMock.mockReset().mockRejectedValue(new Error('network down'))
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      expect(
+        wrapper.get('[data-testid="project-form-framework-version-load-error"]').text()
+      ).toContain('projects.form.frameworkVersionsLoadError')
+    })
+  })
+
   describe('the form-level refusal code', () => {
     it('translates POTENTIAL_CATALOG_INCOMPLETE rather than printing the token', async () => {
       // The one 422 no control on this form can fix, and the only path here
@@ -184,6 +327,57 @@ describe('ProjectForm', () => {
 
       expect(banner).toContain('projects.form.serverError.POTENTIAL_CATALOG_INCOMPLETE')
       expect(banner).not.toBe('POTENTIAL_CATALOG_INCOMPLETE')
+    })
+
+    it('renders a bodiless 409 as waiting, never in the same red as a real validation error', async () => {
+      // A 409 (e.g. a concurrent write) is temporal and self-resolving — the
+      // same distinction ProjectQuestionsPanel/QuestionListEditor and
+      // catalogue/index.vue already draw for the identical rejection shape.
+      createProjectMock.mockRejectedValue(Object.assign(new Error('409'), { status: 409 }))
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+      await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+      await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
+      await wrapper
+        .get('[data-testid="project-form-assessment-type"] button:last-child')
+        .trigger('click')
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+
+      const banner = wrapper.get('[data-testid="project-form-banner"]').text()
+
+      expect(banner).toContain('errors.states.notReady.message')
+      expect(banner).not.toContain('projects.form.saveError')
+    })
+
+    it('renders a bodiless 403 as forbidden, not as the generic save-error fallback', async () => {
+      createProjectMock.mockRejectedValue(Object.assign(new Error('403'), { status: 403 }))
+
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+      await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+      await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
+      await wrapper
+        .get('[data-testid="project-form-assessment-type"] button:last-child')
+        .trigger('click')
+      await wrapper.get('[data-testid="project-form"]').trigger('submit')
+      await flushPromises()
+
+      const banner = wrapper.get('[data-testid="project-form-banner"]').text()
+
+      expect(banner).toContain('errors.states.forbidden.message')
+      expect(banner).not.toContain('projects.form.saveError')
     })
   })
 
@@ -846,6 +1040,7 @@ describe('ProjectForm — field help (D6)', () => {
     ['project-form-nudge-min-chars', 'projects.form.help.nudgeMinChars'],
     ['project-form-exit-redirect-url', 'projects.form.help.exitRedirectUrl'],
     ['project-form-webhook-url', 'projects.form.help.webhookUrl'],
+    ['project-form-assessment-type', 'projects.form.help.assessmentTypeFreezes'],
   ])("%s renders and is pointed at by its control's aria-describedby", async (testId, helpKey) => {
     const wrapper = mount(ProjectForm, {
       props: { project: activeProject({ status: 'draft' }) },
@@ -913,6 +1108,33 @@ describe('ProjectForm — field help (D6)', () => {
 
     expect(wrapper.text()).toContain('projects.form.help.competencies')
   })
+
+  // Rendered but never referenced was exactly the framework-version bug this
+  // whole describe block exists to prevent — the immutability notice on a
+  // LIVE project is the one case both assessment_type and role_code only
+  // render conditionally, so it needs its own assertion beyond the it.each
+  // above (which covers the always-rendered help text on a draft).
+  it.each([
+    ['project-form-assessment-type', 'project-form-assessment-type-immutable'],
+    ['project-form-role-code', 'project-form-role-code-immutable'],
+  ])(
+    "%s's immutability notice on a live project is referenced by its aria-describedby",
+    async (testId, immutableId) => {
+      const wrapper = mount(ProjectForm, {
+        props: { project: activeProject({ status: 'active' }) },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      const notice = wrapper.find(`#${immutableId}`)
+      expect(notice.exists()).toBe(true)
+      expect(notice.text()).toBe('projects.form.immutableWhenLive')
+
+      const control = wrapper.get(`[data-testid="${testId}"]`)
+      const describedIds = (control.attributes('aria-describedby') ?? '').split(/\s+/)
+      expect(describedIds).toContain(immutableId)
+    }
+  )
 })
 
 // bars-coverage-visibility Phase 1 (design D2 "scope finding"): competencyIds

@@ -33,6 +33,9 @@ export type CatalogueRevision = NonNullable<CatalogueRevisionResponse['data']>
 export type OpenDraftRevisionResponse =
   paths['/catalogue/revisions/draft']['post']['responses']['200']['content']['application/json']
 
+export type DiscardDraftRevisionResponse =
+  paths['/catalogue/revisions/draft']['delete']['responses']['200']['content']['application/json']
+
 export type PublishRevisionResponse =
   paths['/catalogue/revisions/publish']['post']['responses']['200']['content']['application/json']
 export type PublishRevisionViolationsResponse =
@@ -103,6 +106,17 @@ export function useCatalogue() {
    */
   async function publishRevision(): Promise<PublishRevisionResponse> {
     return apiFetch<PublishRevisionResponse>('/catalogue/revisions/publish', { method: 'POST' })
+  }
+
+  /**
+   * Abandon the open draft entirely — every uncommitted role, competency,
+   * BARS indicator and default question it holds. Irreversible, same as
+   * `publishRevision`, but the opposite direction: nothing is kept.
+   */
+  async function discardDraftRevision(): Promise<DiscardDraftRevisionResponse> {
+    return apiFetch<DiscardDraftRevisionResponse>('/catalogue/revisions/draft', {
+      method: 'DELETE',
+    })
   }
 
   async function listCompetencies(): Promise<CatalogueCompetenciesResponse> {
@@ -202,6 +216,7 @@ export function useCatalogue() {
     fetchCurrentRevision,
     openDraftRevision,
     publishRevision,
+    discardDraftRevision,
     listCompetencies,
     createCompetency,
     updateCompetency,

@@ -1664,7 +1664,17 @@ export interface paths {
          *     `404` when no published revision exists to clone from.
          */
         post: operations["revision.openDraft"];
-        delete?: never;
+        /**
+         * Abandons the open draft entirely — every uncommitted role, competency,
+         *     BARS indicator and default question it holds. The catalogue reverts to
+         *     showing the latest PUBLISHED revision, read-only, exactly the state it
+         *     was in before `openDraft()` was ever called
+         * @description `404` when no draft is open — nothing to discard. `409` when a
+         *     concurrent write or publish raced this request for the revision lock
+         *     (`RevisionPublishedDuringWriteException`, same contract every other
+         *     catalogue write already answers with).
+         */
+        delete: operations["revision.discard"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6676,6 +6686,69 @@ export interface operations {
                          * @description Error overview.
                          * @example
                          */
+                        message: string;
+                    };
+                };
+            };
+        };
+    };
+    "revision.discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CatalogueRevisionResource"] | null;
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
+            /** @description An error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example no open draft revision to discard
+                         */
+                        message: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
                         message: string;
                     };
                 };

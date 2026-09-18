@@ -508,6 +508,46 @@
       "transcript": "Download transcript",
       "evaluation": "Download evaluation (JSON)",
       "downloading": "Downloading…"
+    },
+    "audit": {
+      "flag": {
+        "judged": "Evidence reviewed",
+        "unavailable": "Could not be reviewed",
+        "malformed": "Could not be reviewed",
+        "skipped": "Not reviewed — no evidence to check",
+        "neverAudited": "Not audited yet",
+        "unknown": "Unrecognised review status"
+      },
+      "reason": {
+        "unassessable_by_construction": "There was no evidence for this indicator, so there was nothing to review.",
+        "assessed_without_excerpts": "The score was given without any quoted evidence, so there was nothing to review.",
+        "judge_unreachable": "The review service could not be reached.",
+        "judge_http_error": "The review service returned an error.",
+        "judge_timeout": "The review service did not respond in time.",
+        "verdict_missing": "The review service did not answer for this indicator.",
+        "verdict_unparseable": "The review service's answer could not be read.",
+        "probability_out_of_domain": "The review service returned an invalid value.",
+        "unknown": "Not reviewed — unrecognised reason."
+      },
+      "refusal": {
+        "audit_disabled": "Audit reviews are currently disabled for this platform.",
+        "audit_already_running": "An audit review is already in progress for this evaluation.",
+        "audit_lock_unavailable": "The audit review could not be started right now. Please try again shortly.",
+        "lifecycle_not_ready": "This evaluation is not ready to be reviewed yet.",
+        "forbidden": "Only administrators may request an audit review.",
+        "unknown": "The audit review could not be started. Please try again."
+      },
+      "panel": {
+        "trigger": "Request an audit review",
+        "triggering": "Requesting…",
+        "inProgress": "Audit review in progress",
+        "status": {
+          "completed": "Audit review complete",
+          "partial": "Audit review complete — some indicators could not be reviewed",
+          "failed": "Audit review could not be completed"
+        },
+        "provenance": "Reviewed with {model}, question set {promptVersion}"
+      }
     }
   },
   "settings": {

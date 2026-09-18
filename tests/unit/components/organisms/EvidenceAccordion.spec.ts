@@ -19,6 +19,14 @@ import type { EvaluationReportData } from '../../../../app/composables/useEvalua
 
 const tMock = (key: string) => key
 
+// scoring-audit-jev P6 — `behaviors[].audit` is ADDITIVE ONLY and NEVER a
+// missing key on the real API response (design D9).
+const NEVER_AUDITED = {
+  status: 'never_audited' as const,
+  support_probability: null,
+  outcome_reason: null,
+}
+
 const SLF_FIXTURE: EvaluationReportData = {
   SLF: {
     score: 4.0,
@@ -30,6 +38,7 @@ const SLF_FIXTURE: EvaluationReportData = {
         explanation: 'Clear and engaging description.',
         excerpts: ['Durante un pranzo tra colleghi ho dovuto...'],
         unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Link own arguments to customer needs',
@@ -37,6 +46,7 @@ const SLF_FIXTURE: EvaluationReportData = {
         explanation: 'Solid but improvable.',
         excerpts: ['avevamo parlato direttamente con dei potenziali clienti...'],
         unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Negotiate to reach solutions',
@@ -44,6 +54,7 @@ const SLF_FIXTURE: EvaluationReportData = {
         explanation: '',
         excerpts: [],
         unassessable_reason: 'model_declared',
+        audit: NEVER_AUDITED,
       },
     ],
     unscorable_reason: null,

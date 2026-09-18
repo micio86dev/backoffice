@@ -87,14 +87,42 @@ describe('pages/participants/[id].vue', () => {
 
   // --- BARS report section + downloads (PR B3, task 21.2 support) --------
 
+  // scoring-audit-jev P6 — `behaviors[].audit` is ADDITIVE ONLY and NEVER a
+  // missing key on the real API response (design D9), so every fixture
+  // behavior carries the serializer-only synthetic `never_audited` status,
+  // matching what an evaluation that has never been audited actually renders.
+  const NEVER_AUDITED_AUDIT_FIXTURE = {
+    status: 'never_audited' as const,
+    support_probability: null,
+    outcome_reason: null,
+  }
+
   const EVALUATION_DATA_FIXTURE = {
     SLF: {
       score: 4,
       reliability: '67%',
       behaviors: [
-        { indicator: 'a', score: 5, explanation: 'x', excerpts: ['ex1'] },
-        { indicator: 'b', score: 3, explanation: 'y', excerpts: ['ex2'] },
-        { indicator: 'c', score: null, explanation: 'z', excerpts: [] },
+        {
+          indicator: 'a',
+          score: 5,
+          explanation: 'x',
+          excerpts: ['ex1'],
+          audit: NEVER_AUDITED_AUDIT_FIXTURE,
+        },
+        {
+          indicator: 'b',
+          score: 3,
+          explanation: 'y',
+          excerpts: ['ex2'],
+          audit: NEVER_AUDITED_AUDIT_FIXTURE,
+        },
+        {
+          indicator: 'c',
+          score: null,
+          explanation: 'z',
+          excerpts: [],
+          audit: NEVER_AUDITED_AUDIT_FIXTURE,
+        },
       ],
     },
   }
@@ -106,7 +134,15 @@ describe('pages/participants/[id].vue', () => {
     framework_version: '1.4.0',
   }
 
-  const EVALUATION_FIXTURE = { data: EVALUATION_DATA_FIXTURE, meta: EVALUATION_META_FIXTURE }
+  // scoring-audit-jev P6 — `meta.audit`/`auditMeta` is `null` for an
+  // evaluation that has never been audited (design D9's own documented
+  // asymmetry: unlike `behaviors[].audit`, `meta.audit` legitimately renders
+  // `null` rather than a synthetic value).
+  const EVALUATION_FIXTURE = {
+    data: EVALUATION_DATA_FIXTURE,
+    meta: EVALUATION_META_FIXTURE,
+    auditMeta: null,
+  }
 
   // operator-participant-visibility PR4, D2/D7: fetched ONLY when the
   // client-side mirror (isParticipantResourceReady(status, 'transcript'))

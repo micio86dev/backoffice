@@ -16,9 +16,17 @@ import { mount } from '@vue/test-utils'
 import { h } from 'vue'
 import { Accordion } from '../../../../app/components/ui/accordion'
 import IndicatorEvidence from '../../../../app/components/molecules/IndicatorEvidence.vue'
+import ScoreChip from '../../../../app/components/atoms/ScoreChip.vue'
+import AuditFlag from '../../../../app/components/atoms/AuditFlag.vue'
 import type { EvaluationBehavior } from '../../../../app/composables/useEvaluationReport'
 
 const tMock = (key: string) => key
+
+const NEVER_AUDITED_AUDIT = {
+  status: 'never_audited',
+  support_probability: null,
+  outcome_reason: null,
+} as const
 
 const SCORED: EvaluationBehavior = {
   indicator: 'Describe products and services accurately',
@@ -26,6 +34,7 @@ const SCORED: EvaluationBehavior = {
   explanation: 'Clear and engaging description.',
   excerpts: ['Durante un pranzo tra colleghi ho dovuto...'],
   unassessable_reason: null,
+  audit: NEVER_AUDITED_AUDIT,
 }
 
 const UNASSESSABLE: EvaluationBehavior = {
@@ -34,6 +43,14 @@ const UNASSESSABLE: EvaluationBehavior = {
   explanation: '',
   excerpts: [],
   unassessable_reason: 'model_declared',
+  audit: NEVER_AUDITED_AUDIT,
+}
+
+// scoring-audit-jev P6.8 — a `judged` verdict, same score as SCORED, so the
+// paired test below can prove ScoreChip's OWN output does not change.
+const AUDITED: EvaluationBehavior = {
+  ...SCORED,
+  audit: { status: 'judged', support_probability: 0.82, outcome_reason: null },
 }
 
 function mountItem(behavior: EvaluationBehavior, open = false) {
@@ -106,6 +123,54 @@ describe('IndicatorEvidence', () => {
   it('says plainly that an indicator produced no excerpts rather than opening onto nothing', () => {
     expect(mountItem(UNASSESSABLE, true).find('[role="region"]').text()).toContain(
       'report.excerpts.empty'
+    )
+  })
+})
+
+// scoring-audit-jev P6.8/P6.9 (admin-backoffice spec — "A Net-New
+// Review-Status Element Renders Per-Indicator Audit Signal — ScoreChip
+// Stays Score-Only"): <AuditFlag> renders BESIDE — not inside — <ScoreChip>,
+// and ScoreChip's own output is byte-identical for an audited vs.
+// never-audited indicator carrying the same score.
+describe('IndicatorEvidence — the audit signal is a distinct element beside the score chip', () => {
+  it('renders AuditFlag on the trigger, alongside ScoreChip', () => {
+    const trigger = mountItem(AUDITED).find('button')
+
+    expect(trigger.findComponent(AuditFlag).exists()).toBe(true)
+    expect(trigger.findComponent(ScoreChip).exists()).toBe(true)
+  })
+
+  it("ScoreChip's own output is byte-identical for an audited vs. never-audited indicator with the same score — AuditFlag receives no audit-derived prop", () => {
+    const auditedScoreChip = mountItem(AUDITED).findComponent(ScoreChip).html()
+    const neverAuditedScoreChip = mountItem(SCORED).findComponent(ScoreChip).html()
+
+    expect(auditedScoreChip).toBe(neverAuditedScoreChip)
+  })
+
+  // scoring-audit-jev P6.19/P6.20 — the UI-layer mirror of design D9/AD-7's
+  // "full report and session-review view emit a byte-identical audit object
+  // for the same indicator" (asserted api-side in
+  // `AdminEvaluationSerializerAuditTest.php`, single shaper). The backoffice
+  // has exactly ONE Vue component that renders `EvaluationBehavior.audit` —
+  // this one, consumed today only via `EvidenceAccordion`/`EvaluationReport`
+  // (the full report). No separate session-review surface currently
+  // consumes per-indicator evidence on the frontend
+  // (`useSessionReview.ts`/`SessionReviewPanel.vue` render integrity/cost
+  // data only, not `behaviors[]`) — so the cross-view guarantee reduces,
+  // honestly, to: IndicatorEvidence is a PURE function of its `behavior`
+  // prop, and therefore renders the identical audit signal for the identical
+  // indicator regardless of which route/container passes it in. This test
+  // pins that purity directly, which is what makes the invariant hold for
+  // any future second caller without further wiring.
+  it('renders the identical audit signal for the identical indicator regardless of the mounting context (purity — the cross-view invariant)', () => {
+    const fullReportMount = mountItem(AUDITED, true)
+    // A second, independent Accordion root — standing in for a hypothetical
+    // second container/route, since IndicatorEvidence always needs an
+    // Accordion ancestor (reka-ui injection) regardless of which page mounts it.
+    const sessionReviewMount = mountItem(AUDITED, true)
+
+    expect(fullReportMount.findComponent(AuditFlag).html()).toBe(
+      sessionReviewMount.findComponent(AuditFlag).html()
     )
   })
 })

@@ -78,6 +78,11 @@ const SCORING_META = {
   framework_version: '1.4.0',
 }
 
+// scoring-audit-jev P6 — `behaviors[].audit` is ADDITIVE ONLY and NEVER a
+// missing key on the real API response (design D9); every fixture behavior
+// carries the serializer-only synthetic `never_audited` status.
+const NEVER_AUDITED = { status: 'never_audited', support_probability: null, outcome_reason: null }
+
 const EVALUATION_REPORT = {
   SLF: {
     score: 4.0,
@@ -92,18 +97,24 @@ const EVALUATION_REPORT = {
         score: 5,
         explanation: 'Clear and engaging description of the product.',
         excerpts: ['Durante un pranzo tra colleghi ho dovuto illustrare...'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Link own arguments to customer needs and priorities',
         score: 3,
         explanation: 'Solid but improvable link to customer needs.',
         excerpts: ['avevamo parlato direttamente con dei potenziali clienti...'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Negotiate to reach solutions that meet the primary interests of customers',
         score: null,
         explanation: 'No relevant example provided; unassessable.',
         excerpts: [],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
     ],
   },
@@ -117,14 +128,25 @@ const EVALUATION_REPORT = {
         score: 5,
         explanation: 'x',
         excerpts: ['e1'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Keep people interested when speaking',
         score: 3,
         explanation: 'y',
         excerpts: ['e2'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
-      { indicator: 'Speak effectively in a group', score: 3, explanation: 'z', excerpts: ['e3'] },
+      {
+        indicator: 'Speak effectively in a group',
+        score: 3,
+        explanation: 'z',
+        excerpts: ['e3'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
+      },
     ],
   },
 }
@@ -214,7 +236,8 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
     // report at all, and every assertion below fails with "table not found" —
     // which reads as a UI regression rather than a stale fixture. That is what
     // it did from 2026-08-24 until this was fixed.
-    (route) => jsonRoute(route, { data: EVALUATION_REPORT, meta: { scoring: SCORING_META } })
+    (route) =>
+      jsonRoute(route, { data: EVALUATION_REPORT, meta: { scoring: SCORING_META, audit: null } })
   )
   await page.route(
     (url) => url.pathname === '/participants/1/transcript/download',

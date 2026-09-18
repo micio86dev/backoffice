@@ -140,6 +140,43 @@ const CATALOGUE_HELP_KEY_PATHS = [
   'catalogue.roles.table.noCompetencies',
 ]
 
+// scoring-audit-jev P6.16/P6.17 — every en/it string introduced for the
+// audit capability (admin-backoffice spec "Audit Copy Names the Signal
+// Advisory and Never Instructs a Score Change"), authored per-locale rather
+// than machine-translated. Derived from `AuditFlag.vue`, `useEvaluationAudit.ts`
+// and `EvaluationAuditPanel.vue`'s own key lookups, so a key one of them
+// reads without matching copy in either locale fails here.
+const AUDIT_KEY_PATHS = [
+  'report.audit.flag.judged',
+  'report.audit.flag.unavailable',
+  'report.audit.flag.malformed',
+  'report.audit.flag.skipped',
+  'report.audit.flag.neverAudited',
+  'report.audit.flag.unknown',
+  'report.audit.reason.unassessable_by_construction',
+  'report.audit.reason.assessed_without_excerpts',
+  'report.audit.reason.judge_unreachable',
+  'report.audit.reason.judge_http_error',
+  'report.audit.reason.judge_timeout',
+  'report.audit.reason.verdict_missing',
+  'report.audit.reason.verdict_unparseable',
+  'report.audit.reason.probability_out_of_domain',
+  'report.audit.reason.unknown',
+  'report.audit.refusal.audit_disabled',
+  'report.audit.refusal.audit_already_running',
+  'report.audit.refusal.audit_lock_unavailable',
+  'report.audit.refusal.lifecycle_not_ready',
+  'report.audit.refusal.forbidden',
+  'report.audit.refusal.unknown',
+  'report.audit.panel.trigger',
+  'report.audit.panel.triggering',
+  'report.audit.panel.inProgress',
+  'report.audit.panel.status.completed',
+  'report.audit.panel.status.partial',
+  'report.audit.panel.status.failed',
+  'report.audit.panel.provenance',
+] as const
+
 function get(obj: unknown, path: string): unknown {
   return path
     .split('.')
@@ -299,5 +336,39 @@ describe('catalogue help and read-only copy — locale key parity', () => {
     expect(get(IT, path)).not.toBe('')
     expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
     expect(get(EN, path)).not.toBe('')
+  })
+})
+
+describe('scoring-audit-jev — audit review copy, locale key parity', () => {
+  it.each(AUDIT_KEY_PATHS)('both locales carry a non-empty string at %s', (path) => {
+    expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+    expect(get(IT, path)).not.toBe('')
+    expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+    expect(get(EN, path)).not.toBe('')
+  })
+
+  // spec: "MUST NOT instruct or imply that an operator should change,
+  // override, or discard the persisted score."
+  it('no audit copy instructs a score change, in either locale', () => {
+    const enInstructionWords = ['change', 'override', 'discard', 'update']
+    const itInstructionWords = ['modifica', 'sovrascriv', 'elimina', 'aggiorna']
+
+    for (const path of AUDIT_KEY_PATHS) {
+      const en = String(get(EN, path)).toLowerCase()
+      const it = String(get(IT, path)).toLowerCase()
+
+      if (en.includes('score')) {
+        expect(
+          enInstructionWords.some((word) => en.includes(word)),
+          `en.json "${path}" pairs an instruction word with "score": "${en}"`
+        ).toBe(false)
+      }
+      if (it.includes('punteggi')) {
+        expect(
+          itInstructionWords.some((word) => it.includes(word)),
+          `it.json "${path}" pairs an instruction word with "punteggi": "${it}"`
+        ).toBe(false)
+      }
+    }
   })
 })

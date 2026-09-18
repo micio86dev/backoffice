@@ -7,6 +7,12 @@
           :score="behavior.score"
           :unassessable-reason="behavior.unassessable_reason"
         />
+        <AuditFlag
+          class="shrink-0"
+          :status="behavior.audit.status"
+          :support-probability="behavior.audit.support_probability"
+          :outcome-reason="behavior.audit.outcome_reason"
+        />
         <span class="text-foreground pt-0.5 leading-5 font-medium">{{ behavior.indicator }}</span>
       </span>
     </AccordionTrigger>
@@ -47,6 +53,7 @@
 import { computed } from 'vue'
 import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import ScoreChip from '@/components/atoms/ScoreChip.vue'
+import AuditFlag from '@/components/atoms/AuditFlag.vue'
 import ExcerptList from '@/components/molecules/ExcerptList.vue'
 import type { EvaluationBehavior } from '@/composables/useEvaluationReport'
 

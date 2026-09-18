@@ -508,6 +508,46 @@
       "transcript": "Scarica trascrizione",
       "evaluation": "Scarica valutazione (JSON)",
       "downloading": "Download in corso…"
+    },
+    "audit": {
+      "flag": {
+        "judged": "Evidenza verificata",
+        "unavailable": "Verifica non riuscita",
+        "malformed": "Verifica non riuscita",
+        "skipped": "Non verificato — nessuna evidenza da controllare",
+        "neverAudited": "Non ancora verificato",
+        "unknown": "Stato di verifica non riconosciuto"
+      },
+      "reason": {
+        "unassessable_by_construction": "Non c'era evidenza per questo indicatore, quindi non c'era nulla da verificare.",
+        "assessed_without_excerpts": "Il punteggio è stato assegnato senza alcuna citazione, quindi non c'era nulla da verificare.",
+        "judge_unreachable": "Non è stato possibile contattare il servizio di verifica.",
+        "judge_http_error": "Il servizio di verifica ha restituito un errore.",
+        "judge_timeout": "Il servizio di verifica non ha risposto in tempo.",
+        "verdict_missing": "Il servizio di verifica non ha fornito una risposta per questo indicatore.",
+        "verdict_unparseable": "Non è stato possibile leggere la risposta del servizio di verifica.",
+        "probability_out_of_domain": "Il servizio di verifica ha restituito un valore non valido.",
+        "unknown": "Non verificato — motivo non riconosciuto ({reason})."
+      },
+      "refusal": {
+        "audit_disabled": "Le verifiche di audit sono al momento disattivate per questa piattaforma.",
+        "audit_already_running": "Una verifica di audit è già in corso per questa valutazione.",
+        "audit_lock_unavailable": "Non è stato possibile avviare la verifica di audit in questo momento. Riprova a breve.",
+        "lifecycle_not_ready": "Questa valutazione non è ancora pronta per essere verificata.",
+        "forbidden": "Solo gli amministratori possono richiedere una verifica di audit.",
+        "unknown": "Non è stato possibile avviare la verifica di audit. Riprova."
+      },
+      "panel": {
+        "trigger": "Richiedi una verifica di audit",
+        "triggering": "Richiesta in corso…",
+        "inProgress": "Verifica di audit in corso",
+        "status": {
+          "completed": "Verifica di audit completata",
+          "partial": "Verifica di audit completata — alcuni indicatori non è stato possibile verificarli",
+          "failed": "Non è stato possibile completare la verifica di audit"
+        },
+        "provenance": "Verificato con {model}, set di domande {promptVersion}"
+      }
     }
   },
   "settings": {

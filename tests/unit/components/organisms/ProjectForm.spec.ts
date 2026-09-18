@@ -1692,3 +1692,107 @@ describe('ProjectForm — publishing the live competency selection', () => {
     expect(wrapper.emitted('update:competencies')?.at(-1)?.[0]).toEqual([])
   })
 })
+
+// project-competency-revision-scope fix: competency ids are validated by
+// StoreProjectRequest/UpdateProjectRequest against the SUBMITTED
+// framework_version_id's own pinned catalogue revision, which can differ
+// from "latest published" — the picker must ask the API on behalf of that
+// specific version, and reload when it changes, or it offers ids the server
+// then refuses as competency_unknown.
+describe('ProjectForm — competency options are scoped to the selected framework version', () => {
+  it('passes the resolved frameworkVersionId to the competency fetch', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue({
+      data: [{ id: 1, code: 'COL', name: 'Collaboration', bars_available: true }],
+    })
+
+    mount(ProjectForm, {
+      props: {
+        project: activeProject({ status: 'draft', role_code: 'ICO', framework_version_id: 1 }),
+      },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    expect(fetchRoleCompetenciesMock).toHaveBeenCalledWith('ICO', 1)
+  })
+
+  it('reloads the competency options, scoped to the NEW version, when the framework-version select changes on create', async () => {
+    fetchRoleCompetenciesMock.mockImplementation(
+      (_roleCode: string, frameworkVersionId: number) => {
+        return Promise.resolve({
+          data: [
+            {
+              id: frameworkVersionId,
+              code: 'COL',
+              name: `Collaboration v${frameworkVersionId}`,
+              bars_available: true,
+            },
+          ],
+        })
+      }
+    )
+    listVersionsMock.mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          organization_id: 1,
+          version: 'v1.0',
+          label: 'Initial',
+          is_locked: false,
+          created_at: null,
+          updated_at: null,
+        },
+        {
+          id: 2,
+          organization_id: 1,
+          version: 'v2.0',
+          label: 'Republished',
+          is_locked: false,
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    })
+
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const roleSelect = wrapper.get('[data-testid="project-form-role-code"]')
+    roleSelect.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await waitFor(
+      () => (document.body.textContent ?? '').includes('projects.roleCode.ICO'),
+      'the role select popup to render its options'
+    )
+    const icoOption = Array.from(document.body.querySelectorAll('[role="option"]')).find((el) =>
+      (el.textContent ?? '').includes('projects.roleCode.ICO')
+    )
+    if (!icoOption) throw new Error('ICO role option not found in the open Select popup')
+    icoOption.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+    await flushPromises()
+
+    expect(fetchRoleCompetenciesMock).toHaveBeenLastCalledWith('ICO', 1)
+    expect(wrapper.findComponent(CompetencyPicker).props('options')).toEqual([
+      { id: 1, code: 'COL', name: 'Collaboration v1', barsAvailable: true },
+    ])
+
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [1])
+
+    // Switching the framework-version pin (still editable on create) must
+    // reload the picker against the NEW version's own revision and clear the
+    // now-stale ticked set — ids belong to a specific role+revision pair.
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('2')
+    await flushPromises()
+
+    expect(fetchRoleCompetenciesMock).toHaveBeenLastCalledWith('ICO', 2)
+    expect(wrapper.findComponent(CompetencyPicker).props('options')).toEqual([
+      { id: 2, code: 'COL', name: 'Collaboration v2', barsAvailable: true },
+    ])
+    expect(wrapper.findComponent(CompetencyPicker).props('modelValue')).toEqual([])
+
+    wrapper.unmount()
+  })
+})

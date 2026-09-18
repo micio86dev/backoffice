@@ -248,6 +248,46 @@ test.describe('Projects CRUD (Unit 2b)', () => {
     await expect(page.getByText('New E2E Project')).toBeVisible()
   })
 
+  // project-competency-revision-scope fix: competency ids are validated by
+  // StoreProjectRequest/UpdateProjectRequest against the SUBMITTED
+  // framework_version_id's own pinned catalogue revision, which can differ
+  // from "latest published" (the catalogue can be republished after an org's
+  // FrameworkVersion was pinned). This suite is fully network-mocked (see
+  // the file header) so it cannot exercise that backend validation itself —
+  // the Pest regression in api/tests/Feature/C4/ProjectCompetencyRevisionScopeTest.php
+  // does that. What this test CAN guard is a future frontend regression:
+  // the picker must keep asking the API on behalf of the selected version.
+  test('the competency picker requests options scoped to the selected framework version', async ({
+    page,
+  }) => {
+    await mockAdminApi(page)
+
+    let lastCompetenciesRequestUrl: string | null = null
+    // Registered AFTER mockAdminApi — the LAST-registered matching route
+    // wins, so this override captures the URL while still answering it.
+    await page.route(
+      (url) => /^\/framework\/roles\/[A-Z]+\/competencies$/.test(url.pathname),
+      (route) => {
+        if (!isDataRequest(route)) return route.continue()
+        lastCompetenciesRequestUrl = route.request().url()
+        return jsonRoute(route, { data: MIXED_COVERAGE_COMPETENCIES })
+      }
+    )
+
+    await login(page)
+    await page.getByRole('link', { name: 'Progetti' }).click()
+    await expect(page).toHaveURL('/projects')
+
+    await page.getByRole('button', { name: 'Nuovo progetto' }).click()
+    await page.getByRole('combobox', { name: 'Ruolo' }).click()
+    await page.getByRole('option', { name: 'Contributore individuale' }).click()
+    await expect(page.getByLabel('Problem Solving')).toBeVisible()
+
+    // `id: 3` is the mocked `/framework/versions` fixture's own id, above —
+    // the version the create form auto-selects as its default pin.
+    expect(lastCompetenciesRequestUrl).toContain('framework_version_id=3')
+  })
+
   test('editing an active project disables its immutable fields', async ({ page }) => {
     await mockAdminApi(page)
     await login(page)

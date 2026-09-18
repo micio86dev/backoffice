@@ -330,12 +330,19 @@
             <AlertTitle>{{ $t('report.states.error.title') }}</AlertTitle>
             <AlertDescription>{{ $t('report.states.error.message') }}</AlertDescription>
           </Alert>
-          <EvaluationReport
-            v-else-if="evaluationData && evaluationMeta"
-            :evaluation="evaluationData"
-            :meta="evaluationMeta"
-            :locale="locale"
-          />
+          <template v-else-if="evaluationData && evaluationMeta">
+            <EvaluationAuditPanel
+              :participant-id="Number(route.params.id)"
+              :audit-meta="evaluationAuditMeta"
+              class="mb-4"
+              @triggered="onAuditTriggered"
+            />
+            <EvaluationReport
+              :evaluation="evaluationData"
+              :meta="evaluationMeta"
+              :locale="locale"
+            />
+          </template>
         </CardContent>
       </Card>
     </div>
@@ -362,6 +369,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
+import EvaluationAuditPanel from '@/components/organisms/EvaluationAuditPanel.vue'
 import TranscriptPanel from '@/components/organisms/TranscriptPanel.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
@@ -371,6 +379,7 @@ import {
   useEvaluationReport,
   type EvaluationReportData,
   type EvaluationScoringMeta,
+  type EvaluationAuditMeta,
 } from '@/composables/useEvaluationReport'
 import { useTranscript, type TranscriptData } from '@/composables/useTranscript'
 import { useDownloads } from '@/composables/useDownloads'
@@ -489,6 +498,12 @@ const costCoverageLabel = computed(() => {
 const evaluationState = ref<ResourceState>('loading')
 const evaluationData = ref<EvaluationReportData | null>(null)
 const evaluationMeta = ref<EvaluationScoringMeta | null>(null)
+// scoring-audit-jev P6 — the LATEST audit run's provenance/counters, or
+// `null` when the evaluation has never been audited (design D9). Refreshed
+// by re-fetching the whole evaluation after a trigger, rather than polling a
+// separate endpoint — the run's own `status` is written exactly once, at
+// completion, and this page has no other read of it.
+const evaluationAuditMeta = ref<EvaluationAuditMeta | null>(null)
 
 // Transcript (D2/D7): fetched ONLY when the client-side mirror already says
 // the resource should be reachable — D7's whole point is knowing this
@@ -684,6 +699,31 @@ async function loadSessions(id: string): Promise<void> {
   }
 }
 
+// scoring-audit-jev P6 — the trigger just accepted a 202; the run itself
+// completes asynchronously (v1 has no polling endpoint, design D6/D9), so a
+// re-fetch right now almost always still returns the SAME `auditMeta` (or
+// `null`) it did a moment ago. Best-effort and silent on failure: the panel
+// already shows its own client-local "in progress" indicator regardless of
+// whether this refresh succeeds, and an operator who reopens the page later
+// sees the terminal status once the run has actually finished.
+async function onAuditTriggered(): Promise<void> {
+  const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
+  if (id === undefined) return
+
+  try {
+    const evaluation = await fetchEvaluation(id)
+    // Also refresh the per-competency data, not just `auditMeta`: it
+    // carries each indicator's `behaviors[].audit` verdict, which is what
+    // `IndicatorEvidence.vue`/`AuditFlag.vue` actually render. Updating only
+    // `auditMeta` left the panel's own summary badge correct while every
+    // individual `AuditFlag` kept showing its stale pre-trigger verdict.
+    evaluationData.value = evaluation.data
+    evaluationAuditMeta.value = evaluation.auditMeta
+  } catch {
+    // Best-effort refresh only — the operator can reopen the page later.
+  }
+}
+
 onMounted(async () => {
   const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
 
@@ -709,6 +749,7 @@ onMounted(async () => {
     const evaluation = await fetchEvaluation(id as string)
     evaluationData.value = evaluation.data
     evaluationMeta.value = evaluation.meta
+    evaluationAuditMeta.value = evaluation.auditMeta
     evaluationState.value = 'ready'
   } catch (error) {
     evaluationState.value = resolveResourceErrorState(error)

@@ -33,6 +33,15 @@ const SCORING_META: EvaluationScoringMeta = {
   framework_version: '1.4.0',
 }
 
+// scoring-audit-jev P6 — `behaviors[].audit` is ADDITIVE ONLY and NEVER a
+// missing key on the real API response (design D9); every fixture behavior
+// carries the serializer-only synthetic `never_audited` status.
+const NEVER_AUDITED = {
+  status: 'never_audited' as const,
+  support_probability: null,
+  outcome_reason: null,
+}
+
 const SLF_FIXTURE: EvaluationReportData = {
   SLF: {
     score: 4.0,
@@ -43,12 +52,16 @@ const SLF_FIXTURE: EvaluationReportData = {
         score: 5,
         explanation: 'Clear and engaging description.',
         excerpts: ['Durante un pranzo tra colleghi ho dovuto...'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Link own arguments to customer needs and priorities',
         score: 3,
         explanation: 'Solid but improvable link to customer needs.',
         excerpts: ['avevamo parlato direttamente con dei potenziali clienti...'],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
       {
         indicator: 'Negotiate to reach solutions that meet the primary interests of customers',
@@ -57,6 +70,8 @@ const SLF_FIXTURE: EvaluationReportData = {
         score: -1,
         explanation: 'No relevant example provided; unassessable.',
         excerpts: [],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
       },
     ],
     unscorable_reason: null,
@@ -68,8 +83,22 @@ const ALL_UNASSESSABLE_FIXTURE: EvaluationReportData = {
     score: null,
     reliability: '100%',
     behaviors: [
-      { indicator: 'a', score: null, explanation: 'x', excerpts: [] },
-      { indicator: 'b', score: null, explanation: 'y', excerpts: [] },
+      {
+        indicator: 'a',
+        score: null,
+        explanation: 'x',
+        excerpts: [],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
+      },
+      {
+        indicator: 'b',
+        score: null,
+        explanation: 'y',
+        excerpts: [],
+        unassessable_reason: null,
+        audit: NEVER_AUDITED,
+      },
     ],
     unscorable_reason: null,
   },

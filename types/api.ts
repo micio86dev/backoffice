@@ -556,6 +556,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/participants/{id}/evaluation/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["evaluationAudit.store"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/evaluations/summary": {
         parameters: {
             query?: never;
@@ -2379,7 +2395,23 @@ export interface components {
         };
         /** EvaluationResource */
         EvaluationResource: {
-            [key: string]: unknown;
+            [key: string]: {
+                score: number | null;
+                reliability: string;
+                behaviors: {
+                    indicator: string;
+                    score: number | null;
+                    explanation: string;
+                    excerpts: string[];
+                    unassessable_reason: string | null;
+                    audit: {
+                        status: string;
+                        support_probability: number | null;
+                        outcome_reason: string | null;
+                    };
+                }[];
+                unscorable_reason: string | null;
+            };
         };
         /**
          * ForgotPasswordRequest
@@ -4832,6 +4864,55 @@ export interface operations {
                 };
             };
             422: components["responses"]["ValidationException"];
+        };
+    };
+    "evaluationAudit.store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        status: "queued";
+                        evaluation_id: number;
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            /**
+             * @description Redis unavailable -> refuse, not proceed (design D7). Fail
+             *     CLOSED: the cheaper mistake here is a refused request, not a
+             *     duplicate vendor charge for the same evaluation.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        reason: "audit_already_running";
+                    } | {
+                        /** @constant */
+                        reason: "audit_lock_unavailable";
+                    } | {
+                        /** @constant */
+                        reason: "audit_disabled";
+                    };
+                };
+            };
         };
     };
     "evaluationIndex.summary": {

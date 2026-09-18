@@ -872,8 +872,8 @@ async function loadCompetencyOptions(): Promise<void> {
     // rendered unchecked. A `potential` project was unconfigurable.
     const response =
       assessmentType.value === 'potential'
-        ? await fetchPotentialCompetencies()
-        : await fetchRoleCompetencies(roleCode.value)
+        ? await fetchPotentialCompetencies(frameworkVersionId.value)
+        : await fetchRoleCompetencies(roleCode.value, frameworkVersionId.value)
 
     competencyOptions.value = response.data.map((competency) => ({
       // Carried through because `StoreProjectRequest.competency_ids` validates
@@ -1267,10 +1267,18 @@ function onAvatarTemplateChange(event: Event): void {
 // created through this form. Unit tests missed it because they mock the
 // composable and never drive the select; E2E caught it on the first real run.
 //
-// Clearing the selection is deliberate: competency ids belong to the role they
-// were listed for, so carrying them across a role change would submit ids that
-// the server's cross-field rule rejects as not assigned to the new role.
-watch([roleCode, assessmentType], () => {
+// `frameworkVersionId` joins the same watch for the identical reason:
+// competency ids are revision-scoped (framework-catalogue-authoring PR3b) and
+// a revision is resolved from the version pin, not from the role/type alone —
+// switching versions on CREATE (the select stays editable there; only
+// `isEditing` disables it) without reloading would leave stale, wrong-revision
+// ids ticked.
+//
+// Clearing the selection is deliberate: competency ids belong to the
+// role+revision combination they were listed for, so carrying them across a
+// change here would submit ids the server's rules reject as either not
+// assigned to the new role or unknown in the new revision.
+watch([roleCode, assessmentType, frameworkVersionId], () => {
   competencyIds.value = []
   void loadCompetencyOptions()
 })

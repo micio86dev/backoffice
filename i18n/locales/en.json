@@ -527,7 +527,7 @@
         "verdict_missing": "The review service did not answer for this indicator.",
         "verdict_unparseable": "The review service's answer could not be read.",
         "probability_out_of_domain": "The review service returned an invalid value.",
-        "unknown": "Not reviewed — unrecognised reason ({reason})."
+        "unknown": "Not reviewed — unrecognised reason."
       },
       "refusal": {
         "audit_disabled": "Audit reviews are currently disabled for this platform.",

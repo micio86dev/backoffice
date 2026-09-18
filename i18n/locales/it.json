@@ -527,7 +527,7 @@
         "verdict_missing": "Il servizio di verifica non ha fornito una risposta per questo indicatore.",
         "verdict_unparseable": "Non è stato possibile leggere la risposta del servizio di verifica.",
         "probability_out_of_domain": "Il servizio di verifica ha restituito un valore non valido.",
-        "unknown": "Non verificato — motivo non riconosciuto ({reason})."
+        "unknown": "Non verificato — motivo non riconosciuto."
       },
       "refusal": {
         "audit_disabled": "Le verifiche di audit sono al momento disattivate per questa piattaforma.",

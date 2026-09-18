@@ -712,6 +712,12 @@ async function onAuditTriggered(): Promise<void> {
 
   try {
     const evaluation = await fetchEvaluation(id)
+    // Also refresh the per-competency data, not just `auditMeta`: it
+    // carries each indicator's `behaviors[].audit` verdict, which is what
+    // `IndicatorEvidence.vue`/`AuditFlag.vue` actually render. Updating only
+    // `auditMeta` left the panel's own summary badge correct while every
+    // individual `AuditFlag` kept showing its stale pre-trigger verdict.
+    evaluationData.value = evaluation.data
     evaluationAuditMeta.value = evaluation.auditMeta
   } catch {
     // Best-effort refresh only — the operator can reopen the page later.

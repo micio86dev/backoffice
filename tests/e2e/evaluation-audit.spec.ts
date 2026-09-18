@@ -297,6 +297,17 @@ test.describe('Evaluation audit trigger (scoring-audit-jev)', () => {
     // Before the trigger: no terminal status, no client-local progress yet.
     await expect(page.getByText('Verifica di audit in corso')).toHaveCount(0)
 
+    // The single indicator's OWN AuditFlag, scoped by the AccordionTrigger
+    // row it lives on — `ScoreChip` renders no Badge, so this is the only
+    // `[data-slot="badge"]` in that row. Before the trigger, it still shows
+    // the pre-trigger `never_audited` verdict from the FIRST evaluation
+    // fetch.
+    const indicatorRow = page.getByRole('button', {
+      name: /Describe products and services accurately/,
+    })
+    const indicatorAuditFlag = indicatorRow.locator('[data-slot="badge"][data-variant]')
+    await expect(indicatorAuditFlag).toHaveAttribute('data-variant', 'outline')
+
     await page.getByRole('button', { name: 'Richiedi una verifica di audit' }).click()
 
     // Client-local, request-lifecycle signal — never the persisted status.
@@ -305,5 +316,13 @@ test.describe('Evaluation audit trigger (scoring-audit-jev)', () => {
     // The panel's own 'triggered' handler re-fetches the evaluation, which
     // now carries the terminal run — the persisted status renders.
     await expect(page.getByText('Verifica di audit completata')).toBeVisible()
+
+    // The re-fetch must ALSO update the per-indicator verdict, not just the
+    // panel's own summary badge above: `EVALUATION_AFTER_AUDIT` carries a
+    // `judged` verdict with `support_probability: 0.91` for this same
+    // indicator, so the individual AuditFlag must flip from `outline`
+    // (never_audited) to `info` (judged) and render the probability.
+    await expect(indicatorAuditFlag).toHaveAttribute('data-variant', 'info')
+    await expect(indicatorAuditFlag).toContainText('91%')
   })
 })

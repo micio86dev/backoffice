@@ -17,7 +17,10 @@
  */
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createI18n } from 'vue-i18n'
 import AuditFlag from '../../../../app/components/atoms/AuditFlag.vue'
+import enMessages from '../../../../i18n/locales/en.json'
+import itMessages from '../../../../i18n/locales/it.json'
 
 const tMock = (key: string, params?: Record<string, unknown>) =>
   params ? `${key}:${JSON.stringify(params)}` : key
@@ -201,5 +204,45 @@ describe('AuditFlag — reason surfaces for a degraded status', () => {
 
     expect(wrapper.text()).toContain('report.audit.reason.unknown')
     expect(wrapper.text()).not.toContain('a_future_reason')
+  })
+
+  // The two tests above mock `$t` as the identity on the KEY, so they never
+  // exercise the actual locale COPY behind `report.audit.reason.unknown` —
+  // a bug where that copy itself renders literally to real users would pass
+  // both of them regardless of what the copy actually says. This test
+  // mounts with the REAL vue-i18n plugin and the REAL locale files instead,
+  // so it renders what an operator actually sees, in both mandatory
+  // locales. Component calls `$t(reasonKey)` with NO named params, so a
+  // `{reason}` interpolation in the message resolves to an EMPTY string
+  // (vue-i18n's behaviour for a missing named param, not the literal
+  // placeholder text) — the observable defect is a dangling empty
+  // parenthetical, e.g. "...unrecognised reason ().", not literal braces.
+  it('the REAL rendered copy for an unrecognised reason reads as sensible copy — no literal {reason} and no dangling empty parenthesis — in en and it', () => {
+    for (const [locale, messages] of [
+      ['en', enMessages],
+      ['it', itMessages],
+    ] as const) {
+      const i18n = createI18n({
+        legacy: true,
+        locale,
+        fallbackLocale: false,
+        missingWarn: false,
+        fallbackWarn: false,
+        messages: { [locale]: messages },
+      })
+
+      const wrapper = mount(AuditFlag, {
+        props: { status: 'malformed', supportProbability: null, outcomeReason: 'a_future_reason' },
+        global: { plugins: [i18n] },
+      })
+
+      const srText = wrapper.find('.sr-only').text()
+      expect(srText, `locale=${locale}`).not.toContain('{reason}')
+      // The dangling-empty-parenthesis defect: an unresolved `{reason}`
+      // named interpolation collapses to an empty string, leaving "()"
+      // in the rendered sentence.
+      expect(srText, `locale=${locale}`).not.toMatch(/\(\s*\)/)
+      expect(srText.trim().length, `locale=${locale}`).toBeGreaterThan(0)
+    }
   })
 })

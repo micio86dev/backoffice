@@ -185,6 +185,28 @@ describe('BrandingForm — the logo control', () => {
     expect(uploadLogo).toHaveBeenCalledWith(file)
   })
 
+  it("cache-busts the preview after a successful upload, so the browser does not serve the id-addressed logo endpoint's cached redirect", async () => {
+    // `GET /api/organizations/{id}/logo` is id-addressed and answers a 302
+    // with `Cache-Control: public, max-age=600` (OrganizationLogoController)
+    // — same URL before and after an upload. Re-assigning `logoUrl` to that
+    // identical URL lets the browser serve its cached redirect to the OLD
+    // file for up to ten minutes. A query-string suffix makes it a different
+    // URL, so the browser actually re-fetches.
+    uploadLogo.mockReset().mockResolvedValue({ data: { logo_url: 'https://api.test/new.png' } })
+    vi.spyOn(Date, 'now').mockReturnValue(123456789)
+
+    const wrapper = mountForm('#123456')
+    const file = new File(['bytes'], 'logo.png', { type: 'image/png' })
+
+    await wrapper.findComponent({ name: 'ImageUploadField' }).vm.$emit('cropped', file)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="image-upload-field"]').attributes('data-preview')).toBe(
+      'https://api.test/new.png?v=123456789'
+    )
+  })
+
   it('routes a rejected file to the field error, with no request', async () => {
     const wrapper = mountForm(null)
 

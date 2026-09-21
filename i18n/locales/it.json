@@ -1241,6 +1241,20 @@
       }
     }
   },
+  "onboardingTour": {
+    "regionLabel": "Tour guidato",
+    "progress": "Passo {current} di {total}",
+    "skip": "Salta il tour",
+    "back": "Indietro",
+    "next": "Avanti",
+    "finish": "Fine",
+    "help": {
+      "description": "Apri questo pannello ogni volta che hai bisogno di ricordare come funziona una pagina."
+    },
+    "clients": {
+      "description": "L'elenco di tutte le organizzazioni della piattaforma. Entra in una per vedere i suoi progetti, candidati e report."
+    }
+  },
   "review": {
     "title": "Resoconto sessione",
     "subtitle": "Cosa è successo durante questo colloquio: tempi, controlli di integrità e fotogrammi.",

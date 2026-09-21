@@ -65,6 +65,20 @@ describe('applyBrandColor', () => {
     expect(hover).toContain('#2563EB')
   })
 
+  it('DERIVES the toggle-group selected-hover shade (fix/backoffice-brand-color-tokens)', () => {
+    // `ToggleGroup` / `Toggle` reads the separate `--color-primary-dark`
+    // token for `data-[state=on]:hover:bg-primary-dark` (DESIGN.md §8.2.2), so
+    // painting `--color-primary` alone left a selected toggle's hover state
+    // snapping back to Quint purple — the same half-applied-brand bug the
+    // sidebar had, just on a button-group instead of the nav.
+    applyBrandColor('#2563EB')
+
+    const hover = read('--color-primary-dark')
+
+    expect(hover).toContain('color-mix')
+    expect(hover).toContain('#2563EB')
+  })
+
   it('REMOVES every token when the organization has no colour', () => {
     // Removal, not a written default. An unset custom property falls through to
     // the stylesheet's own value — the Quint purple DESIGN.md defines — and

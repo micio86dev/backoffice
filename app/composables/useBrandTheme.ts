@@ -44,10 +44,11 @@ const HEX = /^#[0-9a-f]{6}$/i
  * writer and its tests read — so a token added here cannot be left untested,
  * and one removed cannot leave a stale override behind on clear.
  *
- * `--sidebar-accent` (the hover state) is deliberately absent: it is a
- * DARKENED variant of the brand purple, and deriving a darker shade of an
- * arbitrary operator-chosen colour is a colour-space problem this function has
- * no business solving inline. It keeps the product's own hover shade.
+ * `--sidebar-accent` and `--color-primary-dark` (the hover states) are
+ * deliberately absent: both are DARKENED variants of the brand purple, and
+ * deriving a darker shade of an arbitrary operator-chosen colour is a
+ * colour-space problem this function has no business solving inline. They are
+ * painted below, in `BRAND_DERIVED_TOKENS`, instead.
  */
 export const BRAND_COLOR_TOKENS = ['--color-primary', '--sidebar', '--sidebar-primary'] as const
 
@@ -68,10 +69,15 @@ export const BRAND_COLOR_TOKENS = ['--color-primary', '--sidebar', '--sidebar-pr
  * in, with no conversion code shipped and nothing to get subtly wrong for
  * every colour that is not purple.
  *
- * Buttons need no entry here — `[a]:hover:bg-primary/80` is an alpha on
- * `--color-primary`, so they already followed the brand.
+ * `--color-primary-dark` is the SAME bug, on `ToggleGroup` / `Toggle`
+ * (`data-[state=on]:hover:bg-primary-dark`, DESIGN.md §8.2.2's selected-toggle
+ * hover): the comment that used to sit here claimed "buttons need no entry"
+ * because `[a]:hover:bg-primary/80` is an alpha on `--color-primary` — true for
+ * that one pattern, but `bg-primary-dark` reads the separate, still-literal
+ * `--color-primary-dark` token, so a selected toggle hover kept snapping back
+ * to Quint purple exactly like the sidebar did.
  */
-export const BRAND_DERIVED_TOKENS = ['--sidebar-accent'] as const
+export const BRAND_DERIVED_TOKENS = ['--sidebar-accent', '--color-primary-dark'] as const
 
 /**
  * How much of the brand colour survives the darkening.

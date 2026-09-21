@@ -75,17 +75,19 @@ function mockOrganization() {
 }
 
 /**
- * `/api/organization` rejecting the way it does for a SUPERADMIN.
+ * `/api/organization` resolving the way it does for a SUPERADMIN.
  *
  * Not a hypothetical: a superadmin belongs to no organization
  * (`users.organization_id` is null — that is what makes them one), so the
- * singular self-resolving route has no row to return and answers 404 on every
- * page load. `NavBar.vue` already documents this and skips the call entirely.
+ * singular self-resolving route has no row to return. It answers `200` with
+ * `data: null` (api's `OrganizationController::show()`,
+ * fix/organization-no-acting-org-404) — never a 404 — on every page load.
+ * `NavBar.vue` already documents this and skips the call entirely.
  */
 function mockOrganizationNotFound() {
   vi.doMock('../../../../app/composables/useOrganization', () => ({
     useOrganization: () => ({
-      fetchOrganization: vi.fn().mockRejectedValue({ status: 404 }),
+      fetchOrganization: vi.fn().mockResolvedValue({ data: null }),
       updateOrganization: vi.fn(),
     }),
   }))

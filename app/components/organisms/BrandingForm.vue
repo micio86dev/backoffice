@@ -162,7 +162,7 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import FormMessage from '@/components/molecules/FormMessage.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import ImageUploadField from '@/components/molecules/ImageUploadField.vue'
-import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
+import { useOrganization, type OrganizationRecord } from '@/composables/useOrganization'
 import { applyBrandColor } from '@/composables/useBrandTheme'
 import { BRAND_PRIMARY, HEX } from '@/utils/brand'
 import { applyServerFieldErrors } from '@/utils/http-error'
@@ -177,7 +177,7 @@ import { translateServerCodes } from '@/utils/server-message'
 const MAX_LOGO_BYTES = 1_048_576
 
 const props = defineProps<{
-  organization: OrganizationResponse['data']
+  organization: OrganizationRecord
 }>()
 
 const emit = defineEmits<{
@@ -209,21 +209,6 @@ function describedBy(baseId: string, hasError: boolean): string {
   return [hasError ? `${baseId}-error` : null, `${baseId}-help`]
     .filter((id): id is string => id !== null)
     .join(' ')
-}
-
-/**
- * `GET /api/organizations/{id}/logo` (OrganizationLogoController::show) is
- * ID-ADDRESSED — the same URL before and after an upload — and answers a 302
- * with `Cache-Control: public, max-age=600`. Re-assigning `logoUrl` to that
- * identical URL right after a successful upload lets the browser serve its
- * cached redirect to the file that upload just replaced, for up to ten
- * minutes. Appending a fresh query string makes it a URL the browser has
- * never fetched, so it actually re-requests.
- */
-function withCacheBuster(url: string | null): string | null {
-  if (url === null) return null
-
-  return `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`
 }
 
 /**
@@ -357,7 +342,11 @@ async function onSubmit(): Promise<void> {
 
     if (pendingFile.value !== null) {
       const response = await uploadLogo(pendingFile.value)
-      logoUrl.value = withCacheBuster(response.data.logo_url ?? null)
+      // `Organization::absoluteLogoUrl()` (api) already appends a `?v=` that
+      // changes with every upload — the stored object's own filename — so
+      // this URL is one the browser has never fetched. No client-side
+      // cache-buster needed on top of it.
+      logoUrl.value = response.data.logo_url ?? null
       pendingFile.value = null
       // The crop is now the stored image; the local blob has nothing left to
       // say and holds a decoded bitmap for the life of the document.

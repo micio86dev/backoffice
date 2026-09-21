@@ -146,8 +146,16 @@ function stripComments(source: string): string {
 // `URL.` receiver specifically rather than dropping `revoke`, so
 // `revokeApiKey(` — the call this arm was written for — still trips it. Both
 // halves are asserted below; do not widen the lookbehind past `URL.`.
+//
+// Same class of fix, one call further: `(?!removeEventListener\()`
+// (backoffice-role-aware-onboarding-guide). `window.removeEventListener(`
+// is a standard DOM API teardown call, not a destructive action on domain
+// data — `OnboardingTourOverlay.vue` is the first `.vue` file to need one
+// directly, which is why this exclusion did not already exist. Named
+// exactly, like the `URL.` receiver above, so `removeApiKey(` — a genuine
+// destructive call — still trips the guard.
 const DESTRUCTIVE_CALL_REGEX =
-  /(?<!URL\.)\b(?:delete|remove|revoke|archive|destroy|import|activate|deactivate)[A-Z]\w*\(/
+  /(?<!URL\.)\b(?!removeEventListener\()(?:delete|remove|revoke|archive|destroy|import|activate|deactivate)[A-Z]\w*\(/
 
 // Composable methods the regex above cannot see, because their NAME carries
 // no destructive-sounding verb — e.g. `updateProject(id, { status: 'archived' })`
@@ -213,6 +221,13 @@ describe('destructive action confirmation guard (admin-backoffice spec)', () => 
     expect(callsDestructiveMethod('await revokeApiKey(id)')).toBe(true)
     expect(callsDestructiveMethod('await deleteProject(id)')).toBe(true)
     expect(callsDestructiveMethod('URL.revokeObjectURL(croppedUrl.value)')).toBe(false)
+  })
+
+  it('R1 — still trips on removeApiKey, and no longer on a DOM listener teardown', () => {
+    expect(callsDestructiveMethod('await removeApiKey(id)')).toBe(true)
+    expect(callsDestructiveMethod("window.removeEventListener('resize', onWindowChange)")).toBe(
+      false
+    )
   })
 
   it('R1 — every non-allowlisted destructive call site imports ConfirmDialog', () => {

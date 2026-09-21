@@ -16,7 +16,11 @@
     <SidebarContent>
       <SidebarGroup>
         <SidebarMenu>
-          <SidebarMenuItem v-for="item in visibleNavItems" :key="item.to">
+          <SidebarMenuItem
+            v-for="item in visibleNavItems"
+            :key="item.to"
+            :data-onboarding-target="item.to"
+          >
             <SidebarMenuButton as-child :is-active="isCurrent(item.to)">
               <NuxtLink :to="item.to" :aria-current="isCurrent(item.to) ? 'page' : undefined">
                 <component :is="item.icon" aria-hidden="true" />
@@ -76,15 +80,6 @@
 </template>
 
 <script setup lang="ts">
-import {
-  HomeIcon,
-  FolderIcon,
-  UsersIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-  BuildingOffice2Icon,
-  BookOpenIcon,
-} from '@heroicons/vue/24/outline'
 import { computed, onMounted, ref } from 'vue'
 import {
   Sidebar,
@@ -97,86 +92,26 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import type { AbilityKey } from '@/composables/useCurrentUser'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { initials } from '@/utils/initials'
-import { visibleNavItemsFor, type NavScope } from '@/utils/nav-visibility'
+import { visibleNavItemsFor } from '@/utils/nav-visibility'
+import { NAV_ITEMS as navItems } from '@/utils/nav-items'
 import { useSuperadmin } from '@/composables/useSuperadmin'
 
 // Nav items per DESIGN.md §8.1 (Dashboard / Projects / Candidates / Reports /
 // Settings). "Candidates" is the product-facing label for the Participant
 // resource (CLAUDE.md domain glossary: Participant is the model, "candidate"
 // is the user-facing term).
-// Every item carries a SCOPE. `client` pages read one tenant's data;
-// `platform` pages sit above the tenants. It is not a permission — a
-// superadmin passes every gate — it is whether the page has an answer at all:
-// "whose projects?" is unanswered until a client is selected, and the product
+//
+// The list itself — and the SCOPE each item carries (`client` pages read one
+// tenant's data; `platform` pages sit above the tenants) — lives in
+// `nav-items.ts`, not here: the onboarding tour composable walks the SAME
+// list, and a second copy in this file is exactly the drift `nav-items.ts`'s
+// own docblock exists to prevent. Scope is not a permission — a superadmin
+// passes every gate — it is whether the page has an answer at all: "whose
+// projects?" is unanswered until a client is selected, and the product
 // agrees underneath, because TenantScoped throws on a create with no
 // organization resolved.
-const navItems = [
-  { to: '/', labelKey: 'nav.dashboard', icon: HomeIcon, scope: 'client' },
-  { to: '/projects', labelKey: 'nav.projects', icon: FolderIcon, scope: 'client' },
-  { to: '/participants', labelKey: 'nav.candidates', icon: UsersIcon, scope: 'client' },
-  { to: '/reports', labelKey: 'nav.reports', icon: ChartBarIcon, scope: 'client' },
-  // superadmin-clients-console: the platform owner's directory of every
-  // organization. First in the platform block — it is the entry point for
-  // the only viewer who ever sees a platform-only sidebar (DESIGN.md §8.1).
-  // `requires` gates it the same way as the two below: an org admin,
-  // operator or viewer never receives `clients.viewAny`, so the scope filter
-  // alone (which only ever REMOVES items from a SUPERADMIN) would leave this
-  // visible to every other role — the ability gate is what actually hides it.
-  {
-    to: '/clients',
-    labelKey: 'nav.clients',
-    icon: BuildingOffice2Icon,
-    requires: 'clients.viewAny',
-    scope: 'platform',
-  },
-  // C14. Configuration rather than a record, so it sits beside Settings and
-  // after the pages an operator opens daily.
-  //
-  // The last two carry a `requires`: an operator and an observer cannot use
-  // either page, and every request behind them comes back 403. Offering a
-  // door that is locked is worse than not showing it — the user clicks,
-  // waits, and is told no, with nothing they can do about it.
-  {
-    to: '/avatar-templates',
-    labelKey: 'nav.avatarTemplates',
-    icon: Cog6ToothIcon,
-    requires: 'avatarTemplates.viewAny',
-    scope: 'platform',
-  },
-  {
-    to: '/settings',
-    labelKey: 'nav.settings',
-    icon: Cog6ToothIcon,
-    requires: 'users.viewAny',
-    scope: 'platform',
-  },
-  // framework-catalogue-authoring PR10 (D11). `catalogue.manage` is the
-  // SAME ability `middleware/03.abilities.global.ts` guards the route with,
-  // so the link and the guard cannot disagree about who may go there.
-  {
-    to: '/catalogue',
-    labelKey: 'nav.catalogue',
-    icon: BookOpenIcon,
-    requires: 'catalogue.manage',
-    scope: 'platform',
-  },
-] as const satisfies readonly NavItem[]
-
-/**
- * `requires` is the ability the SERVER publishes for that page, not a role
- * name — same map `03.abilities.global.ts` guards the route with, so the link
- * and the guard cannot disagree about who may go there.
- */
-interface NavItem {
-  to: string
-  labelKey: string
-  icon: unknown
-  requires?: AbilityKey
-  scope: NavScope
-}
 
 /**
  * Items with no `requires` are always shown. `can()` fails closed, so on a

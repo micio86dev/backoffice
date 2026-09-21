@@ -1241,6 +1241,20 @@
       }
     }
   },
+  "onboardingTour": {
+    "regionLabel": "Guided tour",
+    "progress": "Step {current} of {total}",
+    "skip": "Skip tour",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Done",
+    "help": {
+      "description": "Open this panel any time you need a reminder of how a page works."
+    },
+    "clients": {
+      "description": "The directory of every organization on the platform. Switch into one to see its projects, candidates and reports."
+    }
+  },
   "review": {
     "title": "Session review",
     "subtitle": "What happened during this interview: timing, integrity checks and snapshots.",

@@ -7,6 +7,7 @@
         <slot />
       </div>
     </SidebarInset>
+    <OnboardingTourOverlay />
   </SidebarProvider>
 </template>
 
@@ -19,6 +20,7 @@ import { onMounted } from 'vue'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import SidebarNav from '@/components/organisms/SidebarNav.vue'
 import NavBar from '@/components/organisms/NavBar.vue'
+import OnboardingTourOverlay from '@/components/organisms/OnboardingTourOverlay.vue'
 import { useOrganization } from '@/composables/useOrganization'
 import { applyBrandColor } from '@/composables/useBrandTheme'
 

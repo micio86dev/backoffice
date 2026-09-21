@@ -29,12 +29,14 @@
 
       The organization is ONE section's data, not the page's. A superadmin
       belongs to no organization — `users.organization_id` is null, which is
-      what makes them one — so `/api/organization` answers 404 on every load,
-      and hiding the entire rail behind that told them "this resource was not
-      found" on a page whose PLATFORM section is built for exactly them and
-      needs no organization at all. Four of the seven sections fetch their own
-      data; only the three that take `organization` as a prop can be affected
-      by its absence, and `visibleSections` drops precisely those.
+      what makes them one — so `/api/organization` answers `data: null` on
+      every load (api's `OrganizationController::show()`,
+      fix/organization-no-acting-org-404), and treating that as a page-wide
+      failure told them "this resource was not found" on a page whose
+      PLATFORM section is built for exactly them and needs no organization at
+      all. Four of the seven sections fetch their own data; only the three
+      that take `organization` as a prop can be affected by its absence, and
+      `visibleSections` drops precisely those.
     -->
     <!--
       `data-active:…font-semibold` is NOT decoration — it is the selected
@@ -119,7 +121,7 @@ import {
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
+import { useOrganization, type OrganizationRecord } from '@/composables/useOrganization'
 import { useCurrentUser, type AbilityKey } from '@/composables/useCurrentUser'
 import {
   resolveResourceErrorState,
@@ -302,7 +304,7 @@ useHead({
 
 const { fetchOrganization } = useOrganization()
 
-const organization = ref<OrganizationResponse['data'] | null>(null)
+const organization = ref<OrganizationRecord | null>(null)
 const loadError = ref<ResourceErrorState | null>(null)
 
 /**
@@ -310,17 +312,20 @@ const loadError = ref<ResourceErrorState | null>(null)
  * is not a failure.
  *
  * `users.organization_id` being null is what makes them a superadmin, so
- * `/api/organization` answers 404 on every load. Rendering that as a
- * destructive "this resource could not be found" tells them something is
- * broken on a page where nothing is: the same complaint as the collapsed rail,
- * just moved into the banner. `NavBar.vue` already applies this exact guard to
- * this exact request — it was simply never applied here.
+ * `/api/organization` answers `200` with `data: null` on every load — never a
+ * 404 (api's `OrganizationController::show()`, fix/organization-no-acting-org-404:
+ * the endpoint used to `findOrFail(null)` and throw, which turned this
+ * ordinary state into an unhandled exception on every superadmin page load).
+ * Rendering it as a destructive "this resource could not be found" tells them
+ * something is broken on a page where nothing is: the same complaint as the
+ * collapsed rail, just moved into the banner.
  *
  * A superadmin ACTING AS a client is the opposite case and must not be caught
  * by it: `TenantContext` scopes them to that organization, the route answers
- * 200, and they get the full settings page for the client they selected. So
- * this is resolved from the RESPONSE, not from identity alone — a 404 for a
- * superadmin is structural, and every other outcome means what it always did.
+ * a real organization, and they get the full settings page for the client
+ * they selected. So this is resolved from the RESPONSE, not from identity
+ * alone — `data: null` for a superadmin is structural, and every other
+ * outcome means what it always did.
  */
 const noOrganizationInContext = ref(false)
 
@@ -328,8 +333,8 @@ const noOrganizationInContext = ref(false)
  * Which population the Users section manages (platform-user-management D6).
  *
  * Read from `noOrganizationInContext`, which is set ONLY when
- * `/api/organization` answered 404 AND the viewer is a superadmin — the exact
- * shape of "a superadmin with no client selected". It is derived from a
+ * `/api/organization` answered `data: null` AND the viewer is a superadmin —
+ * the exact shape of "a superadmin with no client selected". It is derived from a
  * response this page already makes, so there is no fourth `fetchClients()`
  * call to keep in step with the three that exist.
  *
@@ -397,8 +402,8 @@ const visibleSections = computed(() =>
     // FAILED organization read says nothing about whether a client is
     // selected, and hiding this section on a transient 500 would take the keys
     // away from an ordinary admin whose unrelated request happened to break.
-    // Only `noOrganizationInContext` — a 404 for a superadmin, the exact shape
-    // of the all-clients view — drops it.
+    // Only `noOrganizationInContext` — `data: null` for a superadmin, the
+    // exact shape of the all-clients view — drops it.
     if (section.requiresTenant === true && noOrganizationInContext.value) {
       return false
     }
@@ -432,8 +437,9 @@ const visibleSections = computed(() =>
  * `ensureLoaded()` in `onMounted` — AFTER `<Tabs>` has run its setup — so at
  * first render `can()` fails closed on everything, `visibleSections` is EMPTY,
  * and the fallback below is what gets frozen in. Then `/auth/me` resolves, a
- * superadmin's `/api/organization` 404s, the three organization sections drop,
- * and the model still names one of them: a full rail beside an empty column.
+ * superadmin's `/api/organization` answers `data: null`, the three
+ * organization sections drop, and the model still names one of them: a full
+ * rail beside an empty column.
  *
  * So the value is owned here and re-pointed whenever the section it names
  * stops existing. The guard is `!some`, not `length === 0`: the list being
@@ -460,29 +466,16 @@ const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? '
 async function load(): Promise<void> {
   try {
     const response = await fetchOrganization()
-    organization.value = response.data
-    loadError.value = null
-    noOrganizationInContext.value = false
-  } catch (error) {
-    const state = resolveResourceErrorState(error)
 
-    // A 404 here is STRUCTURAL for a platform user and an error for everyone
-    // else, so the branch needs to know which one is asking — and it asks the
-    // ability map, not `user.is_superadmin`.
-    //
-    // `clients.viewAny` is the honest question: it is the ability to operate
-    // the estate rather than one organization, which is exactly the identity
-    // for which `/api/organization` has no row to return. `Gate::define
-    // ('viewAnyClients')` answers it, so client and server agree by
-    // construction instead of by two copies of the same rule.
-    //
-    // It fails CLOSED, and that matters more than the tidiness: `can()`
-    // answers false on a failed `/auth/me`, so an unknown viewer gets the
-    // error banner rather than being silently told this is normal.
-    //
-    // Identity may still be in flight; `ensureLoaded()` is awaited in
-    // `onMounted` before this runs, so the map is settled by now.
-    if (state === 'not-found' && can('clients.viewAny')) {
+    // `data: null` is the ordinary shape of "no organization in context" (api
+    // fix/organization-no-acting-org-404: `TenantResolver::getOrgId()` is null
+    // only in `TenantContext`'s superadmin-bypass branch) — but it is still
+    // resolved against the ABILITY MAP, never trusted on its own. Same
+    // reasoning the old 404-branch check gave for reading `clients.viewAny`
+    // instead of identity: the day that gate grows a second condition, a
+    // superadmin the server has otherwise refused the estate must still see a
+    // real error, not the silent "this is normal" path.
+    if (response.data === null && can('clients.viewAny')) {
       organization.value = null
       loadError.value = null
       noOrganizationInContext.value = true
@@ -490,7 +483,21 @@ async function load(): Promise<void> {
       return
     }
 
-    loadError.value = state
+    if (response.data === null) {
+      loadError.value = 'not-found'
+      noOrganizationInContext.value = false
+
+      return
+    }
+
+    organization.value = response.data
+    loadError.value = null
+    noOrganizationInContext.value = false
+  } catch (error) {
+    // A genuine 404 here — the endpoint no longer emits one for "no acting
+    // org" — is a real anomaly (e.g. a dangling `organization_id`), not the
+    // ordinary superadmin shape above, so it always surfaces as an error now.
+    loadError.value = resolveResourceErrorState(error)
     noOrganizationInContext.value = false
   }
 }

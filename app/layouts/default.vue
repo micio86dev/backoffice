@@ -41,7 +41,9 @@ const { fetchOrganization } = useOrganization()
 onMounted(async () => {
   try {
     const response = await fetchOrganization()
-    applyBrandColor(response.data.primary_color)
+    // `data: null` is the superadmin-with-no-acting-org state (api's
+    // OrganizationController::show()), not an error — nothing to brand.
+    applyBrandColor(response.data?.primary_color)
   } catch {
     // Deliberately empty — see above.
   }

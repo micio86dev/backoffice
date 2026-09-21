@@ -138,7 +138,7 @@ onMounted(async () => {
       actingClientKnown.value = true
 
       // A superadmin has no organization of their own, so there is no name to
-      // fetch and the request below would 404 on every page load.
+      // fetch — the request below would only come back `data: null`.
       return
     }
   } catch {
@@ -147,7 +147,11 @@ onMounted(async () => {
   }
 
   try {
-    organizationName.value = (await useOrganization().fetchOrganization()).data.name
+    // `data` is null only for the superadmin-with-no-acting-org state this
+    // branch already returned early for above; kept as a fallback rather than
+    // a non-null assertion, since a genuinely missing organization here is
+    // exactly the "omit rather than error" case the catch below handles.
+    organizationName.value = (await useOrganization().fetchOrganization()).data?.name ?? null
   } catch {
     // Context, not content: on the login-adjacent routes or a transient
     // failure the topbar simply omits it rather than showing an error.

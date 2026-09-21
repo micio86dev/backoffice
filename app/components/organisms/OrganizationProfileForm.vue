@@ -101,13 +101,13 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
-import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
+import { useOrganization, type OrganizationRecord } from '@/composables/useOrganization'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { applyServerFieldErrors } from '@/utils/http-error'
 import { translateServerCodes } from '@/utils/server-message'
 
 const props = defineProps<{
-  organization: OrganizationResponse['data']
+  organization: OrganizationRecord
 }>()
 
 const emit = defineEmits<{

@@ -80,13 +80,13 @@ import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
 import FormMessage from '@/components/molecules/FormMessage.vue'
 import WriteOnlySecretField from '@/components/molecules/WriteOnlySecretField.vue'
-import { useOrganization, type OrganizationResponse } from '@/composables/useOrganization'
+import { useOrganization, type OrganizationRecord } from '@/composables/useOrganization'
 import { isProjectUrlValid, isUrlLengthValid } from '@/utils/project-field-specs'
 import { applyServerFieldErrors } from '@/utils/http-error'
 import { translateServerCodes } from '@/utils/server-message'
 
 const props = defineProps<{
-  organization: OrganizationResponse['data']
+  organization: OrganizationRecord
 }>()
 
 const emit = defineEmits<{

@@ -1013,7 +1013,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** GET /api/organization */
+        /**
+         * GET /api/organization
+         * @description `data: null` — never a 404 — when `getOrgId()` itself is null: a
+         *     superadmin with no acting organization selected (TenantContext's
+         *     explicit bypass branch). The backoffice shell layout calls this
+         *     endpoint unconditionally on every authenticated page to paint the
+         *     tenant's brand colour, so this is not a rare corner: it is what every
+         *     superadmin session hits before ever choosing "Act as", and a raw
+         *     `findOrFail(null)` turned that ordinary state into an unhandled
+         *     `ModelNotFoundException` logged as a 404 on every single page load.
+         *     Mirrors `RevisionController::current()`'s nullable-resource shape.
+         */
         get: operations["organization.show"];
         put?: never;
         post?: never;
@@ -5525,7 +5536,6 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description `OrganizationResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5533,6 +5543,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["OrganizationResource"];
+                    } | {
+                        data: null;
                     };
                 };
             };

@@ -1,7 +1,30 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
 import AvatarTemplateForm from '../../app/components/organisms/AvatarTemplateForm.vue'
+import AvatarTemplateProviderCombobox from '../../app/components/organisms/AvatarTemplateProviderCombobox.vue'
 import type { FieldSpec, ProviderName } from '../../app/types/avatar-template'
+
+// avatar-template-catalogue PR4 (D7): the form itself never calls the
+// catalogue endpoint — only the picker it now renders for a catalogue-backed
+// field does. Mocked here so mounting the form never depends on a live
+// network call, and so the picker's selectable list is deterministic.
+vi.mock('@/composables/useAvatarTemplates', () => ({
+  useAvatarTemplates: () => ({
+    fetchCatalogue: () =>
+      Promise.resolve({
+        status: 'ok',
+        items: [
+          {
+            id: 'picked-voice-id',
+            label: 'Catalogue voice',
+            language: 'en',
+            preview_image_url: null,
+            preview_audio_url: null,
+          },
+        ],
+      }),
+  }),
+}))
 
 /**
  * The template form (C14 PR6).
@@ -63,7 +86,19 @@ const SPECS: Record<ProviderName, FieldSpec[]> = {
     // other text field in this fixture) became REQUIRED-validated by D3, so
     // it can no longer double as the "clearing drops the key, never blanks
     // it" demonstration field without also tripping the new required check.
-    { key: 'voiceId', type: 'text', label_key: 'avatar_templates.field.voiceId' },
+    //
+    // avatar-template-catalogue PR4 (D7): `catalogue_resource: 'voice'`
+    // deliberately added here rather than to a separate fixture — it makes
+    // EVERY existing test below that touches `voiceId` (both in this
+    // describe block and the "clearing a field" one) exercise the new
+    // combobox control instead of a plain `<input>`, unmodified, which is
+    // exactly the proof that D7's write path did not change.
+    {
+      key: 'voiceId',
+      type: 'text',
+      label_key: 'avatar_templates.field.voiceId',
+      catalogue_resource: 'voice',
+    },
   ],
   tavus: [
     { key: 'faceId', type: 'text', label_key: 'avatar_templates.field.faceId', required: true },
@@ -560,6 +595,43 @@ describe('two-column layout for generated provider fields (feature/form-drawer)'
     const checkbox = wrapper.find('input[type="checkbox"]')
     const field = checkbox.element.closest('[data-slot="field"]')
     expect(field?.getAttribute('data-orientation')).toBe('horizontal')
+  })
+})
+
+// avatar-template-catalogue PR4 (D7): the picker replaces the CONTROL for a
+// catalogue-backed field, never the write path. `voiceId` in the fixture
+// above now carries `catalogue_resource: 'voice'` — every test that already
+// exercised it (both here and in "clearing a field removes it" above) keeps
+// passing unmodified, which is the proof this wiring did not fork the write
+// path D7 exists to protect.
+describe('the catalogue picker (avatar-template-catalogue PR4, D7)', () => {
+  it('renders the combobox for a field with catalogue_resource, and leaves every other field a plain input', async () => {
+    const wrapper = mountForm({ provider: 'heygen', config: {} })
+    await flushPromises()
+
+    expect(wrapper.findComponent(AvatarTemplateProviderCombobox).exists()).toBe(true)
+
+    // avatarId carries no catalogue_resource in this fixture — unchanged.
+    const avatarInput = wrapper.get('[data-testid="template-config-avatarId"]')
+    expect(avatarInput.element.tagName).toBe('INPUT')
+    expect(wrapper.findComponent(AvatarTemplateProviderCombobox).props('field').key).toBe('voiceId')
+  })
+
+  it('routes a catalogue selection through the same onFieldChange path, and clearing it still drops the key', async () => {
+    const wrapper = mountForm({
+      provider: 'heygen',
+      config: { avatarId: 'av_1', voiceId: 'picked-voice-id' },
+    })
+    await flushPromises()
+
+    // The combobox's underlying control carries the SAME testid the plain
+    // input used to — `.setValue('')` here is indistinguishable from the
+    // manual-entry path any operator without a catalogue selection uses.
+    await wrapper.get('[data-testid="template-config-voiceId"]').setValue('')
+    await wrapper.get('form').trigger('submit')
+
+    const payload = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
+    expect(payload.config).not.toHaveProperty('voiceId')
   })
 })
 

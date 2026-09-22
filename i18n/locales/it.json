@@ -961,6 +961,17 @@
         "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
+      },
+      "catalogue": {
+        "searchPlaceholder": "Cerca nel catalogo del servizio…",
+        "languageFilterLabel": "Lingua",
+        "languageAll": "Tutte le lingue",
+        "emptyForLanguage": "Nessun elemento corrisponde a questo filtro nel catalogo del servizio: usa l'inserimento manuale.",
+        "emptyUnavailable": "Il catalogo del servizio non è al momento disponibile: usa l'inserimento manuale.",
+        "preview": {
+          "play": "Riproduci anteprima",
+          "pause": "Metti in pausa l'anteprima"
+        }
       }
     },
     "llm": {

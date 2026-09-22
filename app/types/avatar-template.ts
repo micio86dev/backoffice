@@ -32,6 +32,13 @@
  * file. `AvatarTemplateForm.vue:278` deliberately sends `null` to clear the
  * description, so the local type is re-widened here rather than the runtime
  * behavior changed.
+ *
+ * `CatalogueEntry`/`CatalogueResponse` (avatar-template-catalogue PR4) are a
+ * DIFFERENT kind of gap from the three above: not a narrowing of a generated
+ * type, but a type with NO generated counterpart at all yet, because
+ * `GET /avatar-templates/catalogue` postdates this repo's last `openapi.json`
+ * regeneration. See each type's own docblock for the exact commit and the
+ * condition under which it should stop being hand-written.
  */
 
 import type { components, paths } from '../../types/api'
@@ -39,6 +46,14 @@ import type { components, paths } from '../../types/api'
 export type ProviderName = 'heygen' | 'tavus'
 
 export type FieldType = 'text' | 'number' | 'select' | 'checkbox'
+
+/**
+ * Which provider catalogue resource a field's picker draws from
+ * (avatar-template-catalogue design D2). Present on exactly `avatarId`/
+ * `voiceId` (heygen) and `faceId`/`palId` (tavus); absent — never `null` —
+ * on every other field, including `ttsExternalVoiceId`.
+ */
+export type CatalogueResource = 'voice' | 'avatar' | 'replica'
 
 /**
  * One configurable knob, as the API describes it.
@@ -62,6 +77,51 @@ export interface FieldSpec {
   min?: number
   max?: number
   step?: number
+  catalogue_resource?: CatalogueResource
+}
+
+/**
+ * One provider catalogue entry (avatar-template-catalogue design D1/D4).
+ *
+ * `language` is `null`, never a guess, when the provider's own resource
+ * carries no language attribute (Tavus's voices and replicas today) — a
+ * language filter MUST NOT treat `null` as matching everything.
+ *
+ * UNLIKE `config`/`provider`/`description` above, this is not a narrowing of
+ * a generated type — there is NOTHING to narrow. `GET
+ * /avatar-templates/catalogue` was added on the `api` submodule's own
+ * `feature/avatar-template-catalogue-pr1` branch (commit `22a76a2`), which
+ * regenerated `api/openapi.json` there, but this repo's own
+ * `openapi.json`/`types/api.ts` snapshot is regenerated from a COPY of that
+ * file (`bun run codegen`) and was last refreshed 2026-09-21 — before PR1
+ * existed. `types/api.ts` carries zero trace of this endpoint (confirmed:
+ * `rg -c "avatar-templates/catalogue" openapi.json` → 0 matches), so this
+ * type has none of the drift protection `codegen:check` gives every other
+ * response shape in this file. Revisit once `api`'s PR1 branch merges to
+ * `develop` and this repo's `openapi.json`/`types/api.ts` are regenerated
+ * against it — at that point this SHOULD become an `Omit`+re-add over the
+ * generated schema, matching the pattern above, not stay hand-written.
+ */
+export interface CatalogueEntry {
+  id: string
+  label: string
+  language: string | null
+  preview_image_url: string | null
+  preview_audio_url: string | null
+}
+
+/**
+ * `status: 'unavailable'` is a degraded-but-successful response (D3): a
+ * provider failure or cache miss-then-fail never throws, it returns an empty
+ * list the picker renders as an honest "catalogue unavailable" hint rather
+ * than a blank list that reads as a bug.
+ *
+ * Hand-written for the same reason as `CatalogueEntry` immediately above —
+ * no generated counterpart exists yet for this endpoint.
+ */
+export interface CatalogueResponse {
+  status: 'ok' | 'unavailable'
+  items: CatalogueEntry[]
 }
 
 export type FieldSpecsResponse = {

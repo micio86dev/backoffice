@@ -184,6 +184,27 @@
       :locale="locale"
       @generate="onRequestAnotherLink"
     />
+    <!--
+      interview-scheduling (PR-F): the scheduled branch's success response is
+      a `ParticipantResource` (design AD-7/T-B1: no `entry_url`, nothing was
+      minted or sent) — a genuinely different outcome from an immediate mint,
+      so it gets its own success surface rather than EntryLinkPanel rendering
+      with a link that was never produced.
+    -->
+    <div
+      v-else-if="scheduledParticipant"
+      class="flex flex-col gap-4"
+      data-testid="entry-link-scheduled-success"
+    >
+      <Alert data-testid="entry-link-scheduled-success-alert">
+        <AlertDescription>
+          {{ $t('entryLink.scheduled.success.body') }}
+        </AlertDescription>
+      </Alert>
+      <p class="text-muted-foreground text-sm" data-testid="entry-link-scheduled-success-at">
+        <FormattedDate :value="scheduledParticipant.scheduled_at" :locale="locale" show-zone />
+      </p>
+    </div>
     <EntryLinkForm
       v-else-if="inviteTarget"
       :project-id="inviteTarget.id"
@@ -193,11 +214,12 @@
 
     <template #footer>
       <!--
-        Once the link exists there is nothing left to submit, and a Save
-        control pointing at a form no longer in the DOM would be inert.
+        Once the link exists (or the interview is scheduled) there is nothing
+        left to submit, and a Save control pointing at a form no longer in
+        the DOM would be inert.
       -->
       <Button
-        v-if="mintedLink"
+        v-if="mintedLink || scheduledParticipant"
         variant="outline"
         data-testid="entry-link-close"
         @click="closeInvite"
@@ -227,13 +249,21 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import FormDrawerActions from '@/components/organisms/FormDrawerActions.vue'
 import ProjectStatusBadge from '@/components/atoms/ProjectStatusBadge.vue'
+import FormattedDate from '@/components/atoms/FormattedDate.vue'
 import EntryLinkForm from '@/components/organisms/EntryLinkForm.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import { projectAccessibility } from '@/utils/project-accessibility'
 import type { Project } from '@/composables/useProjects'
+import type { GenerateEntryLinkResponse } from '@/composables/useEntryLinks'
+
+// interview-scheduling (PR-F): only what the scheduled-success surface
+// renders — the full `ParticipantResource` carries far more than this view
+// needs.
+type ScheduledParticipant = { display_name: string; scheduled_at: string | null }
 
 // bars-coverage-visibility Phase 4 (design D1): `coverage` maps role_code ->
 // the IDS of that role's competencies with no BARS anchors, resolved by the
@@ -300,6 +330,10 @@ function uncoveredCount(project: Project): number {
 
 const inviteTarget = ref<Project | null>(null)
 const mintedLink = ref<EntryLink | null>(null)
+// interview-scheduling (PR-F): set instead of `mintedLink` when the response
+// carries no `entry_url` (the scheduled branch never mints/sends anything at
+// creation time — T-B1).
+const scheduledParticipant = ref<ScheduledParticipant | null>(null)
 // Mirrored from EntryLinkForm's own in-flight flag (feature/form-drawer): the
 // form still owns the request, the drawer footer holds its submit control.
 const minting = ref(false)
@@ -307,15 +341,27 @@ const minting = ref(false)
 function openInvite(project: Project): void {
   inviteTarget.value = project
   mintedLink.value = null
+  scheduledParticipant.value = null
 }
 
 function closeInvite(): void {
   inviteTarget.value = null
   mintedLink.value = null
+  scheduledParticipant.value = null
 }
 
-function onInviteSuccess(link: EntryLink): void {
-  mintedLink.value = link
+// The two success shapes are mutually exclusive on the wire (T-B1): the
+// immediate path's response always carries `entry_url`, the scheduled path's
+// never does. Presence of `entry_url` is what tells them apart — never a
+// separate discriminant field, because the API does not send one.
+function onInviteSuccess(response: GenerateEntryLinkResponse): void {
+  if ('entry_url' in response) {
+    mintedLink.value = response
+    scheduledParticipant.value = null
+  } else {
+    scheduledParticipant.value = response
+    mintedLink.value = null
+  }
 }
 
 // "Generate new link" from inside the invite dialog: EntryLinkForm's

@@ -977,6 +977,17 @@
         "descriptionTooLong": "The description must be at most 500 characters.",
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."
+      },
+      "catalogue": {
+        "searchPlaceholder": "Search the service's catalogue…",
+        "languageFilterLabel": "Language",
+        "languageAll": "All languages",
+        "emptyForLanguage": "No entries match this filter in the service's catalogue — use manual entry.",
+        "emptyUnavailable": "The service's catalogue is not available right now — use manual entry.",
+        "preview": {
+          "play": "Play preview",
+          "pause": "Pause preview"
+        }
       }
     },
     "llm": {

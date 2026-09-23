@@ -122,4 +122,38 @@ describe('useAvatarTemplates', () => {
     // empty result — and an operator would watch Save do nothing.
     await expect(useAvatarTemplates().listTemplates()).rejects.toThrow()
   })
+
+  // avatar-template-catalogue PR4 (D1): the picker calls this with the exact
+  // provider/resource pair `field.catalogue_resource` already names — never a
+  // second, hand-maintained mapping in the frontend.
+  it('fetches the provider catalogue with the provider/resource query params, unwrapping the envelope', async () => {
+    const entry = {
+      id: 'v1',
+      label: 'Alessandra - IA',
+      language: 'en',
+      preview_image_url: null,
+      preview_audio_url: 'https://cdn.example/voice.mp3',
+    }
+    apiFetch.mockResolvedValue({ data: { status: 'ok', items: [entry] } })
+
+    const result = await useAvatarTemplates().fetchCatalogue('heygen', 'voice')
+
+    expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/catalogue', {
+      query: { provider: 'heygen', resource: 'voice' },
+    })
+    // The `data` envelope every other endpoint carries is unwrapped here, not
+    // left for every call site to repeat.
+    expect(result).toEqual({ status: 'ok', items: [entry] })
+  })
+
+  it('surfaces a degraded catalogue as-is, never throwing on status: unavailable', async () => {
+    apiFetch.mockResolvedValue({ data: { status: 'unavailable', items: [] } })
+
+    const result = await useAvatarTemplates().fetchCatalogue('tavus', 'replica')
+
+    expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/catalogue', {
+      query: { provider: 'tavus', resource: 'replica' },
+    })
+    expect(result).toEqual({ status: 'unavailable', items: [] })
+  })
 })

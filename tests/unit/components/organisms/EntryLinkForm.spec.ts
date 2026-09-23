@@ -152,6 +152,192 @@ describe('EntryLinkForm', () => {
   })
 })
 
+describe('EntryLinkForm — scheduled interview (interview-scheduling, design AD-2/AD-3, PR-F)', () => {
+  beforeEach(() => {
+    generateEntryLinkMock.mockReset().mockResolvedValue({
+      entry_url: 'https://interview.example.com/interview/tok',
+      expires_at: '2026-08-17T15:32:00.000000Z',
+    })
+  })
+
+  function mountForm() {
+    return mount(EntryLinkForm, {
+      props: { projectId: 42 },
+      global: { mocks: { $t: tMock } },
+    })
+  }
+
+  async function fillRequiredFields(wrapper: ReturnType<typeof mountForm>) {
+    await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
+    await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+  }
+
+  it('defaults to "send now": no timing toggle selection hides the scheduled-at field and shows send-email', () => {
+    const wrapper = mountForm()
+
+    expect(wrapper.find('[data-testid="entry-link-form-scheduled-at"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="entry-link-form-send-email"]').exists()).toBe(true)
+  })
+
+  it('selecting "schedule" reveals the scheduled-at field and hides send-email', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="entry-link-form-scheduled-at"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="entry-link-form-send-email"]').exists()).toBe(false)
+  })
+
+  it('switching back to "now" hides the scheduled-at field again and restores send-email', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+    await wrapper.get('[data-testid="entry-link-form-timing-now"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="entry-link-form-scheduled-at"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="entry-link-form-send-email"]').exists()).toBe(true)
+  })
+
+  it('"send now" submits WITHOUT scheduled_at — byte-for-byte the pre-existing payload (regression)', async () => {
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(generateEntryLinkMock).toHaveBeenCalledWith({
+      project_id: 42,
+      candidate_ref: 'cand-1',
+      display_name: 'Mario Rossi',
+      email: 'mario@example.test',
+      send_email: true,
+    })
+  })
+
+  it('rejects an empty scheduled_at when "schedule" is selected, without calling the API', async () => {
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="entry-link-form-scheduled-at-error"]').exists()).toBe(true)
+    expect(generateEntryLinkMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a scheduled_at less than 16 minutes from now, without calling the API', async () => {
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+
+    const tooSoon = new Date(Date.now() + 5 * 60_000)
+    const localValue = new Date(tooSoon.getTime() - tooSoon.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16)
+    await wrapper.get('[data-testid="entry-link-form-scheduled-at"]').setValue(localValue)
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="entry-link-form-scheduled-at-error"]').exists()).toBe(true)
+    expect(generateEntryLinkMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a past scheduled_at, without calling the API', async () => {
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+    await wrapper.get('[data-testid="entry-link-form-scheduled-at"]').setValue('2020-01-01T10:00')
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="entry-link-form-scheduled-at-error"]').exists()).toBe(true)
+    expect(generateEntryLinkMock).not.toHaveBeenCalled()
+  })
+
+  it('submits scheduled_at as an ISO-8601 string with an explicit UTC offset, and omits send_email', async () => {
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+
+    const future = new Date(Date.now() + 60 * 60_000)
+    const localValue = new Date(future.getTime() - future.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16)
+    await wrapper.get('[data-testid="entry-link-form-scheduled-at"]').setValue(localValue)
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(generateEntryLinkMock).toHaveBeenCalledTimes(1)
+    const payload = generateEntryLinkMock.mock.calls[0]?.[0]
+    expect(payload).toEqual({
+      project_id: 42,
+      candidate_ref: 'cand-1',
+      display_name: 'Mario Rossi',
+      email: 'mario@example.test',
+      scheduled_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/),
+    })
+    expect(payload.scheduled_at).toBe(future.toISOString().slice(0, 16) + ':00.000Z')
+  })
+
+  it('surfaces a mapped 422 (scheduled_at) next to its own control, not the banner', async () => {
+    generateEntryLinkMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: {
+          errors: { scheduled_at: ['The scheduled_at must be at least 16 minutes from now.'] },
+        },
+      })
+    )
+
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+
+    const future = new Date(Date.now() + 60 * 60_000)
+    const localValue = new Date(future.getTime() - future.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16)
+    await wrapper.get('[data-testid="entry-link-form-scheduled-at"]').setValue(localValue)
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="entry-link-form-scheduled-at-error"]').text()).toContain(
+      'The scheduled_at must be at least 16 minutes from now.'
+    )
+    expect(wrapper.find('[data-testid="entry-link-form-banner"]').exists()).toBe(false)
+  })
+
+  it('emits success with the scheduled ParticipantResource shape (no entry_url)', async () => {
+    generateEntryLinkMock.mockResolvedValueOnce({
+      id: 7,
+      candidate_ref: 'cand-1',
+      display_name: 'Mario Rossi',
+      scheduled_at: '2026-10-01T12:00:00.000000Z',
+      scheduling_status: 'pending',
+    })
+
+    const wrapper = mountForm()
+    await fillRequiredFields(wrapper)
+    await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+
+    const future = new Date(Date.now() + 60 * 60_000)
+    const localValue = new Date(future.getTime() - future.getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16)
+    await wrapper.get('[data-testid="entry-link-form-scheduled-at"]').setValue(localValue)
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.emitted('success')?.[0]?.[0]).toEqual({
+      id: 7,
+      candidate_ref: 'cand-1',
+      display_name: 'Mario Rossi',
+      scheduled_at: '2026-10-01T12:00:00.000000Z',
+      scheduling_status: 'pending',
+    })
+  })
+})
+
 describe('EntryLinkForm — the email is required, because it is the identity', () => {
   beforeEach(() => {
     generateEntryLinkMock.mockReset().mockResolvedValue({

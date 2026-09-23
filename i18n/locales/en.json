@@ -243,7 +243,22 @@
       "emailInvalid": "That does not look like an email address.",
       "sendEmail": "Email the invitation to the candidate",
       "help": {
-        "email": "Also identifies the candidate: inviting the same address to another project keeps it the same person."
+        "email": "Also identifies the candidate: inviting the same address to another project keeps it the same person.",
+        "scheduledAt": "The interview must be scheduled at least {minutes} minutes from now."
+      },
+      "timing": {
+        "legend": "When",
+        "now": "Now",
+        "schedule": "Schedule"
+      },
+      "scheduledAt": "Interview date and time",
+      "scheduledAtRequired": "Enter the interview date and time.",
+      "scheduledAtInvalid": "That date and time is not valid.",
+      "scheduledAtTooSoon": "The interview must be scheduled at least {minutes} minutes from now."
+    },
+    "scheduled": {
+      "success": {
+        "body": "The candidate will not receive anything now. They will get a reminder and the entry link at the scheduled time:"
       }
     },
     "serverError": {

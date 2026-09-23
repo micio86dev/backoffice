@@ -174,6 +174,38 @@ describe('ProjectTable — Invite candidate (operator-interview-link)', () => {
     wrapper.unmount()
   })
 
+  // interview-scheduling (PR-F): the scheduled branch's success response is a
+  // `ParticipantResource` (no `entry_url`) — a different shape from the
+  // immediate-mint response above, so the parent must render a DIFFERENT
+  // success surface, never EntryLinkPanel with a missing link.
+  it('opens the invite dialog with EntryLinkForm, then shows a scheduled-success state on a scheduled success', async () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1, status: 'active' })], canInvite: true, locale: 'en' },
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+
+    const form = wrapper.findComponent(EntryLinkForm)
+    form.vm.$emit('success', {
+      id: 7,
+      candidate_ref: 'cand-1',
+      display_name: 'Mario Rossi',
+      scheduled_at: '2026-10-01T12:00:00.000000Z',
+      scheduling_status: 'pending',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(document.body.querySelector('[data-testid="entry-link-form"]')).toBeNull()
+    expect(document.body.querySelector('[data-testid="entry-link-url"]')).toBeNull()
+    expect(
+      document.body.querySelector('[data-testid="entry-link-scheduled-success"]')
+    ).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
   // feature/form-drawer — "Invite candidate" is a create form launched from a
   // table row, which is the drawer case. The two-stage flow is deliberately
   // NOT split into a drawer plus a separate dialog: the minted link has to

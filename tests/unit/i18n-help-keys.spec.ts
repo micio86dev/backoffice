@@ -30,6 +30,23 @@ const HELP_KEY_PATHS = [
   'settings.organization.help.name',
   'settings.apiKeys.help.name',
   'avatar_templates.form.help.name',
+  // interview-scheduling (PR-F): the 16-minute minimum-lead-time hint on the
+  // scheduled-at field.
+  'entryLink.form.help.scheduledAt',
+] as const
+
+// interview-scheduling (PR-F, T-F3): the "send now"/"schedule" toggle, the
+// scheduled-at field, its client-side validation messages, and the
+// scheduled-success copy — every user-facing string PR-F added.
+const ENTRY_LINK_SCHEDULING_KEY_PATHS = [
+  'entryLink.form.timing.legend',
+  'entryLink.form.timing.now',
+  'entryLink.form.timing.schedule',
+  'entryLink.form.scheduledAt',
+  'entryLink.form.scheduledAtRequired',
+  'entryLink.form.scheduledAtInvalid',
+  'entryLink.form.scheduledAtTooSoon',
+  'entryLink.scheduled.success.body',
 ] as const
 
 // bars-coverage-visibility Phase 3 (design D6) — the 4 new coverage-copy
@@ -337,6 +354,18 @@ describe('catalogue help and read-only copy — locale key parity', () => {
     expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
     expect(get(EN, path)).not.toBe('')
   })
+})
+
+describe('interview-scheduling — entry-link scheduling copy, locale key parity', () => {
+  it.each(ENTRY_LINK_SCHEDULING_KEY_PATHS)(
+    'both locales carry a non-empty string at %s',
+    (path) => {
+      expect(typeof get(IT, path), `it.json is missing "${path}"`).toBe('string')
+      expect(get(IT, path)).not.toBe('')
+      expect(typeof get(EN, path), `en.json is missing "${path}"`).toBe('string')
+      expect(get(EN, path)).not.toBe('')
+    }
+  )
 })
 
 describe('scoring-audit-jev — audit review copy, locale key parity', () => {

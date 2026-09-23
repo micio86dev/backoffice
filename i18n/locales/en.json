@@ -556,6 +556,7 @@
         "trigger": "Request an audit review",
         "triggering": "Requesting…",
         "inProgress": "Audit review in progress",
+        "pollTimeout": "This is taking longer than expected — check back in a few minutes.",
         "status": {
           "completed": "Audit review complete",
           "partial": "Audit review complete — some indicators could not be reviewed",

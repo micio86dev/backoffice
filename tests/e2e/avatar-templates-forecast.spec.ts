@@ -35,8 +35,20 @@ function templateFixture(over: Record<string, unknown> = {}) {
   }
 }
 
+// avatar-template-catalogue PR4: `voiceId` carries `catalogue_resource:
+// 'voice'`, `avatarId` deliberately does not — the fixture needs one
+// catalogue-backed field and one plain manual-entry field side by side to
+// prove the picker only replaces the CONTROL it is wired to (D7).
 const FIELD_SPECS = {
-  heygen: [{ key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId' }],
+  heygen: [
+    { key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId' },
+    {
+      key: 'voiceId',
+      type: 'text',
+      label_key: 'avatar_templates.field.voiceId',
+      catalogue_resource: 'voice',
+    },
+  ],
   tavus: [{ key: 'faceId', type: 'text', label_key: 'avatar_templates.field.faceId' }],
 }
 
@@ -137,5 +149,128 @@ test.describe('Avatar templates — conversation-LLM forecast', () => {
     await expect(page.getByTestId('template-llm-forecast-1')).toBeVisible()
 
     await checkA11y(page)
+  })
+})
+
+// avatar-template-catalogue PR4 (D5/D7): the provider-catalogue picker,
+// wired into the same form this file already opens and submits for the
+// forecast tests above — extended rather than a new harness (per this
+// change's own task instructions).
+test.describe('Avatar templates — provider catalogue picker (avatar-template-catalogue PR4)', () => {
+  test('picks a HeyGen voice from the catalogue, showing its language, and the manual-entry path stays unchanged', async ({
+    page,
+  }) => {
+    let patchBody: Record<string, unknown> | null = null
+
+    await mockApi(page, [templateFixture()])
+
+    // `avatarTemplates.update` is PLATFORM-gated (`isSuperadmin`), not a plain
+    // tenant `admin` ability (tests/unit/support/abilities.ts) — `mockApi`'s
+    // shared `/auth/me` stub answers as a tenant admin, which never renders
+    // `template-edit-{id}` at all. Overridden here, after `mockApi`, rather
+    // than changing the shared helper's default: Playwright dispatches the
+    // most-recently-registered matching route first, so this replaces the
+    // `/auth/me` handler for this test only, exactly like
+    // `catalogue-edit-publish.spec.ts`'s own platform-only override.
+    await page.route(
+      (url) => url.pathname === '/auth/me',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              user: {
+                id: 1,
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                locale: 'it',
+                photo_url: null,
+              },
+              organization: { id: 1, name: 'Acme' },
+              roles: ['admin'],
+              abilities: abilitiesFor({ roles: ['admin'], isSuperadmin: true }),
+            })
+          : route.continue()
+    )
+
+    await page.route(
+      (url) => url.pathname === '/avatar-templates/catalogue',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              data: {
+                status: 'ok',
+                items: [
+                  {
+                    id: 'voice-e2e-1',
+                    label: 'Recruiter EN',
+                    language: 'en',
+                    preview_image_url: null,
+                    preview_audio_url: null,
+                  },
+                ],
+              },
+            })
+          : route.continue()
+    )
+    // Both fulfilled-empty rather than left unmocked: the form loads these
+    // in the background on mount (P8's conversation-LLM binding), and an
+    // empty catalogue here still carries the template's existing binding
+    // through untouched — this test is about the AVATAR/VOICE catalogue,
+    // not the LLM one.
+    await page.route(
+      (url) => url.pathname === '/llm-models',
+      (route) => (isDataRequest(route) ? jsonRoute(route, { data: [] }) : route.continue())
+    )
+    await page.route(
+      (url) => url.pathname === '/llm-credentials',
+      (route) => (isDataRequest(route) ? jsonRoute(route, { data: [] }) : route.continue())
+    )
+    await page.route(
+      (url) => url.pathname === '/avatar-templates/1',
+      async (route) => {
+        if (route.request().method() !== 'PATCH') {
+          await route.continue()
+
+          return
+        }
+
+        patchBody = route.request().postDataJSON()
+        await jsonRoute(route, { data: templateFixture() })
+      }
+    )
+
+    await login(page)
+    await page.goto('/avatar-templates')
+
+    // The role-aware first-login guided tour opens over a fresh session
+    // (feature/role-aware-onboarding-tour) and would otherwise sit on top of
+    // the row actions this test needs to click.
+    const tourSkip = page.getByTestId('onboarding-tour-skip')
+    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
+
+    await page.getByTestId('template-edit-1').click()
+    await expect(page.getByTestId('template-form')).toBeVisible()
+
+    // Open the catalogue picker and see the language it carries — the exact
+    // thing an operator needs to catch a preset named for one language but
+    // tagged for another (this feature's founding bug, proposal.md).
+    const voiceInput = page.getByTestId('template-config-voiceId')
+    await voiceInput.click()
+    const catalogueItem = page.getByTestId('template-config-voiceId-item-voice-e2e-1')
+    await expect(catalogueItem).toBeVisible()
+    await expect(catalogueItem).toContainText('en')
+    await catalogueItem.click()
+    await expect(voiceInput).toHaveValue('voice-e2e-1')
+
+    // The manual-entry path, unchanged: avatarId carries no
+    // catalogue_resource in this fixture, so it stays a plain text input.
+    await page.getByTestId('template-config-avatarId').fill('manual-avatar-id')
+
+    await page.getByTestId('form-drawer-save').click()
+    await expect(page.getByTestId('template-form')).toBeHidden()
+
+    expect(patchBody?.config).toMatchObject({
+      voiceId: 'voice-e2e-1',
+      avatarId: 'manual-avatar-id',
+    })
   })
 })

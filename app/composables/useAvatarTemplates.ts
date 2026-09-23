@@ -7,7 +7,10 @@
  */
 import type {
   AvatarTemplate,
+  CatalogueResource,
+  CatalogueResponse,
   FieldSpecsResponse,
+  ProviderName,
   TemplateListResponse,
   TemplateOptionsResponse,
   TemplateResponse,
@@ -44,6 +47,29 @@ export function useAvatarTemplates() {
     // offering a knob the payload never sends looks exactly like a knob that
     // does not work.
     return apiFetch<FieldSpecsResponse>('/avatar-templates/field-specs')
+  }
+
+  /**
+   * The provider's real inventory for one `(provider, resource)` pair
+   * (avatar-template-catalogue design D1). The API caches this for 24h
+   * server-side (D3) — this composable adds no client-side cache of its own,
+   * matching this file's own "no state, no caching" doctrine: which template
+   * is active changes what every candidate meets next, and that discipline
+   * extends to not going stale on the picker's inventory either.
+   *
+   * Unwraps the `{data: {...}}` envelope every other endpoint here carries,
+   * so every call site gets the typed `{status, items}` shape directly rather
+   * than repeating the unwrap.
+   */
+  async function fetchCatalogue(
+    provider: ProviderName,
+    resource: CatalogueResource
+  ): Promise<CatalogueResponse> {
+    const response = await apiFetch<{ data: CatalogueResponse }>('/avatar-templates/catalogue', {
+      query: { provider, resource },
+    })
+
+    return response.data
   }
 
   async function createTemplate(payload: {
@@ -124,6 +150,7 @@ export function useAvatarTemplates() {
     listTemplates,
     listTemplateOptions,
     fetchFieldSpecs,
+    fetchCatalogue,
     createTemplate,
     updateTemplate,
     activateTemplate,

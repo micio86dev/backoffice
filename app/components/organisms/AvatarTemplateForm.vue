@@ -146,8 +146,32 @@
               >
             </FieldLabel>
 
+            <!--
+          avatar-template-catalogue PR4 (D7): checked BEFORE the select/text
+          branches below. A catalogue-backed field (`avatarId`/`voiceId` for
+          heygen, `faceId`/`palId` for tavus — D2) still stores a plain
+          string and still routes through the SAME `onFieldChange()` this
+          form has always used for a text field; the combobox only replaces
+          the CONTROL, never the write path. Every field without
+          `catalogue_resource` (including `ttsExternalVoiceId`) falls
+          through to the branches below, completely unchanged.
+        -->
+            <AvatarTemplateProviderCombobox
+              v-if="field.catalogue_resource"
+              :id="`template-config-${field.key}`"
+              :data-testid="`template-config-${field.key}`"
+              :field="field"
+              :provider="draft.provider"
+              :model-value="stringValue(field.key)"
+              :aria-invalid="Boolean(configErrors[field.key])"
+              :aria-required="field.required ? 'true' : undefined"
+              :aria-describedby="describedBy(field)"
+              @change="onFieldChange(field, $event)"
+              @blur="validateConfigField(field)"
+            />
+
             <select
-              v-if="field.type === 'select'"
+              v-else-if="field.type === 'select'"
               :id="`template-config-${field.key}`"
               :data-testid="`template-config-${field.key}`"
               :value="stringValue(field.key)"
@@ -326,6 +350,7 @@ import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
+import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 import type { LlmCredential, LlmModel } from '@/types/llm'
 

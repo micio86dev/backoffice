@@ -70,9 +70,14 @@ test.describe('Session reload — no /login flash with a valid refresh cookie (D
   }) => {
     await mockAuthenticatedSession(page)
 
+    // level: 1, not just name — a fresh context has no
+    // `beai.onboarding.tour-seen.*` entry, so the first-login tour overlay
+    // auto-opens on step 1, whose own <h2> is ALSO titled "Dashboard". Without
+    // the level filter this is a strict-mode violation the instant the tour
+    // mounts inside the assertion's polling window: flaky, not deterministic.
     await page.goto('/')
     await expect(page).toHaveURL('/')
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
 
     // The reload is the assertion: 00.auth-bootstrap.client.ts must settle
     // BEFORE 02.auth.global.ts's guard runs, on every single load — not just
@@ -80,7 +85,7 @@ test.describe('Session reload — no /login flash with a valid refresh cookie (D
     await page.reload()
 
     await expect(page).toHaveURL('/')
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
   })
 
   test('a reload with NO refresh cookie (refresh fails) correctly lands on /login, not a flash-then-stay', async ({

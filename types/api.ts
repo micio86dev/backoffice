@@ -1232,6 +1232,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/m2m/participants/{id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel a participant's scheduled interview (interview-scheduling,
+         *     design AD-7, tasks T-E4)
+         * @description DELETE /api/m2m/participants/{id}/schedule
+         *     Auth: auth:api-m2m + ability:participants:schedule
+         */
+        delete: operations["participant.cancelSchedule"];
+        options?: never;
+        head?: never;
+        /**
+         * Reschedule a participant's scheduled interview (interview-scheduling,
+         *     design AD-7, tasks T-E4)
+         * @description PATCH /api/m2m/participants/{id}/schedule
+         *     Auth: auth:api-m2m + ability:participants:schedule
+         */
+        patch: operations["participant.updateSchedule"];
+        trace?: never;
+    };
     "/participants/{id}/transcript/download": {
         parameters: {
             query?: never;
@@ -1280,6 +1308,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/participants/{id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** DELETE /api/participants/{id}/schedule */
+        delete: operations["participantSchedule.destroy"];
+        options?: never;
+        head?: never;
+        /** PATCH /api/participants/{id}/schedule */
+        patch: operations["participantSchedule.update"];
         trace?: never;
     };
     "/admin/platform-users": {
@@ -2201,52 +2247,6 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
-        trace?: never;
-    };
-    "/participants/{id}/schedule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** DELETE /api/participants/{id}/schedule */
-        delete: operations["participantSchedule.destroy"];
-        options?: never;
-        head?: never;
-        /** PATCH /api/participants/{id}/schedule */
-        patch: operations["participantSchedule.update"];
-        trace?: never;
-    };
-    "/m2m/participants/{id}/schedule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Cancel a participant's scheduled interview (interview-scheduling,
-         *     design AD-7, tasks T-E4)
-         * @description DELETE /api/m2m/participants/{id}/schedule
-         *     Auth: auth:api-m2m + ability:participants:schedule
-         */
-        delete: operations["participant.cancelSchedule"];
-        options?: never;
-        head?: never;
-        /**
-         * Reschedule a participant's scheduled interview (interview-scheduling,
-         *     design AD-7, tasks T-E4)
-         * @description PATCH /api/m2m/participants/{id}/schedule
-         *     Auth: auth:api-m2m + ability:participants:schedule
-         */
-        patch: operations["participant.updateSchedule"];
         trace?: never;
     };
 }
@@ -5929,6 +5929,14 @@ export interface operations {
                     display_name: string;
                     role_code?: string | null;
                     language?: string | null;
+                    /**
+                     * @description interview-scheduling (design AD-2/AD-3, T-C1): optional future
+                     *     start time, validated by the SAME rule object PR-B's
+                     *     `EntryLinkController` already uses — the explicit-offset
+                     *     check, the future check, and the minimum-lead-time check all
+                     *     live in ONE place, never re-typed per surface.
+                     */
+                    scheduled_at?: string;
                 };
             };
         };
@@ -5952,6 +5960,9 @@ export interface operations {
                         message: string;
                         /** @enum {string|null} */
                         reason: "duplicate_candidate_ref" | "duplicate_email" | null;
+                    } | {
+                        message: string;
+                        reason: string;
                     };
                 };
             };
@@ -5981,6 +5992,61 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
+        };
+    };
+    "participant.cancelSchedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `App.Http.Resources.ParticipantResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            404: components["responses"]["ModelNotFoundException"];
+        };
+    };
+    "participant.updateSchedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    scheduled_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description `App.Http.Resources.ParticipantResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            404: components["responses"]["ModelNotFoundException"];
+            422: components["responses"]["ValidationException"];
         };
     };
     "admin.participants.transcript.download": {
@@ -6072,6 +6138,63 @@ export interface operations {
                     };
                 };
             };
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "participantSchedule.destroy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `App.Http.Resources.ParticipantResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            404: components["responses"]["ModelNotFoundException"];
+        };
+    };
+    "participantSchedule.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    scheduled_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description `App.Http.Resources.ParticipantResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            404: components["responses"]["ModelNotFoundException"];
             422: components["responses"]["ValidationException"];
         };
     };
@@ -7862,118 +7985,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
-        };
-    };
-    "participantSchedule.destroy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
-                };
-            };
-            401: components["responses"]["AuthenticationException"];
-            403: components["responses"]["AuthorizationException"];
-            404: components["responses"]["ModelNotFoundException"];
-        };
-    };
-    "participantSchedule.update": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    scheduled_at: string;
-                };
-            };
-        };
-        responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
-                };
-            };
-            401: components["responses"]["AuthenticationException"];
-            403: components["responses"]["AuthorizationException"];
-            404: components["responses"]["ModelNotFoundException"];
-            422: components["responses"]["ValidationException"];
-        };
-    };
-    "participant.cancelSchedule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
-                };
-            };
-            401: components["responses"]["AuthenticationException"];
-            404: components["responses"]["ModelNotFoundException"];
-        };
-    };
-    "participant.updateSchedule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    scheduled_at: string;
-                };
-            };
-        };
-        responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
-                };
-            };
-            401: components["responses"]["AuthenticationException"];
-            404: components["responses"]["ModelNotFoundException"];
-            422: components["responses"]["ValidationException"];
         };
     };
 }

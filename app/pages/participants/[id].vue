@@ -655,7 +655,15 @@ async function onGenerateEntryLink(): Promise<void> {
       // the least useful thing this button could do.
       send_email: false,
     })
-    entryLink.value = response
+    // interview-scheduling (PR-F): `generateEntryLink`'s response type widened
+    // to a union once `POST /entry-links` grew a scheduled branch (T-B1) that
+    // answers with a `ParticipantResource` instead. This call never sends
+    // `scheduled_at` — re-issuing a link for an EXISTING participant is
+    // always the immediate path — so the `ParticipantResource` arm is
+    // unreachable here in practice; narrowed defensively rather than cast,
+    // so a future change to this payload cannot silently render an
+    // undefined `entry_url`.
+    entryLink.value = 'entry_url' in response ? response : null
   } catch (error) {
     // The API answers with a CODE (`entry_link_participant_completed`,
     // `entry_link_project_closed`, ...) precisely so this layer — the only one

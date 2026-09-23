@@ -81,13 +81,38 @@
         </Field>
 
         <!--
-          Checked by DEFAULT. The operator opened "invite a candidate";
-          producing a link and quietly not sending it is the behaviour that
-          made this feature necessary. Unchecking it is how an operator who
-          delivers links some other way opts out — the link is returned either
-          way.
+          interview-scheduling (design AD-2/AD-3, PR-F): "send now" vs
+          "schedule for later". Default "now" preserves today's behaviour
+          byte-for-byte (spec: "Omitted scheduled_at preserves today's
+          immediate behavior"). ToggleGroup for a 2-choice option set, per
+          this repo's own shadcn-vue convention (ReportFilters.vue's status
+          filter uses the same FieldSet+FieldLegend+ToggleGroup shape).
         -->
-        <Field orientation="horizontal">
+        <FieldSet class="w-auto gap-2">
+          <FieldLegend variant="label">{{ $t('entryLink.form.timing.legend') }}</FieldLegend>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            :model-value="schedulingMode"
+            data-testid="entry-link-form-timing"
+            @update:model-value="onTimingChange"
+          >
+            <ToggleGroupItem value="now" data-testid="entry-link-form-timing-now">
+              {{ $t('entryLink.form.timing.now') }}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="schedule" data-testid="entry-link-form-timing-schedule">
+              {{ $t('entryLink.form.timing.schedule') }}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </FieldSet>
+
+        <!--
+          Nothing is sent at creation time on the scheduled path (T-B1) — no
+          mint, no email — so "send email now" is not a meaningful choice
+          while scheduling is on; it is hidden rather than disabled, since a
+          disabled control still asks a question that has no answer here.
+        -->
+        <Field v-if="schedulingMode === 'now'" orientation="horizontal">
           <Checkbox
             id="entry-link-form-send-email"
             v-model="sendEmail"
@@ -96,6 +121,43 @@
           <FieldLabel for="entry-link-form-send-email">
             {{ $t('entryLink.form.sendEmail') }}
           </FieldLabel>
+        </Field>
+
+        <Field v-else :data-invalid="Boolean(errors.scheduledAt)">
+          <FieldLabel for="entry-link-form-scheduled-at">
+            {{ $t('entryLink.form.scheduledAt') }}
+          </FieldLabel>
+          <Input
+            id="entry-link-form-scheduled-at"
+            v-model="scheduledAt"
+            type="datetime-local"
+            :aria-invalid="Boolean(errors.scheduledAt)"
+            :aria-describedby="
+              errors.scheduledAt
+                ? 'entry-link-form-scheduled-at-error'
+                : 'entry-link-form-scheduled-at-help'
+            "
+            data-testid="entry-link-form-scheduled-at"
+          />
+          <!--
+            The 16-minute figure is confirmed from
+            `api/app/Support/Scheduling/ScheduledInterviewWindow.php`'s
+            `MINIMUM_SCHEDULING_LEAD_MINUTES` — a UX hint only. The server
+            (the SAME `ScheduledStartWithinLeadTime` rule object used by every
+            surface) is the authority; this never replaces its validation.
+          -->
+          <FieldDescription id="entry-link-form-scheduled-at-help">
+            {{
+              $t('entryLink.form.help.scheduledAt', { minutes: MINIMUM_SCHEDULING_LEAD_MINUTES })
+            }}
+          </FieldDescription>
+          <FieldError
+            v-if="errors.scheduledAt"
+            id="entry-link-form-scheduled-at-error"
+            data-testid="entry-link-form-scheduled-at-error"
+          >
+            {{ errors.scheduledAt }}
+          </FieldError>
         </Field>
 
         <Alert
@@ -123,14 +185,46 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 // display_name only. project_id is known from context (the project row the
 // operator opened the dialog from), never a third field to pick.
 import { ref, watch } from 'vue'
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useEntryLinks, type GenerateEntryLinkResponse } from '@/composables/useEntryLinks'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  useEntryLinks,
+  type GenerateEntryLinkPayload,
+  type GenerateEntryLinkResponse,
+} from '@/composables/useEntryLinks'
 import { applyServerFieldErrors } from '@/utils/http-error'
 
 const MAX_LENGTH = 255
+
+// interview-scheduling (design AD-3): mirrors
+// `api/app/Support/Scheduling/ScheduledInterviewWindow::MINIMUM_SCHEDULING_LEAD_MINUTES`
+// (confirmed by reading that file, not guessed). UX hint only — the server's
+// own `ScheduledStartWithinLeadTime` rule is the sole authority; a drift here
+// would only ever make the CLIENT stricter or looser than the real rule, it
+// can never let an invalid `scheduled_at` through.
+const MINIMUM_SCHEDULING_LEAD_MINUTES = 16
+
+/**
+ * `<input type="datetime-local">` yields a timezone-less wall-clock string
+ * (e.g. "2026-10-01T14:30"), parsed by `Date` as the BROWSER's local time.
+ * `toISOString()` converts that same instant to UTC with a trailing `Z` —
+ * satisfying AD-2's "explicit UTC offset or Z suffix" requirement without
+ * any manual offset arithmetic.
+ */
+function toIsoWithExplicitOffset(datetimeLocalValue: string): string {
+  return new Date(datetimeLocalValue).toISOString()
+}
 
 const props = defineProps<{
   projectId: number
@@ -157,9 +251,30 @@ const displayName = ref('')
 // same email (CLAUDE.md ruling 8, reversed 2026-09-01).
 const email = ref('')
 const sendEmail = ref(true)
-const errors = ref<{ candidateRef?: string; displayName?: string; email?: string }>({})
+// interview-scheduling (design AD-1): "now" preserves today's default,
+// byte-for-byte — the spec's own "Omitted scheduled_at preserves today's
+// immediate behavior" requirement.
+const schedulingMode = ref<'now' | 'schedule'>('now')
+// `<input type="datetime-local">` value — no timezone, browser wall-clock
+// time. Converted to an explicit-offset ISO-8601 string only at submit time.
+const scheduledAt = ref('')
+const errors = ref<{
+  candidateRef?: string
+  displayName?: string
+  email?: string
+  scheduledAt?: string
+}>({})
 const formMessage = ref<string | null>(null)
 const submitting = ref(false)
+
+// ToggleGroup type="single" can deselect to '' on a repeat click of the
+// active item (reka-ui). Exactly one of the two modes must always be
+// selected, so an empty selection is ignored rather than left orphaned.
+function onTimingChange(value: unknown): void {
+  if (value === 'now' || value === 'schedule') {
+    schedulingMode.value = value
+  }
+}
 
 // `immediate` so the drawer footer starts from this form's truth rather than
 // from its own prop default.
@@ -184,8 +299,37 @@ function validate(): boolean {
   )
 
   errors.value.email = validateEmail()
+  errors.value.scheduledAt = validateScheduledAt()
 
-  return !errors.value.candidateRef && !errors.value.displayName && !errors.value.email
+  return (
+    !errors.value.candidateRef &&
+    !errors.value.displayName &&
+    !errors.value.email &&
+    !errors.value.scheduledAt
+  )
+}
+
+/**
+ * Client-side hint only (AD-3's 16-minute figure, confirmed by reading
+ * `ScheduledInterviewWindow.php`). The server's `ScheduledStartWithinLeadTime`
+ * rule is the authority for both the future-date and the lead-time checks;
+ * this only stops an obviously-invalid submit from making a round trip.
+ */
+function validateScheduledAt(): string | undefined {
+  if (schedulingMode.value !== 'schedule') return undefined
+
+  const value = scheduledAt.value.trim()
+  if (value === '') return t('entryLink.form.scheduledAtRequired')
+
+  const scheduled = new Date(value)
+  if (Number.isNaN(scheduled.getTime())) return t('entryLink.form.scheduledAtInvalid')
+
+  const minimumLeadMs = MINIMUM_SCHEDULING_LEAD_MINUTES * 60_000
+  if (scheduled.getTime() - Date.now() < minimumLeadMs) {
+    return t('entryLink.form.scheduledAtTooSoon', { minutes: MINIMUM_SCHEDULING_LEAD_MINUTES })
+  }
+
+  return undefined
 }
 
 /**
@@ -211,6 +355,7 @@ const SERVER_FIELD_TO_ERROR_KEY = {
   candidate_ref: 'candidateRef',
   display_name: 'displayName',
   email: 'email',
+  scheduled_at: 'scheduledAt',
 } as const satisfies Record<string, keyof typeof errors.value>
 
 async function onSubmit(): Promise<void> {
@@ -219,23 +364,52 @@ async function onSubmit(): Promise<void> {
 
   submitting.value = true
   try {
-    const response = await generateEntryLink({
+    const payload: GenerateEntryLinkPayload = {
       project_id: props.projectId,
       candidate_ref: candidateRef.value,
       display_name: displayName.value,
       email: email.value.trim(),
-      send_email: sendEmail.value,
-    })
+    }
+
+    // Byte-for-byte identical to the pre-existing payload when scheduling is
+    // off (regression, spec's "Omitted scheduled_at preserves today's
+    // immediate behavior"); `scheduled_at` and `send_email` are mutually
+    // exclusive on the wire — nothing is minted/sent at creation time on the
+    // scheduled path (T-B1), so "send email now" has no payload counterpart.
+    if (schedulingMode.value === 'schedule') {
+      payload.scheduled_at = toIsoWithExplicitOffset(scheduledAt.value)
+    } else {
+      payload.send_email = sendEmail.value
+    }
+
+    const response = await generateEntryLink(payload)
     emit('success', response)
   } catch (error) {
     const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
       errors.value[key] = message
     })
-    // A field with no control of its own (e.g. role_code/project_id) still
-    // has to reach the operator — the server's own message beats a generic
-    // banner that hides it.
+    const mapped = Object.values(errors.value).some((value) => value !== undefined)
+
+    // Pre-existing bug fixed here (found while adding `scheduled_at`, not
+    // introduced by it — CLAUDE.md "always fix findings"): this used to read
+    // `unmapped && unmapped.length > 0 ? ... : saveError`, which showed the
+    // generic banner on EVERY server error, including one fully mapped onto
+    // a field (`unmapped` is `[]`, which is truthy, so the `&&` never short
+    // circuited). Brought in line with `ProjectForm.vue`'s own
+    // `applyServerErrors` convention:
+    //   - unmapped messages exist -> show them (a field with no control of
+    //     its own, e.g. role_code/project_id, still has to reach the
+    //     operator);
+    //   - nothing unmapped but a field WAS mapped -> suppress the banner,
+    //     the reason is already under its own control;
+    //   - neither (no field-shaped body at all, e.g. network/500) -> the
+    //     generic "could not save" banner.
     formMessage.value =
-      unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('entryLink.form.saveError')
+      unmapped && unmapped.length > 0
+        ? unmapped.join(' ')
+        : mapped
+          ? null
+          : t('entryLink.form.saveError')
   } finally {
     submitting.value = false
   }

@@ -243,7 +243,22 @@
       "emailInvalid": "Non sembra un indirizzo email.",
       "sendEmail": "Invia l'invito al candidato via email",
       "help": {
-        "email": "Identifica anche il candidato: invitare lo stesso indirizzo su un altro progetto significa la stessa persona."
+        "email": "Identifica anche il candidato: invitare lo stesso indirizzo su un altro progetto significa la stessa persona.",
+        "scheduledAt": "Il colloquio deve essere pianificato con almeno {minutes} minuti di anticipo."
+      },
+      "timing": {
+        "legend": "Quando",
+        "now": "Subito",
+        "schedule": "Pianifica"
+      },
+      "scheduledAt": "Data e ora del colloquio",
+      "scheduledAtRequired": "Inserisci la data e l'ora del colloquio.",
+      "scheduledAtInvalid": "Data o ora non valida.",
+      "scheduledAtTooSoon": "Il colloquio deve essere pianificato con almeno {minutes} minuti di anticipo."
+    },
+    "scheduled": {
+      "success": {
+        "body": "Il candidato non riceverà nulla ora. Riceverà un promemoria e il link di accesso all'orario pianificato:"
       }
     },
     "serverError": {

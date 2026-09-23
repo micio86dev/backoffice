@@ -23,6 +23,7 @@
       <QuestionList
         :questions="group.questions"
         :locale="locale"
+        :unsaved="group.unsaved"
         :readonly="readonly"
         @reorder="(ids) => emit('reorder', ids)"
         @remove="(id) => (removingId = id)"

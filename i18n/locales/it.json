@@ -1344,6 +1344,7 @@
     "title": "Domande predefinite",
     "description": "Le domande con cui l'avatar apre ogni competenza. I follow-up restano decisi dall'AI in tempo reale.",
     "empty": "Nessuna domanda predefinita: l'avatar aprirà la competenza da sé.",
+    "emptyUnsaved": "Nessuna domanda ancora — salva la selezione delle competenze per vedere se il catalogo ne prevede una predefinita.",
     "add": "Aggiungi domanda",
     "edit": "Modifica",
     "remove": "Elimina",

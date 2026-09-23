@@ -114,6 +114,26 @@ describe('QuestionList', () => {
     const wrapper = mountList([])
 
     expect(wrapper.find('[data-testid="question-empty"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="question-empty"]').text()).toBe('projectQuestions.empty')
+  })
+
+  it('shows a non-committal message instead when the competency itself is not saved yet', () => {
+    // Before save, `ApplyCompetencySelection` has not run — the client cannot
+    // know whether the catalogue holds a default question for this
+    // competency. "No predefined question, the avatar opens it itself" would
+    // assert a fact the API has not decided yet, and is wrong the moment the
+    // operator saves and a copied default appears.
+    const wrapper = mount(QuestionList, {
+      props: { questions: [], locale: 'it', unsaved: true },
+      global: {
+        mocks: { $t: tMock },
+        stubs: { Button: { template: '<button><slot /></button>' } },
+      },
+    })
+
+    expect(wrapper.get('[data-testid="question-empty"]').text()).toBe(
+      'projectQuestions.emptyUnsaved'
+    )
   })
 
   describe('when there is nothing to reorder', () => {

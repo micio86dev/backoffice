@@ -1344,6 +1344,7 @@
     "title": "Predefined questions",
     "description": "The questions the avatar opens each competency with. Follow-ups stay decided by the AI in real time.",
     "empty": "No predefined question: the avatar will open the competency itself.",
+    "emptyUnsaved": "No predefined question yet — save the competency selection to see whether the catalogue has a default.",
     "add": "Add question",
     "edit": "Edit",
     "remove": "Delete",

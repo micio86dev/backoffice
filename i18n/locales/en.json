@@ -556,6 +556,7 @@
         "trigger": "Request an audit review",
         "triggering": "Requesting…",
         "inProgress": "Audit review in progress",
+        "pollTimeout": "This is taking longer than expected — check back in a few minutes.",
         "status": {
           "completed": "Audit review complete",
           "partial": "Audit review complete — some indicators could not be reviewed",
@@ -1344,6 +1345,7 @@
     "title": "Predefined questions",
     "description": "The questions the avatar opens each competency with. Follow-ups stay decided by the AI in real time.",
     "empty": "No predefined question: the avatar will open the competency itself.",
+    "emptyUnsaved": "No predefined question yet — save the competency selection to see whether the catalogue has a default.",
     "add": "Add question",
     "edit": "Edit",
     "remove": "Delete",

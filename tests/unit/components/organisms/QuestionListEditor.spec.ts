@@ -189,6 +189,20 @@ describe('QuestionListEditor', () => {
       expect(wrapper.find('[data-testid="question-unsaved-22"]').exists()).toBe(false)
     })
 
+    it('tells QuestionList when the group itself is unsaved, so the empty state does not overclaim', async () => {
+      const wrapper = await mountEditor({ unsavedCompetencyIds: [11] })
+
+      const group11List = wrapper
+        .get('[data-testid="question-group-11"]')
+        .findComponent({ name: 'QuestionList' })
+      const group22List = wrapper
+        .get('[data-testid="question-group-22"]')
+        .findComponent({ name: 'QuestionList' })
+
+      expect(group11List.props('unsaved')).toBe(true)
+      expect(group22List.props('unsaved')).toBe(false)
+    })
+
     it('behaves exactly as before when nothing is unsaved (default: no prop passed)', async () => {
       const wrapper = await mountEditor({
         questions: [item({ id: 1, competencyId: 11 }), item({ id: 2, competencyId: 11 })],

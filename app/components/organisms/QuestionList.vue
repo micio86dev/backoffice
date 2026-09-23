@@ -5,7 +5,7 @@
       data-testid="question-empty"
       class="text-muted-foreground text-sm"
     >
-      {{ $t('projectQuestions.empty') }}
+      {{ $t(unsaved ? 'projectQuestions.emptyUnsaved' : 'projectQuestions.empty') }}
     </p>
 
     <ul v-else class="flex flex-col gap-2">
@@ -138,6 +138,17 @@ const props = defineProps<{
   questions: QuestionListEntry[]
   /** The PROJECT's language — the interview's, not the operator's. */
   locale: string
+  /**
+   * The competency this group belongs to is ticked in the form's picker but
+   * not saved yet. `ApplyCompetencySelection` only copies a catalogue default
+   * question in once the selection is persisted, so an empty list here does
+   * NOT mean the same thing it means for an already-saved competency: the
+   * client genuinely does not know yet whether a default exists. The regular
+   * "no predefined question, the avatar opens it itself" empty state would
+   * assert that as fact — and be visibly wrong the moment the operator saves
+   * and a copied default appears (the bug this prop exists to close).
+   */
+  unsaved?: boolean
   /**
    * Renders the rows with no grip, move, edit or remove control — for a
    * list whose content cannot be written (a published catalogue revision).

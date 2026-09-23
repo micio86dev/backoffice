@@ -259,6 +259,90 @@ describe('EvaluationAuditPanel — 409 and 403 refusals render with distinct Ale
   })
 })
 
+// v1 originally shipped with NO polling (design D6/D9) — the parent's own
+// single best-effort re-fetch right after the 202 almost always raced the
+// backend job and returned the SAME auditMeta, so the operator only ever saw
+// the terminal status by reloading the page. This re-emits 'triggered' (the
+// same event the parent already listens to and re-fetches on) on an
+// interval, so the parent's existing re-fetch logic does the work — no new
+// fetch path is introduced here.
+describe('EvaluationAuditPanel — polls for the terminal status instead of waiting for a manual reload', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('re-emits triggered on an interval while in progress, and stops once a newer run lands', async () => {
+    triggerAuditMock.mockResolvedValue({ status: 'queued', evaluation_id: 99 })
+    const wrapper = mount(EvaluationAuditPanel, {
+      props: { participantId: 1, auditMeta: null },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="evaluation-audit-trigger"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('triggered')).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wrapper.emitted('triggered')).toHaveLength(2)
+
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(wrapper.emitted('triggered')).toHaveLength(3)
+
+    // The newer run lands — polling must stop, no further emits.
+    await wrapper.setProps({ auditMeta: meta({ run_id: 2, status: 'completed' }) })
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(wrapper.emitted('triggered')).toHaveLength(3)
+  })
+
+  it('stops polling and shows a timeout fallback after the max wait, without emitting further', async () => {
+    triggerAuditMock.mockResolvedValue({ status: 'queued', evaluation_id: 99 })
+    const wrapper = mount(EvaluationAuditPanel, {
+      props: { participantId: 1, auditMeta: null },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="evaluation-audit-trigger"]').trigger('click')
+    await flushPromises()
+
+    // Well past the documented cap (~60s at a 3s interval) — no newer run ever lands.
+    await vi.advanceTimersByTimeAsync(120000)
+    await flushPromises()
+
+    const emitCountAtCap = (wrapper.emitted('triggered') ?? []).length
+    expect(emitCountAtCap).toBeGreaterThan(1)
+    expect(wrapper.find('[data-testid="evaluation-audit-poll-timeout"]').exists()).toBe(true)
+    // Still "in progress" — the outcome is genuinely unknown, not failed.
+    expect(wrapper.find('[data-testid="evaluation-audit-progress"]').exists()).toBe(true)
+
+    // No further emits past the cap.
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(wrapper.emitted('triggered')).toHaveLength(emitCountAtCap)
+  })
+
+  it('a fresh trigger clears a prior timeout fallback', async () => {
+    triggerAuditMock.mockResolvedValue({ status: 'queued', evaluation_id: 99 })
+    const wrapper = mount(EvaluationAuditPanel, {
+      props: { participantId: 1, auditMeta: null },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="evaluation-audit-trigger"]').trigger('click')
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(120000)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="evaluation-audit-poll-timeout"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="evaluation-audit-trigger"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="evaluation-audit-poll-timeout"]').exists()).toBe(false)
+  })
+})
+
 describe('EvaluationAuditPanel — re-triggering resets client-local progress state', () => {
   it('a second trigger does not carry over a stale in-progress indicator from before it was clicked', async () => {
     triggerAuditMock.mockResolvedValueOnce({ status: 'queued', evaluation_id: 1 })

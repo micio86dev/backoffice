@@ -556,6 +556,7 @@
         "trigger": "Richiedi una verifica di audit",
         "triggering": "Richiesta in corso…",
         "inProgress": "Verifica di audit in corso",
+        "pollTimeout": "Sta impiegando più del previsto — riprova a controllare tra qualche minuto.",
         "status": {
           "completed": "Verifica di audit completata",
           "partial": "Verifica di audit completata — alcuni indicatori non è stato possibile verificarli",

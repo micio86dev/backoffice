@@ -51,6 +51,14 @@
         })
       }}
     </p>
+
+    <Badge
+      v-if="inProgress && pollTimedOut"
+      variant="default"
+      data-testid="evaluation-audit-poll-timeout"
+    >
+      {{ $t('report.audit.panel.pollTimeout') }}
+    </Badge>
   </div>
 </template>
 
@@ -107,7 +115,7 @@
 // return array, then swap this component to
 // `v-if="useCurrentUser().can('evaluation.audit')"`, matching every other
 // admin-gated control, and delete this note.
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -160,14 +168,22 @@ const refusalVariant = computed(() =>
     : 'destructive'
 )
 
-// v1 has no polling endpoint (design D6/D9): a caller that triggered a run
-// learns it completed only by RE-FETCHING the evaluation and passing a fresh
-// `auditMeta` prop (this page's own `onAuditTriggered` handler does exactly
-// that). Once a GENUINELY NEWER `auditMeta` arrives (a different `run_id`),
-// the terminal badge below takes over from the client-local "in progress"
-// one — otherwise a run that finished quickly would still show "in
-// progress" forever, since `inProgress` is set once, from the 202 response,
-// and nothing else would ever clear it.
+// v1 originally shipped with NO polling (design D6/D9): a caller that
+// triggered a run learned it completed only by RE-FETCHING the evaluation
+// and passing a fresh `auditMeta` prop (this page's own `onAuditTriggered`
+// handler does exactly that). Its own single best-effort re-fetch right
+// after the 202 almost always raced the backend job and returned the SAME
+// `auditMeta` — the operator only ever saw the terminal status by reloading
+// the page later, even though the backend job itself finishes in about a
+// second (scoring-audit-jev-prod-recovery). Re-emitting `triggered` on an
+// interval below reuses that SAME parent re-fetch path — no new fetch logic
+// is introduced here, only its cadence.
+//
+// Once a GENUINELY NEWER `auditMeta` arrives (a different `run_id`), the
+// terminal badge below takes over from the client-local "in progress" one —
+// otherwise a run that finished quickly would still show "in progress"
+// forever, since `inProgress` is set once, from the 202 response, and
+// nothing else would ever clear it.
 //
 // Comparing `run_id`, not just non-null, matters for a RE-TRIGGER on an
 // evaluation that already has a prior completed run: the best-effort
@@ -178,11 +194,47 @@ const refusalVariant = computed(() =>
 // moment `onTrigger()` starts specifically to make that distinction.
 const knownRunIdBeforeTrigger = ref<number | null>(props.auditMeta?.run_id ?? null)
 
+// 3s interval, ~60s cap (20 attempts): generous now that a real vendor call
+// fails or succeeds in seconds, not the minutes the pre-fix wire contract
+// made it look like. Past the cap the outcome is genuinely unknown — never
+// presented as failed — so polling stops politely and the fallback copy
+// below tells the operator to check back later, rather than polling forever.
+const POLL_INTERVAL_MS = 3000
+const MAX_POLL_ATTEMPTS = 20
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollAttempts = 0
+const pollTimedOut = ref(false)
+
+function stopPolling(): void {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function startPolling(evaluationId: number): void {
+  stopPolling()
+  pollAttempts = 0
+  pollTimer = setInterval(() => {
+    pollAttempts++
+    if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+      stopPolling()
+      pollTimedOut.value = true
+      return
+    }
+    emit('triggered', evaluationId)
+  }, POLL_INTERVAL_MS)
+}
+
+onUnmounted(stopPolling)
+
 watch(
   () => props.auditMeta,
   (newMeta) => {
     if (newMeta !== null && newMeta.run_id !== knownRunIdBeforeTrigger.value) {
       inProgress.value = false
+      stopPolling()
     }
   }
 )
@@ -209,6 +261,8 @@ async function onTrigger(): Promise<void> {
   triggering.value = true
   inProgress.value = false
   refusalReason.value = null
+  pollTimedOut.value = false
+  stopPolling()
   // Whatever run `auditMeta` carries RIGHT NOW is the "known prior" this
   // trigger must not be cleared by — see the watcher's own docblock.
   knownRunIdBeforeTrigger.value = props.auditMeta?.run_id ?? null
@@ -217,6 +271,7 @@ async function onTrigger(): Promise<void> {
     const response = await triggerAudit(props.participantId)
     inProgress.value = true
     emit('triggered', response.evaluation_id)
+    startPolling(response.evaluation_id)
   } catch (error) {
     refusalReason.value =
       getErrorStatus(error) === 403 ? 'forbidden' : (getErrorReason(error) ?? 'unknown')

@@ -187,7 +187,7 @@ jobs:
 
       - name: Assert the developer docs are served offline under /developers/
         run: |
-          docker run -d --name docs-check -p 8089:80 beai-backoffice:ci
+          docker run -d --name docs-check --add-host ci.example.test:127.0.0.1 -p 8089:80 beai-backoffice:ci
           for i in $(seq 1 20); do
             curl -sf http://localhost:8089/developers/ > /dev/null && break; sleep 1
           done

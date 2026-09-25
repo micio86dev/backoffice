@@ -157,4 +157,89 @@ describe('pages/clients/index.vue', () => {
       expect(alert.classes().join(' ')).not.toContain('destructive')
     })
   })
+
+  describe('organization management (template-provider-fixes T7)', () => {
+    function mockComposable(overrides: Record<string, unknown> = {}) {
+      const fetchClientOverviewMock = vi.fn().mockResolvedValue(overviewResponse())
+      const createClient = vi.fn().mockResolvedValue({ data: { id: 9 } })
+      const fetchClient = vi.fn().mockResolvedValue({
+        data: { id: 2, name: 'Acme', slug: 'acme', primary_color: null, logo_url: null },
+      })
+      const updateClient = vi.fn().mockResolvedValue({ data: { id: 2 } })
+      vi.doMock('../../../app/composables/useSuperadmin', () => ({
+        useSuperadmin: () => ({
+          fetchClientOverview: fetchClientOverviewMock,
+          setActingClient: vi.fn(),
+          createClient,
+          fetchClient,
+          updateClient,
+          ...overrides,
+        }),
+      }))
+
+      return { fetchClientOverviewMock, createClient, fetchClient, updateClient }
+    }
+
+    async function mountPage() {
+      const ClientsPage = (await import('../../../app/pages/clients/index.vue')).default
+      const wrapper = mount(ClientsPage, {
+        global: { mocks: { $t: tMock } },
+        attachTo: document.body,
+      })
+      await flushPromises()
+
+      return wrapper
+    }
+
+    const body = (testId: string) => document.body.querySelector(`[data-testid="${testId}"]`)
+
+    beforeEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    it('offers "New client", which opens an empty create form in a drawer', async () => {
+      const { fetchClient } = mockComposable()
+      const wrapper = await mountPage()
+
+      expect(body('client-form')).toBeNull()
+
+      await wrapper.get('[data-testid="clients-new"]').trigger('click')
+      await flushPromises()
+
+      expect(body('client-form')).not.toBeNull()
+      expect(fetchClient).not.toHaveBeenCalled()
+    })
+
+    it('opens the edit form for the row that asked, loading that organization', async () => {
+      const { fetchClient } = mockComposable()
+      const wrapper = await mountPage()
+
+      await wrapper.get('[data-testid="client-edit-2"]').trigger('click')
+      await flushPromises()
+
+      expect(fetchClient).toHaveBeenCalledWith(2)
+      expect(body('client-form')).not.toBeNull()
+    })
+
+    it('closes the drawer and reloads the list after a save', async () => {
+      const { fetchClientOverviewMock, createClient } = mockComposable()
+      const wrapper = await mountPage()
+
+      await wrapper.get('[data-testid="clients-new"]').trigger('click')
+      await flushPromises()
+
+      const name = body('client-name') as HTMLInputElement
+      name.value = 'Globex'
+      name.dispatchEvent(new Event('input', { bubbles: true }))
+      await flushPromises()
+      ;(body('client-form') as HTMLFormElement).dispatchEvent(
+        new Event('submit', { bubbles: true, cancelable: true })
+      )
+      await flushPromises()
+
+      expect(createClient).toHaveBeenCalledWith({ name: 'Globex' })
+      expect(fetchClientOverviewMock).toHaveBeenCalledTimes(2)
+      expect(body('client-form')).toBeNull()
+    })
+  })
 })

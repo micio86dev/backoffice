@@ -1437,7 +1437,38 @@
       "empty": "No clients yet."
     },
     "actAs": "Act as {name}",
-    "actAsCurrent": "You are already acting as {name}"
+    "actAsCurrent": "You are already acting as {name}",
+    "action": {
+      "new": "New client"
+    },
+    "edit": "Edit {name}",
+    "form": {
+      "newTitle": "New client",
+      "editTitle": "Edit client",
+      "loading": "Loading the client…",
+      "loadErrorTitle": "Could not load the client",
+      "loadErrorBody": "Close this panel and try again. If it keeps failing, check that you are signed in as a platform administrator.",
+      "name": "Name",
+      "slug": "Identifier (slug)",
+      "help": {
+        "name": "The organization's display name.",
+        "slug": "Lowercase letters, digits and hyphens. Leave it blank to derive it from the name. It can never be changed afterwards.",
+        "slugLocked": "The identifier is fixed at creation and can never be changed.",
+        "primaryColor": "Optional. Both apps render in this colour for this client; blank uses the product palette."
+      },
+      "errors": {
+        "name_required": "Enter a name.",
+        "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
+        "primary_color_invalid": "Enter a colour as #RRGGBB."
+      },
+      "serverError": {
+        "name_required": "Enter a name.",
+        "slug_taken": "This identifier is already used by another client.",
+        "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
+        "primary_color_invalid": "Enter a colour as #RRGGBB."
+      },
+      "saveError": "Could not save the client. Please try again."
+    }
   },
   "imageUpload": {
     "cta": {

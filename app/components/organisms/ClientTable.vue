@@ -46,7 +46,15 @@
         <TableCell :data-testid="`client-last-activity-${client.id}`">
           <FormattedDate :value="client.last_activity_at" :locale="locale" />
         </TableCell>
-        <TableCell>
+        <TableCell class="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            :data-testid="`client-edit-${client.id}`"
+            @click="emit('edit', client.id)"
+          >
+            {{ $t('clients.edit', { name: client.name }) }}
+          </Button>
           <!--
             The label carries the CLIENT NAME, and the disabled state carries a
             reason. Both were missing, and both matter for the same reader:
@@ -112,6 +120,10 @@ defineProps<{
   /** Marks the current row and disables its own "Act as" button. */
   actingOrganizationId: number | null
 }>()
+
+// `edit` carries the id and nothing else: the page owns the drawer and the
+// form owns the fetch, so this table stays a table.
+const emit = defineEmits<{ (e: 'edit', clientId: number): void }>()
 
 const { locale } = useI18n()
 

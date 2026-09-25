@@ -152,4 +152,19 @@ describe('ClientTable', () => {
     ).toBeUndefined()
     expect(wrapper.find('[data-testid="client-act-as-current-3"]').exists()).toBe(false)
   })
+
+  it('emits `edit` with the client id when its Edit button is pressed', async () => {
+    const wrapper = mountTable([row({ id: 2, name: 'Acme' }), row({ id: 3, name: 'Globex' })])
+
+    await wrapper.get('[data-testid="client-edit-3"]').trigger('click')
+
+    expect(wrapper.emitted('edit')).toEqual([[3]])
+  })
+
+  it('names each Edit button after its client', () => {
+    const wrapper = mountTable([row({ id: 2, name: 'Acme' }), row({ id: 3, name: 'Globex' })])
+
+    expect(wrapper.get('[data-testid="client-edit-2"]').text()).toContain('Acme')
+    expect(wrapper.get('[data-testid="client-edit-3"]').text()).toContain('Globex')
+  })
 })

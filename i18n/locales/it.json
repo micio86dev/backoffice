@@ -1437,7 +1437,38 @@
       "empty": "Ancora nessun cliente."
     },
     "actAs": "Entra come {name}",
-    "actAsCurrent": "Stai già operando come {name}"
+    "actAsCurrent": "Stai già operando come {name}",
+    "action": {
+      "new": "Nuovo cliente"
+    },
+    "edit": "Modifica {name}",
+    "form": {
+      "newTitle": "Nuovo cliente",
+      "editTitle": "Modifica cliente",
+      "loading": "Caricamento del cliente…",
+      "loadErrorTitle": "Impossibile caricare il cliente",
+      "loadErrorBody": "Chiudi questo pannello e riprova. Se continua a fallire, verifica di aver effettuato l'accesso come amministratore di piattaforma.",
+      "name": "Nome",
+      "slug": "Identificativo (slug)",
+      "help": {
+        "name": "Il nome con cui l'organizzazione viene mostrata.",
+        "slug": "Lettere minuscole, cifre e trattini. Lascialo vuoto per ricavarlo dal nome. Non potrà più essere modificato.",
+        "slugLocked": "L'identificativo è fissato alla creazione e non può più essere modificato.",
+        "primaryColor": "Facoltativo. Entrambe le app usano questo colore per questo cliente; se vuoto si usa la palette del prodotto."
+      },
+      "errors": {
+        "name_required": "Inserisci un nome.",
+        "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
+        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB."
+      },
+      "serverError": {
+        "name_required": "Inserisci un nome.",
+        "slug_taken": "Questo identificativo è già usato da un altro cliente.",
+        "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
+        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB."
+      },
+      "saveError": "Impossibile salvare il cliente. Riprova."
+    }
   },
   "imageUpload": {
     "cta": {

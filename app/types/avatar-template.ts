@@ -33,12 +33,11 @@
  * description, so the local type is re-widened here rather than the runtime
  * behavior changed.
  *
- * `CatalogueEntry`/`CatalogueResponse` (avatar-template-catalogue PR4) are a
- * DIFFERENT kind of gap from the three above: not a narrowing of a generated
- * type, but a type with NO generated counterpart at all yet, because
- * `GET /avatar-templates/catalogue` postdates this repo's last `openapi.json`
- * regeneration. See each type's own docblock for the exact commit and the
- * condition under which it should stop being hand-written.
+ * `CatalogueEntry`/`CatalogueResponse` are hand-written for a different reason:
+ * the catalogue path IS in the generated client (its query types are derived
+ * from it below), but Scramble reports the response body as
+ * `{status: string, items: unknown[], code?: string}` because the payload is
+ * assembled from provider responses. See each type's own docblock.
  */
 
 import type { components, paths } from '../../types/api'

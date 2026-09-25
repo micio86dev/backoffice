@@ -75,6 +75,9 @@ function fakeApi() {
   })
 }
 
+/** The switch is done once the page has been told to reload. */
+const reloaded = () => vi.waitFor(() => expect(events).toContain('reload'))
+
 async function mountNavBar(onError: (error: unknown) => void = () => undefined) {
   vi.doMock('../../app/composables/useCurrentUser', () => ({
     useCurrentUser: () => ({
@@ -133,7 +136,7 @@ describe('a superadmin acting as a client (backoffice half of the contract)', ()
     const wrapper = await mountNavBar()
 
     await wrapper.get('[data-testid="client-switcher"]').setValue(String(QUINT.id))
-    await flushPromises()
+    await reloaded()
 
     expect(calls).toContainEqual({
       method: 'PUT',
@@ -168,7 +171,7 @@ describe('a superadmin acting as a client (backoffice half of the contract)', ()
     const wrapper = await mountNavBar()
 
     await wrapper.get('[data-testid="client-switcher"]').setValue('')
-    await flushPromises()
+    await reloaded()
 
     expect(calls).toContainEqual({
       method: 'PUT',
@@ -180,7 +183,7 @@ describe('a superadmin acting as a client (backoffice half of the contract)', ()
   it('restores the selection after a reload from the server, holding nothing client-side', async () => {
     const first = await mountNavBar()
     await first.get('[data-testid="client-switcher"]').setValue(String(QUINT.id))
-    await flushPromises()
+    await reloaded()
     first.unmount()
 
     // The "reload": every module instance is gone, only the server remembers.
@@ -200,7 +203,7 @@ describe('a superadmin acting as a client (backoffice half of the contract)', ()
   it('lets the users edit flow PATCH /users/{id} with no organization of its own, once acting', async () => {
     const wrapper = await mountNavBar()
     await wrapper.get('[data-testid="client-switcher"]').setValue(String(QUINT.id))
-    await flushPromises()
+    await reloaded()
     calls = []
 
     const UserForm = (await import('../../app/components/organisms/UserForm.vue')).default

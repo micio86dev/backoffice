@@ -108,6 +108,10 @@ RUN if [ -n "$SENTRY_AUTH_TOKEN" ]; then \
 # Generate the static SPA output (Nuxt SPA mode: ssr: false → nuxt generate)
 RUN bun run generate
 
+# Developer docs: static Scalar page + vendored /v1 spec, served under
+# /developers/ by the nginx stage below. Fully offline at runtime.
+RUN bun run docs:build
+
 # Assert the value REACHED the bundle. The check above only proves the arg was
 # passed; this proves Nuxt inlined it. They are different failures, and the
 # second one is just as invisible from the outside as the first was.
@@ -180,6 +184,7 @@ RUN test -n "$BEAI_API_ORIGIN" || { \
 RUN rm /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /app/.output/public /usr/share/nginx/html
+COPY --from=builder /app/docs-site /usr/share/nginx/html/developers
 
 # SPA routing: serve index.html for all unknown paths (client-side router)
 # Security headers applied at nginx level (D29 / task 7.8).
@@ -236,6 +241,19 @@ RUN printf 'server {\n\
     location ^~ /_nuxt/ {\n\
         expires 1y;\n\
         try_files $uri =404;\n\
+    }\n\
+\n\
+    # Developer docs (public-api SPEC §6): static Scalar + the /v1 spec.\n\
+    # `^~` keeps the js|json regexes and the SPA fallback out of this tree, and\n\
+    # a miss is a 404, never the SPA shell. `expires` (not add_header) so the\n\
+    # inherited security headers survive.\n\
+    location = /developers {\n\
+        return 301 /developers/;\n\
+    }\n\
+\n\
+    location ^~ /developers/ {\n\
+        expires 1h;\n\
+        try_files $uri $uri/index.html =404;\n\
     }\n\
 \n\
     # ── Same-origin API (backoffice-same-origin-api AD-1) ─────────────────\n\

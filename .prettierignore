@@ -9,3 +9,7 @@ dist/
 # check-client-drift.sh compares it byte-for-byte against api/openapi.json,
 # so reformatting it would make a synced snapshot report as drifted.
 openapi.json
+
+# Copy of api/openapi.v1.json for the developer docs, and its build output.
+docs-src/openapi.v1.json
+docs-site/

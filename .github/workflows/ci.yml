@@ -69,6 +69,15 @@ jobs:
       - name: Client drift check
         run: bun run codegen:check
 
+      - name: Developer docs build
+        run: bun run docs:build
+
+      - name: Developer docs spec is in sync with the api
+        run: |
+          if [ -f ../api/openapi.v1.json ]; then
+            cmp docs-src/openapi.v1.json ../api/openapi.v1.json
+          fi
+
       - name: Vitest unit tests + coverage
         run: node node_modules/.bin/vitest run --coverage --coverage.thresholds.lines=85
 
@@ -175,3 +184,19 @@ jobs:
             echo "::error::proxy_pass is missing, or carries a URI part that would rewrite the request path."
             echo "$CONF" | grep proxy_pass
             exit 1; }
+
+      - name: Assert the developer docs are served offline under /developers/
+        run: |
+          docker run -d --name docs-check -p 8089:80 beai-backoffice:ci
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8089/developers/ > /dev/null && break; sleep 1
+          done
+          curl -sf http://localhost:8089/developers/ | grep -q 'Scalar.createApiReference' || {
+            echo "::error::/developers/ did not serve the docs page."; exit 1; }
+          curl -sf http://localhost:8089/developers/openapi.v1.json | grep -q '"openapi"' || {
+            echo "::error::The vendored /v1 spec is not served."; exit 1; }
+          curl -sf -o /dev/null http://localhost:8089/developers/scalar.js || {
+            echo "::error::The Scalar bundle is not served."; exit 1; }
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8089/developers/nope.json)
+          [ "$CODE" = 404 ] || { echo "::error::A /developers/ miss returned $CODE, not 404."; exit 1; }
+          docker rm -f docs-check

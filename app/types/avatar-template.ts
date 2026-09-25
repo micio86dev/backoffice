@@ -45,6 +45,10 @@ import type { components, paths } from '../../types/api'
 
 export type ProviderName = 'heygen' | 'tavus'
 
+type CatalogueQuery = NonNullable<
+  paths['/avatar-templates/catalogue']['get']['parameters']['query']
+>
+
 export type FieldType = 'text' | 'number' | 'select' | 'checkbox'
 
 /**
@@ -53,7 +57,17 @@ export type FieldType = 'text' | 'number' | 'select' | 'checkbox'
  * `voiceId` (heygen) and `faceId`/`palId` (tavus); absent — never `null` —
  * on every other field, including `ttsExternalVoiceId`.
  */
-export type CatalogueResource = 'voice' | 'avatar' | 'replica'
+export type CatalogueResource = CatalogueQuery['resource']
+
+/**
+ * Which service a catalogue list is fetched from. Wider than `ProviderName`:
+ * a Tavus template can speak with a third-party voice, and that voice picker
+ * queries the third party's own catalogue (`cartesia` / `elevenlabs`).
+ */
+export type CatalogueProvider = CatalogueQuery['provider']
+
+/** Third-party speech engines whose voices the API can list. */
+export const CATALOGUED_TTS_ENGINES = ['cartesia', 'elevenlabs'] as const
 
 /**
  * One configurable knob, as the API describes it.
@@ -81,47 +95,57 @@ export interface FieldSpec {
 }
 
 /**
- * One provider catalogue entry (avatar-template-catalogue design D1/D4).
+ * One provider catalogue entry.
  *
- * `language` is `null`, never a guess, when the provider's own resource
- * carries no language attribute (Tavus's voices and replicas today) — a
- * language filter MUST NOT treat `null` as matching everything.
+ * Hand-written narrowing: Scramble reports the catalogue body as
+ * `{status: string, items: unknown[], code?: string}` because the payload is
+ * assembled from provider responses, not from a typed resource. The request
+ * query (`CatalogueProvider` / `CatalogueResource`) IS derived from the
+ * generated client above, so a provider or resource added server-side breaks
+ * this file's compile instead of drifting.
  *
- * UNLIKE `config`/`provider`/`description` above, this is not a narrowing of
- * a generated type — there is NOTHING to narrow. `GET
- * /avatar-templates/catalogue` was added on the `api` submodule's own
- * `feature/avatar-template-catalogue-pr1` branch (commit `22a76a2`), which
- * regenerated `api/openapi.json` there, but this repo's own
- * `openapi.json`/`types/api.ts` snapshot is regenerated from a COPY of that
- * file (`bun run codegen`) and was last refreshed 2026-09-21 — before PR1
- * existed. `types/api.ts` carries zero trace of this endpoint (confirmed:
- * `rg -c "avatar-templates/catalogue" openapi.json` → 0 matches), so this
- * type has none of the drift protection `codegen:check` gives every other
- * response shape in this file. Revisit once `api`'s PR1 branch merges to
- * `develop` and this repo's `openapi.json`/`types/api.ts` are regenerated
- * against it — at that point this SHOULD become an `Omit`+re-add over the
- * generated schema, matching the pattern above, not stay hand-written.
+ * `language`, `locale`, `accent` and the preview URLs are `null`, never a
+ * guess, when the provider's resource carries no such attribute. `italian` is
+ * the API's own classification: `native` for an Italian voice, `multilingual`
+ * for a voice that can speak Italian, `null` otherwise.
  */
 export interface CatalogueEntry {
   id: string
+  provider: CatalogueProvider
   label: string
+  name: string
   language: string | null
+  locale: string | null
+  accent: string | null
+  italian: 'native' | 'multilingual' | null
   preview_image_url: string | null
   preview_audio_url: string | null
+  /** Tavus faces only. */
+  preview_video_url: string | null
 }
 
+export type CatalogueStatus = 'ok' | 'empty' | 'provider_error'
+
+/** Stable codes the API attaches to `provider_error`. Never the vendor's words. */
+export type CatalogueErrorCode =
+  | 'provider_key_missing'
+  | 'provider_unauthorized'
+  | 'provider_rate_limited'
+  | 'provider_unavailable'
+  | 'provider_unreachable'
+  | 'provider_rejected'
+  | 'provider_bad_response'
+  | 'unsupported_catalogue'
+
 /**
- * `status: 'unavailable'` is a degraded-but-successful response (D3): a
- * provider failure or cache miss-then-fail never throws, it returns an empty
- * list the picker renders as an honest "catalogue unavailable" hint rather
- * than a blank list that reads as a bug.
- *
- * Hand-written for the same reason as `CatalogueEntry` immediately above —
- * no generated counterpart exists yet for this endpoint.
+ * A catalogue answer is always HTTP 200: a provider failure is a `status`, not
+ * an exception, so the picker can say WHY it is empty instead of showing a
+ * blank list that reads as a bug.
  */
 export interface CatalogueResponse {
-  status: 'ok' | 'unavailable'
+  status: CatalogueStatus
   items: CatalogueEntry[]
+  code?: CatalogueErrorCode
 }
 
 export type FieldSpecsResponse = {

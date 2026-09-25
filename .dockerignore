@@ -35,6 +35,7 @@ node_modules
 # ── Generated output and caches: rebuilt in the image, never inherited ──────
 .nuxt
 .output
+docs-site
 dist
 .data
 .cache

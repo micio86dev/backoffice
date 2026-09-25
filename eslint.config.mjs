@@ -74,5 +74,5 @@ export default createConfigForNuxt({
   // for explicitly-passed paths, so prettier was never the culprit. ESLint had
   // no matching entry at all — this is that entry.
   .append({
-    ignores: ['types/api.ts', 'openapi.json'],
+    ignores: ['types/api.ts', 'openapi.json', 'docs-src/openapi.v1.json', 'docs-site/**'],
   })

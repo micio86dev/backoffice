@@ -270,6 +270,24 @@ describe('search', () => {
     expect(wrapper.find(sel(`${P}-item-v-multi`)).exists()).toBe(true)
   })
 
+  it('does not throw when the provider omits optional fields entirely', async () => {
+    const sparse = [
+      { id: 'v-sparse', provider: 'heygen', label: 'Sparse', name: 'Sparse', italian: null },
+    ] as unknown as CatalogueEntry[]
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: sparse })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-search`)).setValue('sparse')
+
+    expect(wrapper.find(sel(`${P}-item-v-sparse`)).exists()).toBe(true)
+
+    await wrapper.get(sel(`${P}-search`)).setValue('zzz')
+
+    expect(wrapper.find(sel(`${P}-no-match`)).exists()).toBe(true)
+  })
+
   it('says so when nothing matches, without calling it an error', async () => {
     fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
     const wrapper = mountPicker()
@@ -284,6 +302,16 @@ describe('search', () => {
 })
 
 describe('selection and open state (the dropdown bugs)', () => {
+  it('marks the selected option with a non-colour indicator', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ modelValue: 'v-en' })
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-selected-mark-v-en`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-selected-mark-v-it`)).exists()).toBe(false)
+  })
+
   it('emits the provider id and closes the list after a selection', async () => {
     fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
     const wrapper = mountPicker()

@@ -1,6 +1,17 @@
 <template>
   <div class="flex flex-col gap-6">
-    <PageHeader :title="$t('clients.title')" :subtitle="$t('clients.subtitle')" />
+    <PageHeader :title="$t('clients.title')" :subtitle="$t('clients.subtitle')">
+      <template #actions>
+        <!--
+          No ability check here: the whole route is guarded by `clients.viewAny`
+          (03.abilities.global.ts) and the API refuses every write to anyone else,
+          so a second client-side gate would only be a copy of the rule.
+        -->
+        <Button data-testid="clients-new" @click="editing = 'new'">
+          {{ $t('clients.action.new') }}
+        </Button>
+      </template>
+    </PageHeader>
     <Alert
       v-if="loadError"
       :variant="loadError === 'not-ready' ? 'default' : 'destructive'"
@@ -10,7 +21,29 @@
       <AlertTitle>{{ $t(loadErrorTitleKey) }}</AlertTitle>
       <AlertDescription>{{ $t(loadErrorMessageKey) }}</AlertDescription>
     </Alert>
-    <ClientTable v-else :clients="clients" :acting-organization-id="actingOrganizationId" />
+    <ClientTable
+      v-else
+      :clients="clients"
+      :acting-organization-id="actingOrganizationId"
+      @edit="(id) => (editing = id)"
+    />
+
+    <FormDrawer
+      :open="editing !== null"
+      :title="editing === 'new' ? $t('clients.form.newTitle') : $t('clients.form.editTitle')"
+      form-id="client-form"
+      :pending="saving"
+      @update:open="(open) => !open && (editing = null)"
+    >
+      <!-- Keyed on the target so switching row never reuses another's fields. -->
+      <ClientForm
+        v-if="editing !== null"
+        :key="String(editing)"
+        :client-id="editing === 'new' ? undefined : editing"
+        @update:pending="(value) => (saving = value)"
+        @saved="onSaved"
+      />
+    </FormDrawer>
   </div>
 </template>
 
@@ -21,7 +54,10 @@
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted } from 'vue'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import ClientTable from '@/components/organisms/ClientTable.vue'
+import ClientForm from '@/components/organisms/ClientForm.vue'
+import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import { useSuperadmin, type ClientOverviewRow } from '@/composables/useSuperadmin'
 import {
   resolveResourceErrorState,
@@ -63,6 +99,15 @@ async function load(): Promise<void> {
   } catch (error) {
     loadError.value = resolveResourceErrorState(error)
   }
+}
+
+// `'new'` for the create form, an organization id for edit, null when closed.
+const editing = ref<'new' | number | null>(null)
+const saving = ref(false)
+
+async function onSaved(): Promise<void> {
+  editing.value = null
+  await load()
 }
 
 onMounted(() => {

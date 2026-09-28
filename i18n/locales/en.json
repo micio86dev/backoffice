@@ -937,7 +937,9 @@
     "active": "Active",
     "provider": {
       "heygen": "HeyGen",
-      "tavus": "Tavus"
+      "tavus": "Tavus",
+      "cartesia": "Cartesia",
+      "elevenlabs": "ElevenLabs"
     },
     "action": {
       "new": "New template",
@@ -980,10 +982,28 @@
       },
       "catalogue": {
         "searchPlaceholder": "Search the service's catalogue…",
-        "languageFilterLabel": "Language",
-        "languageAll": "All languages",
-        "emptyForLanguage": "No entries match this filter in the service's catalogue — use manual entry.",
-        "emptyUnavailable": "The service's catalogue is not available right now — use manual entry.",
+        "choose": "Choose…",
+        "loading": "Loading the service's catalogue…",
+        "empty": "The service's catalogue has no entries for this list.",
+        "noMatch": "No entry matches your search.",
+        "italianOnly": "Italian only",
+        "italianNative": "Native Italian",
+        "italianMultilingual": "Multilingual",
+        "unknownSelected": "Not in the catalogue",
+        "retry": "Try again",
+        "manualLabel": "Enter the ID manually",
+        "previewAlt": "Preview of {name}",
+        "previewFallback": "No preview available",
+        "error": {
+          "provider_key_missing": "The access key for this service is not configured. Contact support.",
+          "provider_unauthorized": "The service refused the access key. Check the key and try again.",
+          "provider_rate_limited": "The service is limiting requests right now. Wait a moment and try again.",
+          "provider_unavailable": "The service is unavailable right now. Try again shortly.",
+          "provider_unreachable": "The service could not be reached. Check the connection and try again.",
+          "provider_rejected": "The service rejected the request.",
+          "provider_bad_response": "The service returned a response that could not be read.",
+          "unsupported_catalogue": "This list is not available for the selected service."
+        },
         "preview": {
           "play": "Play preview",
           "pause": "Pause preview"
@@ -1019,7 +1039,13 @@
         "type": "This value has the wrong type.",
         "range": "This value is out of the allowed range.",
         "enum": "This value is not one of the allowed options.",
-        "unknown": "This setting does not exist for the selected service."
+        "unknown": "This setting does not exist for the selected service.",
+        "avatar_not_found": "This avatar does not exist for the selected service. Choose one from the list.",
+        "voice_not_found": "This voice does not exist for the selected service. Choose one from the list.",
+        "pal_not_found": "This persona does not exist for the selected service. Choose one from the list.",
+        "tts_engine_required": "Choose an external speech engine, or clear the external voice ID.",
+        "tts_voice_required": "Choose a voice for the selected speech engine.",
+        "tts_voice_not_found": "This voice does not exist for the selected speech engine. Choose one from the list."
       },
       "llm": {
         "mode_unsupported": "This model does not support managed mode yet.",
@@ -1411,7 +1437,38 @@
       "empty": "No clients yet."
     },
     "actAs": "Act as {name}",
-    "actAsCurrent": "You are already acting as {name}"
+    "actAsCurrent": "You are already acting as {name}",
+    "action": {
+      "new": "New client"
+    },
+    "edit": "Edit {name}",
+    "form": {
+      "newTitle": "New client",
+      "editTitle": "Edit client",
+      "loading": "Loading the client…",
+      "loadErrorTitle": "Could not load the client",
+      "loadErrorBody": "Close this panel and try again. If it keeps failing, check that you are signed in as a platform administrator.",
+      "name": "Name",
+      "slug": "Identifier (slug)",
+      "help": {
+        "name": "The organization's display name.",
+        "slug": "Lowercase letters, digits and hyphens. Leave it blank to derive it from the name. It can never be changed afterwards.",
+        "slugLocked": "The identifier is fixed at creation and can never be changed.",
+        "primaryColor": "Optional. Both apps render in this colour for this client; blank uses the product palette."
+      },
+      "errors": {
+        "name_required": "Enter a name.",
+        "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
+        "primary_color_invalid": "Enter a colour as #RRGGBB."
+      },
+      "serverError": {
+        "name_required": "Enter a name.",
+        "slug_taken": "This identifier is already used by another client.",
+        "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
+        "primary_color_invalid": "Enter a colour as #RRGGBB."
+      },
+      "saveError": "Could not save the client. Please try again."
+    }
   },
   "imageUpload": {
     "cta": {

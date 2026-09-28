@@ -7,10 +7,10 @@
  */
 import type {
   AvatarTemplate,
+  CatalogueProvider,
   CatalogueResource,
   CatalogueResponse,
   FieldSpecsResponse,
-  ProviderName,
   TemplateListResponse,
   TemplateOptionsResponse,
   TemplateResponse,
@@ -62,7 +62,7 @@ export function useAvatarTemplates() {
    * than repeating the unwrap.
    */
   async function fetchCatalogue(
-    provider: ProviderName,
+    provider: CatalogueProvider,
     resource: CatalogueResource
   ): Promise<CatalogueResponse> {
     const response = await apiFetch<{ data: CatalogueResponse }>('/avatar-templates/catalogue', {

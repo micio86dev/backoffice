@@ -1,24 +1,26 @@
 /**
- * AvatarTemplateProviderCombobox — the provider-catalogue picker
- * (avatar-template-catalogue PR4, design D4/D5/D7).
+ * AvatarTemplateProviderCombobox — the provider-catalogue picker.
  *
- * Built on PR3's `combobox` primitives (reka-ui `Combobox`, which teleports
- * its list content to `document.body` via `ComboboxPortal` — confirmed by
- * `combobox-composition.spec.ts`), so every assertion below that needs the
- * rendered list queries `document.body`, not the mounted wrapper. Selecting
- * an item closes the uncontrolled popover and unmounts the item node
- * immediately, so selection is asserted on the emitted `change` value, never
- * on lingering DOM state.
+ * Root causes this file pins (template-provider-fixes T6):
+ *  - the old picker reopened itself on every focus event, so a selection that
+ *    returned focus to the input reopened the list it had just closed;
+ *  - every picker owned an independent `isOpen`, so two lists could be open at
+ *    once;
+ *  - a selection wrote the raw id into the search box, which then filtered the
+ *    list by LABEL and produced an empty list;
+ *  - the list was teleported, so an outside click was never observed.
  *
- * D7 is the point of this file: selecting a catalogue entry and typing a
- * value manually both emit `change` with the exact plain string the parent's
- * existing `onFieldChange()` already knows how to write (or drop, on empty)
- * — there is no second, parallel write path in this component.
+ * The picker is now inline (no teleport) and single-open by construction, so
+ * assertions query the mounted wrapper directly.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, flushPromises, DOMWrapper } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import AvatarTemplateProviderCombobox from '../../app/components/organisms/AvatarTemplateProviderCombobox.vue'
-import type { CatalogueEntry, FieldSpec, ProviderName } from '../../app/types/avatar-template'
+import type {
+  CatalogueEntry,
+  CatalogueProvider,
+  CatalogueResource,
+} from '../../app/types/avatar-template'
 
 const fetchCatalogue = vi.fn()
 
@@ -26,274 +28,612 @@ vi.mock('@/composables/useAvatarTemplates', () => ({
   useAvatarTemplates: () => ({ fetchCatalogue }),
 }))
 
-const VOICE_FIELD: FieldSpec = {
-  key: 'voiceId',
-  type: 'text',
-  label_key: 'avatar_templates.field.voiceId',
-  catalogue_resource: 'voice',
-}
-
-const AVATAR_FIELD: FieldSpec = {
-  key: 'avatarId',
-  type: 'text',
-  label_key: 'avatar_templates.field.avatarId',
-  catalogue_resource: 'avatar',
-}
-
 function entry(over: Partial<CatalogueEntry> = {}): CatalogueEntry {
   return {
     id: 'v1',
-    label: 'Alessandra - IA',
-    language: 'en',
+    provider: 'heygen',
+    label: 'Alessandra',
+    name: 'Alessandra',
+    language: 'it',
+    locale: 'it-IT',
+    accent: 'northern',
+    italian: 'native',
     preview_image_url: null,
     preview_audio_url: null,
+    preview_video_url: null,
     ...over,
   }
 }
 
-function byTestId(id: string): HTMLElement | null {
-  return document.body.querySelector<HTMLElement>(`[data-testid="${id}"]`)
-}
+const VOICES = [
+  entry({ id: 'v-it', label: 'Alessandra', name: 'Alessandra', italian: 'native' }),
+  entry({
+    id: 'v-en',
+    label: 'John',
+    name: 'John',
+    language: 'en',
+    locale: 'en-US',
+    accent: 'american',
+    italian: null,
+  }),
+  entry({
+    id: 'v-multi',
+    label: 'Multi',
+    name: 'Multi',
+    language: 'en',
+    locale: null,
+    accent: null,
+    italian: 'multilingual',
+  }),
+]
 
-function mountCombobox(
-  props: Partial<{ field: FieldSpec; provider: ProviderName; modelValue: string }> = {}
+function mountPicker(
+  props: Partial<{
+    fieldKey: string
+    resource: CatalogueResource
+    provider: CatalogueProvider
+    modelValue: string
+  }> = {}
 ) {
-  const field = props.field ?? VOICE_FIELD
+  const fieldKey = props.fieldKey ?? 'voiceId'
 
   return mount(AvatarTemplateProviderCombobox, {
     props: {
-      field,
-      provider: 'heygen',
-      modelValue: '',
-      ...props,
+      field: {
+        key: fieldKey,
+        type: 'text' as const,
+        label_key: `avatar_templates.field.${fieldKey}`,
+        catalogue_resource: props.resource ?? 'voice',
+      },
+      provider: props.provider ?? 'heygen',
+      modelValue: props.modelValue ?? '',
     },
     attrs: {
-      id: `template-config-${field.key}`,
-      'data-testid': `template-config-${field.key}`,
+      id: `template-config-${fieldKey}`,
+      'data-testid': `template-config-${fieldKey}`,
     },
     attachTo: document.body,
   })
 }
 
-async function openPopover(wrapper: ReturnType<typeof mountCombobox>): Promise<void> {
-  await wrapper.get('input').trigger('focus')
+type Picker = ReturnType<typeof mountPicker>
+
+const P = 'template-config-voiceId'
+const sel = (id: string) => `[data-testid="${id}"]`
+
+async function open(wrapper: Picker, prefix = P): Promise<void> {
+  await wrapper.get(sel(prefix)).trigger('click')
   await flushPromises()
 }
-
-afterEach(() => {
-  document.body.innerHTML = ''
-})
 
 beforeEach(() => {
   fetchCatalogue.mockReset()
 })
 
-describe('filtering (D4)', () => {
-  it('filters by label as the operator types', async () => {
-    fetchCatalogue.mockResolvedValue({
-      status: 'ok',
-      items: [entry({ id: 'v1', label: 'Alessandra - IA' }), entry({ id: 'v2', label: 'Marco' })],
-    })
-    const wrapper = mountCombobox()
-    await flushPromises()
-    await openPopover(wrapper)
+afterEach(() => {
+  document.body.innerHTML = ''
+})
 
-    await wrapper.get('input').setValue('Marco')
+describe('loading the catalogue', () => {
+  it('asks the API for the field provider and resource', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    mountPicker({ provider: 'cartesia', resource: 'voice' })
     await flushPromises()
 
-    expect(byTestId('template-config-voiceId-item-v2')).not.toBeNull()
-    expect(byTestId('template-config-voiceId-item-v1')).toBeNull()
+    expect(fetchCatalogue).toHaveBeenCalledWith('cartesia', 'voice')
   })
 
-  it('a language filter excludes a null-language entry, never matching it as "any"', async () => {
-    fetchCatalogue.mockResolvedValue({
+  it('shows a loading state until the list arrives', async () => {
+    let resolve: (value: unknown) => void = () => undefined
+    fetchCatalogue.mockReturnValue(new Promise((r) => (resolve = r)))
+    const wrapper = mountPicker()
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-loading`)).exists()).toBe(true)
+
+    resolve({ status: 'ok', items: VOICES })
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-loading`)).exists()).toBe(false)
+    expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(true)
+  })
+
+  it('reloads the right list when the provider changes', async () => {
+    fetchCatalogue.mockResolvedValueOnce({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ provider: 'heygen' })
+    await flushPromises()
+
+    fetchCatalogue.mockResolvedValueOnce({
       status: 'ok',
-      items: [
-        entry({ id: 'v1', label: 'Alessandra - IA', language: 'en' }),
-        entry({ id: 'v2', label: 'No-language voice', language: null }),
-      ],
+      items: [entry({ id: 'el-1', provider: 'elevenlabs', label: 'Rachel' })],
     })
-    const wrapper = mountCombobox()
+    await wrapper.setProps({ provider: 'elevenlabs' })
     await flushPromises()
-    await openPopover(wrapper)
+    await open(wrapper)
 
-    const filter = byTestId('template-config-voiceId-language-filter')
-    expect(filter).not.toBeNull()
-    await new DOMWrapper(filter as HTMLSelectElement).setValue('en')
+    expect(fetchCatalogue).toHaveBeenLastCalledWith('elevenlabs', 'voice')
+    expect(wrapper.find(sel(`${P}-item-el-1`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(false)
+  })
+
+  it('ignores a slow answer for a provider it has since left', async () => {
+    let resolveFirst: (value: unknown) => void = () => undefined
+    fetchCatalogue.mockReturnValueOnce(new Promise((r) => (resolveFirst = r)))
+    const wrapper = mountPicker({ provider: 'heygen' })
+
+    fetchCatalogue.mockResolvedValueOnce({
+      status: 'ok',
+      items: [entry({ id: 'el-1', label: 'Rachel' })],
+    })
+    await wrapper.setProps({ provider: 'elevenlabs' })
     await flushPromises()
 
-    expect(byTestId('template-config-voiceId-item-v1')).not.toBeNull()
-    // D4: null is never a match for a specific language filter — the exact
-    // protection this feature exists to provide (the "Alessandra" bug).
-    expect(byTestId('template-config-voiceId-item-v2')).toBeNull()
+    resolveFirst({ status: 'ok', items: VOICES })
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-item-el-1`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(false)
   })
 })
 
-describe('preview controls (D5)', () => {
-  it('renders a play control for a voice entry with a preview_audio_url', async () => {
-    fetchCatalogue.mockResolvedValue({
-      status: 'ok',
-      items: [entry({ id: 'v1', preview_audio_url: 'https://cdn.example/a.mp3' })],
-    })
-    const wrapper = mountCombobox()
+describe('what an option shows', () => {
+  it('shows provider, name, language/locale, provider voice id and accent', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
     await flushPromises()
-    await openPopover(wrapper)
+    await open(wrapper)
 
-    expect(byTestId('template-config-voiceId-preview-v1')).not.toBeNull()
+    const text = wrapper.get(sel(`${P}-item-v-it`)).text()
+
+    expect(text).toContain('Alessandra')
+    expect(text).toContain('avatar_templates.provider.heygen')
+    expect(text).toContain('it-IT')
+    expect(text).toContain('v-it')
+    expect(text).toContain('northern')
   })
 
-  it('renders no play control for a voice entry with no preview_audio_url', async () => {
-    fetchCatalogue.mockResolvedValue({
-      status: 'ok',
-      items: [entry({ id: 'v1', preview_audio_url: null })],
-    })
-    const wrapper = mountCombobox()
+  it('falls back to the bare language when the entry has no locale', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
     await flushPromises()
-    await openPopover(wrapper)
+    await open(wrapper)
 
-    expect(byTestId('template-config-voiceId-preview-v1')).toBeNull()
+    expect(wrapper.get(sel(`${P}-item-v-multi`)).text()).toContain('en')
   })
 
-  it('renders a thumbnail for an avatar entry with a preview_image_url, never a play control for it', async () => {
-    fetchCatalogue.mockResolvedValue({
-      status: 'ok',
-      items: [
-        entry({ id: 'a1', label: 'Face one', preview_image_url: 'https://cdn.example/a.png' }),
-      ],
-    })
-    const wrapper = mountCombobox({ field: AVATAR_FIELD })
+  it('badges native Italian and multilingual voices, and nothing else', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
     await flushPromises()
-    await openPopover(wrapper)
+    await open(wrapper)
 
-    expect(byTestId('template-config-avatarId-thumb-a1')).not.toBeNull()
-    expect(byTestId('template-config-avatarId-preview-a1')).toBeNull()
-  })
-
-  it('renders neither control for an entry with no preview media at all — no broken img/audio tag', async () => {
-    fetchCatalogue.mockResolvedValue({
-      status: 'ok',
-      items: [
-        entry({ id: 'a1', label: 'No preview', preview_image_url: null, preview_audio_url: null }),
-      ],
-    })
-    const wrapper = mountCombobox({ field: AVATAR_FIELD })
-    await flushPromises()
-    await openPopover(wrapper)
-
-    expect(byTestId('template-config-avatarId-thumb-a1')).toBeNull()
-    expect(byTestId('template-config-avatarId-preview-a1')).toBeNull()
-  })
-})
-
-describe('selection and manual entry both route through the same change event (D7)', () => {
-  it('emits change with the selected entry id (asserted on the emitted value, not lingering DOM state)', async () => {
-    fetchCatalogue.mockResolvedValue({
-      status: 'ok',
-      items: [entry({ id: 'v1', label: 'Alessandra - IA' })],
-    })
-    const wrapper = mountCombobox()
-    await flushPromises()
-    await openPopover(wrapper)
-
-    byTestId('template-config-voiceId-item-v1')?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true })
+    expect(wrapper.find(sel(`${P}-italian-badge-v-it`)).text()).toBe(
+      'avatar_templates.form.catalogue.italianNative'
     )
-    await flushPromises()
-
-    expect(wrapper.emitted('change')?.at(-1)).toEqual(['v1'])
+    expect(wrapper.find(sel(`${P}-italian-badge-v-multi`)).text()).toBe(
+      'avatar_templates.form.catalogue.italianMultilingual'
+    )
+    expect(wrapper.find(sel(`${P}-italian-badge-v-en`)).exists()).toBe(false)
   })
 
-  it('typing manually emits change with the exact typed text, unchanged from a plain text input', async () => {
-    fetchCatalogue.mockResolvedValue({ status: 'ok', items: [] })
-    const wrapper = mountCombobox()
+  it('keeps the API order, which is native Italian first', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
     await flushPromises()
+    await open(wrapper)
 
-    await wrapper.get('input').setValue('hand-typed-id')
+    const ids = wrapper.findAll('[role="option"]').map((o) => o.attributes('data-testid'))
 
-    expect(wrapper.emitted('change')?.at(-1)).toEqual(['hand-typed-id'])
-  })
-
-  it("clearing the manually typed value emits change(''), which onFieldChange already reads as drop-the-key", async () => {
-    fetchCatalogue.mockResolvedValue({ status: 'ok', items: [] })
-    const wrapper = mountCombobox({ modelValue: 'existing-id' })
-    await flushPromises()
-
-    await wrapper.get('input').setValue('')
-
-    expect(wrapper.emitted('change')?.at(-1)).toEqual([''])
+    expect(ids[0]).toBe(`${P}-item-v-it`)
   })
 })
 
-describe('preview playback (D5)', () => {
-  it("plays the entry's audio on click and toggles to pause on a second click", async () => {
-    const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
-    const pauseSpy = vi
-      .spyOn(window.HTMLMediaElement.prototype, 'pause')
-      .mockImplementation(() => undefined)
+describe('the Italian-only toggle', () => {
+  it('is offered for voices and hides every non-native voice', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
 
+    await wrapper.get(sel(`${P}-italian-only`)).setValue(true)
+
+    expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-item-v-en`)).exists()).toBe(false)
+    expect(wrapper.find(sel(`${P}-item-v-multi`)).exists()).toBe(false)
+  })
+
+  it('is not offered for avatars', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: [entry({ id: 'a1' })] })
+    const wrapper = mountPicker({ fieldKey: 'avatarId', resource: 'avatar' })
+    await flushPromises()
+    await open(wrapper, 'template-config-avatarId')
+
+    expect(wrapper.find(sel('template-config-avatarId-italian-only')).exists()).toBe(false)
+  })
+})
+
+describe('search', () => {
+  it('matches label, language, accent and provider id', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-search`)).setValue('american')
+
+    expect(wrapper.find(sel(`${P}-item-v-en`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(false)
+
+    await wrapper.get(sel(`${P}-search`)).setValue('v-multi')
+
+    expect(wrapper.find(sel(`${P}-item-v-multi`)).exists()).toBe(true)
+  })
+
+  it('says so when nothing matches, without calling it an error', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-search`)).setValue('zzz')
+
+    expect(wrapper.find(sel(`${P}-no-match`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-error`)).exists()).toBe(false)
+  })
+})
+
+describe('selection and open state (the dropdown bugs)', () => {
+  it('emits the provider id and closes the list after a selection', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-item-v-en`)).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('change')).toEqual([['v-en']])
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(false)
+  })
+
+  it('does not reopen when focus returns to the trigger after a selection', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-item-v-en`)).trigger('click')
+    await wrapper.get(sel(P)).trigger('focus')
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(false)
+  })
+
+  it('shows the chosen entry in the trigger, by name and not by raw id', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ modelValue: 'v-en' })
+    await flushPromises()
+
+    expect(wrapper.get(sel(P)).text()).toContain('John')
+  })
+
+  it('keeps the full list available after a selection is made', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ modelValue: 'v-en' })
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(3)
+  })
+
+  it('marks the current entry as selected', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ modelValue: 'v-en' })
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.get(sel(`${P}-item-v-en`)).attributes('aria-selected')).toBe('true')
+    expect(wrapper.get(sel(`${P}-item-v-it`)).attributes('aria-selected')).toBe('false')
+  })
+
+  it('closes on an outside click', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(false)
+  })
+
+  it('stays open on a click inside its own panel', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    wrapper
+      .get(sel(`${P}-search`))
+      .element.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(true)
+  })
+
+  it('closes on Escape', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-panel`)).trigger('keydown', { key: 'Escape' })
+
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(false)
+  })
+
+  it('never has two pickers open at once', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const first = mountPicker({ fieldKey: 'voiceId' })
+    const second = mountPicker({ fieldKey: 'avatarId', resource: 'avatar' })
+    await flushPromises()
+
+    await open(first, 'template-config-voiceId')
+    expect(first.find(sel('template-config-voiceId-panel')).exists()).toBe(true)
+
+    await open(second, 'template-config-avatarId')
+
+    expect(second.find(sel('template-config-avatarId-panel')).exists()).toBe(true)
+    expect(first.find(sel('template-config-voiceId-panel')).exists()).toBe(false)
+  })
+
+  it('toggles closed when the trigger is pressed again', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(false)
+  })
+})
+
+describe('reporting what the catalogue holds', () => {
+  it('reports the loaded ids so the form can refuse an unknown one', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+
+    expect(wrapper.emitted('loaded')?.at(-1)).toEqual([['v-it', 'v-en', 'v-multi']])
+  })
+
+  it('reports null when the ids cannot be trusted (provider error)', async () => {
+    fetchCatalogue.mockResolvedValue({
+      status: 'provider_error',
+      items: [],
+      code: 'provider_unavailable',
+    })
+    const wrapper = mountPicker()
+    await flushPromises()
+
+    expect(wrapper.emitted('loaded')?.at(-1)).toEqual([null])
+  })
+
+  it('reports an empty list as known-empty, not unknown', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'empty', items: [] })
+    const wrapper = mountPicker()
+    await flushPromises()
+
+    expect(wrapper.emitted('loaded')?.at(-1)).toEqual([[]])
+  })
+})
+
+describe('empty and error states', () => {
+  it('shows an empty state for status empty', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'empty', items: [] })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-empty`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-error`)).exists()).toBe(false)
+  })
+
+  it.each([
+    'provider_key_missing',
+    'provider_unauthorized',
+    'provider_rate_limited',
+    'provider_unavailable',
+    'provider_unreachable',
+    'provider_rejected',
+    'provider_bad_response',
+    'unsupported_catalogue',
+  ])('maps %s to its own localized message', async (code) => {
+    fetchCatalogue.mockResolvedValue({ status: 'provider_error', items: [], code })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.get(sel(`${P}-error`)).text()).toContain(
+      `avatar_templates.form.catalogue.error.${code}`
+    )
+  })
+
+  it('treats a transport failure as a provider_unreachable error', async () => {
+    fetchCatalogue.mockRejectedValue(new Error('network'))
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.get(sel(`${P}-error`)).text()).toContain(
+      'avatar_templates.form.catalogue.error.provider_unreachable'
+    )
+  })
+
+  it('offers a retry that refetches and recovers', async () => {
+    fetchCatalogue.mockResolvedValueOnce({
+      status: 'provider_error',
+      items: [],
+      code: 'provider_rate_limited',
+    })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    fetchCatalogue.mockResolvedValueOnce({ status: 'ok', items: VOICES })
+    await wrapper.get(sel(`${P}-retry`)).trigger('click')
+    await flushPromises()
+
+    expect(fetchCatalogue).toHaveBeenCalledTimes(2)
+    expect(wrapper.find(sel(`${P}-error`)).exists()).toBe(false)
+    expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(true)
+  })
+
+  it('lets the operator type an id by hand while the provider is down', async () => {
+    fetchCatalogue.mockResolvedValue({
+      status: 'provider_error',
+      items: [],
+      code: 'provider_unavailable',
+    })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    await wrapper.get(sel(`${P}-manual`)).setValue('typed-id')
+
+    expect(wrapper.emitted('change')?.at(-1)).toEqual(['typed-id'])
+  })
+
+  it('does not offer manual entry when the catalogue answered', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker()
+    await flushPromises()
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-manual`)).exists()).toBe(false)
+  })
+
+  it('names a stored id the catalogue does not know instead of hiding it', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ modelValue: 'ghost-id' })
+    await flushPromises()
+
+    expect(wrapper.get(sel(P)).text()).toContain('ghost-id')
+    expect(wrapper.find(sel(`${P}-unknown`)).exists()).toBe(true)
+  })
+})
+
+describe('avatar preview', () => {
+  const AV = 'template-config-avatarId'
+  const avatars = [
+    entry({
+      id: 'a1',
+      label: 'Anna',
+      name: 'Anna',
+      preview_image_url: 'https://cdn.test/anna.png',
+    }),
+    entry({ id: 'a2', label: 'Bea', name: 'Bea', preview_image_url: 'https://cdn.test/bea.png' }),
+    entry({ id: 'a3', label: 'Cleo', name: 'Cleo', preview_image_url: null }),
+  ]
+
+  it('shows the selected avatar image, at least 160x160', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: avatars })
+    const wrapper = mountPicker({ fieldKey: 'avatarId', resource: 'avatar', modelValue: 'a1' })
+    await flushPromises()
+
+    const img = wrapper.get(sel(`${AV}-preview-image`))
+
+    expect(img.attributes('src')).toBe('https://cdn.test/anna.png')
+    expect(Number(img.attributes('width'))).toBeGreaterThanOrEqual(160)
+    expect(Number(img.attributes('height'))).toBeGreaterThanOrEqual(160)
+    expect(img.attributes('style')).toContain('min-width: 160px')
+    expect(img.attributes('style')).toContain('min-height: 160px')
+  })
+
+  it('updates immediately when the selection changes', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: avatars })
+    const wrapper = mountPicker({ fieldKey: 'avatarId', resource: 'avatar', modelValue: 'a1' })
+    await flushPromises()
+
+    await wrapper.setProps({ modelValue: 'a2' })
+
+    expect(wrapper.get(sel(`${AV}-preview-image`)).attributes('src')).toBe(
+      'https://cdn.test/bea.png'
+    )
+  })
+
+  it('shows a placeholder, at least 160x160, when the avatar has no image', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: avatars })
+    const wrapper = mountPicker({ fieldKey: 'avatarId', resource: 'avatar', modelValue: 'a3' })
+    await flushPromises()
+
+    const fallback = wrapper.get(sel(`${AV}-preview-fallback`))
+
+    expect(wrapper.find(sel(`${AV}-preview-image`)).exists()).toBe(false)
+    expect(fallback.attributes('style')).toContain('min-width: 160px')
+    expect(fallback.attributes('style')).toContain('min-height: 160px')
+  })
+
+  it('falls back to the placeholder when the image fails to load', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: avatars })
+    const wrapper = mountPicker({ fieldKey: 'avatarId', resource: 'avatar', modelValue: 'a1' })
+    await flushPromises()
+
+    await wrapper.get(sel(`${AV}-preview-image`)).trigger('error')
+
+    expect(wrapper.find(sel(`${AV}-preview-image`)).exists()).toBe(false)
+    expect(wrapper.find(sel(`${AV}-preview-fallback`)).exists()).toBe(true)
+  })
+
+  it('shows no preview at all while nothing is selected', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: avatars })
+    const wrapper = mountPicker({ fieldKey: 'avatarId', resource: 'avatar' })
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${AV}-preview-image`)).exists()).toBe(false)
+    expect(wrapper.find(sel(`${AV}-preview-fallback`)).exists()).toBe(false)
+  })
+
+  it('shows no image preview for a voice', async () => {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
+    const wrapper = mountPicker({ modelValue: 'v-it' })
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-preview-image`)).exists()).toBe(false)
+  })
+})
+
+describe('voice audio preview', () => {
+  it('offers a play button only for entries that have a sample', async () => {
     fetchCatalogue.mockResolvedValue({
       status: 'ok',
-      items: [entry({ id: 'v1', preview_audio_url: 'https://cdn.example/a.mp3' })],
+      items: [
+        entry({ id: 'v1', preview_audio_url: 'https://cdn.test/v1.mp3' }),
+        entry({ id: 'v2', preview_audio_url: null }),
+      ],
     })
-    const wrapper = mountCombobox()
+    const wrapper = mountPicker()
     await flushPromises()
-    await openPopover(wrapper)
+    await open(wrapper)
 
-    const playButton = byTestId('template-config-voiceId-preview-v1')
-    expect(playButton).not.toBeNull()
-
-    playButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-
-    expect(playSpy).toHaveBeenCalledTimes(1)
-
-    playButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-
-    expect(pauseSpy).toHaveBeenCalledTimes(1)
-
-    playSpy.mockRestore()
-    pauseSpy.mockRestore()
-  })
-})
-
-describe('empty/unavailable hint (never a silently blank list)', () => {
-  it('degrades to the unavailable hint when the fetch itself rejects (a frontend-side failure, not just the API-reported status)', async () => {
-    fetchCatalogue.mockRejectedValue(new Error('network error'))
-    const wrapper = mountCombobox()
-    await flushPromises()
-    await openPopover(wrapper)
-
-    expect(byTestId('template-config-voiceId-empty-hint')).not.toBeNull()
+    expect(wrapper.find(sel(`${P}-play-v1`)).exists()).toBe(true)
+    expect(wrapper.find(sel(`${P}-play-v2`)).exists()).toBe(false)
   })
 
-  it('shows an explanatory hint when the catalogue is empty for the current filter', async () => {
-    fetchCatalogue.mockResolvedValue({ status: 'ok', items: [] })
-    const wrapper = mountCombobox()
+  it('playing a sample does not select the voice', async () => {
+    fetchCatalogue.mockResolvedValue({
+      status: 'ok',
+      items: [entry({ id: 'v1', preview_audio_url: 'https://cdn.test/v1.mp3' })],
+    })
+    const wrapper = mountPicker()
     await flushPromises()
-    await openPopover(wrapper)
+    await open(wrapper)
 
-    expect(byTestId('template-config-voiceId-empty-hint')).not.toBeNull()
-  })
+    await wrapper.get(sel(`${P}-play-v1`)).trigger('click')
 
-  it('shows a hint, not a blank list, when the fetch degrades to status: unavailable', async () => {
-    fetchCatalogue.mockResolvedValue({ status: 'unavailable', items: [] })
-    const wrapper = mountCombobox()
-    await flushPromises()
-    await openPopover(wrapper)
-
-    expect(byTestId('template-config-voiceId-empty-hint')).not.toBeNull()
-  })
-
-  it('still allows manual entry when the catalogue is unavailable', async () => {
-    fetchCatalogue.mockResolvedValue({ status: 'unavailable', items: [] })
-    const wrapper = mountCombobox()
-    await flushPromises()
-
-    const input = wrapper.get('input')
-    await input.setValue('manually-typed')
-
-    expect(wrapper.emitted('change')?.at(-1)).toEqual(['manually-typed'])
-    expect((input.element as HTMLInputElement).disabled).toBe(false)
+    expect(wrapper.emitted('change')).toBeUndefined()
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(true)
   })
 })

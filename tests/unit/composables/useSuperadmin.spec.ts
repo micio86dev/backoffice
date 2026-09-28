@@ -109,4 +109,58 @@ describe('useSuperadmin', () => {
 
     expect(apiFetchMock).toHaveBeenCalledTimes(2)
   })
+
+  /**
+   * Organization management (template-provider-fixes T7). Thin wiring: what is
+   * pinned here is the verb, the path, and that `slug` is optional on create
+   * and absent from an update (the API refuses to change it).
+   */
+  describe('organization management', () => {
+    async function load(apiFetchMock: ReturnType<typeof vi.fn>) {
+      vi.doMock('../../../app/composables/useApi', () => ({
+        useApi: () => ({ apiFetch: apiFetchMock }),
+      }))
+      const { useSuperadmin } = await import('../../../app/composables/useSuperadmin')
+
+      return useSuperadmin()
+    }
+
+    it('createClient() POSTs /admin/organizations with the name and optional slug', async () => {
+      const apiFetchMock = vi.fn().mockResolvedValue({ data: { id: 9 } })
+      const { createClient } = await load(apiFetchMock)
+
+      await createClient({ name: 'Acme', slug: 'acme' })
+      await createClient({ name: 'No slug' })
+
+      expect(apiFetchMock).toHaveBeenNthCalledWith(1, '/admin/organizations', {
+        method: 'POST',
+        body: { name: 'Acme', slug: 'acme' },
+      })
+      expect(apiFetchMock).toHaveBeenNthCalledWith(2, '/admin/organizations', {
+        method: 'POST',
+        body: { name: 'No slug' },
+      })
+    })
+
+    it('fetchClient() GETs /admin/organizations/{id}', async () => {
+      const apiFetchMock = vi.fn().mockResolvedValue({ data: { id: 9 } })
+      const { fetchClient } = await load(apiFetchMock)
+
+      await fetchClient(9)
+
+      expect(apiFetchMock).toHaveBeenCalledWith('/admin/organizations/9')
+    })
+
+    it('updateClient() PATCHes /admin/organizations/{id} with name and colour only', async () => {
+      const apiFetchMock = vi.fn().mockResolvedValue({ data: { id: 9 } })
+      const { updateClient } = await load(apiFetchMock)
+
+      await updateClient(9, { name: 'Renamed', primary_color: null })
+
+      expect(apiFetchMock).toHaveBeenCalledWith('/admin/organizations/9', {
+        method: 'PATCH',
+        body: { name: 'Renamed', primary_color: null },
+      })
+    })
+  })
 })

@@ -8,7 +8,7 @@
  * cross-tenant leak.
  */
 import { watch } from 'vue'
-import type { paths } from '../../types/api'
+import type { components, paths } from '../../types/api'
 import { useApi } from './useApi'
 import { useAuth } from './useAuth'
 
@@ -28,6 +28,28 @@ export type ClientOverviewResponse =
   paths['/admin/clients']['get']['responses']['200']['content']['application/json']
 
 export type ClientOverviewRow = ClientOverviewResponse['data'][number]
+
+/** One organization as the superadmin management endpoints return it. */
+export type ManagedClientResponse =
+  paths['/admin/organizations/{id}']['get']['responses']['200']['content']['application/json']
+
+export type ManagedClient = ManagedClientResponse['data']
+
+/**
+ * `slug` is optional on create — the API derives one from the name when it is
+ * blank — but Scramble reports the request rule as required, so the generated
+ * shape is re-narrowed here rather than followed into a form that could never
+ * leave the slug empty.
+ */
+export type CreateClientPayload = Omit<
+  components['schemas']['StoreOrganizationRequest'],
+  'slug'
+> & {
+  slug?: string
+}
+
+/** Name and colour only: the slug is a tenancy identifier and never changes. */
+export type UpdateClientPayload = components['schemas']['UpdateManagedOrganizationRequest']
 
 // Module-scoped, intentionally NOT inside the `useSuperadmin()` body — the
 // point is that every call site shares ONE in-flight request, and state
@@ -92,5 +114,34 @@ export function useSuperadmin() {
     })
   }
 
-  return { fetchClients, fetchClientOverview, setActingClient }
+  /** Create an organization. Superadmin only; answers 201 with the new record. */
+  async function createClient(payload: CreateClientPayload): Promise<ManagedClientResponse> {
+    return apiFetch<ManagedClientResponse>('/admin/organizations', {
+      method: 'POST',
+      body: payload,
+    })
+  }
+
+  async function fetchClient(id: number): Promise<ManagedClientResponse> {
+    return apiFetch<ManagedClientResponse>(`/admin/organizations/${id}`)
+  }
+
+  async function updateClient(
+    id: number,
+    payload: UpdateClientPayload
+  ): Promise<ManagedClientResponse> {
+    return apiFetch<ManagedClientResponse>(`/admin/organizations/${id}`, {
+      method: 'PATCH',
+      body: payload,
+    })
+  }
+
+  return {
+    fetchClients,
+    fetchClientOverview,
+    setActingClient,
+    createClient,
+    fetchClient,
+    updateClient,
+  }
 }

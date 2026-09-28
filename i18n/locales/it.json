@@ -937,7 +937,9 @@
     "active": "Attivo",
     "provider": {
       "heygen": "HeyGen",
-      "tavus": "Tavus"
+      "tavus": "Tavus",
+      "cartesia": "Cartesia",
+      "elevenlabs": "ElevenLabs"
     },
     "action": {
       "new": "Nuovo template",
@@ -980,10 +982,28 @@
       },
       "catalogue": {
         "searchPlaceholder": "Cerca nel catalogo del servizio…",
-        "languageFilterLabel": "Lingua",
-        "languageAll": "Tutte le lingue",
-        "emptyForLanguage": "Nessun elemento corrisponde a questo filtro nel catalogo del servizio: usa l'inserimento manuale.",
-        "emptyUnavailable": "Il catalogo del servizio non è al momento disponibile: usa l'inserimento manuale.",
+        "choose": "Scegli…",
+        "loading": "Caricamento del catalogo del servizio…",
+        "empty": "Il catalogo del servizio non ha elementi per questo elenco.",
+        "noMatch": "Nessun elemento corrisponde alla ricerca.",
+        "italianOnly": "Solo italiano",
+        "italianNative": "Italiano nativo",
+        "italianMultilingual": "Multilingua",
+        "unknownSelected": "Non presente nel catalogo",
+        "retry": "Riprova",
+        "manualLabel": "Inserisci l'ID manualmente",
+        "previewAlt": "Anteprima di {name}",
+        "previewFallback": "Anteprima non disponibile",
+        "error": {
+          "provider_key_missing": "La chiave di accesso a questo servizio non è configurata. Contatta il supporto.",
+          "provider_unauthorized": "Il servizio ha rifiutato la chiave di accesso. Controlla la chiave e riprova.",
+          "provider_rate_limited": "Il servizio sta limitando le richieste. Attendi un momento e riprova.",
+          "provider_unavailable": "Il servizio non è disponibile al momento. Riprova tra poco.",
+          "provider_unreachable": "Impossibile raggiungere il servizio. Controlla la connessione e riprova.",
+          "provider_rejected": "Il servizio ha rifiutato la richiesta.",
+          "provider_bad_response": "Il servizio ha restituito una risposta non leggibile.",
+          "unsupported_catalogue": "Questo elenco non è disponibile per il servizio selezionato."
+        },
         "preview": {
           "play": "Riproduci anteprima",
           "pause": "Metti in pausa l'anteprima"
@@ -1019,7 +1039,13 @@
         "type": "Questo valore ha il tipo sbagliato.",
         "range": "Questo valore è fuori dall'intervallo consentito.",
         "enum": "Questo valore non è tra le opzioni consentite.",
-        "unknown": "Questa impostazione non esiste per il servizio selezionato."
+        "unknown": "Questa impostazione non esiste per il servizio selezionato.",
+        "avatar_not_found": "Questo avatar non esiste per il servizio selezionato. Sceglilo dall'elenco.",
+        "voice_not_found": "Questa voce non esiste per il servizio selezionato. Sceglila dall'elenco.",
+        "pal_not_found": "Questa persona non esiste per il servizio selezionato. Sceglila dall'elenco.",
+        "tts_engine_required": "Scegli un motore vocale esterno, oppure svuota l'ID voce esterna.",
+        "tts_voice_required": "Scegli una voce per il motore vocale selezionato.",
+        "tts_voice_not_found": "Questa voce non esiste per il motore vocale selezionato. Sceglila dall'elenco."
       },
       "llm": {
         "mode_unsupported": "Questo modello non supporta ancora la modalità gestita.",
@@ -1411,7 +1437,38 @@
       "empty": "Ancora nessun cliente."
     },
     "actAs": "Entra come {name}",
-    "actAsCurrent": "Stai già operando come {name}"
+    "actAsCurrent": "Stai già operando come {name}",
+    "action": {
+      "new": "Nuovo cliente"
+    },
+    "edit": "Modifica {name}",
+    "form": {
+      "newTitle": "Nuovo cliente",
+      "editTitle": "Modifica cliente",
+      "loading": "Caricamento del cliente…",
+      "loadErrorTitle": "Impossibile caricare il cliente",
+      "loadErrorBody": "Chiudi questo pannello e riprova. Se continua a fallire, verifica di aver effettuato l'accesso come amministratore di piattaforma.",
+      "name": "Nome",
+      "slug": "Identificativo (slug)",
+      "help": {
+        "name": "Il nome con cui l'organizzazione viene mostrata.",
+        "slug": "Lettere minuscole, cifre e trattini. Lascialo vuoto per ricavarlo dal nome. Non potrà più essere modificato.",
+        "slugLocked": "L'identificativo è fissato alla creazione e non può più essere modificato.",
+        "primaryColor": "Facoltativo. Entrambe le app usano questo colore per questo cliente; se vuoto si usa la palette del prodotto."
+      },
+      "errors": {
+        "name_required": "Inserisci un nome.",
+        "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
+        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB."
+      },
+      "serverError": {
+        "name_required": "Inserisci un nome.",
+        "slug_taken": "Questo identificativo è già usato da un altro cliente.",
+        "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
+        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB."
+      },
+      "saveError": "Impossibile salvare il cliente. Riprova."
+    }
   },
   "imageUpload": {
     "cta": {

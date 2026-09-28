@@ -157,17 +157,17 @@
           through to the branches below, completely unchanged.
         -->
             <AvatarTemplateProviderCombobox
-              v-if="field.catalogue_resource"
+              v-if="catalogueFor(field) !== null"
               :id="`template-config-${field.key}`"
               :data-testid="`template-config-${field.key}`"
-              :field="field"
-              :provider="draft.provider"
+              :field="catalogueFor(field)!.field"
+              :provider="catalogueFor(field)!.provider"
               :model-value="stringValue(field.key)"
               :aria-invalid="Boolean(configErrors[field.key])"
               :aria-required="field.required ? 'true' : undefined"
               :aria-describedby="describedBy(field)"
               @change="onFieldChange(field, $event)"
-              @blur="validateConfigField(field)"
+              @loaded="onCatalogueLoaded(field.key, $event)"
             />
 
             <select
@@ -351,7 +351,13 @@ import { useLlmModels } from '@/composables/useLlmModels'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
-import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
+import {
+  CATALOGUED_TTS_ENGINES,
+  type AvatarTemplate,
+  type CatalogueProvider,
+  type FieldSpec,
+  type ProviderName,
+} from '@/types/avatar-template'
 import type { LlmCredential, LlmModel } from '@/types/llm'
 
 const props = defineProps<{
@@ -557,14 +563,64 @@ function describedBy(field: FieldSpec): string | undefined {
 // Switching provider on a NEW template clears the config. Carrying the old
 // values over would post knobs belonging to the other provider, which the API
 // rejects as unknown keys — a validation wall for an action that felt like
-// changing one dropdown.
+// changing one dropdown. That also clears every selection that only made sense
+// for the old provider (avatar, voice, persona, speech engine and its voice).
 watch(
   () => draft.value.provider,
   () => {
     if (isNew.value) draft.value.config = {}
     configErrors.value = {}
+    catalogueIds.value = {}
   }
 )
+
+/**
+ * What each catalogue-backed picker currently holds, as its own last report:
+ * the ids when the list is trustworthy, `null` when it is loading or the
+ * provider failed. Only a trustworthy list may refuse a value, so an outage at
+ * the provider never turns into a form that cannot be saved.
+ */
+const catalogueIds = ref<Record<string, string[] | null>>({})
+
+function onCatalogueLoaded(key: string, ids: string[] | null): void {
+  catalogueIds.value = { ...catalogueIds.value, [key]: ids }
+}
+
+const EXTERNAL_TTS_ENGINES = ['cartesia', 'elevenlabs', 'azure']
+
+function isCataloguedEngine(value: unknown): value is (typeof CATALOGUED_TTS_ENGINES)[number] {
+  return (CATALOGUED_TTS_ENGINES as readonly unknown[]).includes(value)
+}
+
+/**
+ * Which picker (if any) a field uses, and which service it lists.
+ *
+ * `ttsExternalVoiceId` carries no catalogue resource server-side — it is a
+ * plain text knob — because WHICH catalogue applies depends on another field:
+ * the chosen speech engine. So it becomes a voice picker against that engine's
+ * own catalogue when the engine has one, and stays a plain input otherwise.
+ */
+function catalogueFor(field: FieldSpec): { field: FieldSpec; provider: CatalogueProvider } | null {
+  if (field.catalogue_resource !== undefined) {
+    return { field, provider: draft.value.provider }
+  }
+
+  const engine = draft.value.config.ttsEngine
+
+  if (field.key === 'ttsExternalVoiceId' && isCataloguedEngine(engine)) {
+    return { field: { ...field, catalogue_resource: 'voice' }, provider: engine }
+  }
+
+  return null
+}
+
+const REFERENCE_ERROR_CODE: Record<string, string> = {
+  avatarId: 'avatar_not_found',
+  faceId: 'avatar_not_found',
+  voiceId: 'voice_not_found',
+  palId: 'pal_not_found',
+  ttsExternalVoiceId: 'tts_voice_not_found',
+}
 
 /**
  * Rebuilds the config WITHOUT a key.
@@ -593,6 +649,14 @@ function stringValue(key: string): string {
  * clearing a field has to remove the key, not blank it.
  */
 function onFieldChange(field: FieldSpec, raw: string | boolean): void {
+  // A voice id belongs to ONE engine's catalogue: keeping it across an engine
+  // change stores an id the new engine has never heard of.
+  if (field.key === 'ttsEngine' && raw !== draft.value.config.ttsEngine) {
+    draft.value.config = withoutKey(draft.value.config, 'ttsExternalVoiceId')
+  }
+
+  configErrors.value[field.key] = undefined
+
   if (field.type === 'checkbox') {
     draft.value.config =
       raw === false
@@ -721,12 +785,59 @@ function validateConfigField(field: FieldSpec): boolean {
   return true
 }
 
+/**
+ * Refuses a provider/avatar/voice combination the API would refuse, before the
+ * round trip. Mirrors `TemplateReferenceValidator` and reuses its codes, so the
+ * message is the same whether it comes from here or from a 422.
+ *
+ * Two kinds of check, with different trust:
+ *  - an id absent from a catalogue that ANSWERED is refused;
+ *  - an id whose catalogue did not answer (provider down, still loading) is let
+ *    through — the server is authoritative, and an outage must not block saves.
+ */
+function validateReferences(): boolean {
+  let ok = true
+
+  const refuse = (key: string, code: string): void => {
+    configErrors.value[key] = t(`avatar_templates.error.config.${code}`)
+    ok = false
+  }
+
+  for (const field of activeFields.value) {
+    const value = draft.value.config[field.key]
+    if (typeof value !== 'string' || value === '' || catalogueFor(field) === null) continue
+
+    const ids = catalogueIds.value[field.key]
+    if (Array.isArray(ids) && !ids.includes(value)) {
+      refuse(field.key, REFERENCE_ERROR_CODE[field.key] ?? 'unknown')
+    }
+  }
+
+  const keys = new Set(activeFields.value.map((field) => field.key))
+
+  if (keys.has('ttsEngine') && keys.has('ttsExternalVoiceId')) {
+    const engine = draft.value.config.ttsEngine
+    const voice = draft.value.config.ttsExternalVoiceId
+    const hasVoice = typeof voice === 'string' && voice.trim() !== ''
+    const external = typeof engine === 'string' && EXTERNAL_TTS_ENGINES.includes(engine)
+
+    if (external && !hasVoice) refuse('ttsExternalVoiceId', 'tts_voice_required')
+    else if (!external && hasVoice) refuse('ttsEngine', 'tts_engine_required')
+  }
+
+  return ok
+}
+
 function validateAllConfigFields(): boolean {
   let ok = true
 
   for (const field of activeFields.value) {
     if (!validateConfigField(field)) ok = false
   }
+
+  // Never short-circuited behind the required-field pass: an operator with a
+  // missing field AND a bad combination is shown both.
+  if (!validateReferences()) ok = false
 
   return ok
 }

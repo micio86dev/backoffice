@@ -222,17 +222,18 @@ function contrastRatio(hexA: string, hexB: string): number {
 // form-clarity-and-console-warnings — the select-highlighted-option contrast
 // requirement. White on `--color-accent` (#e45526) measures 3.7:1 and FAILS
 // WCAG AA's 4.5:1 minimum for normal text; white on `--color-accent-dark`
-// (#b8431e) measures 5.4:1 and passes. `main.css:53` already publishes
-// `--color-accent-dark`; this only asserts the CONSUMER (SelectItem.vue) uses
-// it for the highlight, not `--color-accent`.
+// (#431695, aliased to --color-primary-dark) measures 11.75:1 and passes.
+// `main.css:53` already publishes `--color-accent-dark`; this only asserts
+// the CONSUMER (SelectItem.vue) uses it for the highlight, not
+// `--color-accent`.
 describe('select highlighted-option contrast (admin-backoffice spec)', () => {
-  it('--color-accent-dark resolves to #b8431e', async () => {
+  it('--color-accent-dark resolves to #431695', async () => {
     const compiled = await compileForCandidates(['bg-accent-dark'])
-    expect(computedBackgroundColor(compiled, 'bg-accent-dark')).toBe('#b8431e')
+    expect(computedBackgroundColor(compiled, 'bg-accent-dark')).toBe('#431695')
   })
 
   it('white on --color-accent-dark measures >= 4.5:1 (numerically, not eyeballed)', () => {
-    expect(contrastRatio('#ffffff', '#b8431e')).toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio('#ffffff', '#431695')).toBeGreaterThanOrEqual(4.5)
   })
 
   it('white on plain --color-accent measures BELOW 4.5:1 — the regression this requirement rejects', () => {

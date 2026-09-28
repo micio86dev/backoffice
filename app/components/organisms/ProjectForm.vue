@@ -533,15 +533,10 @@ import { useProjects, type Project } from '@/composables/useProjects'
 import { useFrameworkRoles } from '@/composables/useFrameworkRoles'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { useFrameworkVersions } from '@/composables/useFrameworkVersions'
+import { useProjectFormValidation } from '@/composables/useProjectFormValidation'
 import { formSelectClass } from '@/components/ui/form-control'
 import type { TemplateOption } from '@/types/avatar-template'
 import type { FrameworkVersion } from '@/types/framework-version'
-import {
-  isNudgeMinCharsValid,
-  isProjectUrlValid,
-  isPauseEveryNCompetenciesValid,
-  PROJECT_FIELD_BOUNDS,
-} from '@/utils/project-field-specs'
 import { applyServerFieldErrors, serverErrorCode } from '@/utils/http-error'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { translateServerCodeOrFallback } from '@/utils/server-message'
@@ -636,17 +631,31 @@ watch(saving, (value) => emit('update:pending', value), { immediate: true })
 // itself, there is no "which row" to carry.
 const archiveConfirm = ref(false)
 const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
-const errors = ref<{
-  name?: string
-  slug?: string
-  roleCode?: string
-  pauseEveryNCompetencies?: string
-  nudgeMinChars?: string
-  exitRedirectUrl?: string
-  webhookUrl?: string
-  avatarTemplateId?: string
-  frameworkVersionId?: string
-}>({})
+
+const {
+  errors,
+  validateName,
+  validateSlug,
+  validateRoleCode,
+  validatePauseEveryNCompetencies,
+  validateNudgeMinChars,
+  validateExitRedirectUrl,
+  validateWebhookUrl,
+  validateAvatarTemplate,
+  validateFrameworkVersion,
+} = useProjectFormValidation({
+  name,
+  slug,
+  roleCode,
+  assessmentType,
+  pauseEveryNCompetencies,
+  nudgeMinChars,
+  exitRedirectUrl,
+  webhookUrl,
+  avatarTemplateId,
+  frameworkVersionId,
+  isEditing,
+})
 
 const competencyOptions = ref<CompetencyOption[]>([])
 
@@ -750,100 +759,11 @@ const nextTransition = computed<'active' | 'archived' | null>(() => {
   return null
 })
 
-/**
- * The pin is required on create, and nothing checked it.
- *
- * Only on CREATE: the control is disabled while editing, and the value is
- * whatever the project was pinned to.
- */
-function validateFrameworkVersion(): boolean {
-  if (isEditing.value) {
-    errors.value.frameworkVersionId = undefined
-
-    return true
-  }
-
-  errors.value.frameworkVersionId =
-    frameworkVersionId.value === null
-      ? t('projects.form.serverError.framework_version_required')
-      : undefined
-
-  return errors.value.frameworkVersionId === undefined
-}
-
-function validateName(): boolean {
-  if (name.value.trim() === '') errors.value.name = missingKey('nameRequired')
-  else errors.value.name = undefined
-  return !errors.value.name
-}
-
-function validateSlug(): boolean {
-  errors.value.slug = slug.value.trim() === '' ? missingKey('slugRequired') : undefined
-  return !errors.value.slug
-}
-
-function validatePauseEveryNCompetencies(): boolean {
-  const raw = pauseEveryNCompetencies.value
-  const value = raw === '' ? null : Number(raw)
-  errors.value.pauseEveryNCompetencies = isPauseEveryNCompetenciesValid(value)
-    ? undefined
-    : rangeKey(PROJECT_FIELD_BOUNDS.pauseEveryNCompetencies)
-  return !errors.value.pauseEveryNCompetencies
-}
-
-function validateNudgeMinChars(): boolean {
-  const raw = nudgeMinChars.value
-  const value = raw === '' ? null : Number(raw)
-  errors.value.nudgeMinChars = isNudgeMinCharsValid(value)
-    ? undefined
-    : rangeKey(PROJECT_FIELD_BOUNDS.nudgeMinChars)
-  return !errors.value.nudgeMinChars
-}
-
-function validateExitRedirectUrl(): boolean {
-  errors.value.exitRedirectUrl = isProjectUrlValid(exitRedirectUrl.value)
-    ? undefined
-    : t('projects.form.invalidUrl')
-  return !errors.value.exitRedirectUrl
-}
-
-function validateWebhookUrl(): boolean {
-  errors.value.webhookUrl = isProjectUrlValid(webhookUrl.value)
-    ? undefined
-    : t('projects.form.invalidUrl')
-  return !errors.value.webhookUrl
-}
-
-function validateRoleCode(): boolean {
-  if (assessmentType.value !== 'standard') {
-    errors.value.roleCode = undefined
-    return true
-  }
-  errors.value.roleCode = roleCode.value === '' ? missingKey('roleCodeRequired') : undefined
-  return !errors.value.roleCode
-}
-
-function validateAvatarTemplate(): boolean {
-  // Enforced server-side too (the column is NOT NULL with a restricting
-  // foreign key). Checked here so the operator is told WHICH control is
-  // missing, instead of getting the form-level "could not save" banner that an
-  // unmapped server error produces.
-  errors.value.avatarTemplateId =
-    avatarTemplateId.value === null ? missingKey('avatarTemplateRequired') : undefined
-
-  return !errors.value.avatarTemplateId
-}
-
 // useI18n() is a Nuxt auto-import, same convention as CandidateTable.vue.
+// The 9 field validators previously defined here now live in
+// `useProjectFormValidation` (destructured above) — `t`/`te` stay local,
+// still used by `applyServerErrors` below via `translateServerCodeOrFallback`.
 const { t, te } = useI18n()
-
-function missingKey(key: string): string {
-  return t(`projects.form.${key}`)
-}
-
-function rangeKey(bounds: { min: number; max: number }): string {
-  return t('projects.form.outOfRange', { min: bounds.min, max: bounds.max })
-}
 
 function onAssessmentTypeChange(value: unknown): void {
   if (value !== 'standard' && value !== 'potential') return

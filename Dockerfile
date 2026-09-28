@@ -207,7 +207,21 @@ RUN printf 'server {\n\
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;\n\
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;\n\
     # HSTS applied by Railway (HTTPS termination at edge) — not needed here\n\
-    # CSP deferred to C2\n\
+    #\n\
+    # Content-Security-Policy — origins verified against what this app actually\n\
+    # loads, not guessed: script-src/connect-src for GA4 (app/plugins/analytics.client.ts\n\
+    # injects https://www.googletagmanager.com/gtag/js and gtag.js beacons to the\n\
+    # google-analytics.com/analytics.google.com collection endpoints); connect-src\n\
+    # for Sentry (sentry.client.config.ts, DSN is runtime-configured per deploy via\n\
+    # NUXT_PUBLIC_SENTRY_DSN, so the ingest host is not known at this static-header\n\
+    # build time — *.sentry.io is Sentry'"'"'s own documented CSP wildcard, covering\n\
+    # every regional ingest subdomain). The api itself needs NO entry here: it is\n\
+    # reached through the same-origin /api/ proxy below (backoffice-same-origin-api\n\
+    # AD-1), never a separate origin the browser calls directly. style-src keeps\n\
+    # '"'"'unsafe-inline'"'"': this is a static per-request-nonce-less header, and Vue'"'"'s\n\
+    # `:style` bindings plus Tailwind'"'"'s arbitrary-value classes both compile to\n\
+    # inline style attributes CSP has no other way to allow here.\n\
+    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https://www.google-analytics.com; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
 \n\
     # Serve the health page as a static file\n\
     location /health {\n\

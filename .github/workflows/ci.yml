@@ -81,7 +81,7 @@ jobs:
       - name: Vitest unit tests + coverage
         run: node node_modules/.bin/vitest run --coverage --coverage.thresholds.lines=85
 
-      - name: Playwright E2E (chromium + webkit + mobile, incl. visual regression)
+      - name: Playwright E2E (chromium + webkit, incl. visual regression)
         # webServer (playwright.config) runs `nuxt generate` + static serve; browsers
         # come from the container image (no `playwright install` needed).
         run: node node_modules/.bin/playwright test

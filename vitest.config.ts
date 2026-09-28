@@ -24,19 +24,28 @@ export default defineConfig({
       provider: 'v8',
       include: ['app/**', 'components/**', 'composables/**', 'pages/**', 'server/**'],
       // `app/components/ui/**` is vendored shadcn-vue source (bunx shadcn-vue
-      // add), not hand-authored logic — DESIGN.md §5's "every component
-      // needs a matching Vitest test" rule targets atoms/molecules/organisms
-      // the team writes; the vendored primitives are exercised indirectly
-      // through the organisms/pages that consume them (same size:exception
-      // precedent as PR B0's vendoring commit). Excluding them here mirrors
-      // the pre-existing `types/api.ts` exclusion (generated, not authored)
+      // add), not hand-authored logic — the explicit, narrow exception
+      // DESIGN.md §5 now documents: exercised indirectly through the
+      // organisms/pages that consume it, not through a standalone unit test
+      // per primitive. (Not the same thing as PR B0's `size:exception` —
+      // that was a PR-review-size waiver, unrelated to coverage.) Excluding
+      // them here mirrors the pre-existing `types/api.ts` exclusion (generated,
+      // not authored)
       // and fixes a coverage gate that was silently broken BEFORE this PR —
       // confirmed by measuring the base branch: 54.09% overall lines, all
       // of the shortfall inside app/components/ui/**, never caught because
       // nothing had run `--coverage` end to end since B0 vendored it in.
       exclude: ['.nuxt/**', 'types/api.ts', '*.config.*', 'app/components/ui/**'],
+      // Branches/functions were measured but ungated — actual today is 92.69%
+      // branches / 89.19% functions (verified with a live `--coverage` run,
+      // not guessed), both comfortably above the wrapper CLAUDE.md's 85%
+      // project-wide target, which this gate now enforces on all three
+      // dimensions uniformly rather than only on lines. A future regression
+      // below 85% on any of them now fails CI instead of shipping silently.
       thresholds: {
         lines: 85,
+        branches: 85,
+        functions: 85,
       },
     },
   },

@@ -47,10 +47,16 @@
   /* Normative Quint brand values (D10 — B1 theme reconciliation) */
   --color-primary: #771aaf;
   --color-primary-light: #c222d3;
-  --color-primary-dark: #4f1aaf;
+  /* 15% darker than the prior #4f1aaf — still 11.75:1 against white (was
+     10:1), so the ≥4.5:1 white-text floor stays comfortably clear. */
+  --color-primary-dark: #431695;
   --color-accent: #e45526;
   --color-accent-light: #f19823;
-  --color-accent-dark: #b8431e;
+  /* Aliased to --color-primary-dark, not a second literal: the "active /
+     pressed" role used to point at a leftover orange the product no longer
+     wants there. A var() reference (not a duplicated hex) is what keeps this
+     in sync with the tenant-derived value useBrandTheme.ts writes. */
+  --color-accent-dark: var(--color-primary-dark);
 
   /* Supporting secondary — subtle highlights, badges (DESIGN.md §3.1) */
   --color-lavender: #8373d2;
@@ -228,7 +234,7 @@
   --sidebar-foreground: oklch(0.985 0 0); /* white, 8.2:1 on primary */
   --sidebar-primary: oklch(0.455 0.213 307.581); /* active item — same brand purple */
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.406 0.209 289.368); /* hover — #4f1aaf primary-dark */
+  --sidebar-accent: oklch(0.363 0.184 289.648); /* hover — #431695 primary-dark */
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 15%);
   --sidebar-ring: oklch(0.634 0.187 37.49); /* accent */
@@ -287,9 +293,10 @@
    spec "Select Highlighted Option Meets AA Text Contrast".
 
    `ui/select/SelectItem.vue`'s focus (highlighted) state pairs white text
-   with `--color-accent-dark` (#b8431e), NOT plain `--color-accent` (#e45526):
-   white on `--color-accent` measures 3.7:1 and FAILS WCAG AA's 4.5:1 minimum
-   for normal text; white on `--color-accent-dark` measures 5.4:1 and passes.
+   with `--color-accent-dark` (#431695, aliased to --color-primary-dark), NOT
+   plain `--color-accent` (#e45526): white on `--color-accent` measures 3.7:1
+   and FAILS WCAG AA's 4.5:1 minimum for normal text; white on
+   `--color-accent-dark` measures 11.75:1 and passes.
    `--color-accent-dark` already exists above (no new token) — this is a
    CONSUMER change, asserted numerically (not eyeballed) by
    `tests/unit/theme.spec.ts`'s `contrastRatio()` helper. Darkening the

@@ -21,14 +21,20 @@ import {
   applyBrandColor,
   BRAND_COLOR_TOKENS,
   BRAND_DERIVED_TOKENS,
+  BRAND_FOREGROUND_TOKENS,
 } from '../../../app/composables/useBrandTheme'
+import { contrastRatio } from '../../../app/utils/brand-color'
 
 function read(token: string): string {
   return document.documentElement.style.getPropertyValue(token)
 }
 
 afterEach(() => {
-  for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
+  for (const token of [
+    ...BRAND_COLOR_TOKENS,
+    ...BRAND_DERIVED_TOKENS,
+    ...BRAND_FOREGROUND_TOKENS,
+  ]) {
     document.documentElement.style.removeProperty(token)
   }
 })
@@ -79,6 +85,29 @@ describe('applyBrandColor', () => {
     expect(hover).toContain('#2563EB')
   })
 
+  it('picks a readable foreground for a DARK tenant colour (white)', () => {
+    // gga review finding: the foreground used to be hardcoded white,
+    // unconditionally — this proves the branch that already worked by luck
+    // for a dark colour still does, now that it is a real decision.
+    applyBrandColor('#2563EB')
+
+    for (const token of BRAND_FOREGROUND_TOKENS) {
+      expect(read(token)).toBe('#ffffff')
+    }
+  })
+
+  it('picks a readable foreground for a LIGHT tenant colour (black) — the exact bug this fixes', () => {
+    // #ffd400 on white used to stay white: 1.43:1, nowhere near WCAG AA's
+    // 4.5:1. This is the concrete case the hardcoded foreground broke.
+    applyBrandColor('#ffd400')
+
+    for (const token of BRAND_FOREGROUND_TOKENS) {
+      const foreground = read(token)
+      expect(foreground).toBe('#000000')
+      expect(contrastRatio('#ffd400', foreground)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
   it('REMOVES every token when the organization has no colour', () => {
     // Removal, not a written default. An unset custom property falls through to
     // the stylesheet's own value — the Quint purple DESIGN.md defines — and
@@ -87,7 +116,11 @@ describe('applyBrandColor', () => {
     applyBrandColor('#7C3AED')
     applyBrandColor(null)
 
-    for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
+    for (const token of [
+      ...BRAND_COLOR_TOKENS,
+      ...BRAND_DERIVED_TOKENS,
+      ...BRAND_FOREGROUND_TOKENS,
+    ]) {
       expect(read(token)).toBe('')
     }
   })
@@ -99,7 +132,11 @@ describe('applyBrandColor', () => {
     applyBrandColor('#7C3AED')
     applyBrandColor('red; } body { display: none } .x{')
 
-    for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
+    for (const token of [
+      ...BRAND_COLOR_TOKENS,
+      ...BRAND_DERIVED_TOKENS,
+      ...BRAND_FOREGROUND_TOKENS,
+    ]) {
       expect(read(token)).toBe('')
     }
   })

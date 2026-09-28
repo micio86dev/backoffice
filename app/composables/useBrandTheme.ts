@@ -36,6 +36,8 @@
  * promised to check is exactly how an injection survives a refactor.
  */
 
+import { readableForeground } from '~/utils/brand-color'
+
 /** The same shape the API enforces. Duplicated deliberately — see above. */
 const HEX = /^#[0-9a-f]{6}$/i
 
@@ -80,20 +82,51 @@ export const BRAND_COLOR_TOKENS = ['--color-primary', '--sidebar', '--sidebar-pr
 export const BRAND_DERIVED_TOKENS = ['--sidebar-accent', '--color-primary-dark'] as const
 
 /**
+ * The foreground painted on TOP of each `BRAND_COLOR_TOKENS` background.
+ *
+ * gga review finding: this app hardcoded `--primary-foreground` /
+ * `--sidebar-foreground` / `--sidebar-primary-foreground` to white
+ * (`main.css`, "white, 8.2:1 on primary" — true only against the product's
+ * OWN `#771aaf`), unconditionally, for every tenant colour. "Contrast is the
+ * operator's responsibility once they choose a colour" — this file's own
+ * stated philosophy, two paragraphs below — does not cover the foreground,
+ * because the product picks that, not the operator. A light tenant colour
+ * (e.g. `#ffd400`, 1.43:1 with white) shipped white text on a light
+ * background: a real, unguarded WCAG AA violation, not a hypothetical one.
+ *
+ * Order matches `BRAND_COLOR_TOKENS` — each index pairs a background token
+ * with the foreground painted on it, so a token added to one without the
+ * other is a mismatched-length array, not a silently wrong pairing.
+ */
+export const BRAND_FOREGROUND_TOKENS = [
+  '--primary-foreground',
+  '--sidebar-foreground',
+  '--sidebar-primary-foreground',
+] as const
+
+/**
  * How much of the brand colour survives the darkening.
  *
- * 78% against black reproduces roughly the relationship the product's own
- * palette has between `#771aaf` and its `#4f1aaf` hover, so a tenant colour
- * gets a hover of the same *character* rather than an arbitrary one.
+ * gga review finding, corrected: this used to claim 70%/black in OKLab
+ * reproduces `#431695` from `#771aaf` — verified false (OKLab `color-mix`
+ * moves L, a, AND b together; matching only L, as the prior version of this
+ * comment implicitly assumed, is not the same operation). Restated honestly:
+ * this reproduces the SAME KIND of shift `--color-primary-light`'s derivation
+ * already documents for the frontend's copy of this file — the ROLE the
+ * shade plays (a meaningfully darker hover, not a precise colorimetric match
+ * to the product's own literal `#431695`), the same way `#771aaf` → `#c222d3`
+ * is a role, not an exact reproducible formula, per that file's own header.
  */
-const HOVER_MIX = 'color-mix(in oklab, COLOR 78%, black)'
+const HOVER_MIX = 'color-mix(in oklab, COLOR 70%, black)'
 
 /**
  * A plain hex is a valid CSS colour in every browser this product supports
  * (DESIGN.md §2), so the override does not need converting to the OKLCH the
- * stylesheet's own values happen to use. Contrast against the foreground is
- * the operator's responsibility once they choose a colour of their own; the
- * product cannot verify a colour it did not pick.
+ * stylesheet's own values happen to use. Contrast of the BACKGROUND against
+ * arbitrary surrounding content is the operator's responsibility once they
+ * choose a colour of their own — the product cannot verify a colour it did
+ * not pick — but the FOREGROUND painted on top of it is the product's own
+ * choice, so `readableForeground` guards it (see `BRAND_FOREGROUND_TOKENS`).
  */
 export function applyBrandColor(color: string | null | undefined): void {
   if (typeof document === 'undefined') return
@@ -103,7 +136,11 @@ export function applyBrandColor(color: string | null | undefined): void {
   if (!color || !HEX.test(color)) {
     // Remove rather than reset: removing restores the stylesheet's own value,
     // while writing one here would hardcode a second copy of the brand colour.
-    for (const token of [...BRAND_COLOR_TOKENS, ...BRAND_DERIVED_TOKENS]) {
+    for (const token of [
+      ...BRAND_COLOR_TOKENS,
+      ...BRAND_DERIVED_TOKENS,
+      ...BRAND_FOREGROUND_TOKENS,
+    ]) {
       root.style.removeProperty(token)
     }
 
@@ -119,5 +156,11 @@ export function applyBrandColor(color: string | null | undefined): void {
   // malformed payload rather than stop it.
   for (const token of BRAND_DERIVED_TOKENS) {
     root.style.setProperty(token, HOVER_MIX.replace('COLOR', color))
+  }
+
+  const foreground = readableForeground(color)
+
+  for (const token of BRAND_FOREGROUND_TOKENS) {
+    root.style.setProperty(token, foreground)
   }
 }

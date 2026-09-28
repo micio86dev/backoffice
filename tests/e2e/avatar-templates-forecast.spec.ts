@@ -259,7 +259,11 @@ test.describe('Avatar templates — provider catalogue picker (avatar-template-c
     await expect(catalogueItem).toBeVisible()
     await expect(catalogueItem).toContainText('en')
     await catalogueItem.click()
-    await expect(voiceInput).toHaveValue('voice-e2e-1')
+    // The combobox rebuild (template-provider-fixes T6) turned this trigger
+    // into a <button>, not an <input> — it shows the picked catalogue item's
+    // label rather than the raw id, so this checks that display instead of a
+    // DOM value. The raw id is asserted below, from the actual PATCH body.
+    await expect(voiceInput).toContainText('Recruiter EN')
 
     // The manual-entry path, unchanged: avatarId carries no
     // catalogue_resource in this fixture, so it stays a plain text input.

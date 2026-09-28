@@ -146,6 +146,12 @@
           >
             <span class="flex min-w-0 flex-col">
               <span class="flex items-center gap-2">
+                <CheckIcon
+                  v-if="candidate.id === modelValue"
+                  class="size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                  :data-testid="`${testIdPrefix}-selected-mark-${candidate.id}`"
+                />
                 <span class="truncate font-medium">{{ candidate.label }}</span>
                 <span
                   v-if="candidate.italian !== null"
@@ -255,7 +261,7 @@
  * trip, without ever blocking a save just because the provider is down.
  */
 import { computed, onMounted, reactive, ref, useAttrs, watch } from 'vue'
-import { ChevronDownIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import { CheckIcon, ChevronDownIcon, PauseIcon, PlayIcon } from '@lucide/vue'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
@@ -361,7 +367,7 @@ const visibleEntries = computed(() => {
       candidate.locale,
       candidate.accent,
       candidate.id,
-    ].some((part) => part !== null && part.toLowerCase().includes(term))
+    ].some((part) => typeof part === 'string' && part.toLowerCase().includes(term))
   })
 })
 
@@ -371,7 +377,7 @@ function describe(candidate: CatalogueEntry): string {
     candidate.locale ?? candidate.language,
     candidate.accent,
   ]
-    .filter((part): part is string => part !== null && part !== '')
+    .filter((part): part is string => typeof part === 'string' && part !== '')
     .join(' · ')
 }
 

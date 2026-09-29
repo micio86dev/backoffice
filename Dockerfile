@@ -234,7 +234,14 @@ RUN printf 'server {\n\
     # (scripts/csp-script-hashes.mjs) and substituted for the placeholder\n\
     # below, never hardcoded. font-src allows data: because Vite inlines the\n\
     # small woff/woff2 files into the CSS as data URIs.\n\
-    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com __CSP_SCRIPT_HASHES__; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https://www.google-analytics.com; font-src '"'"'self'"'"' data:; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
+    #\n\
+    # img-src / media-src allow any https: origin. The avatar-template pickers\n\
+    # render provider-hosted previews (Tavus cdn.replica.tavus.io, HeyGen\n\
+    # files2.heygen.ai, voice sample audio) whose hosts are chosen by the\n\
+    # provider and change without notice, so an allow-list would silently break\n\
+    # the picker again. Images and media cannot execute script; script-src,\n\
+    # connect-src and frame-ancestors stay strict. blob: covers the object-URL\n    # preview of a file the operator has just picked, before it is uploaded.\n\
+    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com __CSP_SCRIPT_HASHES__; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: blob: https:; media-src '"'"'self'"'"' blob: https:; font-src '"'"'self'"'"' data:; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
 \n\
     # Serve the health page as a static file\n\
     location /health {\n\

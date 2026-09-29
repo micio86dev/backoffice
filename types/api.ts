@@ -427,6 +427,29 @@ export interface paths {
         patch: operations["avatarTemplate.update"];
         trace?: never;
     };
+    "/avatar-templates/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * POST /api/avatar-templates/{id}/duplicate
+         * @description Creates one new INACTIVE template per target organization and answers
+         *     `{data: [{organization_id, id, name}]}` in the order of the targets.
+         *     All-or-nothing. The source organization among the targets is a 422
+         *     (`source_organization_included`).
+         */
+        post: operations["avatarTemplateDuplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/avatar-templates/export": {
         parameters: {
             query?: never;
@@ -5104,6 +5127,43 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["AvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    avatarTemplateDuplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    target_organization_ids: number[];
+                    name?: string | null;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            organization_id: number;
+                            id: number;
+                            name: string;
+                        }[];
                     };
                 };
             };

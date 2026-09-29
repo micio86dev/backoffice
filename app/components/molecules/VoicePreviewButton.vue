@@ -10,13 +10,20 @@
       <button
         type="button"
         :data-testid="testId"
-        :aria-label="accessibleName"
+        :aria-label="labelled ? undefined : accessibleName"
         :aria-pressed="state === 'playing' ? 'true' : 'false'"
         :aria-busy="state === 'loading' ? 'true' : undefined"
         :aria-describedby="describedBy"
         :title="compact ? captionText : undefined"
         :disabled="unavailableReason !== null"
-        class="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+        :class="
+          cn(
+            'inline-flex shrink-0 items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
+            labelled
+              ? 'min-h-10 gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground'
+              : 'size-7 rounded'
+          )
+        "
         @click="onClick"
       >
         <LoaderCircleIcon
@@ -26,6 +33,7 @@
         />
         <SquareIcon v-else-if="state === 'playing'" class="size-4" aria-hidden="true" />
         <Volume2Icon v-else class="size-4" aria-hidden="true" />
+        <template v-if="labelled">{{ accessibleName }}</template>
       </button>
 
       <span
@@ -87,11 +95,20 @@ const props = withDefaults(
     language?: 'it' | 'en'
     /** Caption for assistive tech and as a tooltip only — for dense list rows. */
     compact?: boolean
+    /** Visible text next to the icon, on a 40px-tall control — never icon-only. */
+    labelled?: boolean
     testId?: string
     /** Names the voice in the accessible name — needed where many rows share a list. */
     voiceName?: string
   }>(),
-  { ttsEngine: null, language: 'it', compact: false, testId: undefined, voiceName: undefined }
+  {
+    ttsEngine: null,
+    language: 'it',
+    compact: false,
+    labelled: false,
+    testId: undefined,
+    voiceName: undefined,
+  }
 )
 
 const { t, te } = useI18n()
@@ -143,7 +160,11 @@ const captionText = computed(() =>
 
 const accessibleName = computed(() =>
   props.voiceName === undefined
-    ? t('avatar_templates.form.voicePreview.action')
+    ? t(
+        props.provider === 'heygen'
+          ? 'avatar_templates.form.voicePreview.actionGeneric'
+          : 'avatar_templates.form.voicePreview.action'
+      )
     : t('avatar_templates.form.voicePreview.rowAction', { name: props.voiceName })
 )
 

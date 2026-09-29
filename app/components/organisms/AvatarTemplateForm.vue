@@ -185,6 +185,7 @@
                 :aria-invalid="Boolean(configErrors[field.key])"
                 :aria-required="field.required ? 'true' : undefined"
                 :aria-describedby="describedBy(field)"
+                :preview="voicePreviewFor(field) ?? undefined"
                 @change="onFieldChange(field, $event)"
                 @loaded="onCatalogueLoaded(field.key, $event)"
               />
@@ -252,12 +253,15 @@
                 @blur="validateConfigField(field)"
               />
               <!--
-          Listen to the voice this field holds (DESIGN.md §16.14). Rendered for
-          every voice field, disabled WITH a reason when no sample can exist,
-          so a voice is never something you can only pick blind.
+          Listen to the voice this field holds (DESIGN.md §16.14). A field with
+          a picker gets its control INSIDE the picker's panel (one control per
+          field, never two players); this one is for a voice field with no
+          panel, such as the plain input used for the Azure voice. Disabled WITH
+          a reason when no sample can exist, so a voice is never picked blind.
         -->
               <VoicePreviewButton
-                v-if="voicePreviewFor(field) !== null"
+                v-if="voicePreviewFor(field) !== null && catalogueFor(field) === null"
+                labelled
                 v-bind="voicePreviewFor(field)!"
                 :test-id="`template-config-${field.key}-preview`"
               />

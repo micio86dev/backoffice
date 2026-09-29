@@ -988,6 +988,7 @@
       },
       "voicePreview": {
         "action": "Ascolta il campione italiano di questa voce",
+        "actionGeneric": "Ascolta un campione generico di questa voce",
         "caption": {
           "italian": "Campione italiano",
           "heygen": "Campione generico (non italiano)",

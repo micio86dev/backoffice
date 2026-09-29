@@ -353,3 +353,44 @@ describe('guard: every voice-typed field has a preview control or an explicit ex
     }
   })
 })
+
+describe('one control per voice field', () => {
+  it('does not render a second, form-level control when the picker panel already has it', async () => {
+    const heygen = mountForm('heygen', { voiceId: 'hv-it' })
+    await flushPromises()
+    expect(heygen.findAll(preview('voiceId'))).toHaveLength(1)
+    expect(heygen.find(sel('template-config-voiceId-voice-preview')).exists()).toBe(true)
+
+    const tavus = mountForm('tavus', { ttsEngine: 'cartesia', ttsExternalVoiceId: 'ca-it' })
+    await flushPromises()
+    expect(tavus.findAll(preview('ttsExternalVoiceId'))).toHaveLength(1)
+    expect(tavus.find(sel('template-config-ttsExternalVoiceId-voice-preview')).exists()).toBe(true)
+  })
+
+  it('keeps a labelled form-level button where there is no panel (plain text input)', async () => {
+    const wrapper = mountForm('tavus', { ttsEngine: 'azure', ttsExternalVoiceId: 'it-IT-Elsa' })
+    await flushPromises()
+
+    const button = wrapper.get(preview('ttsExternalVoiceId'))
+    expect(wrapper.find(sel('template-config-ttsExternalVoiceId-voice-preview')).exists()).toBe(
+      false
+    )
+    expect(button.text()).toBe('avatar_templates.form.voicePreview.action')
+    expect(button.classes()).toContain('min-h-10')
+  })
+
+  it('hands the panel the form’s own provider and engine', async () => {
+    const wrapper = mountForm('tavus', { ttsEngine: 'cartesia', ttsExternalVoiceId: 'ca-it' })
+    await flushPromises()
+
+    await wrapper.get(preview('ttsExternalVoiceId')).trigger('click')
+    await flushPromises()
+
+    expect(previewBodies().at(-1)).toEqual({
+      provider: 'tavus',
+      voice_id: 'ca-it',
+      tts_engine: 'cartesia',
+      language: 'it',
+    })
+  })
+})

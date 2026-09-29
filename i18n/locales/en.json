@@ -988,6 +988,7 @@
       },
       "voicePreview": {
         "action": "Listen to the Italian sample of this voice",
+        "actionGeneric": "Listen to a generic sample of this voice",
         "caption": {
           "italian": "Italian sample",
           "heygen": "Generic sample (not Italian)",

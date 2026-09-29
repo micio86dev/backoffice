@@ -169,4 +169,22 @@ describe('VoicePreviewButton', () => {
       'avatar_templates.form.voicePreview.caption.italian'
     )
   })
+
+  it('labelled mode shows the action as visible text on a 40px-tall control, not icon-only', () => {
+    const wrapper = mountButton({ labelled: true })
+
+    expect(button(wrapper).text()).toBe('avatar_templates.form.voicePreview.action')
+    expect(button(wrapper).classes()).toContain('min-h-10')
+    // The visible text IS the name: no separate aria-label that could disagree with it.
+    expect(button(wrapper).attributes('aria-label')).toBeUndefined()
+  })
+
+  it('names a HeyGen sample honestly: generic, never "Italian"', () => {
+    const wrapper = mountButton({ provider: 'heygen', labelled: true })
+
+    expect(button(wrapper).text()).toBe('avatar_templates.form.voicePreview.actionGeneric')
+    expect(
+      mountButton({ provider: 'heygen' }).get('[data-testid="vp"]').attributes('aria-label')
+    ).toBe('avatar_templates.form.voicePreview.actionGeneric')
+  })
 })

@@ -86,6 +86,7 @@ type Handlers = Partial<{
   activateTemplate: ReturnType<typeof vi.fn>
   deactivateTemplate: ReturnType<typeof vi.fn>
   deleteTemplate: ReturnType<typeof vi.fn>
+  duplicateTemplate: ReturnType<typeof vi.fn>
 }>
 
 /**
@@ -126,6 +127,7 @@ async function mountPage(
     activateTemplate: vi.fn().mockResolvedValue({ data: template({ is_active: true }) }),
     deactivateTemplate: vi.fn().mockResolvedValue({ data: template({ is_active: false }) }),
     deleteTemplate: vi.fn().mockResolvedValue(undefined),
+    duplicateTemplate: vi.fn().mockResolvedValue({ data: [] }),
     ...handlers,
   }
 
@@ -880,5 +882,81 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(false)
+  })
+
+  /**
+   * Copy to organizations (DESIGN.md §16.15). Superadmin only, and it is the
+   * SAME platform-only ability as creating a template: the API answers 403 to
+   * every other role, so the control is simply not offered to them.
+   */
+  describe('copy to organizations', () => {
+    const fetchClients = vi.fn()
+
+    beforeEach(() => {
+      fetchClients.mockReset()
+      fetchClients.mockResolvedValue({
+        data: [
+          { id: 1, name: 'Source Org' },
+          { id: 2, name: 'Beta Org' },
+        ],
+        acting_organization_id: 1,
+      })
+      vi.doMock('../../app/composables/useSuperadmin', () => ({
+        useSuperadmin: () => ({ fetchClients }),
+      }))
+    })
+
+    it('offers the action to a superadmin, on every row', async () => {
+      const { wrapper } = await mountPage({
+        listTemplates: vi
+          .fn()
+          .mockResolvedValue({ data: [template({ id: 1 }), template({ id: 2, name: 'Other' })] }),
+      })
+
+      expect(wrapper.find('[data-testid="template-copy-1"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="template-copy-2"]').exists()).toBe(true)
+    })
+
+    it('offers it to nobody who may not create templates', async () => {
+      const { wrapper } = await mountPage({}, abilities({ create: false }))
+
+      expect(wrapper.find('[data-testid="template-copy-1"]').exists()).toBe(false)
+      expect(document.body.querySelector('[data-testid="copy-template-dialog"]')).toBeNull()
+    })
+
+    it('opens the dialog for THAT template and lists the other organizations', async () => {
+      const { wrapper } = await mountPage({
+        listTemplates: vi
+          .fn()
+          .mockResolvedValue({ data: [template({ id: 1 }), template({ id: 2, name: 'Other' })] }),
+      })
+
+      await wrapper.find('[data-testid="template-copy-2"]').trigger('click')
+      await waitForTestId('copy-template-dialog')
+      await waitForTestId('org-multiselect')
+
+      expect(
+        document.body.querySelector('[data-testid="copy-template-dialog"]')?.textContent
+      ).toContain('"name":"Other"')
+      expect(document.body.querySelector('[data-testid="org-option-2"]')).not.toBeNull()
+      expect(document.body.querySelector('[data-testid="org-option-1"]')).toBeNull()
+    })
+
+    it('does not refetch the list after a copy: the copies live in other organizations', async () => {
+      const duplicateTemplate = vi
+        .fn()
+        .mockResolvedValue({ data: [{ organization_id: 2, id: 90, name: 'Recruiter voice' }] })
+      const { wrapper, api } = await mountPage({ duplicateTemplate })
+
+      await wrapper.find('[data-testid="template-copy-1"]').trigger('click')
+      const option = await waitForTestId('org-option-2')
+      option.click()
+      await flushPromises()
+      ;(document.body.querySelector('[data-testid="copy-template-submit"]') as HTMLElement).click()
+      await waitForTestId('copy-template-result')
+
+      expect(duplicateTemplate).toHaveBeenCalledWith(1, [2], '')
+      expect(api.listTemplates).toHaveBeenCalledTimes(1)
+    })
   })
 })

@@ -184,6 +184,21 @@
             </button>
           </template>
           <!--
+            Copy to other organizations: platform-only, the same ability as
+            creating a template (the API answers 403 to every other role).
+            Offered on every row, active or not — the copy is created inactive
+            in its target, so the source's state is irrelevant to it.
+          -->
+          <button
+            v-if="canCreate"
+            type="button"
+            :data-testid="`template-copy-${template.id}`"
+            class="hover:bg-primary/10 focus-visible:ring-ring rounded-md border border-border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+            @click="copyTarget = template"
+          >
+            {{ $t('avatar_templates.action.copy') }}
+          </button>
+          <!--
             No delete button on the active template at all. The API answers 409,
             but offering a control whose only outcome is an error is a worse
             experience than not offering it — and this one reads as destructive,
@@ -244,6 +259,18 @@
       @cancel="activateTarget = null"
     />
 
+    <!--
+      Copies land in OTHER organizations, so this page's list never changes and
+      nothing is refetched after one. Same nullable-ref contract as the
+      confirmations: `:open` derives from the target, closing clears it.
+    -->
+    <CopyTemplateDialog
+      v-if="canCreate"
+      :open="copyTarget !== null"
+      :template="copyTarget"
+      @update:open="(open) => !open && (copyTarget = null)"
+    />
+
     <ConfirmDialog
       :open="deleteTarget !== null"
       :title="$t('avatar_templates.confirm.deleteTitle')"
@@ -274,6 +301,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
+import CopyTemplateDialog from '@/components/organisms/CopyTemplateDialog.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import ActingClientNotice from '@/components/molecules/ActingClientNotice.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
@@ -403,6 +431,7 @@ const formTitle = computed(() =>
 // `@confirm` reads it into a local, clears the ref FIRST, then acts.
 const activateTarget = ref<AvatarTemplate | null>(null)
 const deleteTarget = ref<AvatarTemplate | null>(null)
+const copyTarget = ref<AvatarTemplate | null>(null)
 
 // Names the template being replaced — "activate X" is not the consequence,
 // "X replaces Y for every candidate in your organization" is (design.md D5).

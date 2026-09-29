@@ -394,3 +394,68 @@ describe('one control per voice field', () => {
     })
   })
 })
+
+describe('layout regression: placements never make the caption a flex sibling of a control', () => {
+  // Pixels cannot be measured here; the classes that prevent the squeeze are pinned.
+  it('plain-input placement: the block follows the input on its own full-width line', async () => {
+    const wrapper = mountForm('tavus', { ttsEngine: 'azure', ttsExternalVoiceId: 'it-IT-Elsa' })
+    await flushPromises()
+
+    const input = wrapper.get(sel('template-config-ttsExternalVoiceId')).element
+    const block = wrapper.get('[data-slot="voice-preview"]').element as HTMLElement
+
+    expect(block.parentElement).toBe(input.parentElement)
+    expect(input.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(block.classList.contains('w-full')).toBe(true)
+    expect(block.classList.contains('basis-full')).toBe(true)
+    expect(input.contains(block)).toBe(false)
+  })
+
+  it('picker placement: the block sits in the panel under the trigger, full width, wrapping', async () => {
+    const wrapper = mountForm('tavus', { ttsEngine: 'cartesia', ttsExternalVoiceId: 'ca-it' })
+    await flushPromises()
+
+    const panel = wrapper.get(sel('template-config-ttsExternalVoiceId-voice-preview'))
+    expect(panel.classes()).toContain('w-full')
+    const row = panel.get('.flex-wrap')
+    // both the Italian control and the catalogue-sample control share a WRAPPING row
+    expect(row.find('[data-slot="voice-preview"]').exists()).toBe(true)
+    expect(row.get('[data-slot="voice-preview"]').classes()).toContain('w-full')
+    expect(row.get('[data-slot="voice-preview-row"]').classes()).toContain('flex-wrap')
+  })
+
+  it('list rows: compact control keeps the caption for assistive tech only', async () => {
+    const wrapper = mountForm('tavus', { ttsEngine: 'cartesia' })
+    await flushPromises()
+    await wrapper.get(sel('template-config-ttsExternalVoiceId')).trigger('click')
+
+    const caption = wrapper.get(
+      sel('template-config-ttsExternalVoiceId-italian-preview-ca-it-caption')
+    )
+    expect(caption.classes()).toContain('sr-only')
+  })
+})
+
+describe('Tavus voice replacement note', () => {
+  it('tells the operator saving replaces the persona’s voice, on the Tavus form only', async () => {
+    const tavus = mountForm('tavus')
+    await flushPromises()
+    expect(tavus.get(sel('template-tts-voice-note')).text()).toBe(
+      'avatar_templates.form.ttsVoiceNote'
+    )
+
+    const heygen = mountForm('heygen')
+    await flushPromises()
+    expect(heygen.find(sel('template-tts-voice-note')).exists()).toBe(false)
+  })
+
+  it('sits with the TTS settings, right after the engine field', async () => {
+    const wrapper = mountForm('tavus')
+    await flushPromises()
+
+    const engine = wrapper.get(sel('template-config-ttsEngine')).element
+    const note = wrapper.get(sel('template-tts-voice-note')).element
+
+    expect(engine.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})

@@ -266,6 +266,17 @@
                 :test-id="`template-config-${field.key}-preview`"
               />
               <!--
+          What saving does to the persona's voice, said where the TTS settings
+          are chosen. Only the VOICE is claimed: the persona sync replaces the
+          whole `layers` node, so nothing is promised about its other settings.
+        -->
+              <FieldDescription
+                v-if="field.key === 'ttsEngine' && draft.provider === 'tavus'"
+                data-testid="template-tts-voice-note"
+              >
+                {{ $t('avatar_templates.form.ttsVoiceNote') }}
+              </FieldDescription>
+              <!--
           A dependent select whose parent value offers no choice (Tavus model
           for azure / tavus-auto / no engine) is disabled WITH its reason, never
           hidden: an absent control reads as a missing feature.

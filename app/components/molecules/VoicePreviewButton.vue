@@ -1,6 +1,6 @@
 <template>
-  <div data-slot="voice-preview" class="flex min-w-0 flex-col gap-1">
-    <div class="flex items-center gap-2">
+  <div data-slot="voice-preview" class="flex w-full basis-full min-w-0 flex-col gap-1">
+    <div data-slot="voice-preview-row" class="flex flex-wrap items-start gap-2">
       <!--
         The accessible name is CONSTANT ("Listen to the Italian sample") and the
         play/stop state rides on aria-pressed. A name that flips between "play"
@@ -39,10 +39,25 @@
       <span
         :id="captionId"
         :data-testid="testId ? `${testId}-caption` : undefined"
-        :class="cn('text-xs text-muted-foreground', compact && 'sr-only')"
+        :class="
+          cn(
+            'flex flex-col gap-0.5 text-xs whitespace-normal break-words text-wrap',
+            compact ? 'sr-only' : 'min-w-[12rem] flex-1'
+          )
+        "
       >
-        {{ captionText }}
-        <span> {{ t('avatar_templates.form.voicePreview.disclaimer') }}</span>
+        <span
+          :data-testid="testId ? `${testId}-caption-label` : undefined"
+          class="font-medium text-foreground"
+        >
+          {{ captionText }}
+        </span>
+        <span
+          :data-testid="testId ? `${testId}-disclaimer` : undefined"
+          class="text-muted-foreground"
+        >
+          {{ t('avatar_templates.form.voicePreview.disclaimer') }}
+        </span>
       </span>
     </div>
 

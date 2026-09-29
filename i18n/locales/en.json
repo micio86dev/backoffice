@@ -986,6 +986,7 @@
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."
       },
+      "ttsVoiceNote": "Saving writes this voice to the Tavus persona and replaces the voice the persona had. With an external engine (Cartesia, ElevenLabs, Azure) the engine, model and voice you choose here are sent; leave the engine on \"tavus-auto\" and no external voice is written, so Tavus chooses the voice.",
       "voicePreview": {
         "action": "Listen to the Italian sample of this voice",
         "actionGeneric": "Listen to a generic sample of this voice",
@@ -994,7 +995,7 @@
           "heygen": "Generic sample (not Italian)",
           "catalogue": "Catalogue sample"
         },
-        "disclaimer": "A sample from the voice vendor; the final rendering by Tavus / LiveAvatar may differ.",
+        "disclaimer": "A sample from the voice vendor's own synthesis, not yet rendered by Tavus; the final rendering by Tavus / LiveAvatar may differ.",
         "noVoice": "Choose a voice to listen to it.",
         "stockUnavailable": "Stock voices have no preview. Choose Cartesia or ElevenLabs as the speech engine and a voice to listen to it.",
         "rowAction": "Listen to the Italian sample of {name}",

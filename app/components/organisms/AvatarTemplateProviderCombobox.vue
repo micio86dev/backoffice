@@ -279,9 +279,9 @@
     <div
       v-if="resource === 'voice'"
       :data-testid="`${testIdPrefix}-voice-preview`"
-      class="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3"
+      class="flex w-full min-w-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3"
     >
-      <p class="truncate text-sm font-medium">
+      <p class="text-sm font-medium break-words">
         {{ selected?.label ?? (modelValue !== '' ? modelValue : '') }}
       </p>
       <div class="flex flex-wrap items-start gap-2">

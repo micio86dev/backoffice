@@ -986,6 +986,7 @@
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
       },
+      "ttsVoiceNote": "Il salvataggio scrive questa voce sulla persona Tavus e sostituisce la voce che la persona aveva. Con un motore esterno (Cartesia, ElevenLabs, Azure) vengono inviati motore, modello e voce scelti qui; lascia il motore su \"tavus-auto\" e non viene scritta alcuna voce esterna, quindi la voce la sceglie Tavus.",
       "voicePreview": {
         "action": "Ascolta il campione italiano di questa voce",
         "actionGeneric": "Ascolta un campione generico di questa voce",
@@ -994,7 +995,7 @@
           "heygen": "Campione generico (non italiano)",
           "catalogue": "Campione del catalogo"
         },
-        "disclaimer": "Un campione del fornitore della voce; il rendering finale di Tavus / LiveAvatar può differire.",
+        "disclaimer": "Un campione della sintesi del fornitore della voce, non ancora reso da Tavus; il rendering finale di Tavus / LiveAvatar può differire.",
         "noVoice": "Scegli una voce per ascoltarla.",
         "stockUnavailable": "Le voci stock non hanno anteprima. Scegli Cartesia o ElevenLabs come motore vocale e una voce per ascoltarla.",
         "rowAction": "Ascolta il campione italiano di {name}",

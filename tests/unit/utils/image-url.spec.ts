@@ -12,6 +12,21 @@ describe('toSameOriginImageUrl', () => {
     ],
     ['cross-origin http without query', 'http://localhost:8000/api/x/logo', '/api/x/logo'],
     [
+      'http /storage signed URL unchanged (not proxied by nginx)',
+      'http://localhost:8000/storage/profile-photos/7/a.jpg?expires=1&signature=abc',
+      'http://localhost:8000/storage/profile-photos/7/a.jpg?expires=1&signature=abc',
+    ],
+    [
+      'http non-/api path unchanged',
+      'http://localhost:8000/other/x.png',
+      'http://localhost:8000/other/x.png',
+    ],
+    [
+      'http /apix lookalike unchanged',
+      'http://localhost:8000/apix/logo',
+      'http://localhost:8000/apix/logo',
+    ],
+    [
       'https unchanged',
       'https://api.example.com/logo.png?v=1',
       'https://api.example.com/logo.png?v=1',

@@ -5,7 +5,7 @@
  * absoluteLogoUrl()`). In local docker that is `http://localhost:8000`, a
  * cross-origin http URL that the backoffice CSP (`img-src 'self' data: blob:
  * https:`) blocks. The backoffice reaches the API same-origin through `/api/`,
- * so an http URL on a foreign origin is rewritten to its same-origin path
+ * so an http `/api/...` URL on a foreign origin is rewritten to its same-origin path
  * (query kept: the `?v=` cache-buster must survive). The CSP is not loosened.
  *
  * Everything else is returned untouched: null/empty, relative, `blob:`,
@@ -30,6 +30,10 @@ export function toSameOriginImageUrl(
   const origin = currentOrigin ?? (typeof window !== 'undefined' ? window.location.origin : '')
 
   if (parsed.origin === origin) return url
+
+  // Only `/api/` is proxied by nginx. Any other path (e.g. a signed `/storage/`
+  // URL, whose signature is bound to the request host) would 404 same-origin.
+  if (!parsed.pathname.startsWith('/api/')) return url
 
   return parsed.pathname + parsed.search
 }

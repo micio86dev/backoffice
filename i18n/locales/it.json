@@ -984,6 +984,29 @@
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
       },
+      "voicePreview": {
+        "action": "Ascolta il campione italiano di questa voce",
+        "caption": {
+          "italian": "Campione italiano",
+          "heygen": "Campione generico (non italiano)",
+          "catalogue": "Campione del catalogo"
+        },
+        "disclaimer": "Un campione del fornitore della voce; il rendering finale di Tavus / LiveAvatar può differire.",
+        "noVoice": "Scegli una voce per ascoltarla.",
+        "stockUnavailable": "Le voci stock non hanno anteprima. Scegli Cartesia o ElevenLabs come motore vocale e una voce per ascoltarla.",
+        "rowAction": "Ascolta il campione italiano di {name}",
+        "error": {
+          "unavailable": "Questa voce non ha un'anteprima.",
+          "provider_not_configured": "Il servizio vocale non è configurato su questo server.",
+          "voice_not_found": "Il servizio vocale non riconosce questa voce.",
+          "provider_error": "Il servizio vocale non ha prodotto il campione. Riprova tra un momento.",
+          "rate_limited": "Troppe anteprime in poco tempo. Attendi un minuto e riprova.",
+          "invalid_request": "Non è possibile ascoltare l'anteprima di questo id voce.",
+          "forbidden": "Non hai i permessi per ascoltare le anteprime delle voci.",
+          "playback_failed": "Non è stato possibile riprodurre il campione in questo browser.",
+          "unknown": "L'anteprima non è riuscita. Riprova."
+        }
+      },
       "catalogue": {
         "searchPlaceholder": "Cerca nel catalogo del servizio…",
         "choose": "Scegli…",
@@ -1009,8 +1032,8 @@
           "unsupported_catalogue": "Questo elenco non è disponibile per il servizio selezionato."
         },
         "preview": {
-          "play": "Riproduci anteprima",
-          "pause": "Metti in pausa l'anteprima"
+          "play": "Riproduci campione del catalogo",
+          "pause": "Metti in pausa il campione del catalogo"
         }
       }
     },

@@ -984,6 +984,29 @@
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."
       },
+      "voicePreview": {
+        "action": "Listen to the Italian sample of this voice",
+        "caption": {
+          "italian": "Italian sample",
+          "heygen": "Generic sample (not Italian)",
+          "catalogue": "Catalogue sample"
+        },
+        "disclaimer": "A sample from the voice vendor; the final rendering by Tavus / LiveAvatar may differ.",
+        "noVoice": "Choose a voice to listen to it.",
+        "stockUnavailable": "Stock voices have no preview. Choose Cartesia or ElevenLabs as the speech engine and a voice to listen to it.",
+        "rowAction": "Listen to the Italian sample of {name}",
+        "error": {
+          "unavailable": "This voice has no preview.",
+          "provider_not_configured": "The voice service is not configured on this server.",
+          "voice_not_found": "The voice service does not know this voice.",
+          "provider_error": "The voice service could not produce the sample. Try again in a moment.",
+          "rate_limited": "Too many previews in a short time. Wait a minute and try again.",
+          "invalid_request": "This voice id cannot be previewed.",
+          "forbidden": "You are not allowed to preview voices.",
+          "playback_failed": "The sample could not be played in this browser.",
+          "unknown": "The preview failed. Try again."
+        }
+      },
       "catalogue": {
         "searchPlaceholder": "Search the service's catalogue…",
         "choose": "Choose…",
@@ -1009,8 +1032,8 @@
           "unsupported_catalogue": "This list is not available for the selected service."
         },
         "preview": {
-          "play": "Play preview",
-          "pause": "Pause preview"
+          "play": "Play catalogue sample",
+          "pause": "Pause catalogue sample"
         }
       }
     },

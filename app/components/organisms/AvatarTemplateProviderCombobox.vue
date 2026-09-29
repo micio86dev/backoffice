@@ -164,6 +164,30 @@
                 />
                 <span class="truncate font-medium">{{ candidate.label }}</span>
                 <span
+                  v-if="resource === 'pal' && candidate.editable != null"
+                  :data-testid="`${testIdPrefix}-editable-badge-${candidate.id}`"
+                  :data-editable="String(candidate.editable)"
+                  :title="
+                    candidate.editable
+                      ? undefined
+                      : t('avatar_templates.form.catalogue.editable.noTitle')
+                  "
+                  :class="
+                    cn(
+                      'shrink-0 rounded-full px-2 text-xs',
+                      candidate.editable
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-warning-light text-warning-dark dark:bg-warning/15 dark:text-warning'
+                    )
+                  "
+                >
+                  {{
+                    candidate.editable
+                      ? t('avatar_templates.form.catalogue.editable.yes')
+                      : t('avatar_templates.form.catalogue.editable.no')
+                  }}
+                </span>
+                <span
                   v-if="candidate.italian !== null"
                   :data-testid="`${testIdPrefix}-italian-badge-${candidate.id}`"
                   :class="
@@ -233,6 +257,19 @@
         </li>
       </ul>
     </div>
+
+    <!--
+      Ownership hint for the SELECTED persona. Tavus refuses to modify a persona
+      the account does not own, so voice/LLM/turn-taking chosen below would be
+      silently dropped. Advisory only: selection is never blocked.
+    -->
+    <p
+      v-if="ownershipHint !== null"
+      :data-testid="`${testIdPrefix}-editable-hint`"
+      class="text-sm text-warning-dark dark:text-warning"
+    >
+      {{ ownershipHint }}
+    </p>
 
     <!--
       Selected-avatar preview. Explicit 160px floors as attributes AND inline
@@ -415,6 +452,15 @@ function describe(candidate: CatalogueEntry): string {
     .filter((part): part is string => typeof part === 'string' && part !== '')
     .join(' · ')
 }
+
+const ownershipHint = computed<string | null>(() => {
+  if (resource.value !== 'pal' || selected.value === null) return null
+  if (selected.value.editable === true) return null
+
+  return selected.value.editable === false
+    ? t('avatar_templates.form.catalogue.editable.hintNo')
+    : t('avatar_templates.form.catalogue.editable.hintUnknown')
+})
 
 const showsImagePreview = computed(
   () => resource.value !== 'voice' && props.modelValue !== '' && selected.value !== null

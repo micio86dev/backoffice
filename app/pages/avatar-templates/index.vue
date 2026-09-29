@@ -127,6 +127,12 @@
           >
             {{ forecastLabel(template) }}
           </p>
+          <!--
+            Whether Tavus accepted the persona-level settings (voice, model,
+            behavior) on the last save. Tavus templates only — the component
+            renders nothing for another provider. DESIGN.md 16.16.
+          -->
+          <PalSyncStatus class="mt-2" :sync="template.pal_sync" :provider="template.provider" />
         </div>
 
         <div class="flex shrink-0 gap-2">
@@ -285,6 +291,7 @@
 
 <script setup lang="ts">
 import HelpTip from '@/components/atoms/HelpTip.vue'
+import PalSyncStatus from '@/components/molecules/PalSyncStatus.vue'
 import TemplatePortability from '@/components/organisms/TemplatePortability.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 /**

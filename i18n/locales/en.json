@@ -973,6 +973,7 @@
       "provider_locked": "The service cannot be changed after creation: the settings belong to one service only. Create a new template instead.",
       "settings": "Settings",
       "default": "Default",
+      "dependentUnavailable": "Not used with the current speech engine. Choose an engine that offers several models (Cartesia or ElevenLabs) to set it.",
       "required": "Required",
       "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it.",
       "help": {
@@ -1018,6 +1019,13 @@
         "italianNative": "Native Italian",
         "italianMultilingual": "Multilingual",
         "unknownSelected": "Not in the catalogue",
+        "editable": {
+          "yes": "Yours",
+          "no": "Tavus stock, read-only",
+          "noTitle": "A Tavus stock persona: Tavus does not let you change its voice or persona settings.",
+          "hintNo": "This is a Tavus stock persona: Tavus refuses to modify it, so the voice and other persona settings you choose here will NOT be applied. Choose one of your own personas to change them.",
+          "hintUnknown": "Could not verify that this persona is one of yours. If it is not, the voice and other persona settings you choose here will not be applied."
+        },
         "retry": "Try again",
         "manualLabel": "Enter the ID manually",
         "previewAlt": "Preview of {name}",
@@ -1073,7 +1081,8 @@
         "pal_not_found": "This persona does not exist for the selected service. Choose one from the list.",
         "tts_engine_required": "Choose an external speech engine, or clear the external voice ID.",
         "tts_voice_required": "Choose a voice for the selected speech engine.",
-        "tts_voice_not_found": "This voice does not exist for the selected speech engine. Choose one from the list."
+        "tts_voice_not_found": "This voice does not exist for the selected speech engine. Choose one from the list.",
+        "tts_model_engine_mismatch": "This model does not belong to the selected speech engine. Choose one from the list."
       },
       "llm": {
         "mode_unsupported": "This model does not support managed mode yet.",
@@ -1087,12 +1096,26 @@
       "write_title": "The change was not applied",
       "projectCount": "{count} project is pinned to it. | {count} projects are pinned to it."
     },
+    "palSync": {
+      "bannerTitle": "Persona settings are not applied",
+      "lastSynced": "Last synced:",
+      "status": {
+        "never": "Not synced yet",
+        "synced": "Persona synced",
+        "skipped": "Nothing to sync",
+        "warning": "Sync failed"
+      }
+    },
     "warning": {
       "title": "Saved, with a warning",
-      "pal_sync_failed": "Some advanced settings have not reached the service yet. Save again to retry.",
-      "pal_sync_unreachable": "The service is unreachable: advanced settings are not live yet. Save again to retry.",
-      "tavus_key_missing": "The service access key is missing: advanced settings cannot be applied.",
-      "pal_id_missing": "The persona ID is missing: advanced settings cannot be applied.",
+      "pal_sync_failed": "Tavus did not accept the persona update, so the voice and other persona settings you chose may NOT be applied. Save again to retry.",
+      "pal_sync_unreachable": "Tavus could not be reached, so the persona settings you chose are not live yet. Save again to retry.",
+      "tavus_key_missing": "The Tavus access key is not configured, so persona settings (voice, model, behavior) cannot be applied. Contact support.",
+      "pal_id_missing": "This template has no persona ID, so persona settings cannot be applied. Choose a persona and save again.",
+      "pal_not_editable": "Tavus refused to modify this persona, so the voice and other persona settings you chose are NOT applied. Choose one of your own personas.",
+      "pal_sync_rejected": "Tavus rejected the persona settings you sent, so they are NOT applied. Check the values (voice, model, engine) and save again.",
+      "pal_sync_unauthorized": "Tavus refused the access key, so persona settings cannot be applied. Check the key with support, then save again.",
+      "pal_not_found": "This persona no longer exists on Tavus, so persona settings cannot be applied. Choose another persona and save again.",
       "llm_provider_unreachable": "The service is not configured: the conversation model cannot be activated. Contact support.",
       "llm_credential_missing": "The model or the credential is no longer available: the conversation model was not activated. Check the binding.",
       "llm_secret_failed": "The service did not accept the credential: the conversation model is not live yet. Check the API key and save again.",
@@ -1122,6 +1145,7 @@
       "llmSpeculativeInference": "Speculative inference",
       "ttsEngine": "Speech synthesis engine",
       "ttsExternalVoiceId": "External voice ID",
+      "ttsModelName": "Speech model",
       "turnTakingPatience": "Turn-taking patience",
       "interruptibility": "Interruptibility",
       "voiceIsolation": "Voice isolation",
@@ -1149,10 +1173,11 @@
       "llmTemperature": "How free/creative the answers are (0–2). Low = more precise and repeatable; high = more varied and creative.",
       "maxCallDurationSec": "After how many seconds the conversation ends on its own. Tavus default: 3600 (60 minutes).",
       "maxSessionDurationSec": "After how many seconds the session ends on its own. Essential plan reference: ~1200s (20 minutes).",
-      "palId": "The Tavus avatar’s “personality” (voice + brain + behavior). In Personas, open the chosen one and copy its ID. If you fill the fields below (model, voice, etc.), this ID is created/updated automatically on save.",
+      "palId": "The Tavus avatar’s “personality” (voice + brain + behavior). In Personas, open the chosen one and copy its ID. Voice and persona settings below are applied only to your own personas: a Tavus stock persona is read-only and keeps its own voice.",
       "participantAbsentTimeoutSec": "After how many seconds to end if the person is gone (nobody talking/on camera). Default: 300 (5 minutes).",
       "ttsEngine": "The service that turns text into speech. “tavus-auto” picks the best one for you — leave it if unsure.",
       "ttsExternalVoiceId": "Only needed if you use an external voice engine (e.g. ElevenLabs): paste that service’s voice ID here. With “tavus-auto”, leave it empty.",
+      "ttsModelName": "The engine’s speech model. Cartesia “sonic-3” (or newer) is required for Italian: “sonic-2” has no Italian. Leave the default if unsure.",
       "turnTakingPatience": "How long the avatar waits before replying, to tell whether you have finished. High = waits longer (fewer interruptions).",
       "videoEncoding": "Technical video format. Leave H264 unless you have a reason to change it — it is the most compatible.",
       "videoQuality": "Video quality. Higher = sharper but heavier; lower = smoother with less latency.",

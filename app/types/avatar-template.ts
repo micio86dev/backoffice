@@ -91,6 +91,16 @@ export interface FieldSpec {
   max?: number
   step?: number
   catalogue_resource?: CatalogueResource
+  /**
+   * Dependent options: this select's choices depend on the CURRENT value of
+   * the field named here. `options` stays the flat union (what a client that
+   * ignores dependence would offer); `options_by_value` maps each value of the
+   * parent field to the subset that is valid for it. A parent value with no
+   * entry means the field takes no value at all (Tavus `ttsModelName` for
+   * azure / tavus-auto / no engine).
+   */
+  options_depend_on?: string
+  options_by_value?: Record<string, string[]>
 }
 
 /**
@@ -121,6 +131,13 @@ export interface CatalogueEntry {
   preview_audio_url: string | null
   /** Tavus faces only. */
   preview_video_url: string | null
+  /**
+   * Tavus personas only: `true` = one of the account's own personas (Tavus
+   * `persona_type=user`), `false` = a Tavus stock persona whose voice/persona
+   * settings Tavus refuses to modify, `null`/absent = unknown. Unknown is
+   * never treated as editable.
+   */
+  editable?: boolean | null
 }
 
 export type CatalogueStatus = 'ok' | 'empty' | 'provider_error'
@@ -153,10 +170,43 @@ export type FieldSpecsResponse = {
 
 type GeneratedTemplate = components['schemas']['AvatarTemplateResource']
 
-export type AvatarTemplate = Omit<GeneratedTemplate, 'config' | 'provider' | 'description'> & {
+/**
+ * Stable codes a Tavus persona sync can end in when it did not fully apply
+ * (`pal_sync.code`, and the save response's top-level `warning`). Never the
+ * vendor's words. Every code needs copy in both locales: the guard in
+ * `pal-sync-i18n.spec.ts` derives from this list.
+ */
+export const PAL_SYNC_CODES = [
+  'tavus_key_missing',
+  'pal_id_missing',
+  'pal_not_editable',
+  'pal_sync_rejected',
+  'pal_sync_unauthorized',
+  'pal_not_found',
+  'pal_sync_failed',
+  'pal_sync_unreachable',
+] as const
+
+export type PalSyncCode = (typeof PAL_SYNC_CODES)[number]
+
+/**
+ * Narrowed like `config`/`provider` above: Scramble types the three members as
+ * plain `string | null`; the closed sets live in a PHP enum. `synced_at` is the
+ * last SUCCESSFUL sync and survives a later failure.
+ */
+export type PalSync = Omit<GeneratedTemplate['pal_sync'], 'status' | 'code'> & {
+  status: 'synced' | 'skipped' | 'warning' | null
+  code: PalSyncCode | null
+}
+
+export type AvatarTemplate = Omit<
+  GeneratedTemplate,
+  'config' | 'provider' | 'description' | 'pal_sync'
+> & {
   config: Record<string, unknown>
   provider: ProviderName
   description: string | null
+  pal_sync: PalSync
 }
 
 /**

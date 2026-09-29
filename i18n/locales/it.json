@@ -973,6 +973,7 @@
       "provider_locked": "Il servizio non è modificabile dopo la creazione: le impostazioni appartengono a un solo servizio. Crea un nuovo template.",
       "settings": "Impostazioni",
       "default": "Predefinito",
+      "dependentUnavailable": "Non usato con il motore vocale attuale. Scegli un motore con più modelli (Cartesia o ElevenLabs) per impostarlo.",
       "required": "Obbligatorio",
       "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai.",
       "help": {
@@ -1018,6 +1019,13 @@
         "italianNative": "Italiano nativo",
         "italianMultilingual": "Multilingua",
         "unknownSelected": "Non presente nel catalogo",
+        "editable": {
+          "yes": "Tua",
+          "no": "Persona Tavus, sola lettura",
+          "noTitle": "Una persona predefinita di Tavus: Tavus non permette di cambiarne la voce o le impostazioni.",
+          "hintNo": "Questa è una persona predefinita di Tavus: Tavus rifiuta di modificarla, quindi la voce e le altre impostazioni della persona che scegli qui NON verranno applicate. Scegli una delle tue persone per cambiarle.",
+          "hintUnknown": "Non è stato possibile verificare che questa persona sia tua. Se non lo è, la voce e le altre impostazioni della persona che scegli qui non verranno applicate."
+        },
         "retry": "Riprova",
         "manualLabel": "Inserisci l'ID manualmente",
         "previewAlt": "Anteprima di {name}",
@@ -1073,7 +1081,8 @@
         "pal_not_found": "Questa persona non esiste per il servizio selezionato. Sceglila dall'elenco.",
         "tts_engine_required": "Scegli un motore vocale esterno, oppure svuota l'ID voce esterna.",
         "tts_voice_required": "Scegli una voce per il motore vocale selezionato.",
-        "tts_voice_not_found": "Questa voce non esiste per il motore vocale selezionato. Sceglila dall'elenco."
+        "tts_voice_not_found": "Questa voce non esiste per il motore vocale selezionato. Sceglila dall'elenco.",
+        "tts_model_engine_mismatch": "Questo modello non appartiene al motore vocale selezionato. Sceglilo dall'elenco."
       },
       "llm": {
         "mode_unsupported": "Questo modello non supporta ancora la modalità gestita.",
@@ -1087,12 +1096,26 @@
       "write_title": "La modifica non è stata applicata",
       "projectCount": "{count} progetto lo utilizza. | {count} progetti lo utilizzano."
     },
+    "palSync": {
+      "bannerTitle": "Le impostazioni della persona non sono applicate",
+      "lastSynced": "Ultima sincronizzazione:",
+      "status": {
+        "never": "Non ancora sincronizzata",
+        "synced": "Persona sincronizzata",
+        "skipped": "Niente da sincronizzare",
+        "warning": "Sincronizzazione non riuscita"
+      }
+    },
     "warning": {
       "title": "Salvato, con un avviso",
-      "pal_sync_failed": "Alcune impostazioni avanzate non sono ancora arrivate al servizio. Salva di nuovo per riprovare.",
-      "pal_sync_unreachable": "Il servizio non è raggiungibile: le impostazioni avanzate non sono ancora attive. Salva di nuovo per riprovare.",
-      "tavus_key_missing": "Manca la chiave di accesso al servizio: le impostazioni avanzate non possono essere applicate.",
-      "pal_id_missing": "Manca l'ID persona: le impostazioni avanzate non possono essere applicate.",
+      "pal_sync_failed": "Tavus non ha accettato l'aggiornamento della persona, quindi la voce e le altre impostazioni scelte potrebbero NON essere applicate. Salva di nuovo per riprovare.",
+      "pal_sync_unreachable": "Tavus non è raggiungibile, quindi le impostazioni della persona scelte non sono ancora attive. Salva di nuovo per riprovare.",
+      "tavus_key_missing": "La chiave di accesso a Tavus non è configurata, quindi le impostazioni della persona (voce, modello, comportamento) non possono essere applicate. Contatta il supporto.",
+      "pal_id_missing": "Questo template non ha un ID persona, quindi le impostazioni della persona non possono essere applicate. Scegli una persona e salva di nuovo.",
+      "pal_not_editable": "Tavus ha rifiutato di modificare questa persona, quindi la voce e le altre impostazioni della persona che hai scelto NON sono applicate. Scegli una delle tue persone.",
+      "pal_sync_rejected": "Tavus ha rifiutato le impostazioni della persona inviate, quindi NON sono applicate. Controlla i valori (voce, modello, motore) e salva di nuovo.",
+      "pal_sync_unauthorized": "Tavus ha rifiutato la chiave di accesso, quindi le impostazioni della persona non possono essere applicate. Verifica la chiave con il supporto, poi salva di nuovo.",
+      "pal_not_found": "Questa persona non esiste più su Tavus, quindi le impostazioni della persona non possono essere applicate. Scegli un'altra persona e salva di nuovo.",
       "llm_provider_unreachable": "Il servizio non è configurato: il modello di conversazione non può essere attivato. Contatta l'assistenza.",
       "llm_credential_missing": "Il modello o la credenziale non sono più disponibili: il modello di conversazione non è stato attivato. Verifica l'associazione.",
       "llm_secret_failed": "Il servizio non ha accettato la credenziale: il modello di conversazione non è ancora attivo. Verifica la chiave API e salva di nuovo.",
@@ -1122,6 +1145,7 @@
       "llmSpeculativeInference": "Inferenza speculativa",
       "ttsEngine": "Motore di sintesi vocale",
       "ttsExternalVoiceId": "ID voce esterna",
+      "ttsModelName": "Modello vocale",
       "turnTakingPatience": "Pazienza nei turni di parola",
       "interruptibility": "Interrompibilità",
       "voiceIsolation": "Isolamento vocale",
@@ -1149,10 +1173,11 @@
       "llmTemperature": "Quanto sono libere/creative le risposte (0–2). Bassa = più precisa e ripetibile; alta = più varia e creativa.",
       "maxCallDurationSec": "Dopo quanti secondi la conversazione si chiude da sola. Predefinito Tavus: 3600 (60 minuti).",
       "maxSessionDurationSec": "Dopo quanti secondi la sessione si chiude da sola. Riferimento piano Essential: ~1200 sec (20 minuti).",
-      "palId": "La «personalità» dell'avatar Tavus (voce + cervello + comportamento). In Personas, apri quella scelta e copia il suo ID. Se compili i campi qui sotto (modello, voce, ecc.), questo ID viene creato/aggiornato in automatico al salvataggio.",
+      "palId": "La «personalità» dell'avatar Tavus (voce + cervello + comportamento). In Personas, apri quella scelta e copia il suo ID. Voce e impostazioni della persona qui sotto vengono applicate solo alle tue persone: una persona predefinita di Tavus è in sola lettura e mantiene la propria voce.",
       "participantAbsentTimeoutSec": "Dopo quanti secondi chiudere se la persona non c'è più (nessuno parla/inquadrato). Predefinito: 300 (5 minuti).",
       "ttsEngine": "Il servizio che trasforma il testo in voce. «tavus-auto» sceglie da solo il migliore: lascialo così se hai dubbi.",
       "ttsExternalVoiceId": "Serve solo se usi un motore voce esterno (es. ElevenLabs): incolla qui l’ID della voce di quel servizio. Con «tavus-auto» lascialo vuoto.",
+      "ttsModelName": "Il modello vocale del motore. Per l'italiano serve Cartesia «sonic-3» (o successivo): «sonic-2» non ha l'italiano. Lascia il predefinito se hai dubbi.",
       "turnTakingPatience": "Quanto l'avatar aspetta prima di rispondere, per capire se hai finito di parlare. Alta = aspetta di più (meno interruzioni).",
       "videoEncoding": "Formato tecnico del video. Lascia H264 se non hai un motivo per cambiarlo: è il più compatibile.",
       "videoQuality": "Qualità del video. Più alta = più nitido ma più pesante; più bassa = più fluido e meno latenza.",

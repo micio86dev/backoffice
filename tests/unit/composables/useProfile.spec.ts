@@ -20,35 +20,6 @@ describe('useProfile', () => {
     apiFetch.mockResolvedValue({ data: {} })
   })
 
-  it.each([
-    [
-      'http cross-origin -> same-origin path',
-      'http://localhost:8000/api/profile/photo?v=a.png',
-      '/api/profile/photo?v=a.png',
-    ],
-    ['https unchanged', 'https://api.example.com/p.png?v=1', 'https://api.example.com/p.png?v=1'],
-    ['blob unchanged', 'blob:http://localhost:3001/uuid', 'blob:http://localhost:3001/uuid'],
-    ['null stays null', null, null],
-  ])('normalises photo_url on the profile read: %s', async (_n, input, expected) => {
-    apiFetch.mockResolvedValue({ data: { name: 'Ada', photo_url: input } })
-
-    const result = await useProfile().fetchProfile()
-
-    expect(result.data.photo_url).toBe(expected)
-    expect(result.data.name).toBe('Ada')
-  })
-
-  it('normalises photo_url on profile update and photo upload/delete responses', async () => {
-    const raw = 'http://localhost:8000/api/profile/photo?v=b.png'
-    apiFetch.mockResolvedValue({ data: { photo_url: raw } })
-
-    const u = await useProfile().updateProfile({ name: 'n', email: 'e@x.test', locale: 'it' })
-    const up = await useProfile().uploadPhoto(new File(['x'], 'p.png', { type: 'image/png' }))
-    const del = await useProfile().deletePhoto()
-
-    for (const r of [u, up, del]) expect(r.data.photo_url).toBe('/api/profile/photo?v=b.png')
-  })
-
   it('reads the self-resolving singular resource — no id in the path', async () => {
     await useProfile().fetchProfile()
 

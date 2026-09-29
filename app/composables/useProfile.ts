@@ -16,7 +16,6 @@
  */
 import type { paths } from '../../types/api'
 import { useApi } from './useApi'
-import { toSameOriginImageUrl } from '../utils/image-url'
 
 export type ProfileResponse =
   paths['/profile']['get']['responses']['200']['content']['application/json']
@@ -34,29 +33,15 @@ export type UpdatePasswordResponse =
 export type ProfilePhotoResponse =
   paths['/profile/photo']['post']['responses']['200']['content']['application/json']
 
-/**
- * The API builds `photo_url` from APP_URL — an http cross-origin URL in local
- * docker, which the backoffice CSP (`img-src`) blocks. Normalised once here so
- * every consumer (profile page, photo form) receives a same-origin path.
- */
-function withSameOriginPhoto<T extends { data: { photo_url?: string | null } }>(response: T): T {
-  const url = response?.data?.photo_url
-  if (typeof url !== 'string') return response
-
-  return { ...response, data: { ...response.data, photo_url: toSameOriginImageUrl(url) } }
-}
-
 export function useProfile() {
   const { apiFetch } = useApi()
 
   async function fetchProfile(): Promise<ProfileResponse> {
-    return withSameOriginPhoto(await apiFetch<ProfileResponse>('/profile'))
+    return apiFetch<ProfileResponse>('/profile')
   }
 
   async function updateProfile(payload: UpdateProfilePayload): Promise<ProfileResponse> {
-    return withSameOriginPhoto(
-      await apiFetch<ProfileResponse>('/profile', { method: 'PATCH', body: payload })
-    )
+    return apiFetch<ProfileResponse>('/profile', { method: 'PATCH', body: payload })
   }
 
   async function updatePassword(payload: UpdatePasswordPayload): Promise<UpdatePasswordResponse> {
@@ -66,15 +51,11 @@ export function useProfile() {
   async function uploadPhoto(file: File): Promise<ProfilePhotoResponse> {
     const formData = new FormData()
     formData.set('photo', file)
-    return withSameOriginPhoto(
-      await apiFetch<ProfilePhotoResponse>('/profile/photo', { method: 'POST', body: formData })
-    )
+    return apiFetch<ProfilePhotoResponse>('/profile/photo', { method: 'POST', body: formData })
   }
 
   async function deletePhoto(): Promise<ProfilePhotoResponse> {
-    return withSameOriginPhoto(
-      await apiFetch<ProfilePhotoResponse>('/profile/photo', { method: 'DELETE' })
-    )
+    return apiFetch<ProfilePhotoResponse>('/profile/photo', { method: 'DELETE' })
   }
 
   return { fetchProfile, updateProfile, updatePassword, uploadPhoto, deletePhoto }

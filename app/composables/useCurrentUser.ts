@@ -27,7 +27,6 @@ import { computed, ref, watch } from 'vue'
 import type { paths } from '../../types/api'
 import { useApi } from './useApi'
 import { useAuth } from './useAuth'
-import { toSameOriginImageUrl } from '../utils/image-url'
 
 /**
  * DERIVED FROM THE GENERATED CLIENT, never hand-written.
@@ -67,14 +66,7 @@ watch(useAuth().accessToken, (token) => {
 
 async function load(): Promise<CurrentUser> {
   const { apiFetch } = useApi()
-  const raw = await apiFetch<CurrentUser>('/auth/me')
-  // `photo_url` is built from APP_URL (http cross-origin in local docker), which
-  // the CSP `img-src` blocks — normalised once here for every consumer.
-  const photo = raw?.user?.photo_url
-  const response: CurrentUser =
-    typeof photo === 'string'
-      ? { ...raw, user: { ...raw.user, photo_url: toSameOriginImageUrl(photo) } }
-      : raw
+  const response = await apiFetch<CurrentUser>('/auth/me')
   current.value = response
   return response
 }

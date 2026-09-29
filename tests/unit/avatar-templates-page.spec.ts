@@ -960,3 +960,109 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
     })
   })
 })
+
+describe('AvatarTemplatesPage — Tavus persona sync visibility', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    tMock.mockClear()
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal('useI18n', () => ({ t: tMock, te: realI18n().te, locale: ref('it') }))
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  const tavus = (palSync: Record<string, unknown>, overrides: Record<string, unknown> = {}) =>
+    template({
+      id: 5,
+      provider: 'tavus',
+      config: { faceId: 'r1' },
+      pal_sync: palSync,
+      ...overrides,
+    })
+
+  it('shows the sync state on every Tavus row, and not on a HeyGen row', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({
+        data: [
+          tavus({ status: 'warning', code: 'pal_not_editable', synced_at: null }),
+          template({ id: 6, pal_sync: { status: null, code: null, synced_at: null } }),
+        ],
+      }),
+    })
+
+    const rows = wrapper.findAll('[data-testid="templates-list"] > li')
+    const tavusRow = rows[0]!
+    const heygenRow = rows[1]!
+
+    expect(tavusRow.get('[data-testid="pal-sync"]').attributes('data-status')).toBe('warning')
+    expect(tavusRow.text()).toContain('avatar_templates.warning.pal_not_editable')
+    expect(heygenRow.find('[data-testid="pal-sync"]').exists()).toBe(false)
+  })
+
+  it('keeps a save warning on screen after the drawer closes, with actionable copy', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi
+        .fn()
+        .mockResolvedValue({ data: [tavus({ status: null, code: null, synced_at: null })] }),
+      updateTemplate: vi.fn().mockResolvedValue({
+        data: tavus({ status: 'warning', code: 'pal_not_editable', synced_at: null }),
+        warning: 'pal_not_editable',
+      }),
+    })
+
+    await wrapper.find('[data-testid="template-edit-5"]').trigger('click')
+    await submitTemplateForm()
+
+    const alert = wrapper.get('[data-testid="template-warning"]')
+    expect(alert.attributes('role')).toBe('alert')
+    expect(alert.text()).toContain('avatar_templates.warning.pal_not_editable')
+  })
+
+  it('clears the warning once a later save syncs cleanly', async () => {
+    const updateTemplate = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: tavus({ status: 'warning', code: 'pal_not_editable', synced_at: null }),
+        warning: 'pal_not_editable',
+      })
+      .mockResolvedValueOnce({
+        data: tavus({ status: 'synced', code: null, synced_at: '2026-09-29T10:00:00Z' }),
+      })
+    const { wrapper } = await mountPage({
+      listTemplates: vi
+        .fn()
+        .mockResolvedValue({ data: [tavus({ status: null, code: null, synced_at: null })] }),
+      updateTemplate,
+    })
+
+    await wrapper.find('[data-testid="template-edit-5"]').trigger('click')
+    await submitTemplateForm()
+    expect(wrapper.find('[data-testid="template-warning"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="template-edit-5"]').trigger('click')
+    await submitTemplateForm()
+    expect(wrapper.find('[data-testid="template-warning"]').exists()).toBe(false)
+  })
+
+  it('falls back to generic copy for a warning code it has no translation for', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi
+        .fn()
+        .mockResolvedValue({ data: [tavus({ status: null, code: null, synced_at: null })] }),
+      updateTemplate: vi.fn().mockResolvedValue({
+        data: tavus({ status: null, code: null, synced_at: null }),
+        warning: 'brand_new_code',
+      }),
+    })
+
+    await wrapper.find('[data-testid="template-edit-5"]').trigger('click')
+    await submitTemplateForm()
+
+    const text = wrapper.get('[data-testid="template-warning"]').text()
+    expect(text).toContain('avatar_templates.warning.generic')
+    expect(text).not.toContain('brand_new_code')
+  })
+})

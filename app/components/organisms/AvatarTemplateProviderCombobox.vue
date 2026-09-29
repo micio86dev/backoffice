@@ -164,6 +164,30 @@
                 />
                 <span class="truncate font-medium">{{ candidate.label }}</span>
                 <span
+                  v-if="resource === 'pal' && candidate.editable != null"
+                  :data-testid="`${testIdPrefix}-editable-badge-${candidate.id}`"
+                  :data-editable="String(candidate.editable)"
+                  :title="
+                    candidate.editable
+                      ? undefined
+                      : t('avatar_templates.form.catalogue.editable.noTitle')
+                  "
+                  :class="
+                    cn(
+                      'shrink-0 rounded-full px-2 text-xs',
+                      candidate.editable
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-warning-light text-warning-dark dark:bg-warning/15 dark:text-warning'
+                    )
+                  "
+                >
+                  {{
+                    candidate.editable
+                      ? t('avatar_templates.form.catalogue.editable.yes')
+                      : t('avatar_templates.form.catalogue.editable.no')
+                  }}
+                </span>
+                <span
                   v-if="candidate.italian !== null"
                   :data-testid="`${testIdPrefix}-italian-badge-${candidate.id}`"
                   :class="
@@ -233,6 +257,71 @@
         </li>
       </ul>
     </div>
+
+    <!--
+      Ownership hint for the SELECTED persona. Tavus refuses to modify a persona
+      the account does not own, so voice/LLM/turn-taking chosen below would be
+      silently dropped. Advisory only: selection is never blocked.
+    -->
+    <p
+      v-if="ownershipHint !== null"
+      :data-testid="`${testIdPrefix}-editable-hint`"
+      class="text-sm text-warning-dark dark:text-warning"
+    >
+      {{ ownershipHint }}
+    </p>
+
+    <!--
+      Voice preview block (DESIGN.md §16.14). A voice has no image, so this
+      takes the place of the face picker's panel. Rendered for ANY voice id,
+      catalogued or typed by hand: the Italian sample needs only provider + id.
+    -->
+    <div
+      v-if="resource === 'voice' || resource === 'pal'"
+      :data-testid="`${testIdPrefix}-voice-preview`"
+      class="flex w-full min-w-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3"
+    >
+      <p class="text-sm font-medium break-words">
+        {{ selected?.label ?? (modelValue !== '' ? modelValue : '') }}
+      </p>
+      <div class="flex flex-wrap items-start gap-2">
+        <VoicePreviewButton
+          v-if="resource === 'pal'"
+          labelled
+          provider="tavus"
+          :pal-id="modelValue"
+          :test-id="`${testIdPrefix}-preview`"
+        />
+        <VoicePreviewButton
+          v-else
+          labelled
+          :provider="blockPreview.provider"
+          :tts-engine="blockPreview.ttsEngine"
+          :voice-id="modelValue"
+          :test-id="`${testIdPrefix}-preview`"
+        />
+        <button
+          v-if="resource === 'voice' && selected?.preview_audio_url"
+          type="button"
+          :data-testid="`${testIdPrefix}-catalogue-sample`"
+          :aria-pressed="playingId === selected.id ? 'true' : 'false'"
+          class="inline-flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          @click="togglePreview(selected)"
+        >
+          <PauseIcon v-if="playingId === selected.id" class="size-4" aria-hidden="true" />
+          <PlayIcon v-else class="size-4" aria-hidden="true" />
+          {{ t('avatar_templates.form.voicePreview.caption.catalogue') }}
+        </button>
+      </div>
+    </div>
+
+    <p
+      v-if="resource === 'pal'"
+      :data-testid="`${testIdPrefix}-pal-note`"
+      class="text-xs text-muted-foreground"
+    >
+      {{ t('avatar_templates.form.voicePreview.palSaveNote') }}
+    </p>
 
     <!--
       Selected-avatar preview. Explicit 160px floors as attributes AND inline
@@ -312,6 +401,13 @@ const props = defineProps<{
   field: FieldSpec
   provider: CatalogueProvider
   modelValue: string
+  /**
+   * What the listen control samples, as the FORM works it out for this field
+   * (Tavus `ttsExternalVoiceId` = provider `tavus` + the current engine). The
+   * picker's own `provider` is the catalogue it lists, which for that field is
+   * the vendor, not Tavus. Absent: sample the catalogue's own provider.
+   */
+  preview?: { provider: 'heygen' | 'tavus' | 'cartesia' | 'elevenlabs'; ttsEngine?: string | null }
 }>()
 
 const emit = defineEmits<{
@@ -335,6 +431,10 @@ const resource = computed<CatalogueResource>(() => props.field.catalogue_resourc
 const previewProvider = computed<'heygen' | 'cartesia' | 'elevenlabs' | null>(() =>
   props.provider === 'tavus' ? null : props.provider
 )
+const blockPreview = computed(() => ({
+  provider: props.preview?.provider ?? props.provider,
+  ttsEngine: props.preview?.ttsEngine ?? null,
+}))
 const testIdPrefix = computed(() => `template-config-${props.field.key}`)
 const panelId = computed(() => `${testIdPrefix.value}-panel`)
 
@@ -416,8 +516,21 @@ function describe(candidate: CatalogueEntry): string {
     .join(' · ')
 }
 
+const ownershipHint = computed<string | null>(() => {
+  if (resource.value !== 'pal' || selected.value === null) return null
+  if (selected.value.editable === true) return null
+
+  return selected.value.editable === false
+    ? t('avatar_templates.form.catalogue.editable.hintNo')
+    : t('avatar_templates.form.catalogue.editable.hintUnknown')
+})
+
 const showsImagePreview = computed(
-  () => resource.value !== 'voice' && props.modelValue !== '' && selected.value !== null
+  () =>
+    resource.value !== 'voice' &&
+    resource.value !== 'pal' &&
+    props.modelValue !== '' &&
+    selected.value !== null
 )
 
 const previewUrl = computed(() => {

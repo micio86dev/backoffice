@@ -504,6 +504,10 @@ export interface paths {
          *     not JSON. Failures are `{message: <code>}` with one of
          *     `voice_preview_unavailable` (422, Tavus stock voice), `voice_preview_provider_not_configured`
          *     (503), `voice_preview_voice_not_found` (404) and `voice_preview_provider_error` (502).
+         *     `voice_preview_unavailable` also carries a `reason`: `tavus_stock_voice`,
+         *     `pal_uses_tavus_voice`, `pal_azure_engine` or `pal_no_voice_configured`.
+         *
+         *     For `provider: tavus` send `pal_id` INSTEAD of `voice_id` to hear a persona's voice.
          */
         post: operations["avatarVoicePreview"];
         delete?: never;
@@ -2887,6 +2891,11 @@ export interface components {
                     usd: number;
                 } | null;
             };
+            pal_sync: {
+                status: string | null;
+                code: string | null;
+                synced_at: string | null;
+            };
         };
         /**
          * AvatarVoicePreviewRequest
@@ -2903,7 +2912,9 @@ export interface components {
         AvatarVoicePreviewRequest: {
             /** @enum {string} */
             provider: "cartesia" | "elevenlabs" | "heygen" | "tavus";
-            voice_id: string;
+            /** @description Exactly one of `voice_id` / `pal_id`; `pal_id` (a Tavus persona) only with `tavus`. */
+            voice_id?: string;
+            pal_id?: string;
             /**
              * @description Meaningful for `tavus` only: which TTS vendor its voice is routed through.
              * @enum {string|null}

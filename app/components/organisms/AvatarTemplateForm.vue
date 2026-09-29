@@ -22,6 +22,19 @@
         <li v-for="error in unmappedErrors" :key="error">{{ error }}</li>
       </ul>
 
+      <!--
+        Persona sync state (DESIGN.md 16.16): a Tavus persona Tavus refuses to
+        modify silently keeps its OLD voice, so the state of the last sync is
+        shown where the operator edits the settings. Edit only: a template not
+        yet saved has never been synced.
+      -->
+      <PalSyncStatus
+        v-if="!isNew && draft.provider === 'tavus'"
+        :sync="props.template.pal_sync"
+        provider="tavus"
+        layout="banner"
+      />
+
       <Field :data-invalid="Boolean(nameError)">
         <FieldLabel for="template-name">{{ $t('avatar_templates.form.name') }}</FieldLabel>
         <input
@@ -181,6 +194,7 @@
                 :id="`template-config-${field.key}`"
                 :data-testid="`template-config-${field.key}`"
                 :value="stringValue(field.key)"
+                :disabled="!dependentOptionsAvailable(field, draft.config)"
                 autocomplete="off"
                 :aria-invalid="Boolean(configErrors[field.key])"
                 :aria-required="field.required ? 'true' : undefined"
@@ -194,7 +208,11 @@
             who opens a select can never unset it again.
           -->
                 <option value="">{{ $t('avatar_templates.form.default') }}</option>
-                <option v-for="option in field.options ?? []" :key="option" :value="option">
+                <option
+                  v-for="option in optionsFor(field, draft.config)"
+                  :key="option"
+                  :value="option"
+                >
                   {{ option }}
                 </option>
               </select>
@@ -243,6 +261,18 @@
                 v-bind="voicePreviewFor(field)!"
                 :test-id="`template-config-${field.key}-preview`"
               />
+              <!--
+          A dependent select whose parent value offers no choice (Tavus model
+          for azure / tavus-auto / no engine) is disabled WITH its reason, never
+          hidden: an absent control reads as a missing feature.
+        -->
+              <FieldDescription
+                v-if="!dependentOptionsAvailable(field, draft.config)"
+                :id="`template-config-${field.key}-unavailable`"
+                :data-testid="`template-config-${field.key}-unavailable`"
+              >
+                {{ $t('avatar_templates.form.dependentUnavailable') }}
+              </FieldDescription>
               <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
                 {{ $t(field.hint_key) }}
               </FieldDescription>
@@ -354,6 +384,12 @@ import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import VoicePreviewButton from '@/components/molecules/VoicePreviewButton.vue'
+import PalSyncStatus from '@/components/molecules/PalSyncStatus.vue'
+import {
+  dependentOptionsAvailable,
+  fieldsToResetOnChange,
+  optionsFor,
+} from '@/utils/dependent-options'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
@@ -560,6 +596,9 @@ const nameDescribedBy = computed(() =>
 function describedBy(field: FieldSpec): string | undefined {
   const ids = [
     configErrors.value[field.key] ? `template-config-${field.key}-error` : null,
+    !dependentOptionsAvailable(field, draft.value.config)
+      ? `template-config-${field.key}-unavailable`
+      : null,
     field.hint_key ? `template-config-${field.key}-hint` : null,
   ].filter((id): id is string => id !== null)
 
@@ -689,6 +728,13 @@ function onFieldChange(field: FieldSpec, raw: string | boolean): void {
   // change stores an id the new engine has never heard of.
   if (field.key === 'ttsEngine' && raw !== draft.value.config.ttsEngine) {
     draft.value.config = withoutKey(draft.value.config, 'ttsExternalVoiceId')
+  }
+
+  // Dependent selects (`options_depend_on`): a value the new parent value no
+  // longer offers is stale — Tavus's model for the previous engine — and would
+  // be refused by the server, so it is dropped with the change that outdated it.
+  for (const key of fieldsToResetOnChange(activeFields.value, field.key, draft.value.config, raw)) {
+    draft.value.config = withoutKey(draft.value.config, key)
   }
 
   configErrors.value[field.key] = undefined

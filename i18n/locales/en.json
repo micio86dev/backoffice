@@ -1108,6 +1108,7 @@
     },
     "warning": {
       "title": "Saved, with a warning",
+      "generic": "The change was saved, but one part did not reach the service. Save again to retry.",
       "pal_sync_failed": "Tavus did not accept the persona update, so the voice and other persona settings you chose may NOT be applied. Save again to retry.",
       "pal_sync_unreachable": "Tavus could not be reached, so the persona settings you chose are not live yet. Save again to retry.",
       "tavus_key_missing": "The Tavus access key is not configured, so persona settings (voice, model, behavior) cannot be applied. Contact support.",

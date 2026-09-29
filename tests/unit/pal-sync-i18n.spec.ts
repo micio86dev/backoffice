@@ -18,6 +18,7 @@ function lookup(bundle: unknown, key: string): unknown {
 
 const KEYS = [
   ...PAL_SYNC_CODES.map((code) => `avatar_templates.warning.${code}`),
+  'avatar_templates.warning.generic',
   'avatar_templates.palSync.bannerTitle',
   'avatar_templates.palSync.lastSynced',
   ...['never', 'synced', 'skipped', 'warning'].map((s) => `avatar_templates.palSync.status.${s}`),

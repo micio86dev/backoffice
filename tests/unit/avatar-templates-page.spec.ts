@@ -1046,4 +1046,23 @@ describe('AvatarTemplatesPage — Tavus persona sync visibility', () => {
     await submitTemplateForm()
     expect(wrapper.find('[data-testid="template-warning"]').exists()).toBe(false)
   })
+
+  it('falls back to generic copy for a warning code it has no translation for', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi
+        .fn()
+        .mockResolvedValue({ data: [tavus({ status: null, code: null, synced_at: null })] }),
+      updateTemplate: vi.fn().mockResolvedValue({
+        data: tavus({ status: null, code: null, synced_at: null }),
+        warning: 'brand_new_code',
+      }),
+    })
+
+    await wrapper.find('[data-testid="template-edit-5"]').trigger('click')
+    await submitTemplateForm()
+
+    const text = wrapper.get('[data-testid="template-warning"]').text()
+    expect(text).toContain('avatar_templates.warning.generic')
+    expect(text).not.toContain('brand_new_code')
+  })
 })

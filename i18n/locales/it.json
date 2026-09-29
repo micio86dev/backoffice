@@ -1108,6 +1108,7 @@
     },
     "warning": {
       "title": "Salvato, con un avviso",
+      "generic": "La modifica è stata salvata, ma una parte non è arrivata al servizio. Salva di nuovo per riprovare.",
       "pal_sync_failed": "Tavus non ha accettato l'aggiornamento della persona, quindi la voce e le altre impostazioni scelte potrebbero NON essere applicate. Salva di nuovo per riprovare.",
       "pal_sync_unreachable": "Tavus non è raggiungibile, quindi le impostazioni della persona scelte non sono ancora attive. Salva di nuovo per riprovare.",
       "tavus_key_missing": "La chiave di accesso a Tavus non è configurata, quindi le impostazioni della persona (voce, modello, comportamento) non possono essere applicate. Contatta il supporto.",

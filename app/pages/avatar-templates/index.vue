@@ -76,7 +76,7 @@
         provider yet, which an operator must be told: without it they would
         believe a setting they configured is live when it is not.
       -->
-      <AlertDescription>{{ $t(`avatar_templates.warning.${warning}`) }}</AlertDescription>
+      <AlertDescription>{{ warningMessage }}</AlertDescription>
     </Alert>
 
     <p
@@ -414,6 +414,13 @@ const writeErrorMessage = computed(() => {
   return writeError.value === null ? null : t(resourceErrorKey(writeError.value, 'message'))
 })
 const warning = ref<string | null>(null)
+// A code this build has no copy for reads as generic copy, never as an i18n key.
+const warningMessage = computed(() => {
+  if (warning.value === null) return ''
+  const key = `avatar_templates.warning.${warning.value}`
+
+  return te(key) ? t(key) : t('avatar_templates.warning.generic')
+})
 const saving = ref(false)
 // The raw rejection, passed down VERBATIM (form-clarity-and-console-warnings,
 // D3) — the form runs `applyServerFieldErrors` and its own "knob: code"

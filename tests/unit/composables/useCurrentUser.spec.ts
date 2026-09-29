@@ -43,6 +43,29 @@ describe('useCurrentUser — shared state (admin-backoffice spec)', () => {
     expect(apiFetch).toHaveBeenCalledWith('/auth/me')
   })
 
+  it('normalises user.photo_url to a same-origin path (CSP img-src), https and null untouched', async () => {
+    const cases: Array<[string | null, string | null]> = [
+      ['http://localhost:8000/api/profile/photo?v=a.png', '/api/profile/photo?v=a.png'],
+      ['https://api.example.com/p.png?v=1', 'https://api.example.com/p.png?v=1'],
+      [null, null],
+    ]
+
+    for (const [input, expected] of cases) {
+      vi.resetModules()
+      apiFetch.mockReset()
+      apiFetch.mockResolvedValue({
+        ...meResponse(),
+        user: { ...meResponse().user, photo_url: input },
+      })
+      const { useCurrentUser } = await import('../../../app/composables/useCurrentUser')
+
+      const result = await useCurrentUser().ensureLoaded()
+
+      expect(result.user.photo_url).toBe(expected)
+      expect(useCurrentUser().user.value?.photo_url).toBe(expected)
+    }
+  })
+
   it('concurrent ensureLoaded() callers share a single in-flight promise', async () => {
     apiFetch.mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10))

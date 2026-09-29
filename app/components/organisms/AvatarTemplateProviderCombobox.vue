@@ -14,6 +14,7 @@
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
       :aria-controls="panelId"
+      :aria-busy="state === 'loading' ? 'true' : undefined"
       :class="cn(formSelectClass, 'flex items-center justify-between gap-2 text-left')"
       @click="toggle"
     >
@@ -22,8 +23,24 @@
         <span v-else-if="modelValue !== ''" class="truncate font-mono text-xs">
           {{ modelValue }}
         </span>
-        <span v-else class="truncate text-muted-foreground">
+        <span v-else-if="state !== 'loading'" class="truncate text-muted-foreground">
           {{ t('avatar_templates.form.catalogue.choose') }}
+        </span>
+        <!--
+          The catalogue can load while the panel is closed, and the panel is
+          the only other place that says so. Shown on the trigger so a slow
+          provider never reads as a control that is simply empty. It carries
+          `role="status"` only while the panel is CLOSED: an open panel renders
+          its own status line, and two live regions would announce it twice.
+        -->
+        <span
+          v-if="state === 'loading'"
+          :data-testid="`${testIdPrefix}-trigger-loading`"
+          :role="isOpen ? undefined : 'status'"
+          class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+          {{ t('avatar_templates.form.catalogue.loading') }}
         </span>
         <span
           v-if="selected === null && modelValue !== '' && loaded"
@@ -254,7 +271,7 @@
  * trip, without ever blocking a save just because the provider is down.
  */
 import { computed, onMounted, reactive, ref, useAttrs, watch } from 'vue'
-import { CheckIcon, ChevronDownIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, PauseIcon, PlayIcon } from '@lucide/vue'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'

@@ -509,6 +509,26 @@ describe.each<Context>(['create', 'edit'])('the template form in %s context', (c
 
       expect(wrapper.find(sel(`${cfg('voiceId')}-loading`)).exists()).toBe(true)
     })
+
+    it.each([
+      ['heygen', ['avatarId', 'voiceId']],
+      ['tavus', ['faceId', 'palId']],
+    ])(
+      'shows the loading state on every %s catalogue trigger while the panel is CLOSED',
+      async (provider, keys) => {
+        fetchCatalogue.mockReturnValue(new Promise(() => undefined))
+        const wrapper = mountForm(context, { provider })
+        await flushPromises()
+
+        for (const key of keys) {
+          const trigger = wrapper.get(sel(cfg(key)))
+          expect(trigger.attributes('aria-busy')).toBe('true')
+          expect(wrapper.get(sel(`${cfg(key)}-trigger-loading`)).text()).toContain(
+            'avatar_templates.form.catalogue.loading'
+          )
+        }
+      }
+    )
   })
 
   describe('server 422 config.* codes land on the right field', () => {

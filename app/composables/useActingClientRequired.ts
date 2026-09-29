@@ -27,6 +27,9 @@ export const ACTING_CLIENT_NOTICE_ID = 'acting-client-required-notice'
 export function useActingClientRequired() {
   const actingClientRequired = ref(false)
 
+  // Evaluated once per mount, by design: the navbar client switcher reloads the
+  // whole app after a selection change (NavBar.vue `window.location.reload()`,
+  // pinned by NavBar.spec.ts), so a mounted page never outlives the selection.
   onMounted(async () => {
     try {
       const { ensureLoaded, can } = useCurrentUser()

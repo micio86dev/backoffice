@@ -166,6 +166,7 @@ import { useOrganization, type OrganizationRecord } from '@/composables/useOrgan
 import { applyBrandColor } from '@/composables/useBrandTheme'
 import { BRAND_PRIMARY, HEX } from '@/utils/brand'
 import { applyServerFieldErrors } from '@/utils/http-error'
+import { toSameOriginImageUrl } from '@/utils/image-url'
 import { translateServerCodes } from '@/utils/server-message'
 
 /**
@@ -188,7 +189,9 @@ const { updateOrganization, uploadLogo, removeLogo } = useOrganization()
 const { t, te } = useI18n()
 
 const color = ref(props.organization.primary_color ?? '')
-const logoUrl = ref(props.organization.logo_url ?? null)
+// The API builds `logo_url` from APP_URL; in local docker that is an http
+// cross-origin URL the CSP blocks, so it is normalised to a same-origin path.
+const logoUrl = ref(toSameOriginImageUrl(props.organization.logo_url))
 const pendingFile = ref<File | null>(null)
 
 const colorError = ref<string | undefined>(undefined)
@@ -285,7 +288,7 @@ async function onRemoveLogo(): Promise<void> {
 
   try {
     const response = await removeLogo()
-    logoUrl.value = response.data.logo_url ?? null
+    logoUrl.value = toSameOriginImageUrl(response.data.logo_url)
     // The pending crop goes WITH it, in the form AND in the control. The
     // confirmation promises "the file will be permanently deleted"; leaving it
     // queued meant the next Save re-uploaded the exact file the operator had
@@ -346,7 +349,7 @@ async function onSubmit(): Promise<void> {
       // changes with every upload — the stored object's own filename — so
       // this URL is one the browser has never fetched. No client-side
       // cache-buster needed on top of it.
-      logoUrl.value = response.data.logo_url ?? null
+      logoUrl.value = toSameOriginImageUrl(response.data.logo_url)
       pendingFile.value = null
       // The crop is now the stored image; the local blob has nothing left to
       // say and holds a decoded bitmap for the life of the document.

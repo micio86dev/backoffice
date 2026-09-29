@@ -160,6 +160,23 @@ describe('NavBar', () => {
     expect(wrapper.find('[data-testid="client-switcher"]').exists()).toBe(false)
   })
 
+  // `useActingClientRequired` reads the selection once per mount, on purpose: a
+  // selection change reloads the app, so no mounted page outlives it. If this
+  // stops reloading, that composable goes stale and must gain a watcher.
+  it('reloads the app after a client is picked in the switcher', async () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    mockIdentity(true)
+    const wrapper = await mountFresh()
+    const ClientSwitcher = (await import('../../../../app/components/organisms/ClientSwitcher.vue'))
+      .default
+
+    wrapper.findComponent(ClientSwitcher).vm.$emit('change', 1)
+    await flushPromises()
+
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
   it('refreshes the switcher list when a client is created elsewhere (no reload)', async () => {
     // The real composable is the point: earlier tests doMock it and the mock
     // outlives `resetModules`.

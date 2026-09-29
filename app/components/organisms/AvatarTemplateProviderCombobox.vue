@@ -199,21 +199,37 @@
               loading="lazy"
             />
           </button>
-          <button
-            v-if="resource === 'voice' && candidate.preview_audio_url !== null"
-            type="button"
-            :data-testid="`${testIdPrefix}-play-${candidate.id}`"
-            :aria-label="
-              playingId === candidate.id
-                ? t('avatar_templates.form.catalogue.preview.pause')
-                : t('avatar_templates.form.catalogue.preview.play')
-            "
-            class="ml-2 rounded p-1 text-muted-foreground hover:bg-primary/10"
-            @click="togglePreview(candidate)"
-          >
-            <PauseIcon v-if="playingId === candidate.id" class="size-4" />
-            <PlayIcon v-else class="size-4" />
-          </button>
+          <!--
+            Two distinct samples per voice row, labelled so they are never
+            confused: the vendor's free CATALOGUE clip (any language, may not
+            exist) and the synthesised ITALIAN sample from our own endpoint.
+          -->
+          <div v-if="resource === 'voice'" class="flex items-center gap-2 pl-2">
+            <button
+              v-if="candidate.preview_audio_url !== null"
+              type="button"
+              :data-testid="`${testIdPrefix}-play-${candidate.id}`"
+              :aria-label="
+                playingId === candidate.id
+                  ? t('avatar_templates.form.catalogue.preview.pause')
+                  : t('avatar_templates.form.catalogue.preview.play')
+              "
+              :title="t('avatar_templates.form.voicePreview.caption.catalogue')"
+              class="rounded p-1 text-muted-foreground hover:bg-primary/10"
+              @click="togglePreview(candidate)"
+            >
+              <PauseIcon v-if="playingId === candidate.id" class="size-4" />
+              <PlayIcon v-else class="size-4" />
+            </button>
+            <VoicePreviewButton
+              v-if="previewProvider !== null"
+              compact
+              :provider="previewProvider"
+              :voice-id="candidate.id"
+              :voice-name="candidate.label"
+              :test-id="`${testIdPrefix}-italian-preview-${candidate.id}`"
+            />
+          </div>
         </li>
       </ul>
     </div>
@@ -273,10 +289,12 @@
 import { computed, onMounted, reactive, ref, useAttrs, watch } from 'vue'
 import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, PauseIcon, PlayIcon } from '@lucide/vue'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
+import VoicePreviewButton from '@/components/molecules/VoicePreviewButton.vue'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { useExclusivePopover } from '@/composables/useExclusivePopover'
+import { useVoicePreview } from '@/composables/useVoicePreview'
 import type {
   CatalogueEntry,
   CatalogueErrorCode,
@@ -303,6 +321,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { fetchCatalogue } = useAvatarTemplates()
+const { claimPlayback } = useVoicePreview()
 const attrs = useAttrs()
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -311,6 +330,11 @@ const audioRef = ref<HTMLAudioElement | null>(null)
 const { isOpen, close, toggle } = useExclusivePopover(rootRef)
 
 const resource = computed<CatalogueResource>(() => props.field.catalogue_resource ?? 'voice')
+// Tavus's own stock voices have no synthesised sample (the button would only
+// ever be disabled), so a Tavus list row gets none.
+const previewProvider = computed<'heygen' | 'cartesia' | 'elevenlabs' | null>(() =>
+  props.provider === 'tavus' ? null : props.provider
+)
 const testIdPrefix = computed(() => `template-config-${props.field.key}`)
 const panelId = computed(() => `${testIdPrefix.value}-panel`)
 
@@ -414,6 +438,11 @@ function onEscape(): void {
   triggerRef.value?.focus()
 }
 
+function stopCatalogueSample(): void {
+  audioRef.value?.pause()
+  playingId.value = null
+}
+
 function togglePreview(candidate: CatalogueEntry): void {
   const audio = audioRef.value
   if (audio === null || candidate.preview_audio_url === null) return
@@ -424,6 +453,10 @@ function togglePreview(candidate: CatalogueEntry): void {
 
     return
   }
+
+  // One sample at a time, app-wide: silence the synthesised Italian sample
+  // (and be silenced by it in turn).
+  claimPlayback(stopCatalogueSample)
 
   audio.src = candidate.preview_audio_url
   playingId.value = candidate.id

@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
@@ -54,7 +54,7 @@ import HelpSheet from '@/components/organisms/HelpSheet.vue'
 import { useAuth } from '@/composables/useAuth'
 import { useOrganization } from '@/composables/useOrganization'
 import { useCurrentUser } from '@/composables/useCurrentUser'
-import { useSuperadmin, type Client } from '@/composables/useSuperadmin'
+import { useSuperadmin, clientsRevision, type Client } from '@/composables/useSuperadmin'
 import ClientSwitcher from '@/components/organisms/ClientSwitcher.vue'
 
 const organizationName = ref<string | null>(null)
@@ -102,6 +102,27 @@ async function onSwitchClient(clientId: number | null): Promise<void> {
   }
 }
 
+/**
+ * Re-read the list AFTER first render when a client is written elsewhere
+ * (`/clients` create / edit). A failed refresh keeps the previous list: it was
+ * true a moment ago, and hiding a working switcher over a transient error is
+ * worse than a briefly stale option.
+ */
+watch(clientsRevision, async () => {
+  if (!canSwitchClients.value) return
+  try {
+    await refreshClients()
+  } catch {
+    // Keep the last known list.
+  }
+})
+
+async function refreshClients(): Promise<void> {
+  const response = await useSuperadmin().fetchClients()
+  clients.value = response.data
+  actingClientId.value = response.acting_organization_id ?? null
+}
+
 onMounted(async () => {
   try {
     // The shell's identity contract, cached once per page load — so the
@@ -117,9 +138,7 @@ onMounted(async () => {
     canSwitchClients.value = useCurrentUser().can('clients.viewAny')
 
     if (canSwitchClients.value) {
-      const response = await useSuperadmin().fetchClients()
-      clients.value = response.data
-      actingClientId.value = response.acting_organization_id ?? null
+      await refreshClients()
 
       // ONLY NOW is the switcher allowed to render. A FAILED read must never
       // render as a state the operator could have chosen — the rule

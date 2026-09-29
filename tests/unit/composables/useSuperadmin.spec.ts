@@ -163,4 +163,46 @@ describe('useSuperadmin', () => {
       })
     })
   })
+
+  describe('clients revision (shared list invalidation)', () => {
+    async function load(apiFetchMock: ReturnType<typeof vi.fn>) {
+      vi.doMock('../../../app/composables/useApi', () => ({
+        useApi: () => ({ apiFetch: apiFetchMock }),
+      }))
+      return import('../../../app/composables/useSuperadmin')
+    }
+
+    it('bumps clientsRevision after createClient() succeeds', async () => {
+      const { useSuperadmin, clientsRevision } = await load(
+        vi.fn().mockResolvedValue({ data: { id: 9 } })
+      )
+      const before = clientsRevision.value
+
+      await useSuperadmin().createClient({ name: 'New' })
+
+      expect(clientsRevision.value).toBe(before + 1)
+    })
+
+    it('bumps clientsRevision after updateClient() succeeds (rename / deactivate)', async () => {
+      const { useSuperadmin, clientsRevision } = await load(
+        vi.fn().mockResolvedValue({ data: { id: 9 } })
+      )
+      const before = clientsRevision.value
+
+      await useSuperadmin().updateClient(9, { name: 'Renamed' })
+
+      expect(clientsRevision.value).toBe(before + 1)
+    })
+
+    it('does NOT bump clientsRevision when the write fails', async () => {
+      const { useSuperadmin, clientsRevision } = await load(
+        vi.fn().mockRejectedValue(new Error('422'))
+      )
+      const before = clientsRevision.value
+
+      await expect(useSuperadmin().createClient({ name: 'x' })).rejects.toThrow()
+
+      expect(clientsRevision.value).toBe(before)
+    })
+  })
 })

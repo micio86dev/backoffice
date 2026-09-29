@@ -11,7 +11,8 @@ import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const INLINE_SCRIPT = /<script(?![^>]*\bsrc\s*=)(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g
+const INLINE_SCRIPT =
+  /<script(?![^>]*\bsrc\s*=)(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g
 
 function* htmlFiles(dir) {
   for (const name of readdirSync(dir)) {
@@ -31,7 +32,9 @@ for (const root of process.argv.slice(2)) {
 }
 
 if (hashes.size === 0) {
-  console.error('csp-script-hashes: no inline script found — the SPA shell always has one; refusing to emit an empty list')
+  console.error(
+    'csp-script-hashes: no inline script found — the SPA shell always has one; refusing to emit an empty list'
+  )
   process.exit(1)
 }
 console.log([...hashes].join('\n'))

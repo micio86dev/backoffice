@@ -989,10 +989,14 @@
       "ttsVoiceNote": "Il salvataggio scrive questa voce sulla persona Tavus e sostituisce la voce che la persona aveva. Con un motore esterno (Cartesia, ElevenLabs, Azure) vengono inviati motore, modello e voce scelti qui; lascia il motore su \"tavus-auto\" e non viene scritta alcuna voce esterna, quindi la voce la sceglie Tavus.",
       "voicePreview": {
         "action": "Ascolta il campione italiano di questa voce",
+        "palAction": "Ascolta la voce di questa persona",
+        "noPersona": "Scegli una persona per ascoltarne la voce.",
+        "palSaveNote": "Salvando questo template, la voce che imposti qui sotto viene scritta sulla persona e sostituisce quella che ha ora.",
         "actionGeneric": "Ascolta un campione generico di questa voce",
         "caption": {
           "italian": "Campione italiano",
           "heygen": "Campione generico (non italiano)",
+          "pal": "Campione della voce della persona",
           "catalogue": "Campione del catalogo"
         },
         "disclaimer": "Un campione della sintesi del fornitore della voce, non ancora reso da Tavus; il rendering finale di Tavus / LiveAvatar può differire.",
@@ -1000,6 +1004,10 @@
         "stockUnavailable": "Le voci stock non hanno anteprima. Scegli Cartesia o ElevenLabs come motore vocale e una voce per ascoltarla.",
         "rowAction": "Ascolta il campione italiano di {name}",
         "error": {
+          "pal_uses_tavus_voice": "Questa persona usa una voce Tavus, che non ha anteprima.",
+          "pal_azure_engine": "Questa persona usa il motore Azure, che non ha anteprima.",
+          "pal_no_voice_configured": "Questa persona non ha ancora una voce configurata.",
+          "tavus_stock_voice": "Questa persona usa una voce stock di Tavus, che non ha anteprima.",
           "unavailable": "Questa voce non ha un'anteprima.",
           "provider_not_configured": "Il servizio vocale non è configurato su questo server.",
           "voice_not_found": "Il servizio vocale non riconosce questa voce.",

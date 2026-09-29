@@ -210,7 +210,7 @@ describe('voice pickers show a voice preview block instead of the image fallback
 })
 
 describe('non-voice pickers are untouched', () => {
-  it.each<CatalogueResource>(['avatar', 'replica', 'pal'])(
+  it.each<CatalogueResource>(['avatar', 'replica'])(
     '%s keeps the image panel and its fallback, with no voice block',
     async (resource) => {
       fetchCatalogue.mockResolvedValue({
@@ -223,6 +223,122 @@ describe('non-voice pickers are untouched', () => {
       expect(wrapper.find(sel(`${P}-preview-fallback`)).exists()).toBe(true)
       expect(wrapper.find(sel(`${P}-voice-preview`)).exists()).toBe(false)
       expect(wrapper.find(sel(`${P}-preview`)).exists()).toBe(false)
+    }
+  )
+})
+
+describe('persona (pal) picker shows the persona voice block', () => {
+  const PALS = [entry({ id: 'pal-1', provider: 'tavus', label: 'Giulia persona' })]
+
+  function mountPal(modelValue: string) {
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: PALS })
+    const wrapper = mountPicker({ resource: 'pal', provider: 'tavus', modelValue })
+    return wrapper
+  }
+
+  const PAL = 'template-config-ttsExternalVoiceId'
+
+  it('replaces the empty square with a labelled, enabled listen control and the persona name', async () => {
+    const wrapper = mountPal('pal-1')
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${PAL}-preview-fallback`)).exists()).toBe(false)
+    const block = wrapper.get(sel(`${PAL}-voice-preview`))
+    expect(block.classes()).toEqual(expect.arrayContaining(['w-full', 'min-w-0']))
+    expect(block.text()).toContain('Giulia persona')
+    const button = wrapper.get(sel(`${PAL}-preview`))
+    expect(button.text()).toBe('avatar_templates.form.voicePreview.palAction')
+    expect(button.attributes('disabled')).toBeUndefined()
+  })
+
+  it('does NOT call the server on render: only after the click', async () => {
+    const wrapper = mountPal('pal-1')
+    await flushPromises()
+    expect(apiFetch).not.toHaveBeenCalled()
+
+    await wrapper.get(sel(`${PAL}-preview`)).trigger('click')
+    await flushPromises()
+
+    expect(bodies()).toEqual([{ provider: 'tavus', pal_id: 'pal-1', language: 'it' }])
+  })
+
+  it('says the save replaces the persona voice', async () => {
+    const wrapper = mountPal('pal-1')
+    await flushPromises()
+
+    expect(wrapper.get(sel(`${PAL}-pal-note`)).text()).toBe(
+      'avatar_templates.form.voicePreview.palSaveNote'
+    )
+  })
+
+  it.each([
+    [
+      'pal_uses_tavus_voice',
+      422,
+      { message: 'voice_preview_unavailable', reason: 'pal_uses_tavus_voice' },
+    ],
+    ['pal_azure_engine', 422, { message: 'voice_preview_unavailable', reason: 'pal_azure_engine' }],
+    [
+      'pal_no_voice_configured',
+      422,
+      { message: 'voice_preview_unavailable', reason: 'pal_no_voice_configured' },
+    ],
+    [
+      'tavus_stock_voice',
+      422,
+      { message: 'voice_preview_unavailable', reason: 'tavus_stock_voice' },
+    ],
+    ['voice_not_found', 404, { message: 'voice_preview_voice_not_found' }],
+    ['provider_error', 502, { message: 'voice_preview_provider_error' }],
+    ['provider_not_configured', 503, { message: 'voice_preview_provider_not_configured' }],
+    ['rate_limited', 429, { message: 'Too Many Attempts.' }],
+  ])('shows the translated %s message after the click', async (code, status, body) => {
+    apiFetch.mockRejectedValueOnce({ status, data: body })
+    const wrapper = mountPal('pal-1')
+    await flushPromises()
+
+    await wrapper.get(sel(`${PAL}-preview`)).trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      `avatar_templates.form.voicePreview.error.${code}`
+    )
+  })
+
+  it('works for a persona id that is not in the loaded list', async () => {
+    const wrapper = mountPal('typed-pal')
+    await flushPromises()
+
+    expect(wrapper.get(sel(`${PAL}-voice-preview`)).text()).toContain('typed-pal')
+    await wrapper.get(sel(`${PAL}-preview`)).trigger('click')
+    await flushPromises()
+    expect(bodies().at(-1)).toEqual({ provider: 'tavus', pal_id: 'typed-pal', language: 'it' })
+  })
+
+  it('is disabled with a reason while no persona is chosen', async () => {
+    const wrapper = mountPal('')
+    await flushPromises()
+
+    expect(wrapper.get(sel(`${PAL}-preview`)).attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('avatar_templates.form.voicePreview.noPersona')
+  })
+
+  it('renders exactly one player control for the persona (no duplicate)', async () => {
+    const wrapper = mountPal('pal-1')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-slot="voice-preview"]')).toHaveLength(1)
+  })
+
+  it.each<CatalogueResource>(['avatar', 'replica'])(
+    '%s pickers still keep the image fallback and no persona block',
+    async (resource) => {
+      fetchCatalogue.mockResolvedValue({ status: 'ok', items: [entry({ id: 'f-1' })] })
+      const wrapper = mountPicker({ resource, provider: 'tavus', modelValue: 'f-1' })
+      await flushPromises()
+
+      expect(wrapper.find(sel(`${PAL}-preview-fallback`)).exists()).toBe(true)
+      expect(wrapper.find(sel(`${PAL}-voice-preview`)).exists()).toBe(false)
     }
   )
 })

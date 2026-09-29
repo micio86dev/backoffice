@@ -402,7 +402,7 @@ describe('layout regression: placements never make the caption a flex sibling of
     await flushPromises()
 
     const input = wrapper.get(sel('template-config-ttsExternalVoiceId')).element
-    const block = wrapper.get('[data-slot="voice-preview"]').element as HTMLElement
+    const block = input.parentElement!.querySelector('[data-slot="voice-preview"]') as HTMLElement
 
     expect(block.parentElement).toBe(input.parentElement)
     expect(input.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

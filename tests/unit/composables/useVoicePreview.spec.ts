@@ -286,4 +286,88 @@ describe('useVoicePreview', () => {
     expect(revoke).toHaveBeenCalledTimes(2)
     expect(FakeAudio.instances[0]!.pause).toHaveBeenCalled()
   })
+
+  describe('persona variant (pal_id)', () => {
+    const pal = { provider: 'tavus', pal_id: 'p-1' } as const
+
+    it('sends pal_id and no voice_id, with the Italian default', async () => {
+      const { useVoicePreview } = await load()
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggle(pal)
+
+      expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/voice-preview', {
+        method: 'POST',
+        body: { provider: 'tavus', pal_id: 'p-1', language: 'it' },
+        responseType: 'blob',
+      })
+      scope.stop()
+    })
+
+    it('caches per persona id and never shares a key with a voice id of the same value', async () => {
+      const { useVoicePreview, voicePreviewKey } = await load()
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      expect(voicePreviewKey(pal)).not.toBe(voicePreviewKey({ provider: 'tavus', voice_id: 'p-1' }))
+      expect(voicePreviewKey(pal)).not.toBe(voicePreviewKey({ provider: 'tavus', pal_id: 'p-2' }))
+
+      await preview.toggle(pal)
+      await preview.toggle(pal) // stop
+      await preview.toggle(pal) // replay from memory
+      expect(apiFetch).toHaveBeenCalledTimes(1)
+
+      await preview.toggle({ provider: 'tavus', pal_id: 'p-2' })
+      expect(apiFetch).toHaveBeenCalledTimes(2)
+      scope.stop()
+    })
+
+    it.each([
+      'pal_uses_tavus_voice',
+      'pal_azure_engine',
+      'pal_no_voice_configured',
+      'tavus_stock_voice',
+    ])('surfaces the 422 reason %s instead of the umbrella code', async (reason) => {
+      const { useVoicePreview, voicePreviewKey } = await load()
+      apiFetch.mockRejectedValueOnce({
+        status: 422,
+        data: new Blob([JSON.stringify({ message: 'voice_preview_unavailable', reason })]),
+      })
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggle(pal)
+
+      expect(preview.errorFor(voicePreviewKey(pal))).toBe(reason)
+      scope.stop()
+    })
+
+    it('keeps "unavailable" for an unknown or missing reason', async () => {
+      const { useVoicePreview, voicePreviewKey } = await load()
+      apiFetch.mockRejectedValueOnce({
+        status: 422,
+        data: { message: 'voice_preview_unavailable', reason: 'something_new' },
+      })
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggle(pal)
+
+      expect(preview.errorFor(voicePreviewKey(pal))).toBe('unavailable')
+      scope.stop()
+    })
+
+    it('maps a missing persona (404) and a provider failure like a voice', async () => {
+      const { useVoicePreview, voicePreviewKey } = await load()
+      apiFetch.mockRejectedValueOnce(serverError(404, 'voice_preview_voice_not_found'))
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggle(pal)
+
+      expect(preview.errorFor(voicePreviewKey(pal))).toBe('voice_not_found')
+      scope.stop()
+    })
+  })
 })

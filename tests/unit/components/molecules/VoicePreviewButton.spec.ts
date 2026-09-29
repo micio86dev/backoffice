@@ -14,8 +14,13 @@ const errors = ref<Record<string, string | null>>({})
 const toggle = vi.fn()
 
 vi.mock('../../../../app/composables/useVoicePreview', () => ({
-  voicePreviewKey: (r: { provider: string; voice_id: string; tts_engine?: string }) =>
-    `${r.provider}|${r.voice_id}|${r.tts_engine ?? ''}`,
+  voicePreviewKey: (r: {
+    provider: string
+    voice_id?: string
+    pal_id?: string
+    tts_engine?: string
+  }) =>
+    `${r.provider}|${r.pal_id !== undefined ? `pal:${r.pal_id}` : r.voice_id}|${r.tts_engine ?? ''}`,
   useVoicePreview: () => ({
     stateFor: (key: string) => states.value[key] ?? 'idle',
     errorFor: (key: string) => errors.value[key] ?? null,
@@ -236,6 +241,36 @@ describe('VoicePreviewButton', () => {
       const caption = mountButton({ compact: true }).get('[data-testid="vp-caption"]')
 
       expect(caption.classes()).toContain('sr-only')
+    })
+  })
+
+  describe('persona variant', () => {
+    it('is ENABLED as soon as a persona is chosen and asks for its voice with pal_id', async () => {
+      const wrapper = mountButton({ provider: 'tavus', voiceId: '', palId: 'p-1', labelled: true })
+
+      expect(button(wrapper).attributes('disabled')).toBeUndefined()
+      expect(button(wrapper).text()).toBe('avatar_templates.form.voicePreview.palAction')
+      await button(wrapper).trigger('click')
+
+      expect(toggle).toHaveBeenCalledWith({ provider: 'tavus', pal_id: 'p-1', language: 'it' })
+    })
+
+    it('is disabled with a persona-specific reason while none is chosen', () => {
+      const wrapper = mountButton({ provider: 'tavus', voiceId: '', palId: '' })
+
+      expect(button(wrapper).attributes('disabled')).toBeDefined()
+      expect(wrapper.text()).toContain('avatar_templates.form.voicePreview.noPersona')
+    })
+
+    it('renders the server-reported reason as translated copy in the alert region', async () => {
+      const wrapper = mountButton({ provider: 'tavus', voiceId: '', palId: 'p-1' })
+      states.value = { 'tavus|pal:p-1|': 'error' }
+      errors.value = { 'tavus|pal:p-1|': 'pal_uses_tavus_voice' }
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.get('[role="alert"]').text()).toContain(
+        'avatar_templates.form.voicePreview.error.pal_uses_tavus_voice'
+      )
     })
   })
 })

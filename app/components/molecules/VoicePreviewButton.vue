@@ -104,7 +104,14 @@ import { translateServerCode } from '@/utils/server-message'
 const props = withDefaults(
   defineProps<{
     provider: VoicePreviewRequest['provider']
-    voiceId: string
+    voiceId?: string
+    /**
+     * A Tavus persona whose OWN voice is sampled (server-side: it reads the
+     * persona's TTS layer). Instead of `voiceId`. Whether a sample exists is
+     * only known after asking, so the control is enabled once a persona is
+     * chosen and shows the server's reason afterwards.
+     */
+    palId?: string
     /** Only meaningful for `tavus`: the TTS vendor its voice is routed through. */
     ttsEngine?: string | null
     language?: 'it' | 'en'
@@ -117,6 +124,8 @@ const props = withDefaults(
     voiceName?: string
   }>(),
   {
+    voiceId: '',
+    palId: undefined,
     ttsEngine: null,
     language: 'it',
     compact: false,
@@ -136,7 +145,13 @@ function routableEngine(value: string | null): value is RoutableEngine {
   return ROUTABLE_ENGINES.includes(value as RoutableEngine)
 }
 
+const isPersona = computed(() => props.palId !== undefined)
+
 const request = computed<VoicePreviewRequest>(() => {
+  if (props.palId !== undefined) {
+    return { provider: 'tavus', pal_id: props.palId, language: props.language }
+  }
+
   const base: VoicePreviewRequest = {
     provider: props.provider,
     voice_id: props.voiceId,
@@ -155,30 +170,36 @@ const state = computed(() => stateFor(key.value))
 const errorCode = computed(() => errorFor(key.value))
 
 /** Why no sample can exist, or `null` when one can. */
-const unavailableReason = computed<'noVoice' | 'stockUnavailable' | null>(() => {
+const unavailableReason = computed<'noVoice' | 'noPersona' | 'stockUnavailable' | null>(() => {
+  if (props.palId !== undefined) return props.palId.trim() === '' ? 'noPersona' : null
+
   // Tavus's own stock voices (and Azure) expose no preview anywhere; only a
   // voice routed through Cartesia or ElevenLabs can be sampled. Checked BEFORE
   // "no voice yet": choosing a voice would not help, choosing an engine does.
   if (props.provider === 'tavus' && !routableEngine(props.ttsEngine)) return 'stockUnavailable'
-  if (props.voiceId.trim() === '') return 'noVoice'
+  if (props.voiceId === undefined || props.voiceId.trim() === '') return 'noVoice'
 
   return null
 })
 
 const captionText = computed(() =>
   t(
-    props.provider === 'heygen'
-      ? 'avatar_templates.form.voicePreview.caption.heygen'
-      : 'avatar_templates.form.voicePreview.caption.italian'
+    isPersona.value
+      ? 'avatar_templates.form.voicePreview.caption.pal'
+      : props.provider === 'heygen'
+        ? 'avatar_templates.form.voicePreview.caption.heygen'
+        : 'avatar_templates.form.voicePreview.caption.italian'
   )
 )
 
 const accessibleName = computed(() =>
   props.voiceName === undefined
     ? t(
-        props.provider === 'heygen'
-          ? 'avatar_templates.form.voicePreview.actionGeneric'
-          : 'avatar_templates.form.voicePreview.action'
+        isPersona.value
+          ? 'avatar_templates.form.voicePreview.palAction'
+          : props.provider === 'heygen'
+            ? 'avatar_templates.form.voicePreview.actionGeneric'
+            : 'avatar_templates.form.voicePreview.action'
       )
     : t('avatar_templates.form.voicePreview.rowAction', { name: props.voiceName })
 )

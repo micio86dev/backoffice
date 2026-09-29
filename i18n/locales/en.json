@@ -989,10 +989,14 @@
       "ttsVoiceNote": "Saving writes this voice to the Tavus persona and replaces the voice the persona had. With an external engine (Cartesia, ElevenLabs, Azure) the engine, model and voice you choose here are sent; leave the engine on \"tavus-auto\" and no external voice is written, so Tavus chooses the voice.",
       "voicePreview": {
         "action": "Listen to the Italian sample of this voice",
+        "palAction": "Listen to this persona's voice",
+        "noPersona": "Choose a persona to listen to its voice.",
+        "palSaveNote": "Saving this template writes the voice you set below onto the persona and replaces the voice it has now.",
         "actionGeneric": "Listen to a generic sample of this voice",
         "caption": {
           "italian": "Italian sample",
           "heygen": "Generic sample (not Italian)",
+          "pal": "Persona voice sample",
           "catalogue": "Catalogue sample"
         },
         "disclaimer": "A sample from the voice vendor's own synthesis, not yet rendered by Tavus; the final rendering by Tavus / LiveAvatar may differ.",
@@ -1000,6 +1004,10 @@
         "stockUnavailable": "Stock voices have no preview. Choose Cartesia or ElevenLabs as the speech engine and a voice to listen to it.",
         "rowAction": "Listen to the Italian sample of {name}",
         "error": {
+          "pal_uses_tavus_voice": "This persona uses a Tavus voice, which has no preview.",
+          "pal_azure_engine": "This persona uses the Azure engine, which has no preview.",
+          "pal_no_voice_configured": "This persona has no voice configured yet.",
+          "tavus_stock_voice": "This persona uses a Tavus stock voice, which has no preview.",
           "unavailable": "This voice has no preview.",
           "provider_not_configured": "The voice service is not configured on this server.",
           "voice_not_found": "The voice service does not know this voice.",

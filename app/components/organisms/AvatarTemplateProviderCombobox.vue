@@ -277,7 +277,7 @@
       catalogued or typed by hand: the Italian sample needs only provider + id.
     -->
     <div
-      v-if="resource === 'voice'"
+      v-if="resource === 'voice' || resource === 'pal'"
       :data-testid="`${testIdPrefix}-voice-preview`"
       class="flex w-full min-w-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3"
     >
@@ -286,6 +286,14 @@
       </p>
       <div class="flex flex-wrap items-start gap-2">
         <VoicePreviewButton
+          v-if="resource === 'pal'"
+          labelled
+          provider="tavus"
+          :pal-id="modelValue"
+          :test-id="`${testIdPrefix}-preview`"
+        />
+        <VoicePreviewButton
+          v-else
           labelled
           :provider="blockPreview.provider"
           :tts-engine="blockPreview.ttsEngine"
@@ -293,7 +301,7 @@
           :test-id="`${testIdPrefix}-preview`"
         />
         <button
-          v-if="selected?.preview_audio_url"
+          v-if="resource === 'voice' && selected?.preview_audio_url"
           type="button"
           :data-testid="`${testIdPrefix}-catalogue-sample`"
           :aria-pressed="playingId === selected.id ? 'true' : 'false'"
@@ -306,6 +314,14 @@
         </button>
       </div>
     </div>
+
+    <p
+      v-if="resource === 'pal'"
+      :data-testid="`${testIdPrefix}-pal-note`"
+      class="text-xs text-muted-foreground"
+    >
+      {{ t('avatar_templates.form.voicePreview.palSaveNote') }}
+    </p>
 
     <!--
       Selected-avatar preview. Explicit 160px floors as attributes AND inline
@@ -510,7 +526,11 @@ const ownershipHint = computed<string | null>(() => {
 })
 
 const showsImagePreview = computed(
-  () => resource.value !== 'voice' && props.modelValue !== '' && selected.value !== null
+  () =>
+    resource.value !== 'voice' &&
+    resource.value !== 'pal' &&
+    props.modelValue !== '' &&
+    selected.value !== null
 )
 
 const previewUrl = computed(() => {

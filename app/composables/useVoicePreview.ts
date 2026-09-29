@@ -29,6 +29,11 @@ export type VoicePreviewState = 'idle' | 'loading' | 'playing' | 'error'
 /** The server's `voice_preview_*` codes with the shared prefix dropped, plus client-side ones. */
 export type VoicePreviewErrorCode =
   | 'unavailable'
+  // Why a PERSONA has no sample, as the server reports it in `reason`.
+  | 'pal_uses_tavus_voice'
+  | 'pal_azure_engine'
+  | 'pal_no_voice_configured'
+  | 'tavus_stock_voice'
   | 'provider_not_configured'
   | 'voice_not_found'
   | 'provider_error'
@@ -45,11 +50,19 @@ const SERVER_CODES: Record<string, VoicePreviewErrorCode> = {
   voice_preview_provider_error: 'provider_error',
 }
 
+const PAL_REASONS = [
+  'pal_uses_tavus_voice',
+  'pal_azure_engine',
+  'pal_no_voice_configured',
+  'tavus_stock_voice',
+] as const
+
 /** Cache / ownership key: everything that changes what the sample sounds like. */
 export function voicePreviewKey(request: VoicePreviewRequest): string {
   return [
     request.provider,
-    request.voice_id,
+    // A persona and a voice id live in different namespaces: never share a key.
+    request.pal_id !== undefined ? `pal:${request.pal_id}` : request.voice_id,
     request.provider === 'tavus' ? (request.tts_engine ?? '') : '',
     request.language ?? 'it',
   ].join('|')
@@ -100,29 +113,47 @@ function stopExternal(): void {
 }
 
 /** A Blob error body is JSON in a Blob when the request asked for `blob`. */
-async function readErrorCode(error: unknown): Promise<string | null> {
-  if (typeof error !== 'object' || error === null) return null
+async function readErrorBody(
+  error: unknown
+): Promise<{ message: string | null; reason: string | null }> {
+  const empty = { message: null, reason: null }
+  if (typeof error !== 'object' || error === null) return empty
   let data = (error as { data?: unknown }).data
 
   if (typeof Blob !== 'undefined' && data instanceof Blob) {
     try {
       data = JSON.parse(await data.text())
     } catch {
-      return null
+      return empty
     }
   }
 
-  if (typeof data !== 'object' || data === null) return null
-  const message = (data as { message?: unknown }).message
+  if (typeof data !== 'object' || data === null) return empty
+  const { message, reason } = data as { message?: unknown; reason?: unknown }
 
-  return typeof message === 'string' ? message : null
+  return {
+    message: typeof message === 'string' ? message : null,
+    reason: typeof reason === 'string' ? reason : null,
+  }
 }
 
 async function mapError(error: unknown): Promise<VoicePreviewErrorCode> {
   const status = getErrorStatus(error)
-  const code = await readErrorCode(error)
+  const { message, reason } = await readErrorBody(error)
 
-  if (code !== null && code in SERVER_CODES) return SERVER_CODES[code] as VoicePreviewErrorCode
+  if (message !== null && message in SERVER_CODES) {
+    const code = SERVER_CODES[message] as VoicePreviewErrorCode
+    // A persona's "unavailable" says WHY; surface the reason, not the umbrella.
+    if (
+      code === 'unavailable' &&
+      reason !== null &&
+      (PAL_REASONS as readonly string[]).includes(reason)
+    ) {
+      return reason as VoicePreviewErrorCode
+    }
+
+    return code
+  }
   if (status === 429) return 'rate_limited'
   if (status === 403) return 'forbidden'
   if (status === 422) return 'invalid_request'

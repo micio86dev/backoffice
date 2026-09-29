@@ -21,8 +21,12 @@ exports[`brand theme token source (regression guard) > :root semantic block matc
   --muted: oklch(0.968 0.007 247.896); /* --color-neutral-100 */
   --muted-foreground: oklch(0.446 0.037 257.281); /* --color-neutral-600 */
 
-  --accent: oklch(0.634 0.187 37.49); /* #e45526 */
-  --accent-foreground: oklch(0.208 0.04 265.755); /* --color-neutral-900, AA-safe on accent */
+  /* shadcn's \`accent\` is a SURFACE token (the hover/highlight fill of a list
+     row), not the brand accent. DESIGN.md §16 rule 10: a highlighted list item
+     is the PRIMARY family (--color-primary-dark, white text, 11.75:1), never
+     brand orange. Orange stays on \`--color-accent\` (CTAs) and \`--ring\`. */
+  --accent: oklch(0.363 0.184 289.648); /* #431695 primary-dark */
+  --accent-foreground: oklch(0.985 0 0); /* white, 11.25:1 on primary-dark */
 
   --destructive: oklch(0.505 0.19 27.518); /* #b91c1c, not #ef4444 (DESIGN.md §9.1) */
 

@@ -95,7 +95,7 @@
         <button
           type="button"
           :data-testid="`${testIdPrefix}-retry`"
-          class="self-start rounded-md border border-border px-3 py-1 text-sm hover:bg-accent"
+          class="self-start rounded-md border border-border px-3 py-1 text-sm hover:bg-accent-dark hover:text-white"
           @click="load"
         >
           {{ t('avatar_templates.form.catalogue.retry') }}
@@ -138,8 +138,8 @@
             :data-testid="`${testIdPrefix}-item-${candidate.id}`"
             :class="
               cn(
-                'flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent',
-                candidate.id === modelValue && 'bg-accent'
+                'flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent-dark hover:text-white hover:**:text-white',
+                candidate.id === modelValue && 'bg-primary/10'
               )
             "
             @click="onSelect(candidate.id)"
@@ -198,7 +198,7 @@
                 ? t('avatar_templates.form.catalogue.preview.pause')
                 : t('avatar_templates.form.catalogue.preview.play')
             "
-            class="ml-2 rounded p-1 text-muted-foreground hover:bg-accent"
+            class="ml-2 rounded p-1 text-muted-foreground hover:bg-primary/10"
             @click="togglePreview(candidate)"
           >
             <PauseIcon v-if="playingId === candidate.id" class="size-4" />

@@ -951,7 +951,8 @@
       "delete": "Elimina",
       "save": "Salva",
       "cancel": "Annulla",
-      "deactivate": "Disattiva"
+      "deactivate": "Disattiva",
+      "copy": "Copia in altre organizzazioni"
     },
     "confirm": {
       "activateTitle": "Attivare questo template?",
@@ -1168,7 +1169,38 @@
     "llmForecastUnavailable": "A questo template non è associato alcun modello di conversazione, quindi il suo costo LLM non può essere stimato.",
     "serverError": {
       "template_in_use": "Questo template non può essere eliminato finché dei progetti lo usano.",
-      "template_active": "Il template attivo non può essere eliminato. Attivane prima un altro."
+      "template_active": "Il template attivo non può essere eliminato. Attivane prima un altro.",
+      "source_organization_included": "Il template appartiene già a una delle organizzazioni selezionate. Deselezionala e riprova.",
+      "source_config_invalid": "La configurazione di questo template non è più valida, quindi non può essere copiato. Correggi prima il template.",
+      "target_organizations_invalid": "Le organizzazioni selezionate non sono valide. Ricarica l'elenco e scegli di nuovo.",
+      "validation_failed": "La richiesta non è valida. Controlla il nome e la selezione.",
+      "forbidden": "Solo gli amministratori della piattaforma possono copiare i template in altre organizzazioni.",
+      "template_not_found": "Questo template non esiste più. Ricarica la pagina.",
+      "duplicate_failed": "Non è stato possibile copiare il template. Non è stato creato nulla; riprova."
+    },
+    "copy": {
+      "title": "Copia \"{name}\" in altre organizzazioni",
+      "description": "Crea una copia indipendente in ogni organizzazione selezionata. Le copie vengono create inattive.",
+      "searchLabel": "Cerca organizzazioni",
+      "searchPlaceholder": "Cerca per nome",
+      "listLabel": "Organizzazioni",
+      "selectAll": "Seleziona tutte le organizzazioni",
+      "selectAllFiltered": "Seleziona tutte le organizzazioni trovate",
+      "selectedCount": "1 selezionata | {count} selezionate",
+      "loading": "Caricamento delle organizzazioni…",
+      "loadError": "Non è stato possibile caricare le organizzazioni. Chiudi questa finestra e riprova.",
+      "noOrganizations": "Non ci sono altre organizzazioni in cui copiare.",
+      "noMatches": "Nessuna organizzazione corrisponde alla ricerca.",
+      "nameLabel": "Nome delle copie (facoltativo)",
+      "nameHint": "Lascia vuoto per mantenere \"{name}\". Se un'organizzazione ha già quel nome, viene aggiunto \"(copy)\".",
+      "submit": "Copia in 1 organizzazione | Copia in {count} organizzazioni",
+      "submitting": "Copia in corso…",
+      "submitNone": "Seleziona almeno un'organizzazione in cui copiare.",
+      "cancel": "Annulla",
+      "close": "Chiudi",
+      "resultTitle": "1 copia creata | {count} copie create",
+      "resultInactive": "Le copie sono inattive. Attivale una per una nella rispettiva organizzazione prima di usarle.",
+      "resultItem": "{organization} — \"{name}\""
     }
   },
   "help": {

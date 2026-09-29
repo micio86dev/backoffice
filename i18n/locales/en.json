@@ -951,7 +951,8 @@
       "delete": "Delete",
       "save": "Save",
       "cancel": "Cancel",
-      "deactivate": "Deactivate"
+      "deactivate": "Deactivate",
+      "copy": "Copy to organizations"
     },
     "confirm": {
       "activateTitle": "Activate this template?",
@@ -1168,7 +1169,38 @@
     "llmForecastUnavailable": "No conversation model is bound to this template, so its LLM cost cannot be forecast.",
     "serverError": {
       "template_in_use": "This template cannot be deleted while projects still use it.",
-      "template_active": "The active template cannot be deleted. Activate another one first."
+      "template_active": "The active template cannot be deleted. Activate another one first.",
+      "source_organization_included": "The template already belongs to one of the selected organizations. Deselect it and try again.",
+      "source_config_invalid": "This template's configuration is no longer valid, so it cannot be copied. Fix the template first.",
+      "target_organizations_invalid": "The selected organizations are not valid. Reload the list and choose again.",
+      "validation_failed": "The request was not valid. Check the name and the selection.",
+      "forbidden": "Only platform administrators can copy templates to other organizations.",
+      "template_not_found": "This template no longer exists. Reload the page.",
+      "duplicate_failed": "The template could not be copied. Nothing was created; please try again."
+    },
+    "copy": {
+      "title": "Copy \"{name}\" to other organizations",
+      "description": "Creates an independent copy in each organization you select. Copies are created inactive.",
+      "searchLabel": "Search organizations",
+      "searchPlaceholder": "Search by name",
+      "listLabel": "Organizations",
+      "selectAll": "Select all organizations",
+      "selectAllFiltered": "Select all matching organizations",
+      "selectedCount": "{count} selected | {count} selected",
+      "loading": "Loading organizations…",
+      "loadError": "The organizations could not be loaded. Close this dialog and try again.",
+      "noOrganizations": "There are no other organizations to copy to.",
+      "noMatches": "No organization matches your search.",
+      "nameLabel": "Name for the copies (optional)",
+      "nameHint": "Leave empty to keep \"{name}\". Where an organization already has that name, \"(copy)\" is added.",
+      "submit": "Copy to 1 organization | Copy to {count} organizations",
+      "submitting": "Copying…",
+      "submitNone": "Select at least one organization to copy to.",
+      "cancel": "Cancel",
+      "close": "Close",
+      "resultTitle": "1 copy created | {count} copies created",
+      "resultInactive": "Copies are inactive. Activate each one inside its organization before it is used.",
+      "resultItem": "{organization} — \"{name}\""
     }
   },
   "help": {

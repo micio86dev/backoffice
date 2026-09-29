@@ -162,4 +162,19 @@ describe('CheckboxField', () => {
     expect(wrapper.find('b').text()).toBe('Rich')
     expect(wrapper.find('i').text()).toBe('Desc')
   })
+
+  it('shows a mixed state when indeterminate, and a click selects it', async () => {
+    const wrapper = mountField({ indeterminate: true, modelValue: false })
+
+    expect(box(wrapper).attributes('aria-checked')).toBe('mixed')
+    expect(box(wrapper).attributes('data-state')).toBe('indeterminate')
+
+    await box(wrapper).trigger('click')
+
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([true])
+  })
+
+  it('is not mixed by default', () => {
+    expect(box(mountField()).attributes('aria-checked')).toBe('false')
+  })
 })

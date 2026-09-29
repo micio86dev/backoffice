@@ -190,3 +190,13 @@ export type TemplateOption =
 
 export type TemplateOptionsResponse =
   paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']
+
+/**
+ * Copy-to-organizations, derived from the generated client (no hand-written
+ * API shapes): the request body and the 201 envelope of
+ * `POST /avatar-templates/{id}/duplicate`.
+ */
+export type DuplicateTemplateResponse =
+  paths['/avatar-templates/{id}/duplicate']['post']['responses']['201']['content']['application/json']
+
+export type DuplicatedTemplate = DuplicateTemplateResponse['data'][number]

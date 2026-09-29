@@ -17,14 +17,18 @@
       <Checkbox
         :id="id"
         v-bind="boxAttrs"
-        :model-value="model"
+        :model-value="indeterminate ? 'indeterminate' : model"
         :disabled="disabled"
         :aria-labelledby="labelId"
         :aria-describedby="describedBy"
         :aria-invalid="isInvalid ? 'true' : undefined"
         :required="required"
         @update:model-value="(checked) => (model = checked === true)"
-      />
+      >
+        <!-- Mixed state (select-all over a partial selection): a dash, not a tick. -->
+        <MinusIcon v-if="indeterminate" />
+        <CheckIcon v-else />
+      </Checkbox>
     </span>
 
     <div data-slot="checkbox-field-content" class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -68,6 +72,7 @@
  * `Checkbox`; extra attrs (`data-testid`, …) land on the box itself.
  */
 import { computed, useAttrs, useSlots } from 'vue'
+import { CheckIcon, MinusIcon } from '@lucide/vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldDescription, FieldError } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
@@ -84,6 +89,11 @@ const props = withDefaults(
     invalid?: boolean
     required?: boolean
     disabled?: boolean
+    /**
+     * Mixed state: some, not all, of a group is selected (a "select all" over a
+     * partial selection). Shown as `aria-checked="mixed"`; clicking selects.
+     */
+    indeterminate?: boolean
     /** Accessible title of the required marker. */
     requiredTitle?: string
     /** Extra ids appended to aria-describedby. */
@@ -100,6 +110,7 @@ const props = withDefaults(
     invalid: false,
     required: false,
     disabled: false,
+    indeterminate: false,
     requiredTitle: undefined,
     describedby: undefined,
     descriptionId: undefined,

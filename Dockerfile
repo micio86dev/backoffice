@@ -156,6 +156,10 @@ RUN if [ -n "$NUXT_PUBLIC_SENTRY_DSN" ]; then \
     fi
 
 # ─── Stage 2: Runtime ────────────────────────────────────────────────────────
+# CSP hashes of every executable inline <script> in what nginx will serve.
+# Fails the build if none are found: an empty list is the blank-page bug.
+RUN bun scripts/csp-script-hashes.mjs .output/public docs-site | tr '\n' ' ' > /app/csp-script-hashes.txt
+
 FROM nginx:1.27.5-alpine AS runtime
 
 # Where /api/* is forwarded. The browser never sees this host.
@@ -185,6 +189,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /app/.output/public /usr/share/nginx/html
 COPY --from=builder /app/docs-site /usr/share/nginx/html/developers
+COPY --from=builder /app/csp-script-hashes.txt /tmp/csp-script-hashes.txt
 
 # SPA routing: serve index.html for all unknown paths (client-side router)
 # Security headers applied at nginx level (D29 / task 7.8).
@@ -221,7 +226,15 @@ RUN printf 'server {\n\
     # '"'"'unsafe-inline'"'"': this is a static per-request-nonce-less header, and Vue'"'"'s\n\
     # `:style` bindings plus Tailwind'"'"'s arbitrary-value classes both compile to\n\
     # inline style attributes CSP has no other way to allow here.\n\
-    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https://www.google-analytics.com; font-src '"'"'self'"'"'; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
+    #\n\
+    # script-src carries sha256 hashes of the inline scripts (the SPA shell\n\
+    # window.__NUXT__ config, the docs bootstrap). Without them the browser\n\
+    # blocks the shell script and the app renders a blank page. They embed\n\
+    # build-time config, so they are computed in the builder stage\n\
+    # (scripts/csp-script-hashes.mjs) and substituted for the placeholder\n\
+    # below, never hardcoded. font-src allows data: because Vite inlines the\n\
+    # small woff/woff2 files into the CSS as data URIs.\n\
+    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com __CSP_SCRIPT_HASHES__; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: https://www.google-analytics.com; font-src '"'"'self'"'"' data:; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
 \n\
     # Serve the health page as a static file\n\
     location /health {\n\
@@ -317,6 +330,13 @@ RUN printf 'server {\n\
         add_header Cache-Control "public, immutable";\n\
     }\n\
 }\n' > /etc/nginx/conf.d/default.conf
+
+# Substitute the build-time inline-script hashes into the CSP; fail rather than
+# ship a header that still holds the placeholder (the blank-page bug).
+RUN test -s /tmp/csp-script-hashes.txt \
+  && sed -i "s|__CSP_SCRIPT_HASHES__|$(sed 's/ *$//' /tmp/csp-script-hashes.txt)|" /etc/nginx/conf.d/default.conf \
+  && ! grep -q __CSP_SCRIPT_HASHES__ /etc/nginx/conf.d/default.conf \
+  && rm /tmp/csp-script-hashes.txt
 
 # Non-root: nginx worker runs as existing nginx user (uid 101 on alpine)
 # We adjust permissions so the nginx user can write to required dirs

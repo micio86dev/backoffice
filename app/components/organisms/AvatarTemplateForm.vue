@@ -233,6 +233,16 @@
                 @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
                 @blur="validateConfigField(field)"
               />
+              <!--
+          Listen to the voice this field holds (DESIGN.md §16.14). Rendered for
+          every voice field, disabled WITH a reason when no sample can exist,
+          so a voice is never something you can only pick blind.
+        -->
+              <VoicePreviewButton
+                v-if="voicePreviewFor(field) !== null"
+                v-bind="voicePreviewFor(field)!"
+                :test-id="`template-config-${field.key}-preview`"
+              />
               <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
                 {{ $t(field.hint_key) }}
               </FieldDescription>
@@ -343,6 +353,7 @@ import { getErrorFields } from '@/utils/http-error'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
+import VoicePreviewButton from '@/components/molecules/VoicePreviewButton.vue'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
@@ -607,6 +618,36 @@ function catalogueFor(field: FieldSpec): { field: FieldSpec; provider: Catalogue
   }
 
   return null
+}
+
+/**
+ * Which voice fields carry a listen control, and for which sample.
+ *
+ * Every voice-typed knob has one: a catalogue `voice` field (HeyGen `voiceId`)
+ * and Tavus's `ttsExternalVoiceId`, which is sampled through the vendor named
+ * by the CURRENT `ttsEngine` value. The control is not hidden for a Tavus stock
+ * voice — it renders disabled with its reason, because a missing control reads
+ * as a missing feature.
+ *
+ * Whole form is superadmin-only (the page gates create/edit on the same
+ * `avatarTemplates.*` abilities the preview endpoint's policy uses), so no
+ * further role check is repeated here.
+ */
+function voicePreviewFor(
+  field: FieldSpec
+): { provider: 'heygen' | 'tavus'; voiceId: string; ttsEngine?: string | null } | null {
+  if (field.catalogue_resource !== 'voice' && field.key !== 'ttsExternalVoiceId') return null
+
+  const provider = draft.value.provider
+  const voiceId = stringValue(field.key)
+
+  if (provider === 'tavus') {
+    const engine = draft.value.config.ttsEngine
+
+    return { provider, voiceId, ttsEngine: typeof engine === 'string' ? engine : null }
+  }
+
+  return { provider, voiceId }
 }
 
 const REFERENCE_ERROR_CODE: Record<string, string> = {

@@ -124,10 +124,11 @@ const errorCode = computed(() => errorFor(key.value))
 
 /** Why no sample can exist, or `null` when one can. */
 const unavailableReason = computed<'noVoice' | 'stockUnavailable' | null>(() => {
-  if (props.voiceId.trim() === '') return 'noVoice'
   // Tavus's own stock voices (and Azure) expose no preview anywhere; only a
-  // voice routed through Cartesia or ElevenLabs can be sampled.
+  // voice routed through Cartesia or ElevenLabs can be sampled. Checked BEFORE
+  // "no voice yet": choosing a voice would not help, choosing an engine does.
   if (props.provider === 'tavus' && !routableEngine(props.ttsEngine)) return 'stockUnavailable'
+  if (props.voiceId.trim() === '') return 'noVoice'
 
   return null
 })

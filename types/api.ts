@@ -2887,6 +2887,11 @@ export interface components {
                     usd: number;
                 } | null;
             };
+            pal_sync: {
+                status: string | null;
+                code: string | null;
+                synced_at: string | null;
+            };
         };
         /**
          * AvatarVoicePreviewRequest

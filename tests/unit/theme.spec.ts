@@ -33,7 +33,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest'
 import { compile } from '@tailwindcss/node'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Window } from 'happy-dom'
 import { mount } from '@vue/test-utils'
@@ -497,5 +497,57 @@ describe('every highlighted row uses ONE highlight', () => {
     // activation in JS, so dropping it costs no protection.
     expect(source).toMatch(/data-\[?disabled\]?:cursor-not-allowed/)
     expect(source).not.toMatch(/data-\[?disabled\]?:pointer-events-none/)
+  })
+})
+
+/**
+ * LIST-ITEM HIGHLIGHT IS THE PRIMARY FAMILY, NEVER BRAND ORANGE.
+ *
+ * `bg-accent` compiles from `--color-accent` (#e45526, a literal in `@theme`;
+ * the shadcn `--accent` variable is NOT what it reads — the bridge omits that
+ * key on purpose). shadcn's `ComboboxItem` and the hand-rolled catalogue list
+ * both painted it, so a combobox row lit up orange while the select beside it
+ * lit up purple. This guard covers ALL of `app/`, not a file list, so the next
+ * vendored component or hand-rolled list cannot reintroduce it.
+ */
+describe('no UI surface paints plain brand-orange --color-accent', () => {
+  const appRoot = resolve(__dirname, '../../app')
+  const files = (readdirSync(appRoot, { recursive: true }) as string[])
+    .filter((f) => /\.(?:vue|ts)$/.test(f))
+    .map((f) => ({ file: f, source: readFileSync(resolve(appRoot, f), 'utf-8') }))
+
+  // A class token ending in bg/text/border/ring/... `-accent` exactly (any
+  // variant prefix): NOT `-accent-dark`, `-accent-light`, `-accent-foreground`.
+  const bareAccentToken =
+    /(?:^|:)(?:bg|text|border|ring|outline|fill|stroke|from|via|to|decoration|divide|shadow)-accent$/
+  const hasBareAccent = (source: string) =>
+    source.split(/[\s'"`]+/).some((token) => bareAccentToken.test(token))
+
+  it('scans a non-trivial number of files', () => {
+    expect(files.length).toBeGreaterThan(50)
+  })
+
+  it('no file uses a bare *-accent utility (orange) — use accent-dark + white, or a primary tint', () => {
+    const offenders = files.filter((f) => hasBareAccent(f.source)).map((f) => f.file)
+
+    expect(offenders).toEqual([])
+  })
+
+  it('no file uses text-accent-foreground (near-black, unreadable on the accent-dark highlight)', () => {
+    const offenders = files
+      .filter((f) => /text-accent-foreground/.test(f.source))
+      .map((f) => f.file)
+
+    expect(offenders).toEqual([])
+  })
+
+  it('ComboboxItem highlights with accent-dark + white, matching SelectItem', () => {
+    const source = readFileSync(
+      resolve(appRoot, 'components/ui/combobox/ComboboxItem.vue'),
+      'utf-8'
+    )
+
+    expect(source).toContain('data-highlighted:bg-accent-dark')
+    expect(source).toContain('data-highlighted:text-white')
   })
 })

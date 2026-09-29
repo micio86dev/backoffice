@@ -180,9 +180,9 @@
  * not eyeballed; the converter was verified against DESIGN.md §9.1's own
  * pre-published contrast ratios (white-on-primary 8.2:1, white-on-accent 3.7:1,
  * white-on-accent-dark 5.4:1, white-on-primary-light 4.7:1 all reproduced within
- * 0.1). `--accent-foreground` uses `--color-neutral-900` rather than white: per
- * DESIGN.md §9.1, white on `--color-accent` is 3.7:1 and FAILS the 4.5:1 AA
- * threshold for normal text; neutral-900 on accent is 4.78:1 and passes.
+ * 0.1). `--accent` / `--accent-foreground` are the shadcn hover SURFACE pair and
+ * follow the primary family (primary-dark + white); the brand orange lives on
+ * `--color-accent` only (white on it is 3.7:1 and fails AA for normal text).
  */
 :root {
   --radius: 0.5rem;
@@ -205,8 +205,12 @@
   --muted: oklch(0.968 0.007 247.896); /* --color-neutral-100 */
   --muted-foreground: oklch(0.446 0.037 257.281); /* --color-neutral-600 */
 
-  --accent: oklch(0.634 0.187 37.49); /* #e45526 */
-  --accent-foreground: oklch(0.208 0.04 265.755); /* --color-neutral-900, AA-safe on accent */
+  /* shadcn's `accent` is a SURFACE token (the hover/highlight fill of a list
+     row), not the brand accent. DESIGN.md §16 rule 10: a highlighted list item
+     is the PRIMARY family (--color-primary-dark, white text, 11.75:1), never
+     brand orange. Orange stays on `--color-accent` (CTAs) and `--ring`. */
+  --accent: oklch(0.363 0.184 289.648); /* #431695 primary-dark */
+  --accent-foreground: oklch(0.985 0 0); /* white, 11.25:1 on primary-dark */
 
   --destructive: oklch(0.505 0.19 27.518); /* #b91c1c, not #ef4444 (DESIGN.md §9.1) */
 

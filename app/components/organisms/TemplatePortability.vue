@@ -10,7 +10,14 @@
         {{ $t('avatar_templates.portability.export') }}
       </Button>
 
-      <Button variant="outline" size="sm" data-testid="template-import" @click="picker?.click()">
+      <Button
+        variant="outline"
+        size="sm"
+        data-testid="template-import"
+        :disabled="importBlocked"
+        :aria-describedby="importBlocked ? ACTING_CLIENT_NOTICE_ID : undefined"
+        @click="picker?.click()"
+      >
         {{ $t('avatar_templates.portability.import') }}
       </Button>
 
@@ -71,12 +78,19 @@ import { computed, ref } from 'vue'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
+import { ACTING_CLIENT_NOTICE_ID } from '@/composables/useActingClientRequired'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
+import { serverMessageCode } from '@/utils/http-error'
+import { translateServerCode } from '@/utils/server-message'
 
-defineProps<{ isAdmin: boolean }>()
+defineProps<{
+  isAdmin: boolean
+  /** A superadmin with no acting client: the import would be refused 409. */
+  importBlocked?: boolean
+}>()
 const emit = defineEmits<{ (e: 'imported'): void }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { exportTemplates, importTemplates } = useAvatarTemplates()
 
 const picker = ref<HTMLInputElement | null>(null)
@@ -100,7 +114,10 @@ const importDescription = computed(() => {
   const { names } = pendingImport.value
   const shown = names.slice(0, PREVIEW_CUTOFF)
   const remaining = names.length - shown.length
-  const list = remaining > 0 ? `${shown.join(', ')}, +${remaining} more` : shown.join(', ')
+  const list =
+    remaining > 0
+      ? `${shown.join(', ')}, ${t('avatar_templates.confirm.importMore', { count: remaining })}`
+      : shown.join(', ')
 
   return t('avatar_templates.confirm.importDescription', { count: names.length, names: list })
 })
@@ -179,11 +196,14 @@ async function onImportConfirmed(): Promise<void> {
   } catch (error) {
     // The server's own reason is shown rather than a generic failure: "unknown
     // key voiceSpeedd" is actionable, "import failed" is not.
-    const reason = (error as { data?: { errors?: Record<string, string[]> } })?.data?.errors
-      ? Object.values((error as { data: { errors: Record<string, string[]> } }).data.errors)
-          .flat()
-          .join(' ')
-      : String((error as Error)?.message ?? '')
+    const code = serverMessageCode(error)
+    const reason = code
+      ? translateServerCode({ t, te }, 'avatar_templates.serverError', code)
+      : (error as { data?: { errors?: Record<string, string[]> } })?.data?.errors
+        ? Object.values((error as { data: { errors: Record<string, string[]> } }).data.errors)
+            .flat()
+            .join(' ')
+        : String((error as Error)?.message ?? '')
 
     message.value = {
       kind: 'error',

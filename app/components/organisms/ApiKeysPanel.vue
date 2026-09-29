@@ -124,35 +124,25 @@
               >
                 <li v-for="ability in abilities" :key="ability.value">
                   <div
-                    class="flex items-center gap-3 px-3 py-2.5 transition-colors has-data-checked:bg-primary/5 hover:bg-muted"
+                    class="px-3 py-2.5 transition-colors has-data-checked:bg-primary/5 hover:bg-muted"
                   >
                     <!--
-                      Deliberately `FieldTitle`, not `Label`: a <label for>
-                      cannot name a reka-ui checkbox, because the primitive
-                      renders a <button role="checkbox"> and a <button> is not
-                      a labelable element — neither the accessible name nor
-                      the click would ever reach it. The name is wired through
-                      `aria-labelledby`, and the click is forwarded explicitly.
+                      `CheckboxField` names the reka-ui checkbox through
+                      `aria-labelledby` (a <label for> cannot name its
+                      <button role="checkbox">) and forwards the label click.
                     -->
-                    <Checkbox
+                    <CheckboxField
                       :id="`api-key-ability-${ability.id}`"
-                      :aria-labelledby="`api-key-ability-${ability.id}-label`"
                       :model-value="selectedAbilities.includes(ability.value)"
                       :data-testid="`api-key-ability-${ability.id}`"
+                      label-class="flex items-baseline justify-between gap-3"
                       @update:model-value="(checked) => toggleAbility(ability.value, checked)"
-                    />
-                    <FieldTitle
-                      :id="`api-key-ability-${ability.id}-label`"
-                      class="flex flex-1 cursor-pointer items-baseline justify-between gap-3"
-                      @click="
-                        toggleAbility(ability.value, !selectedAbilities.includes(ability.value))
-                      "
                     >
                       <span class="text-foreground">{{ ability.label }}</span>
                       <code class="font-mono text-xs font-normal text-muted-foreground">{{
                         ability.value
                       }}</code>
-                    </FieldTitle>
+                    </CheckboxField>
                   </div>
                 </li>
               </ul>
@@ -257,10 +247,9 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
-  FieldTitle,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'

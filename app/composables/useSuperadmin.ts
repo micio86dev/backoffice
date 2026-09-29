@@ -7,7 +7,7 @@
  * have to be honoured correctly by every endpoint, and one mistake is a
  * cross-tenant leak.
  */
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import type { components, paths } from '../../types/api'
 import { useApi } from './useApi'
 import { useAuth } from './useAuth'
@@ -63,6 +63,16 @@ export type UpdateClientPayload = components['schemas']['UpdateManagedOrganizati
 // that reload exists to prevent.
 let clientsInFlight: Promise<ClientsResponse> | null = null
 
+/**
+ * Bumped after every successful client write (create / rename / recolour /
+ * deactivate). A shell that renders the client list (the navbar switcher)
+ * watches it and re-fetches, so a client created on `/clients` shows up without
+ * a full reload. A shared counter rather than a shared list: the list is
+ * deliberately not cached here (see above), so all that has to be broadcast is
+ * "your copy is stale". No polling.
+ */
+export const clientsRevision = ref(0)
+
 // Same discipline `useCurrentUser` applies to its cache: a logout must not
 // leave one tenant's request resolving into the next session.
 watch(useAuth().accessToken, (token) => {
@@ -116,10 +126,12 @@ export function useSuperadmin() {
 
   /** Create an organization. Superadmin only; answers 201 with the new record. */
   async function createClient(payload: CreateClientPayload): Promise<ManagedClientResponse> {
-    return apiFetch<ManagedClientResponse>('/admin/organizations', {
+    const created = await apiFetch<ManagedClientResponse>('/admin/organizations', {
       method: 'POST',
       body: payload,
     })
+    clientsRevision.value += 1
+    return created
   }
 
   async function fetchClient(id: number): Promise<ManagedClientResponse> {
@@ -130,10 +142,12 @@ export function useSuperadmin() {
     id: number,
     payload: UpdateClientPayload
   ): Promise<ManagedClientResponse> {
-    return apiFetch<ManagedClientResponse>(`/admin/organizations/${id}`, {
+    const updated = await apiFetch<ManagedClientResponse>(`/admin/organizations/${id}`, {
       method: 'PATCH',
       body: payload,
     })
+    clientsRevision.value += 1
+    return updated
   }
 
   return {

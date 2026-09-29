@@ -34,6 +34,18 @@ export interface Viewer {
 }
 
 /**
+ * True when this viewer operates the whole estate and has picked no client.
+ *
+ * The single definition of that state: it hides the client-scoped nav pages,
+ * and it is also why a tenant-scoped write (avatar-template create/import,
+ * project questions) cannot complete — the API answers it 409
+ * `organization_context_required`. Both consumers read it from here.
+ */
+export function needsActingClient(viewer: Viewer): boolean {
+  return viewer.canSwitchClients && viewer.actingClientId === null
+}
+
+/**
  * A superadmin with NO client selected sees only platform pages.
  *
  * Not a permission rule — a superadmin passes every gate. It is that the
@@ -50,7 +62,7 @@ export function visibleNavItemsFor<T extends ScopedNavItem>(
   items: readonly T[],
   viewer: Viewer
 ): T[] {
-  if (!viewer.canSwitchClients || viewer.actingClientId !== null) {
+  if (!needsActingClient(viewer)) {
     return [...items]
   }
 

@@ -14,6 +14,7 @@
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
       :aria-controls="panelId"
+      :aria-busy="state === 'loading' ? 'true' : undefined"
       :class="cn(formSelectClass, 'flex items-center justify-between gap-2 text-left')"
       @click="toggle"
     >
@@ -22,8 +23,24 @@
         <span v-else-if="modelValue !== ''" class="truncate font-mono text-xs">
           {{ modelValue }}
         </span>
-        <span v-else class="truncate text-muted-foreground">
+        <span v-else-if="state !== 'loading'" class="truncate text-muted-foreground">
           {{ t('avatar_templates.form.catalogue.choose') }}
+        </span>
+        <!--
+          The catalogue can load while the panel is closed, and the panel is
+          the only other place that says so. Shown on the trigger so a slow
+          provider never reads as a control that is simply empty. It carries
+          `role="status"` only while the panel is CLOSED: an open panel renders
+          its own status line, and two live regions would announce it twice.
+        -->
+        <span
+          v-if="state === 'loading'"
+          :data-testid="`${testIdPrefix}-trigger-loading`"
+          :role="isOpen ? undefined : 'status'"
+          class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+          {{ t('avatar_templates.form.catalogue.loading') }}
         </span>
         <span
           v-if="selected === null && modelValue !== '' && loaded"
@@ -59,20 +76,13 @@
         :class="formControlClass"
       />
 
-      <label
+      <CheckboxField
         v-if="resource === 'voice'"
-        class="flex items-center gap-2 text-sm"
-        :for="`${testIdPrefix}-italian-only`"
-      >
-        <input
-          :id="`${testIdPrefix}-italian-only`"
-          v-model="italianOnly"
-          type="checkbox"
-          :data-testid="`${testIdPrefix}-italian-only`"
-          class="size-4 accent-primary"
-        />
-        {{ t('avatar_templates.form.catalogue.italianOnly') }}
-      </label>
+        :id="`${testIdPrefix}-italian-only`"
+        v-model="italianOnly"
+        :data-testid="`${testIdPrefix}-italian-only`"
+        :label="t('avatar_templates.form.catalogue.italianOnly')"
+      />
 
       <p
         v-if="state === 'loading'"
@@ -95,7 +105,7 @@
         <button
           type="button"
           :data-testid="`${testIdPrefix}-retry`"
-          class="self-start rounded-md border border-border px-3 py-1 text-sm hover:bg-accent"
+          class="self-start rounded-md border border-border px-3 py-1 text-sm hover:bg-accent-dark hover:text-white"
           @click="load"
         >
           {{ t('avatar_templates.form.catalogue.retry') }}
@@ -138,8 +148,8 @@
             :data-testid="`${testIdPrefix}-item-${candidate.id}`"
             :class="
               cn(
-                'flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent',
-                candidate.id === modelValue && 'bg-accent'
+                'flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent-dark hover:text-white hover:**:text-white',
+                candidate.id === modelValue && 'bg-primary/10'
               )
             "
             @click="onSelect(candidate.id)"
@@ -198,7 +208,7 @@
                 ? t('avatar_templates.form.catalogue.preview.pause')
                 : t('avatar_templates.form.catalogue.preview.play')
             "
-            class="ml-2 rounded p-1 text-muted-foreground hover:bg-accent"
+            class="ml-2 rounded p-1 text-muted-foreground hover:bg-primary/10"
             @click="togglePreview(candidate)"
           >
             <PauseIcon v-if="playingId === candidate.id" class="size-4" />
@@ -261,7 +271,8 @@
  * trip, without ever blocking a save just because the provider is down.
  */
 import { computed, onMounted, reactive, ref, useAttrs, watch } from 'vue'
-import { CheckIcon, ChevronDownIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'

@@ -11,6 +11,9 @@
       "it": "Italian"
     }
   },
+  "serverError": {
+    "organization_context_required": "Select a client first: this action needs an active client."
+  },
   "login": {
     "title": "Sign in",
     "subtitle": "Sign in to the BEAI admin panel",
@@ -957,6 +960,7 @@
       "deleteTitle": "Delete this template?",
       "deleteDescription": "This cannot be undone.",
       "importTitle": "Import {count} templates?",
+      "importMore": "+{count} more",
       "importDescription": "This adds {count} templates to your organization's catalogue: {names}. Existing templates are never overwritten."
     },
     "form": {
@@ -1420,7 +1424,11 @@
   "superadmin": {
     "switchClient": "Viewing client",
     "allClients": "All clients",
-    "switchError": "Could not switch client."
+    "switchError": "Could not switch client.",
+    "actingClientRequired": {
+      "title": "Select a client first",
+      "body": "Choose a client in the navbar switcher to enable this action."
+    }
   },
   "clients": {
     "title": "Clients",

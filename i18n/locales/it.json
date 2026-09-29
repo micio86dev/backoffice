@@ -11,6 +11,9 @@
       "it": "Italiano"
     }
   },
+  "serverError": {
+    "organization_context_required": "Seleziona prima un cliente: questa azione richiede un cliente attivo."
+  },
   "login": {
     "title": "Accedi",
     "subtitle": "Accedi al pannello amministrativo BEAI",
@@ -957,6 +960,7 @@
       "deleteTitle": "Eliminare questo template?",
       "deleteDescription": "Questa azione non può essere annullata.",
       "importTitle": "Importare {count} template?",
+      "importMore": "+{count} altri",
       "importDescription": "Verranno aggiunti {count} template al catalogo della tua organizzazione: {names}. I template esistenti non vengono mai sovrascritti."
     },
     "form": {
@@ -1420,7 +1424,11 @@
   "superadmin": {
     "switchClient": "Cliente visualizzato",
     "allClients": "Tutti i clienti",
-    "switchError": "Non è stato possibile cambiare cliente."
+    "switchError": "Non è stato possibile cambiare cliente.",
+    "actingClientRequired": {
+      "title": "Seleziona prima un cliente",
+      "body": "Scegli un cliente dal selettore nella barra superiore per abilitare questa azione."
+    }
   },
   "clients": {
     "title": "Clienti",

@@ -152,13 +152,15 @@
           type="button"
           variant="outline"
           size="sm"
-          :disabled="group.unsaved || atCap(group)"
+          :disabled="addBlocked || group.unsaved || atCap(group)"
           :aria-describedby="
-            group.unsaved
-              ? `question-unsaved-${group.competencyId}`
-              : atCap(group)
-                ? `question-cap-${group.competencyId}`
-                : undefined
+            addBlocked
+              ? ACTING_CLIENT_NOTICE_ID
+              : group.unsaved
+                ? `question-unsaved-${group.competencyId}`
+                : atCap(group)
+                  ? `question-cap-${group.competencyId}`
+                  : undefined
           "
           :data-testid="`question-add-${group.competencyId}`"
           @click="startNew(group.competencyId)"
@@ -247,12 +249,13 @@
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import QuestionList from '@/components/organisms/QuestionList.vue'
+import { ACTING_CLIENT_NOTICE_ID } from '@/composables/useActingClientRequired'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
-import { applyServerFieldErrors, getErrorFields } from '@/utils/http-error'
-import { translateServerCodeOrFallback } from '@/utils/server-message'
+import { applyServerFieldErrors, getErrorFields, serverMessageCode } from '@/utils/http-error'
+import { translateServerCode, translateServerCodeOrFallback } from '@/utils/server-message'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import type { FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import type {
@@ -287,8 +290,14 @@ const props = withDefaults(
     submitError: unknown | null
     /** No add, edit, reorder or remove control — see `QuestionList`'s own prop. */
     readonly?: boolean
+    /**
+     * A superadmin with no acting client: every Add would be refused 409
+     * `organization_context_required`. The container renders the notice this
+     * points its `aria-describedby` at.
+     */
+    addBlocked?: boolean
   }>(),
-  { unsavedCompetencyIds: () => [] }
+  { unsavedCompetencyIds: () => [], addBlocked: false }
 )
 
 const emit = defineEmits<{
@@ -360,6 +369,20 @@ watch(
     // permission refusal, a vanished question and "not ready yet" render as
     // themselves instead of all collapsing into one "could not save".
     if (getErrorFields(submitError) === null) {
+      // A refusal that carries its own machine code says what happened; the
+      // HTTP-state mapping below would render this 409 as "not ready yet, try
+      // again shortly", which is wrong for a state only the operator can fix.
+      const code = serverMessageCode(submitError)
+
+      if (code === 'organization_context_required') {
+        emit('unmapped-error', {
+          kind: 'error',
+          text: translateServerCode({ t, te }, 'projectQuestions.serverError', code),
+        })
+
+        return
+      }
+
       const state = resolveResourceErrorState(submitError)
 
       emit('unmapped-error', {

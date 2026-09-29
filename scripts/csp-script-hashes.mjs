@@ -12,7 +12,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const INLINE_SCRIPT =
-  /<script(?![^>]*\bsrc\s*=)(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g
+  /<script(?![^>]*\ssrc\s*=)(?![^>]*type="application\/json")[^>]*>([\s\S]*?)<\/script>/g
 
 function* htmlFiles(dir) {
   for (const name of readdirSync(dir)) {

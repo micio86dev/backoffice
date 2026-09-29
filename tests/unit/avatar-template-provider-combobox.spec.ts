@@ -236,7 +236,7 @@ describe('the Italian-only toggle', () => {
     await flushPromises()
     await open(wrapper)
 
-    await wrapper.get(sel(`${P}-italian-only`)).setValue(true)
+    await wrapper.get(sel(`${P}-italian-only`)).trigger('click')
 
     expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(true)
     expect(wrapper.find(sel(`${P}-item-v-en`)).exists()).toBe(false)

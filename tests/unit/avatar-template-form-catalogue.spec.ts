@@ -250,7 +250,7 @@ describe.each<Context>(['create', 'edit'])('the template form in %s context', (c
 
       expect(wrapper.find(sel(`${cfg('voiceId')}-italian-badge-hv-it`)).exists()).toBe(true)
 
-      await wrapper.get(sel(`${cfg('voiceId')}-italian-only`)).setValue(true)
+      await wrapper.get(sel(`${cfg('voiceId')}-italian-only`)).trigger('click')
 
       expect(wrapper.find(sel(`${cfg('voiceId')}-item-hv-it`)).exists()).toBe(true)
       expect(wrapper.find(sel(`${cfg('voiceId')}-item-hv-en`)).exists()).toBe(false)
@@ -261,7 +261,7 @@ describe.each<Context>(['create', 'edit'])('the template form in %s context', (c
       await flushPromises()
 
       await wrapper.get(sel(cfg('voiceId'))).trigger('click')
-      await wrapper.get(sel(`${cfg('voiceId')}-italian-only`)).setValue(true)
+      await wrapper.get(sel(`${cfg('voiceId')}-italian-only`)).trigger('click')
       await wrapper.get(sel(`${cfg('voiceId')}-item-hv-it`)).trigger('click')
       await flushPromises()
 

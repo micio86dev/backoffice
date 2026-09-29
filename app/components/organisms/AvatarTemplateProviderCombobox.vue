@@ -59,20 +59,13 @@
         :class="formControlClass"
       />
 
-      <label
+      <CheckboxField
         v-if="resource === 'voice'"
-        class="flex items-center gap-2 text-sm"
-        :for="`${testIdPrefix}-italian-only`"
-      >
-        <input
-          :id="`${testIdPrefix}-italian-only`"
-          v-model="italianOnly"
-          type="checkbox"
-          :data-testid="`${testIdPrefix}-italian-only`"
-          class="size-4 accent-primary"
-        />
-        {{ t('avatar_templates.form.catalogue.italianOnly') }}
-      </label>
+        :id="`${testIdPrefix}-italian-only`"
+        v-model="italianOnly"
+        :data-testid="`${testIdPrefix}-italian-only`"
+        :label="t('avatar_templates.form.catalogue.italianOnly')"
+      />
 
       <p
         v-if="state === 'loading'"
@@ -262,6 +255,7 @@
  */
 import { computed, onMounted, reactive, ref, useAttrs, watch } from 'vue'
 import { CheckIcon, ChevronDownIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'

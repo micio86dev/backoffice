@@ -58,6 +58,7 @@ const SPECS: Record<ProviderName, FieldSpec[]> = {
       key: 'voiceUseSpeakerBoost',
       type: 'checkbox',
       label_key: 'avatar_templates.field.voiceUseSpeakerBoost',
+      hint_key: 'avatar_templates.hint.voiceUseSpeakerBoost',
     },
     // Non-required text field, appended deliberately: `avatarId` (the only
     // other text field in this fixture) is REQUIRED-validated (D3), so it can
@@ -167,7 +168,7 @@ describe('clearing a field removes it, never blanks it', () => {
       config: { avatarId: 'av_1', voiceUseSpeakerBoost: true },
     })
 
-    await wrapper.find('[data-testid="template-config-voiceUseSpeakerBoost"]').setValue(false)
+    await wrapper.find('[data-testid="template-config-voiceUseSpeakerBoost"]').trigger('click')
     await wrapper.find('form').trigger('submit')
 
     // false tells the provider "off"; absent tells it "your default". They are
@@ -558,26 +559,45 @@ describe('two-column layout for generated provider fields (feature/form-drawer)'
     expect(container.classes()).not.toContain('grid')
   })
 
-  it("does not change a Field's own orientation when arranging it into the grid", () => {
-    // The checkbox-vs-text orientation assertion above (D3) must survive the
-    // grid wrapper unchanged — a two-column ARRANGEMENT of fields is not the
-    // same thing as a field's own internal label/control orientation.
+  it('keeps a checkbox in one grid cell without stretching the box', () => {
+    // A two-column ARRANGEMENT must not change how a checkbox lays itself out:
+    // the CheckboxField sits directly in the grid and its box keeps a
+    // shrink-0 wrapper, so it cannot be widened to the cell.
     const wrapper = mountForm({ provider: 'heygen', config: {} })
 
-    const checkbox = wrapper.find('input[type="checkbox"]')
-    const field = checkbox.element.closest('[data-slot="field"]')
-    expect(field?.getAttribute('data-orientation')).toBe('horizontal')
+    const box = wrapper.get('[role="checkbox"]')
+    const field = box.element.closest('[data-slot="checkbox-field"]')
+    expect(field).not.toBeNull()
+    expect(field?.parentElement?.getAttribute('data-testid')).toBe('template-config-fields')
+    expect(box.element.parentElement?.className).toContain('shrink-0')
   })
 })
 
-it('lays a checkbox field out horizontally so it cannot stretch to the container', () => {
+it('renders a boolean knob as a CheckboxField: box before label, hint under the label', () => {
   const wrapper = mountForm()
 
-  const checkbox = wrapper.find('input[type="checkbox"]')
-  expect(checkbox.exists()).toBe(true)
+  const box = wrapper.get('[role="checkbox"]')
+  expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
 
-  const field = checkbox.element.closest('[data-slot="field"]')
-  expect(field?.getAttribute('data-orientation')).toBe('horizontal')
+  const field = box.element.closest('[data-slot="checkbox-field"]') as HTMLElement
+  const content = field.querySelector('[data-slot="checkbox-field-content"]') as HTMLElement
+
+  // Order: the box precedes the text column and is not inside it.
+  expect(content.contains(box.element)).toBe(false)
+  expect(
+    box.element.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy()
+
+  // The name is wired through aria-labelledby to the label inside the column.
+  const labelledBy = box.attributes('aria-labelledby') ?? ''
+  expect(content.querySelector(`#${labelledBy}`)?.textContent).toContain(
+    'avatar_templates.field.voiceUseSpeakerBoost'
+  )
+
+  // The hint renders under the label and describes the box.
+  const hint = content.querySelector('#template-config-voiceUseSpeakerBoost-hint')
+  expect(hint?.textContent).toContain('avatar_templates.hint.voiceUseSpeakerBoost')
+  expect(box.attributes('aria-describedby')).toContain('template-config-voiceUseSpeakerBoost-hint')
 
   // A non-checkbox control keeps the vertical stacking it needs.
   const text = wrapper.find('input[type="text"], input[type="number"], select')

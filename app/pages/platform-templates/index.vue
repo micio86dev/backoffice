@@ -164,14 +164,14 @@
       :open="editing !== null"
       :title="formTitle"
       form-id="template-form"
-      :pending="saving"
+      :pending="saving || busy"
       @update:open="(open) => !open && (editing = null)"
     >
       <AvatarTemplateForm
         v-if="editing !== null"
         :template="editing"
         :field-specs="fieldSpecs"
-        :saving="saving"
+        :saving="saving || busy"
         :submit-error="submitError"
         data-testid="template-form"
         @submit="onSubmit"
@@ -377,6 +377,10 @@ async function perform(
 }
 
 async function send(payload: Partial<AvatarTemplate>): Promise<void> {
+  // Same gate as perform(): a save must not overlap another row write, and
+  // while it runs Offer / Retire / Delete are disabled through `busy`.
+  if (busy.value) return
+  busy.value = true
   saving.value = true
   submitError.value = null
   notice.value = null
@@ -413,6 +417,7 @@ async function send(payload: Partial<AvatarTemplate>): Promise<void> {
     submitError.value = error
   } finally {
     saving.value = false
+    busy.value = false
   }
 }
 

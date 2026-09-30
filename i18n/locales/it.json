@@ -1772,5 +1772,25 @@
         "none": "Nessuno — senza ruolo (solo competenze di potenziale)"
       }
     }
+  },
+  "platformTemplates": {
+    "impact": {
+      "usage": "{organizations} organizzazioni / {projects} progetti usano questo template.",
+      "edit": {
+        "title": "Salvare le modifiche a \"{name}\"?",
+        "effect": "La modifica si applica subito a ogni progetto che lo usa, comprese le interviste in corso alla prossima ripresa.",
+        "confirm": "Salva le modifiche"
+      },
+      "retire": {
+        "title": "Ritirare \"{name}\"?",
+        "effect": "Non sarà più proposto per i nuovi progetti. I progetti che già lo usano continuano a funzionare.",
+        "confirm": "Ritira"
+      },
+      "delete": {
+        "title": "Eliminare \"{name}\"?",
+        "effect": "Questa azione non può essere annullata.",
+        "confirm": "Elimina"
+      }
+    }
   }
 }

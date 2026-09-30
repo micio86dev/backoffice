@@ -1772,5 +1772,25 @@
         "none": "None — role-less (potential competency only)"
       }
     }
+  },
+  "platformTemplates": {
+    "impact": {
+      "usage": "{organizations} organizations / {projects} projects use this template.",
+      "edit": {
+        "title": "Save changes to \"{name}\"?",
+        "effect": "The change applies immediately to every project that uses it, including interviews in progress the next time they resume.",
+        "confirm": "Save changes"
+      },
+      "retire": {
+        "title": "Retire \"{name}\"?",
+        "effect": "It will no longer be offered for new projects. Projects that already use it keep working.",
+        "confirm": "Retire"
+      },
+      "delete": {
+        "title": "Delete \"{name}\"?",
+        "effect": "This cannot be undone.",
+        "confirm": "Delete"
+      }
+    }
   }
 }

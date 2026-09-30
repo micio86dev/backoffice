@@ -257,9 +257,10 @@ export interface paths {
          *     submit, with nothing they could do about it.
          *
          *     So this is the narrow answer rather than a widened `viewAny`: exactly
-         *     the four fields choosing a template requires — `id`, `name`, `provider`
-         *     and `is_active`, which is what the method below returns and what
-         *     `openapi.json` publishes. A viewer gets it too —
+         *     the five fields choosing a template requires — `id`, `name`, `provider`,
+         *     `is_active` and `scope` (`organization` | `platform`, so a picker can
+         *     group and badge the platform templates it is offered), which is what the
+         *     method below returns and what `openapi.json` publishes. A viewer gets it too —
          *     reading a project's configuration should show which template it names,
          *     not a bare id.
          *
@@ -1772,6 +1773,53 @@ export interface paths {
         patch: operations["participantSchedule.update"];
         trace?: never;
     };
+    "/admin/avatar-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List platform avatar templates with their usage */
+        get: operations["platformAvatarTemplate.index"];
+        put?: never;
+        /**
+         * Create a platform avatar template
+         * @description Created INACTIVE and never activatable through this payload: creating a
+         *     template must not change what candidates are being interviewed with
+         *     right now, and offering it to every organization is its own decision.
+         */
+        post: operations["platformAvatarTemplate.store"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/avatar-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show a platform avatar template with its usage */
+        get: operations["platformAvatarTemplate.show"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit a platform avatar template
+         * @description An edit reaches EVERY project that pins this template, in every
+         *     organization, on the next read (live edit, design D1) — which is why the
+         *     audit row carries the usage at edit time: the reach of the change is part
+         *     of what happened. It records field NAMES, never config values.
+         */
+        patch: operations["platformAvatarTemplate.update"];
+        trace?: never;
+    };
     "/admin/platform-users": {
         parameters: {
             query?: never;
@@ -2874,6 +2922,8 @@ export interface components {
             name: string;
             description: string | null;
             provider: string;
+            /** @enum {string} */
+            scope: "organization" | "platform";
             config: {
                 [key: string]: unknown;
             };
@@ -2897,6 +2947,12 @@ export interface components {
                 synced_at: string | null;
             };
         };
+        /**
+         * AvatarTemplateScope
+         * @description Who owns an avatar template: one organization, or the platform itself (`organization_id IS NULL`). The wire vocabulary for the scope marker on template resources and picker options.
+         * @enum {string}
+         */
+        AvatarTemplateScope: "organization" | "platform";
         /**
          * AvatarVoicePreviewRequest
          * @description Body of `POST /api/avatar-templates/voice-preview`.
@@ -3301,6 +3357,41 @@ export interface components {
             completed_at: string | null;
             created_at: string | null;
         };
+        /** PlatformAvatarTemplateResource */
+        PlatformAvatarTemplateResource: {
+            id: number;
+            name: string;
+            description: string | null;
+            provider: string;
+            /** @enum {string} */
+            scope: "organization" | "platform";
+            config: {
+                [key: string]: unknown;
+            };
+            is_active: boolean;
+            created_at: string | null;
+            updated_at: string | null;
+            llm_model_id: number | null;
+            llm_credential_id: number | null;
+            llm_sync_status: string | null;
+            llm_synced_at: string | null;
+            llm: {
+                estimated_cost_usd_per_interview: {
+                    minutes: number;
+                    turns: number;
+                    usd: number;
+                } | null;
+            };
+            pal_sync: {
+                status: string | null;
+                code: string | null;
+                synced_at: string | null;
+            };
+            usage: {
+                organization_count: number;
+                project_count: number;
+            };
+        };
         /** PlatformUserResource */
         PlatformUserResource: {
             id: number;
@@ -3359,6 +3450,8 @@ export interface components {
                 id: number;
                 name: string;
                 provider: string;
+                /** @enum {string} */
+                scope: "organization" | "platform";
                 llm_model: string | null;
             } | null;
             webhook_url: string | null;
@@ -4787,6 +4880,7 @@ export interface operations {
                                 update: boolean;
                                 activate: boolean;
                                 delete: boolean;
+                                manageGlobal: boolean;
                             };
                             projects: {
                                 viewAny: boolean;
@@ -4835,6 +4929,7 @@ export interface operations {
                             name: string;
                             provider: string;
                             is_active: boolean;
+                            scope: components["schemas"]["AvatarTemplateScope"];
                         }[];
                     };
                 };
@@ -7970,6 +8065,172 @@ export interface operations {
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
             404: components["responses"]["ModelNotFoundException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "platformAvatarTemplate.index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformAvatarTemplateResource"][];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
+        };
+    };
+    "platformAvatarTemplate.store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    description?: string | null;
+                    /**
+                     * @description Literal list — see catalogue()'s validation for why implode(self::PROVIDERS) is not used.
+                     * @enum {string}
+                     */
+                    provider: "heygen" | "tavus";
+                    config: string[];
+                    /**
+                     * @description Both-or-neither is enforced by the DB CHECK (I1) and by
+                     *     AvatarTemplate::booted()'s I2/I3/I4 guards — never re-checked
+                     *     here (pluggable-conversation-llm PR P3a, design D4).
+                     */
+                    llm_model_id?: number | null;
+                    llm_credential_id?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description `PlatformAvatarTemplateResource` */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformAvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "platformAvatarTemplate.show": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `PlatformAvatarTemplateResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformAvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            /** @description An error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Error overview.
+                         * @example
+                         */
+                        message: string;
+                    };
+                };
+            };
+        };
+    };
+    "platformAvatarTemplate.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    description?: string | null;
+                    config?: string[];
+                    /**
+                     * @description Both-or-neither is enforced by the DB CHECK (I1) and by
+                     *     AvatarTemplate::booted()'s I2/I3/I4 guards — never re-checked
+                     *     here (pluggable-conversation-llm PR P3a, design D4). Both null
+                     *     clears the binding (see "Unbinding a template clears only
+                     *      that template's binding").
+                     */
+                    llm_model_id?: number | null;
+                    llm_credential_id?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description `PlatformAvatarTemplateResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformAvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
             422: components["responses"]["ValidationException"];
         };
     };

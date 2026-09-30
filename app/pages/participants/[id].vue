@@ -660,7 +660,9 @@ function externalReferencePayload(detail: { external_id: number | null; source: 
 } {
   return {
     ...(typeof detail.external_id === 'number' ? { external_id: detail.external_id } : {}),
-    ...(typeof detail.source === 'string' && detail.source !== '' ? { source: detail.source } : {}),
+    ...(typeof detail.source === 'string' && detail.source.trim() !== ''
+      ? { source: detail.source }
+      : {}),
   }
 }
 

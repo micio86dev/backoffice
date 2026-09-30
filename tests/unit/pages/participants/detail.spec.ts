@@ -799,6 +799,9 @@ describe('pages/participants/[id].vue', () => {
       [{ external_id: 4471, source: null }, ['external_id']],
       [{ external_id: null, source: 'Acme ATS' }, ['source']],
       [{ external_id: null, source: null }, []],
+      // A blank source is not a reference: the molecule renders nothing for it,
+      // so the re-issue must not send it either.
+      [{ external_id: null, source: '   ' }, []],
       [undefined, []],
     ])(
       'sends only the stored values for %j: a null is never sent as a key',

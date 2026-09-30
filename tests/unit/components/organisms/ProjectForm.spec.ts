@@ -1513,7 +1513,7 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       ).toBe('9')
     })
 
-    it('falls back to the first template when none has been used yet', async () => {
+    it('preselects nothing when the only template is inactive', async () => {
       listTemplatesMock.mockResolvedValue({
         data: [{ id: 3, name: 'The only one', provider: 'heygen', is_active: false }],
       })
@@ -1527,7 +1527,7 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       expect(
         (wrapper.get('[data-testid="project-form-avatar-template"]').element as HTMLSelectElement)
           .value
-      ).toBe('3')
+      ).toBe('')
     })
 
     it('never overwrites the template an existing project already pinned', async () => {
@@ -1583,6 +1583,167 @@ describe('ProjectForm — coverage re-evaluates on role change (Phase 3)', () =>
       await flushPromises()
 
       expect(updateProjectMock).toHaveBeenCalled()
+    })
+  })
+
+  /**
+   * Platform (global) templates in the picker — global-avatar-templates, B1.
+   *
+   * A platform template is owned by BEAI, not by the organization: the picker
+   * shows name and provider only (the API sends no config for it), groups it
+   * after the organization's own templates, and never offers a RETIRED one as a
+   * new choice. A project already pinned to one that was retired later keeps it.
+   */
+  describe('avatar template picker: platform templates', () => {
+    const own = (id: number, overrides: Record<string, unknown> = {}) => ({
+      id,
+      name: `Own ${id}`,
+      provider: 'heygen',
+      is_active: true,
+      scope: 'organization',
+      ...overrides,
+    })
+    const platform = (id: number, overrides: Record<string, unknown> = {}) => ({
+      id,
+      name: `Global ${id}`,
+      provider: 'tavus',
+      is_active: true,
+      scope: 'platform',
+      ...overrides,
+    })
+
+    async function mountPicker(options: unknown[], project: unknown = null) {
+      listTemplatesMock.mockResolvedValue({ data: options })
+      const wrapper = mount(ProjectForm, {
+        props: { project },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      return wrapper
+    }
+
+    const selectOf = (wrapper: Awaited<ReturnType<typeof mountPicker>>) =>
+      wrapper.get('[data-testid="project-form-avatar-template"]')
+    const valueOf = (wrapper: Awaited<ReturnType<typeof mountPicker>>) =>
+      (selectOf(wrapper).element as HTMLSelectElement).value
+
+    it('renders the organization group before the platform group', async () => {
+      const wrapper = await mountPicker([platform(1), own(2), own(3)])
+
+      const groups = selectOf(wrapper).findAll('optgroup')
+
+      expect(groups.map((g) => g.attributes('label'))).toEqual([
+        'projects.form.templateGroup.organization',
+        'projects.form.templateGroup.platform',
+      ])
+      expect(groups[0]!.findAll('option').map((o) => o.text())).toEqual([
+        'Own 2 (avatar_templates.provider.heygen)',
+        'Own 3 (avatar_templates.provider.heygen)',
+      ])
+      expect(groups[1]!.findAll('option').map((o) => o.text())).toEqual([
+        'Global 1 (avatar_templates.provider.tavus)',
+      ])
+    })
+
+    it('renders no empty group', async () => {
+      const wrapper = await mountPicker([own(2)])
+
+      expect(selectOf(wrapper).findAll('optgroup')).toHaveLength(1)
+    })
+
+    it('shows the Platform badge only while a platform template is selected', async () => {
+      const wrapper = await mountPicker(
+        [platform(1), own(2)],
+        activeProject({ avatar_template_id: 1 })
+      )
+
+      expect(wrapper.get('[data-testid="project-form-avatar-template-platform"]').text()).toContain(
+        'projects.form.platformBadge'
+      )
+
+      await selectOf(wrapper).setValue('2')
+
+      expect(wrapper.find('[data-testid="project-form-avatar-template-platform"]').exists()).toBe(
+        false
+      )
+    })
+
+    it('does not offer a retired global as a new choice', async () => {
+      const wrapper = await mountPicker([own(2), platform(1, { is_active: false }), platform(3)])
+
+      expect(
+        selectOf(wrapper)
+          .findAll('option')
+          .map((o) => o.attributes('value'))
+      ).toEqual(['2', '3'])
+    })
+
+    it('preselects an own active template before an active global', async () => {
+      const wrapper = await mountPicker([platform(1), own(2)])
+
+      expect(valueOf(wrapper)).toBe('2')
+    })
+
+    it('preselects the first active global when no own template is active', async () => {
+      const wrapper = await mountPicker([own(2, { is_active: false }), platform(1)])
+
+      expect(valueOf(wrapper)).toBe('1')
+    })
+
+    it('preselects nothing when only inactive templates exist', async () => {
+      const wrapper = await mountPicker([own(2, { is_active: false })])
+
+      expect(valueOf(wrapper)).toBe('')
+    })
+
+    it('never re-points a project pinned to an own template at an active global', async () => {
+      const wrapper = await mountPicker(
+        [platform(1), own(2, { is_active: false })],
+        activeProject({ avatar_template_id: 2 })
+      )
+
+      expect(valueOf(wrapper)).toBe('2')
+    })
+
+    it('keeps a retired global as the current pin, marked retired and re-submittable', async () => {
+      const wrapper = await mountPicker(
+        [own(2), platform(9, { is_active: false })],
+        activeProject({ avatar_template_id: 9 })
+      )
+
+      expect(valueOf(wrapper)).toBe('9')
+      expect(selectOf(wrapper).find('option[value="9"]').text()).toBe(
+        'Global 9 (avatar_templates.provider.tavus) projects.form.templateRetired'
+      )
+
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      expect(updateProjectMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ avatar_template_id: 9 })
+      )
+    })
+
+    it('asks for the option list without any config detail', async () => {
+      await mountPicker([platform(1)])
+
+      expect(listTemplatesMock).toHaveBeenCalledWith()
+    })
+
+    it('has copy for every new key in both locales', () => {
+      const { te } = realI18n()
+
+      for (const key of [
+        'projects.form.templateGroup.organization',
+        'projects.form.templateGroup.platform',
+        'projects.form.platformBadge',
+        'projects.form.templateRetired',
+        'projects.table.platformBadge',
+      ]) {
+        expect(te(key), key).toBe(true)
+      }
     })
   })
   it('gives the assessment-type toggle an accessible name a label cannot provide', () => {

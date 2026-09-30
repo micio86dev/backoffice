@@ -306,7 +306,8 @@
       "avatarProvider": "Servizio avatar",
       "avatarTemplate": "Template",
       "noCompetencies": "Nessuna competenza selezionata: questo progetto non può avviare un colloquio.",
-      "noAvatarTemplate": "Nessun template avatar assegnato"
+      "noAvatarTemplate": "Nessun template avatar assegnato",
+      "platformBadge": "Piattaforma"
     },
     "action": {
       "new": "Nuovo progetto",
@@ -421,6 +422,12 @@
       },
       "competenciesLoadError": "L'elenco delle competenze non è stato caricato. Riprova.",
       "templatesLoadError": "L'elenco dei template avatar non è stato caricato. Riprova.",
+      "templateGroup": {
+        "organization": "La tua organizzazione",
+        "platform": "Piattaforma"
+      },
+      "platformBadge": "Piattaforma",
+      "templateRetired": "(ritirato)",
       "frameworkVersionsLoadError": "L'elenco delle versioni del framework non è stato caricato. Riprova."
     },
     "secret": {

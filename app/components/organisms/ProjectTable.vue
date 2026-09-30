@@ -86,7 +86,16 @@
           attribute stops being scannable long before it stops being correct.
         -->
         <TableCell :data-testid="`project-row-template-${project.id}`">
-          <template v-if="project.avatar_template">{{ project.avatar_template.name }}</template>
+          <template v-if="project.avatar_template">
+            {{ project.avatar_template.name }}
+            <PlatformTemplateBadge
+              v-if="project.avatar_template.scope === 'platform'"
+              class="ml-2"
+              :data-testid="`project-row-template-platform-${project.id}`"
+            >
+              {{ $t('projects.table.platformBadge') }}
+            </PlatformTemplateBadge>
+          </template>
           <template v-else>
             <span aria-hidden="true">–</span>
             <span class="sr-only">{{ $t('projects.table.noAvatarTemplate') }}</span>
@@ -253,6 +262,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import FormDrawerActions from '@/components/organisms/FormDrawerActions.vue'
 import ProjectStatusBadge from '@/components/atoms/ProjectStatusBadge.vue'
+import PlatformTemplateBadge from '@/components/atoms/PlatformTemplateBadge.vue'
 import FormattedDate from '@/components/atoms/FormattedDate.vue'
 import EntryLinkForm from '@/components/organisms/EntryLinkForm.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'

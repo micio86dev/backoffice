@@ -342,10 +342,43 @@
             reachable only in the moment before the default resolves, and the
             validator below refuses a submit made in it.
           -->
-            <option v-for="template in avatarTemplates" :key="template.id" :value="template.id">
-              {{ template.name }} ({{ $t(`avatar_templates.provider.${template.provider}`) }})
-            </option>
+            <!--
+              Native <optgroup>s: the group label is announced by assistive
+              technology, and a badge cannot live inside an <option>, so the
+              Platform badge is shown under the control for the selected one.
+              An empty group is not rendered.
+            -->
+            <optgroup
+              v-if="templateGroups.own.length > 0"
+              :label="$t('projects.form.templateGroup.organization')"
+            >
+              <option
+                v-for="template in templateGroups.own"
+                :key="template.id"
+                :value="template.id"
+              >
+                {{ templateLabel(template) }}
+              </option>
+            </optgroup>
+            <optgroup
+              v-if="templateGroups.platform.length > 0"
+              :label="$t('projects.form.templateGroup.platform')"
+            >
+              <option
+                v-for="template in templateGroups.platform"
+                :key="template.id"
+                :value="template.id"
+              >
+                {{ templateLabel(template) }}
+              </option>
+            </optgroup>
           </select>
+          <PlatformTemplateBadge
+            v-if="selectedTemplateIsPlatform"
+            data-testid="project-form-avatar-template-platform"
+          >
+            {{ $t('projects.form.platformBadge') }}
+          </PlatformTemplateBadge>
           <FieldDescription id="project-form-avatar-template-help">
             {{ $t('projects.form.help.avatarTemplate') }}
           </FieldDescription>
@@ -536,6 +569,12 @@ import { useFrameworkVersions } from '@/composables/useFrameworkVersions'
 import { useProjectFormValidation } from '@/composables/useProjectFormValidation'
 import { formSelectClass } from '@/components/ui/form-control'
 import type { TemplateOption } from '@/types/avatar-template'
+import PlatformTemplateBadge from '@/components/atoms/PlatformTemplateBadge.vue'
+import {
+  groupTemplateOptions,
+  isPlatformTemplate,
+  pickDefaultTemplate,
+} from '@/utils/default-template'
 import type { FrameworkVersion } from '@/types/framework-version'
 import { applyServerFieldErrors, serverErrorCode } from '@/utils/http-error'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
@@ -1154,8 +1193,10 @@ async function loadAvatarTemplates(): Promise<void> {
  * "The one the organization is using" is the ACTIVE template — the closest
  * available reading of "the last one used", and an honest one: there is no
  * last-used timestamp on this endpoint, and inventing one from list order would
- * be a guess dressed as a fact. Falls back to the first template when none is
- * active.
+ * be a guess dressed as a fact. The rules live in `pickDefaultTemplate`: an own
+ * active template, else the first active platform one, else nothing — an
+ * inactive template is legal to pin but never a default the operator did not
+ * choose.
  *
  * NEVER overwrites an existing pin. The default is for a project that has made
  * no choice; applying it to one that has would silently re-point a live project
@@ -1164,10 +1205,29 @@ async function loadAvatarTemplates(): Promise<void> {
 function applyDefaultTemplate(): void {
   if (avatarTemplateId.value !== null) return
 
-  const preferred =
-    avatarTemplates.value.find((template) => template.is_active) ?? avatarTemplates.value[0]
+  avatarTemplateId.value = pickDefaultTemplate(avatarTemplates.value)?.id ?? null
+}
 
-  avatarTemplateId.value = preferred?.id ?? null
+/**
+ * Picker groups. The current pin is `props.project`'s, not the live selection:
+ * choosing another template must not make a retired global vanish from under
+ * the operator mid-edit.
+ */
+const templateGroups = computed(() =>
+  groupTemplateOptions(avatarTemplates.value, props.project?.avatar_template_id ?? null)
+)
+
+const selectedTemplateIsPlatform = computed(() =>
+  avatarTemplates.value.some(
+    (template) => template.id === avatarTemplateId.value && isPlatformTemplate(template)
+  )
+)
+
+/** Name and provider only; a retired option (a kept pin) says so in words. */
+function templateLabel(template: AvatarTemplateOption): string {
+  const label = `${template.name} (${t(`avatar_templates.provider.${template.provider}`)})`
+
+  return template.is_active ? label : `${label} ${t('projects.form.templateRetired')}`
 }
 
 function onAvatarTemplateChange(event: Event): void {

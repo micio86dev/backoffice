@@ -238,6 +238,9 @@ export type TemplateListResponse = Omit<
 export type TemplateOption =
   paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']['data'][number]
 
+/** Who owns a template: the caller's organization, or the platform (a global). */
+export type TemplateScope = components['schemas']['AvatarTemplateScope']
+
 export type TemplateOptionsResponse =
   paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']
 

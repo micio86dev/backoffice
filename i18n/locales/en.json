@@ -306,7 +306,8 @@
       "avatarProvider": "Avatar service",
       "avatarTemplate": "Template",
       "noCompetencies": "No competencies selected — this project cannot run an interview.",
-      "noAvatarTemplate": "No avatar template assigned"
+      "noAvatarTemplate": "No avatar template assigned",
+      "platformBadge": "Platform"
     },
     "action": {
       "new": "New project",
@@ -421,6 +422,12 @@
       },
       "competenciesLoadError": "The competency list could not be loaded. Please try again.",
       "templatesLoadError": "The avatar template list could not be loaded. Please try again.",
+      "templateGroup": {
+        "organization": "Your organization",
+        "platform": "Platform"
+      },
+      "platformBadge": "Platform",
+      "templateRetired": "(retired)",
       "frameworkVersionsLoadError": "The framework version list could not be loaded. Please try again."
     },
     "secret": {

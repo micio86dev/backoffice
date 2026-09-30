@@ -55,7 +55,11 @@
       {{ $t('platformTemplates.empty') }}
     </p>
 
-    <ul v-else class="flex flex-col gap-3" data-testid="platform-templates-list">
+    <ul
+      v-else-if="templates.length > 0"
+      class="flex flex-col gap-3"
+      data-testid="platform-templates-list"
+    >
       <li
         v-for="row in templates"
         :key="row.id"

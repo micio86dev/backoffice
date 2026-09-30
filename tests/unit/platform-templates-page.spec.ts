@@ -196,6 +196,20 @@ describe('PlatformTemplatesPage', () => {
     })
   })
 
+  describe('load failure', () => {
+    it('says so in an alert and renders neither an empty list nor the empty state', async () => {
+      const { wrapper } = await mountPage(undefined, () => ({
+        list: vi.fn().mockRejectedValue(new Error('offline')),
+      }))
+
+      expect(wrapper.find('[data-testid="platform-templates-load-error"]').attributes('role')).toBe(
+        'alert'
+      )
+      expect(wrapper.find('[data-testid="platform-templates-list"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="platform-templates-empty"]').exists()).toBe(false)
+    })
+  })
+
   describe('create and edit reuse AvatarTemplateForm', () => {
     it('renders booleans as CheckboxField, never a raw checkbox input', async () => {
       const { wrapper } = await mountPage()

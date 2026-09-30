@@ -1244,7 +1244,8 @@
       "close": "Chiudi",
       "resultTitle": "1 copia creata | {count} copie create",
       "resultInactive": "Le copie sono inattive. Attivale una per una nella rispettiva organizzazione prima di usarle.",
-      "resultItem": "{organization} — \"{name}\""
+      "resultItem": "{organization} — \"{name}\"",
+      "platformIndependent": "Questo è un template piattaforma. La copia è indipendente: le modifiche successive al template piattaforma non la raggiungono."
     }
   },
   "help": {
@@ -1783,7 +1784,8 @@
       "edit": "Modifica",
       "offer": "Offri alle organizzazioni",
       "retire": "Ritira",
-      "delete": "Elimina"
+      "delete": "Elimina",
+      "copy": "Copia nelle organizzazioni"
     },
     "state": {
       "offered": "Offerto",

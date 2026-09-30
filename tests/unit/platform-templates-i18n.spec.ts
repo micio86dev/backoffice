@@ -50,9 +50,14 @@ function usedKeys(): string[] {
 
   // `platformTemplates.serverError` is a NAMESPACE handed to translateServerCode;
   // its codes are covered by their own test below.
-  return [...new Set([...literal, ...composed, 'nav.platformTemplates'])].filter(
-    (key) => key !== 'platformTemplates.serverError'
-  )
+  return [
+    ...new Set([
+      ...literal,
+      ...composed,
+      'nav.platformTemplates',
+      'avatar_templates.copy.platformIndependent',
+    ]),
+  ].filter((key) => key !== 'platformTemplates.serverError')
 }
 
 describe.each(Object.entries(TABLES))('platform templates copy in %s', (_locale, table) => {

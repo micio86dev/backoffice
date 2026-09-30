@@ -72,8 +72,18 @@ async function mountPage(
     remove: vi.fn().mockResolvedValue(undefined),
     ...handlers(errors),
   }
+  vi.doMock('../../app/composables/useSuperadmin', () => ({
+    useSuperadmin: () => ({
+      fetchClients: vi
+        .fn()
+        .mockResolvedValue({ data: [{ id: 2, name: 'Beta Org' }], acting_organization_id: null }),
+    }),
+  }))
   vi.doMock('../../app/composables/useAvatarTemplates', () => ({
-    useAvatarTemplates: () => ({ fetchFieldSpecs: vi.fn().mockResolvedValue({ data: SPECS }) }),
+    useAvatarTemplates: () => ({
+      fetchFieldSpecs: vi.fn().mockResolvedValue({ data: SPECS }),
+      duplicateTemplate: vi.fn().mockResolvedValue({ data: [] }),
+    }),
   }))
 
   const Page = (await import('../../app/pages/platform-templates/index.vue')).default
@@ -365,6 +375,25 @@ describe('PlatformTemplatesPage', () => {
       expect(wrapper.find('[data-testid="platform-template-error"]').text()).not.toContain(
         'projects still use'
       )
+    })
+  })
+
+  describe('copy to organizations', () => {
+    it('opens the copy dialog for the clicked row, as a platform source', async () => {
+      const { wrapper } = await mountPage([
+        template({ id: 1, name: 'Studio voice' }),
+        template({ id: 2, name: 'Other' }),
+      ])
+
+      await click(wrapper, 'platform-template-copy-2')
+      await waitForTestId('copy-template-dialog')
+
+      expect(
+        document.body.querySelector('[data-testid="copy-template-dialog"]')?.textContent
+      ).toContain('Other')
+      expect(
+        document.body.querySelector('[data-testid="copy-template-platform-badge"]')
+      ).not.toBeNull()
     })
   })
 })

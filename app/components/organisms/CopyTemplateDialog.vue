@@ -9,6 +9,20 @@
       </DialogHeader>
 
       <!--
+        A platform source: labelled as one, and the copy is said to be
+        independent of it, because the alternative reading ("it stays linked,
+        so my edit to the global reaches it") is exactly what it is not.
+      -->
+      <div v-if="scope === 'platform'" class="flex flex-col gap-2">
+        <PlatformTemplateBadge class="w-fit" data-testid="copy-template-platform-badge">
+          {{ $t('platformTemplates.badge') }}
+        </PlatformTemplateBadge>
+        <p class="text-muted-foreground text-sm" data-testid="copy-template-independence">
+          {{ $t('avatar_templates.copy.platformIndependent') }}
+        </p>
+      </div>
+
+      <!--
         The outcome replaces the form rather than sitting under it: the copies
         are in OTHER organizations, so nothing on the page behind this dialog
         changes, and this summary is the only confirmation the operator gets.
@@ -171,6 +185,7 @@
  * cached: it is the one thing here that another superadmin can change under us.
  */
 import { computed, nextTick, ref, watch } from 'vue'
+import PlatformTemplateBadge from '@/components/atoms/PlatformTemplateBadge.vue'
 import FormMessage from '@/components/molecules/FormMessage.vue'
 import OrganizationMultiSelect from '@/components/molecules/OrganizationMultiSelect.vue'
 import { Button } from '@/components/ui/button'
@@ -186,14 +201,22 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { useSuperadmin } from '@/composables/useSuperadmin'
-import type { AvatarTemplate, DuplicatedTemplate } from '@/types/avatar-template'
+import type { AvatarTemplate, DuplicatedTemplate, TemplateScope } from '@/types/avatar-template'
 import { applyServerFieldErrors } from '@/utils/http-error'
 import { translateServerCode } from '@/utils/server-message'
 
-const props = defineProps<{
-  open: boolean
-  template: Pick<AvatarTemplate, 'id' | 'name'> | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    template: Pick<AvatarTemplate, 'id' | 'name'> | null
+    /**
+     * Whose template is being copied. `platform` (a global) has no source
+     * organization, so nothing is excluded from the choices.
+     */
+    scope?: TemplateScope
+  }>(),
+  { scope: 'organization' }
+)
 
 const emit = defineEmits<{ 'update:open': [open: boolean] }>()
 
@@ -236,9 +259,12 @@ async function loadOrganizations(): Promise<void> {
   loading.value = true
   try {
     const response = await fetchClients()
-    organizations.value = response.data.filter(
-      (organization) => organization.id !== response.acting_organization_id
-    )
+    organizations.value =
+      props.scope === 'platform'
+        ? response.data
+        : response.data.filter(
+            (organization) => organization.id !== response.acting_organization_id
+          )
   } catch {
     loadError.value = true
   } finally {
@@ -264,7 +290,12 @@ async function submit(): Promise<void> {
   nameError.value = null
 
   try {
-    const response = await duplicateTemplate(props.template.id, selectedIds.value, name.value)
+    const response = await duplicateTemplate(
+      props.template.id,
+      selectedIds.value,
+      name.value,
+      props.scope
+    )
     created.value = response.data
     await nextTick()
     resultTitle.value?.focus()

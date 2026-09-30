@@ -1244,7 +1244,8 @@
       "close": "Close",
       "resultTitle": "1 copy created | {count} copies created",
       "resultInactive": "Copies are inactive. Activate each one inside its organization before it is used.",
-      "resultItem": "{organization} — \"{name}\""
+      "resultItem": "{organization} — \"{name}\"",
+      "platformIndependent": "This is a platform template. The copy is independent of it: later edits to the platform template never reach the copy."
     }
   },
   "help": {
@@ -1783,7 +1784,8 @@
       "edit": "Edit",
       "offer": "Offer to organizations",
       "retire": "Retire",
-      "delete": "Delete"
+      "delete": "Delete",
+      "copy": "Copy to organizations"
     },
     "state": {
       "offered": "Offered",

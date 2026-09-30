@@ -124,6 +124,14 @@
           >
             {{ $t('platformTemplates.action.retire') }}
           </button>
+          <button
+            type="button"
+            :data-testid="`platform-template-copy-${row.id}`"
+            :class="buttonClass"
+            @click="copyTarget = row"
+          >
+            {{ $t('platformTemplates.action.copy') }}
+          </button>
           <div class="flex flex-col items-end gap-1">
             <button
               type="button"
@@ -168,6 +176,14 @@
       />
     </FormDrawer>
 
+    <!-- Copies land in OTHER organizations, so nothing on this page changes. -->
+    <CopyTemplateDialog
+      scope="platform"
+      :open="copyTarget !== null"
+      :template="copyTarget"
+      @update:open="(open) => !open && (copyTarget = null)"
+    />
+
     <GlobalTemplateImpactDialog
       v-if="impact !== null"
       :open="true"
@@ -201,6 +217,7 @@ import PlatformTemplateBadge from '@/components/atoms/PlatformTemplateBadge.vue'
 import GlobalTemplateImpactDialog from '@/components/molecules/GlobalTemplateImpactDialog.vue'
 import PalSyncStatus from '@/components/molecules/PalSyncStatus.vue'
 import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
+import CopyTemplateDialog from '@/components/organisms/CopyTemplateDialog.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
@@ -244,6 +261,8 @@ const warning = ref<string | null>(null)
 const saving = ref(false)
 // The raw rejection, handed to the form verbatim: it owns per-field placement.
 const submitError = ref<unknown | null>(null)
+
+const copyTarget = ref<PlatformTemplate | null>(null)
 
 /** null = closed; an object with no id = creating. */
 const editing = ref<Partial<AvatarTemplate> | null>(null)

@@ -18,6 +18,7 @@
  * Fixtures and the UI use real numbers: `external_id` is `number | null`, never
  * a numeric string, and no cast is needed to satisfy the compiler.
  */
+import type { ExternalReferenceProps } from '../../app/components/molecules/ExternalReference.vue'
 import type { GenerateEntryLinkPayload } from '../../app/composables/useEntryLinks'
 import type { ParticipantDetailResponse } from '../../app/composables/useParticipants'
 import type { components, paths } from '../../types/api'
@@ -85,3 +86,30 @@ type CandidateParticipant = components['schemas']['App.Http.Resources.Participan
 export const candidateSchemaHasNoExternalId: LacksKey<CandidateParticipant, 'external_id'> = true
 
 export const candidateSchemaHasNoSource: LacksKey<CandidateParticipant, 'source'> = true
+
+// -- Presentational molecule: props accept the admin row's values -----------
+
+/** One-way: every value the admin resources can carry must be a valid prop. */
+type Accepts<Prop, Value> = [Value] extends [Prop] ? true : false
+
+type AdminReference = Pick<ParticipantListPayload['data'][number], 'external_id' | 'source'>
+
+export const moleculeAcceptsAdminExternalId: Accepts<
+  ExternalReferenceProps['externalId'],
+  AdminReference['external_id']
+> = true
+
+export const moleculeAcceptsAdminSource: Accepts<
+  ExternalReferenceProps['source'],
+  AdminReference['source']
+> = true
+
+export const moleculeAcceptsDetailExternalId: Accepts<
+  ExternalReferenceProps['externalId'],
+  ParticipantDetailResponse['data']['external_id']
+> = true
+
+export const moleculeAcceptsDetailSource: Accepts<
+  ExternalReferenceProps['source'],
+  ParticipantDetailResponse['data']['source']
+> = true

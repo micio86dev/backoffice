@@ -15,6 +15,7 @@ import type {
   TemplateListResponse,
   TemplateOptionsResponse,
   TemplateResponse,
+  TemplateScope,
 } from '../types/avatar-template'
 import { useApi } from './useApi'
 
@@ -201,6 +202,9 @@ export function useAvatarTemplates() {
    * carried over), so nothing a target's candidates meet changes until someone
    * there activates it. The result is in target order.
    *
+   * `scope` says whose template `id` is; the default keeps the organization
+   * behaviour byte for byte.
+   *
    * `name` is optional; a blank one is not sent, so the server keeps the
    * source name (and suffixes "(copy)" where it collides). Failures reject
    * with a `DuplicateTemplateError`.
@@ -208,12 +212,16 @@ export function useAvatarTemplates() {
   async function duplicateTemplate(
     id: number | string,
     targetOrganizationIds: number[],
-    name?: string | null
+    name?: string | null,
+    scope: TemplateScope = 'organization'
   ): Promise<DuplicateTemplateResponse> {
     const trimmed = name?.trim() ?? ''
+    // A platform template is copied through its OWN route: the organization one
+    // answers 404 for a platform id, like every organization route.
+    const path = scope === 'platform' ? '/admin/avatar-templates' : '/avatar-templates'
 
     try {
-      return await apiFetch<DuplicateTemplateResponse>(`/avatar-templates/${id}/duplicate`, {
+      return await apiFetch<DuplicateTemplateResponse>(`${path}/${id}/duplicate`, {
         method: 'POST',
         body: {
           target_organization_ids: targetOrganizationIds,

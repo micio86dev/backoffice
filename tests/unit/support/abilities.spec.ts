@@ -52,6 +52,16 @@ describe('tests/unit/support/abilities — the mirror answers VALUES, not just b
     expect(abilitiesForRole({ roles: [], isSuperadmin: true }).avatarTemplates.create).toBe(true)
   })
 
+  it('keeps manageGlobal superadmin-only: an org admin reads false, a superadmin true', () => {
+    // R3-manageglobal-untested. The nav entry and the route guard both key off
+    // this value, so a mirror that answered `admin` here would show the door.
+    expect(abilitiesForRole('admin').avatarTemplates.manageGlobal).toBe(false)
+    expect(abilitiesForRole('operator').avatarTemplates.manageGlobal).toBe(false)
+    expect(abilitiesForRole({ roles: [], isSuperadmin: true }).avatarTemplates.manageGlobal).toBe(
+      true
+    )
+  })
+
   it('still gives an org admin the abilities that ARE theirs', () => {
     // A guard that answered `false` to everything would pass the cases above
     // for the wrong reason.

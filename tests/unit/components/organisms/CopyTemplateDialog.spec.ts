@@ -52,9 +52,9 @@ async function click(testId: string): Promise<void> {
   await flushPromises()
 }
 
-async function mountOpen() {
+async function mountOpen(scope?: 'platform' | 'organization') {
   const wrapper = mount(CopyTemplateDialog, {
-    props: { open: true, template },
+    props: { open: true, template, ...(scope === undefined ? {} : { scope }) },
     global: { mocks: { $t: tMock } },
     attachTo: document.body,
   })
@@ -104,7 +104,7 @@ describe('CopyTemplateDialog', () => {
     await click('org-select-all')
     await click('copy-template-submit')
 
-    expect(duplicateTemplate).toHaveBeenCalledWith(7, [2, 3], '')
+    expect(duplicateTemplate).toHaveBeenCalledWith(7, [2, 3], '', 'organization')
   })
 
   it('sends the optional name override', async () => {
@@ -117,7 +117,7 @@ describe('CopyTemplateDialog', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await click('copy-template-submit')
 
-    expect(duplicateTemplate).toHaveBeenCalledWith(7, [3], 'Shared voice')
+    expect(duplicateTemplate).toHaveBeenCalledWith(7, [3], 'Shared voice', 'organization')
   })
 
   it('shows a loading state and blocks a second submit while the request runs', async () => {
@@ -243,5 +243,41 @@ describe('CopyTemplateDialog', () => {
     await waitForTestId('org-multiselect')
     expect(q('copy-template-result')).toBeNull()
     expect(q('org-option-2')!.getAttribute('aria-checked')).toBe('false')
+  })
+
+  describe('copying FROM a platform template (scope="platform")', () => {
+    it('offers EVERY organization, the acting one included: a global has no source organization', async () => {
+      await mountOpen('platform')
+
+      expect(q('org-option-1')).not.toBeNull()
+      expect(q('org-option-2')).not.toBeNull()
+      expect(q('org-option-3')).not.toBeNull()
+    })
+
+    it('labels the source with the Platform badge and says the copy is independent', async () => {
+      await mountOpen('platform')
+
+      expect(q('copy-template-platform-badge')?.textContent).toContain('platformTemplates.badge')
+      expect(q('copy-template-independence')?.textContent).toContain(
+        'avatar_templates.copy.platformIndependent'
+      )
+    })
+
+    it('copies through the platform route by passing the scope on', async () => {
+      duplicateTemplate.mockResolvedValue({ data: [] })
+      await mountOpen('platform')
+
+      await click('org-option-1')
+      await click('copy-template-submit')
+
+      expect(duplicateTemplate).toHaveBeenCalledWith(7, [1], '', 'platform')
+    })
+
+    it('shows neither the badge nor the notice for an organization template', async () => {
+      await mountOpen()
+
+      expect(q('copy-template-platform-badge')).toBeNull()
+      expect(q('copy-template-independence')).toBeNull()
+    })
   })
 })

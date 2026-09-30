@@ -116,7 +116,8 @@
     "avatarTemplates": "Template avatar",
     "clients": "Clienti",
     "catalogue": "Catalogo",
-    "profileLabel": "Profilo di {name}"
+    "profileLabel": "Profilo di {name}",
+    "platformTemplates": "Template piattaforma"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1243,7 +1244,8 @@
       "close": "Chiudi",
       "resultTitle": "1 copia creata | {count} copie create",
       "resultInactive": "Le copie sono inattive. Attivale una per una nella rispettiva organizzazione prima di usarle.",
-      "resultItem": "{organization} — \"{name}\""
+      "resultItem": "{organization} — \"{name}\"",
+      "platformIndependent": "Questo è un template piattaforma. La copia è indipendente: le modifiche successive al template piattaforma non la raggiungono."
     }
   },
   "help": {
@@ -1408,6 +1410,9 @@
     },
     "clients": {
       "description": "L'elenco di tutte le organizzazioni della piattaforma. Entra in una per vedere i suoi progetti, candidati e report."
+    },
+    "platformTemplates": {
+      "description": "I template avatar che BEAI offre a ogni organizzazione. Modificarne uno raggiunge ogni progetto che lo usa."
     }
   },
   "review": {
@@ -1766,6 +1771,62 @@
       "roleLabel": "Ruolo",
       "roleOption": {
         "none": "Nessuno — senza ruolo (solo competenze di potenziale)"
+      }
+    }
+  },
+  "platformTemplates": {
+    "title": "Template piattaforma",
+    "intro": "I template avatar che BEAI offre a ogni organizzazione. Le organizzazioni ne scelgono uno dal modulo progetto e non ne vedono mai la configurazione. Una modifica raggiunge ogni progetto che lo usa.",
+    "empty": "Nessun template piattaforma.",
+    "badge": "Piattaforma",
+    "action": {
+      "new": "Nuovo template piattaforma",
+      "edit": "Modifica",
+      "offer": "Offri alle organizzazioni",
+      "retire": "Ritira",
+      "delete": "Elimina",
+      "copy": "Copia nelle organizzazioni"
+    },
+    "state": {
+      "offered": "Offerto",
+      "retired": "Ritirato"
+    },
+    "usage": "{organizations} organizzazioni / {projects} progetti",
+    "deleteBlocked": "Non eliminabile finché {organizations} organizzazioni / {projects} progetti lo usano.",
+    "llmSyncFailed": "Il modello conversazionale non è stato sincronizzato con il provider. Salva di nuovo il template per riprovare.",
+    "notice": {
+      "saved": "\"{name}\" salvato.",
+      "offered": "\"{name}\" è ora offerto a ogni organizzazione.",
+      "retired": "\"{name}\" ritirato. I progetti che già lo usano continuano a funzionare.",
+      "deleted": "\"{name}\" eliminato."
+    },
+    "error": {
+      "title": "Operazione non riuscita",
+      "loadTitle": "Impossibile caricare i template piattaforma",
+      "loadBody": "Verifica di aver effettuato l'accesso come amministratore di piattaforma e riprova.",
+      "stillUsed": "{organizations} organizzazioni / {projects} progetti usano ancora questo template."
+    },
+    "serverError": {
+      "template_active": "Questo template è ancora offerto alle organizzazioni. Ritiralo prima, poi eliminalo.",
+      "template_in_use": "Questo template non può essere eliminato finché dei progetti lo usano.",
+      "forbidden": "Solo gli amministratori di piattaforma possono gestire i template piattaforma."
+    },
+    "impact": {
+      "usage": "{organizations} organizzazioni / {projects} progetti usano questo template.",
+      "edit": {
+        "title": "Salvare le modifiche a \"{name}\"?",
+        "effect": "La modifica si applica subito a ogni progetto che lo usa, comprese le interviste in corso alla prossima ripresa.",
+        "confirm": "Salva le modifiche"
+      },
+      "retire": {
+        "title": "Ritirare \"{name}\"?",
+        "effect": "Non sarà più proposto per i nuovi progetti. I progetti che già lo usano continuano a funzionare.",
+        "confirm": "Ritira"
+      },
+      "delete": {
+        "title": "Eliminare \"{name}\"?",
+        "effect": "Questa azione non può essere annullata.",
+        "confirm": "Elimina"
       }
     }
   }

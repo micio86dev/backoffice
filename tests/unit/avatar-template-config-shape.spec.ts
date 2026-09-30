@@ -19,10 +19,13 @@ describe('avatar template config shape', () => {
     await useAvatarTemplates().updateTemplate(1, { config: edited })
     await useAvatarTemplates().createTemplate({ name: 'X', provider: 'heygen', config: edited })
 
-    for (const call of apiFetch.mock.calls) {
-      const body = (call[1] as { body: { config: unknown } }).body
-      expect(Array.isArray(body.config)).toBe(false)
-      expect(body.config).toEqual({ avatarId: 'a', voiceId: 'v2' })
-    }
+    // Exactly one call per builder: an empty call list must fail, not pass vacuously.
+    expect(apiFetch).toHaveBeenCalledTimes(2)
+    const bodies = apiFetch.mock.calls.map((c) => (c[1] as { body: { config: unknown } }).body)
+    expect(bodies.map((b) => Array.isArray(b.config))).toEqual([false, false])
+    expect(bodies.map((b) => b.config)).toEqual([
+      { avatarId: 'a', voiceId: 'v2' },
+      { avatarId: 'a', voiceId: 'v2' },
+    ])
   })
 })

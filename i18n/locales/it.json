@@ -273,8 +273,10 @@
   },
   "externalReference": {
     "label": "Riferimento esterno",
+    "help": "Serve solo se il candidato è stato creato da un altro sistema.",
     "externalId": "ID esterno",
-    "source": "Origine"
+    "source": "Origine",
+    "externalIdInvalid": "Inserisci un numero intero da 1 a {max}."
   },
   "participantRecovery": {
     "description": "La valutazione di questo candidato è fallita durante il colloquio. Un admin o un operatore può riaprirla per permettere al candidato di riprendere.",

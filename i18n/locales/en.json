@@ -273,8 +273,10 @@
   },
   "externalReference": {
     "label": "External reference",
+    "help": "Only needed when another system created this candidate.",
     "externalId": "External ID",
-    "source": "Source"
+    "source": "Source",
+    "externalIdInvalid": "Enter a whole number from 1 to {max}."
   },
   "participantRecovery": {
     "description": "This candidate's assessment failed during the interview. An admin or operator can re-open it so the candidate can resume.",

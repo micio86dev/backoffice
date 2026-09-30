@@ -25,8 +25,10 @@ function lookup(bundle: unknown, key: string): unknown {
 /** The whole `externalReference` namespace, asked for by the UI. */
 const EXTERNAL_REFERENCE_KEYS = [
   'externalReference.label',
+  'externalReference.help',
   'externalReference.externalId',
   'externalReference.source',
+  'externalReference.externalIdInvalid',
 ] as const
 
 describe('external reference copy', () => {
@@ -44,6 +46,10 @@ describe('external reference copy', () => {
       expect(Object.keys(namespace).sort()).toEqual(
         EXTERNAL_REFERENCE_KEYS.map((key) => key.split('.')[1]!).sort()
       )
+    })
+
+    it('keeps the {max} placeholder in the External ID message: the limit is interpolated, not typed', () => {
+      expect(lookup(table, 'externalReference.externalIdInvalid')).toContain('{max}')
     })
 
     it('tells the operator the list search also matches source and external ID', () => {

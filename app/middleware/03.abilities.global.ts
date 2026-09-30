@@ -39,6 +39,9 @@ import { useCurrentUser } from '@/composables/useCurrentUser'
 const REQUIRED: Record<string, AbilityKey> = {
   settings: 'users.viewAny',
   'avatar-templates': 'avatarTemplates.viewAny',
+  // A separate root, not a child of /avatar-templates: that guard is `viewAny`,
+  // which an org admin holds.
+  'platform-templates': 'avatarTemplates.manageGlobal',
   clients: 'clients.viewAny',
   catalogue: 'catalogue.manage',
 }

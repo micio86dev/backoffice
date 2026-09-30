@@ -258,3 +258,52 @@ export type DuplicateTemplateResponse =
   paths['/avatar-templates/{id}/duplicate']['post']['responses']['201']['content']['application/json']
 
 export type DuplicatedTemplate = DuplicateTemplateResponse['data'][number]
+
+type GeneratedPlatformTemplate = components['schemas']['PlatformAvatarTemplateResource']
+
+/**
+ * A platform (global) template as the superadmin's management page reads it:
+ * the same narrowings as `AvatarTemplate`, plus how far its reach extends.
+ * `usage` counts non-deleted pinning projects across EVERY organization and is
+ * the only cross-tenant number the api exposes (never organization names).
+ */
+export type PlatformTemplate = Omit<
+  GeneratedPlatformTemplate,
+  'config' | 'provider' | 'description' | 'pal_sync'
+> & {
+  config: Record<string, unknown>
+  provider: ProviderName
+  description: string | null
+  pal_sync: PalSync
+}
+
+export type PlatformTemplateUsage = GeneratedPlatformTemplate['usage']
+
+/** Same conditional `warning` code as `TemplateResponse`, for the platform routes. */
+export interface PlatformTemplateResponse {
+  data: PlatformTemplate
+  warning?: string
+}
+
+export interface PlatformTemplateListResponse {
+  data: PlatformTemplate[]
+}
+
+type PlatformStoreBody =
+  paths['/admin/avatar-templates']['post']['requestBody']['content']['application/json']
+type PlatformUpdateBody = NonNullable<
+  paths['/admin/avatar-templates/{id}']['patch']['requestBody']
+>['content']['application/json']
+
+/**
+ * The platform write bodies, with `config` re-narrowed to the string-keyed MAP
+ * the api really validates (the generated `string[]` is Scramble reading a PHP
+ * `array` rule as a list) — the same narrowing `AvatarTemplate['config']` has,
+ * pinned by `tests/nuxt/avatar-template-config-contract.ts`.
+ */
+export type PlatformTemplateCreatePayload = Omit<PlatformStoreBody, 'config'> & {
+  config: Record<string, unknown>
+}
+export type PlatformTemplateUpdatePayload = Omit<PlatformUpdateBody, 'config'> & {
+  config?: Record<string, unknown>
+}

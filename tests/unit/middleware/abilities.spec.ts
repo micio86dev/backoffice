@@ -156,4 +156,26 @@ describe('03.abilities.global.ts', () => {
 
     expect(navigateToMock).toHaveBeenCalledWith('/')
   })
+
+  it('guards the platform templates page by the manageGlobal ability, not the org viewAny one', async () => {
+    canMock.mockReturnValue(true)
+    vi.stubGlobal('navigateTo', vi.fn())
+
+    await run('/platform-templates')
+
+    expect(canMock).toHaveBeenCalledWith('avatarTemplates.manageGlobal')
+    expect(canMock).not.toHaveBeenCalledWith('avatarTemplates.viewAny')
+  })
+
+  it('redirects an org admin away from the platform templates page, locale prefix included', async () => {
+    // `/avatar-templates` admits org admins; the platform page must not
+    // inherit that guard through a shared route root.
+    canMock.mockImplementation((ability) => ability === 'avatarTemplates.viewAny')
+    const navigateToMock = vi.fn()
+    vi.stubGlobal('navigateTo', navigateToMock)
+
+    await run('/en/platform-templates')
+
+    expect(navigateToMock).toHaveBeenCalledWith('/')
+  })
 })

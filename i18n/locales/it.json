@@ -116,7 +116,8 @@
     "avatarTemplates": "Template avatar",
     "clients": "Clienti",
     "catalogue": "Catalogo",
-    "profileLabel": "Profilo di {name}"
+    "profileLabel": "Profilo di {name}",
+    "platformTemplates": "Template piattaforma"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1408,6 +1409,9 @@
     },
     "clients": {
       "description": "L'elenco di tutte le organizzazioni della piattaforma. Entra in una per vedere i suoi progetti, candidati e report."
+    },
+    "platformTemplates": {
+      "description": "I template avatar che BEAI offre a ogni organizzazione. Modificarne uno raggiunge ogni progetto che lo usa."
     }
   },
   "review": {

@@ -10,6 +10,8 @@ import type { AvatarTemplate } from '../../app/types/avatar-template'
 const apiFetch = vi.fn().mockResolvedValue({ data: {} })
 vi.mock('../../app/composables/useApi', () => ({ useApi: () => ({ apiFetch }) }))
 const { useAvatarTemplates } = await import('../../app/composables/useAvatarTemplates')
+const { usePlatformAvatarTemplates } =
+  await import('../../app/composables/usePlatformAvatarTemplates')
 
 describe('avatar template config shape', () => {
   it('round-trips a config map through the payload builders unchanged', async () => {
@@ -27,5 +29,20 @@ describe('avatar template config shape', () => {
       { avatarId: 'a', voiceId: 'v2' },
       { avatarId: 'a', voiceId: 'v2' },
     ])
+  })
+
+  it('round-trips a config map through the PLATFORM payload builders unchanged', async () => {
+    // R3-platform-template-config-gap: the platform write bodies carry the same
+    // generated `string[]` for `config`, and need the same narrowing.
+    apiFetch.mockClear()
+    const edited = { avatarId: 'a', voiceId: 'v2' }
+
+    await usePlatformAvatarTemplates().update(1, { config: edited })
+    await usePlatformAvatarTemplates().create({ name: 'X', provider: 'tavus', config: edited })
+
+    expect(apiFetch).toHaveBeenCalledTimes(2)
+    const bodies = apiFetch.mock.calls.map((c) => (c[1] as { body: { config: unknown } }).body)
+    expect(bodies.map((b) => Array.isArray(b.config))).toEqual([false, false])
+    expect(bodies.map((b) => b.config)).toEqual([edited, edited])
   })
 })

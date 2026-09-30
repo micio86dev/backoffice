@@ -116,7 +116,8 @@
     "avatarTemplates": "Avatar templates",
     "clients": "Clients",
     "catalogue": "Catalogue",
-    "profileLabel": "{name}'s profile"
+    "profileLabel": "{name}'s profile",
+    "platformTemplates": "Platform templates"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1408,6 +1409,9 @@
     },
     "clients": {
       "description": "The directory of every organization on the platform. Switch into one to see its projects, candidates and reports."
+    },
+    "platformTemplates": {
+      "description": "Avatar templates that BEAI offers to every organization. Editing one reaches every project that uses it."
     }
   },
   "review": {

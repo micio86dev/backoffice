@@ -86,7 +86,7 @@ describe('OnboardingTourOverlay', () => {
     expect(panel()?.textContent).toContain('nav.dashboard')
     expect(panel()?.textContent).toContain('help.topics.dashboard.summary')
     expect(document.querySelector('[data-testid="onboarding-tour-progress"]')?.textContent).toBe(
-      'onboardingTour.progress|{"current":1,"total":8}'
+      'onboardingTour.progress|{"current":1,"total":9}'
     )
   })
 
@@ -148,9 +148,9 @@ describe('OnboardingTourOverlay', () => {
     mountOverlay()
     await flushPromises()
 
-    // 7 nav items reachable by this permissive `can()` mock, plus the
+    // 8 nav items reachable by this permissive `can()` mock, plus the
     // trailing help step — see nav-items.ts. Advance to the very last one.
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 8; i++) {
       document.querySelector<HTMLButtonElement>('[data-testid="onboarding-tour-next"]')?.click()
       await flushPromises()
     }

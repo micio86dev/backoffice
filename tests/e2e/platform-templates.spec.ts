@@ -119,6 +119,24 @@ async function mockApi(page: Page, api: Api): Promise<void> {
         return jsonRoute(route, { data: resource(created) }, 201)
       }
       if (row === undefined) return jsonRoute(route, { message: 'not_found' }, 404)
+      if (method === 'POST' && path.endsWith('/duplicate')) {
+        const targets = (body?.target_organization_ids ?? []) as number[]
+
+        return jsonRoute(
+          route,
+          {
+            data: targets.map((organizationId, index) => ({
+              ...resource(row),
+              id: 900 + index,
+              scope: 'organization',
+              organization_id: organizationId,
+              name: String(body?.name ?? row.name),
+              is_active: false,
+            })),
+          },
+          201
+        )
+      }
       if (method === 'POST' && path.endsWith('/activate')) row.is_active = true
       if (method === 'POST' && path.endsWith('/deactivate')) row.is_active = false
       if (method === 'PATCH') row.name = String(body?.name ?? row.name)
@@ -266,6 +284,63 @@ test.describe('Platform templates: management flow (superadmin)', () => {
     const alert = page.getByTestId('platform-template-error')
     await expect(alert).toContainText('2 organizzazioni / 3 progetti usano ancora questo template')
     await expect(page.getByTestId('platform-template-row-8')).toBeVisible()
+  })
+
+  test('copies a global into chosen organizations: platform route, payload, result summary', async ({
+    page,
+  }) => {
+    const api = newApi([{ ...IN_USE }])
+    await injectSession(page)
+    await mockIdentity(page, 'superadmin')
+    await mockApi(page, api)
+    // Registered after `mockIdentity`, so it wins: the dialog needs real targets.
+    await page.route(
+      (url) => url.pathname === '/admin/organizations',
+      (route) =>
+        jsonRoute(route, {
+          data: [
+            { id: 11, name: 'Acme' },
+            { id: 12, name: 'Globex' },
+            { id: 13, name: 'Initech' },
+          ],
+          acting_organization_id: null,
+        })
+    )
+
+    await page.goto('/platform-templates')
+    await page.getByTestId('platform-template-copy-7').click()
+
+    const dialog = page.getByTestId('copy-template-dialog')
+    await expect(dialog.getByTestId('copy-template-platform-badge')).toBeVisible()
+    await expect(dialog.getByTestId('copy-template-independence')).toBeVisible()
+
+    // Nothing selected: the submit is disabled and nothing has been sent.
+    await expect(dialog.getByTestId('copy-template-submit')).toBeDisabled()
+    expect(api.writes).toHaveLength(0)
+
+    await dialog.getByRole('checkbox', { name: 'Acme' }).click()
+    await dialog.getByRole('checkbox', { name: 'Initech' }).click()
+    await dialog.getByTestId('copy-template-name').fill('Studio voice (client)')
+    await dialog.getByTestId('copy-template-submit').click()
+
+    // The platform route, never the organization one (which 404s a global id).
+    expect(api.writes).toHaveLength(1)
+    expect(api.writes[0]).toMatchObject({
+      method: 'POST',
+      path: '/admin/avatar-templates/7/duplicate',
+      body: { target_organization_ids: [11, 13], name: 'Studio voice (client)' },
+    })
+
+    const result = dialog.getByTestId('copy-template-result')
+    await expect(result).toHaveAttribute('role', 'status')
+    await expect(dialog.getByTestId('copy-template-result-title')).toHaveText('2 copie create')
+    await expect(dialog.getByTestId('copy-result-900')).toContainText('Acme')
+    await expect(dialog.getByTestId('copy-result-901')).toContainText('Initech')
+
+    await dialog.getByTestId('copy-template-done').click()
+    await expect(dialog).toHaveCount(0)
+    // The copies live in other organizations: the list behind is unchanged.
+    await expect(page.getByTestId('platform-template-row-7')).toContainText('Studio voice')
   })
 })
 

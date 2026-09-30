@@ -52,6 +52,19 @@
               {{ participant.display_name }}
             </NuxtLink>
             <div class="text-muted-foreground text-xs">{{ participant.candidate_ref }}</div>
+            <!--
+              candidate-external-reference: the calling system's own reference,
+              as a muted sub-line under the candidate_ref. NOT a column — the
+              column set is part of the list's contract and most rows have no
+              reference at all. The molecule renders nothing when both values
+              are null, so a row without one keeps today's markup exactly.
+            -->
+            <ExternalReference
+              variant="compact"
+              :external-id="participant.external_id"
+              :source="participant.source"
+              class="text-muted-foreground text-xs"
+            />
           </TableCell>
           <TableCell>{{ participant.project_name ?? '–' }}</TableCell>
           <TableCell>{{ participant.role_code }}</TableCell>
@@ -113,6 +126,7 @@ import { formSelectClass } from '@/components/ui/form-control'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
+import ExternalReference from '@/components/molecules/ExternalReference.vue'
 import { PARTICIPANT_STATUSES } from '@/utils/participant-lifecycle'
 import { formatDate } from '@/utils/format'
 import { cn } from '@/lib/utils'

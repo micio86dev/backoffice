@@ -153,7 +153,7 @@
     "subtitle": "Chi ha ricevuto un link di accesso e a che punto è arrivato.",
     "filters": {
       "search": "Cerca",
-      "searchPlaceholder": "Cerca per nome o riferimento",
+      "searchPlaceholder": "Cerca per nome, riferimento, origine o ID esterno",
       "status": "Stato",
       "allStatuses": "Tutti gli stati"
     },
@@ -270,6 +270,13 @@
       "entry_link_participant_failed": "La valutazione di questo candidato è fallita. Riaprila prima di generare un nuovo link.",
       "entry_link_project_closed": "Questo progetto al momento non accetta colloqui."
     }
+  },
+  "externalReference": {
+    "label": "Riferimento esterno",
+    "help": "Serve solo se il candidato è stato creato da un altro sistema.",
+    "externalId": "ID esterno",
+    "source": "Origine",
+    "externalIdInvalid": "Inserisci un numero intero da 1 a {max}."
   },
   "participantRecovery": {
     "description": "La valutazione di questo candidato è fallita durante il colloquio. Un admin o un operatore può riaprirla per permettere al candidato di riprendere.",

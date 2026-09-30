@@ -81,6 +81,83 @@
         </Field>
 
         <!--
+          candidate-external-reference (design AD-8): OPTIONAL. The calling
+          system's own id for this candidate and the name of that system — only
+          meaningful when another system created the candidate, so both stay
+          empty for a candidate invited by hand.
+
+          One help line for the PAIR, nested in the FieldSet it describes (the
+          WebhookDefaultsForm pattern), not a loose sibling inside FieldGroup.
+          It is the `aria-describedby` of each input until that input has an
+          error of its own, which then takes its place.
+
+          External ID is `type="text" inputmode="numeric"`, NOT `type="number"`:
+          a number input scrolls with the wheel, accepts `e` notation and hands
+          back a float, so an identifier near 2^53 would lose digits before
+          validation ever saw it.
+        -->
+        <FieldSet class="gap-3" data-testid="entry-link-form-external-reference">
+          <FieldLegend variant="label">{{ $t('externalReference.label') }}</FieldLegend>
+          <FieldDescription id="entry-link-form-external-reference-help">
+            {{ $t('externalReference.help') }}
+          </FieldDescription>
+
+          <Field :data-invalid="Boolean(errors.externalId)">
+            <FieldLabel for="entry-link-form-external-id">
+              {{ $t('externalReference.externalId') }}
+            </FieldLabel>
+            <Input
+              id="entry-link-form-external-id"
+              v-model="externalId"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.externalId)"
+              :aria-describedby="
+                errors.externalId
+                  ? 'entry-link-form-external-id-error'
+                  : 'entry-link-form-external-reference-help'
+              "
+              data-testid="entry-link-form-external-id"
+              @blur="errors.externalId = validateExternalId()"
+            />
+            <FieldError
+              v-if="errors.externalId"
+              id="entry-link-form-external-id-error"
+              data-testid="entry-link-form-external-id-error"
+            >
+              {{ errors.externalId }}
+            </FieldError>
+          </Field>
+
+          <Field :data-invalid="Boolean(errors.source)">
+            <FieldLabel for="entry-link-form-source">
+              {{ $t('externalReference.source') }}
+            </FieldLabel>
+            <Input
+              id="entry-link-form-source"
+              v-model="source"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.source)"
+              :aria-describedby="
+                errors.source
+                  ? 'entry-link-form-source-error'
+                  : 'entry-link-form-external-reference-help'
+              "
+              data-testid="entry-link-form-source"
+              @blur="errors.source = validateSource()"
+            />
+            <FieldError
+              v-if="errors.source"
+              id="entry-link-form-source-error"
+              data-testid="entry-link-form-source-error"
+            >
+              {{ errors.source }}
+            </FieldError>
+          </Field>
+        </FieldSet>
+
+        <!--
           interview-scheduling (design AD-2/AD-3, PR-F): "send now" vs
           "schedule for later". Default "now" preserves today's behaviour
           byte-for-byte (spec: "Omitted scheduled_at preserves today's
@@ -204,6 +281,13 @@ import { applyServerFieldErrors } from '@/utils/http-error'
 
 const MAX_LENGTH = 255
 
+// candidate-external-reference: mirror the API's `ExternalReference` rules —
+// `external_id` is an integer between 1 and 2^53 - 1 (the largest value a
+// JavaScript number, and therefore a JSON consumer, can hold exactly) and
+// `source` is at most 180 characters. UX hint only: the server is the authority.
+const EXTERNAL_ID_MAX = Number.MAX_SAFE_INTEGER
+const SOURCE_MAX_LENGTH = 180
+
 // interview-scheduling (design AD-3): mirrors
 // `api/app/Support/Scheduling/ScheduledInterviewWindow::MINIMUM_SCHEDULING_LEAD_MINUTES`
 // (confirmed by reading that file, not guessed). UX hint only — the server's
@@ -255,11 +339,17 @@ const schedulingMode = ref<'now' | 'schedule'>('now')
 // `<input type="datetime-local">` value — no timezone, browser wall-clock
 // time. Converted to an explicit-offset ISO-8601 string only at submit time.
 const scheduledAt = ref('')
+// Both optional, both kept as the raw text the operator typed: External ID is
+// converted to a number only at submit time, after it has been validated.
+const externalId = ref('')
+const source = ref('')
 const errors = ref<{
   candidateRef?: string
   displayName?: string
   email?: string
   scheduledAt?: string
+  externalId?: string
+  source?: string
 }>({})
 const formMessage = ref<string | null>(null)
 const submitting = ref(false)
@@ -297,13 +387,48 @@ function validate(): boolean {
 
   errors.value.email = validateEmail()
   errors.value.scheduledAt = validateScheduledAt()
+  errors.value.externalId = validateExternalId()
+  errors.value.source = validateSource()
 
   return (
     !errors.value.candidateRef &&
     !errors.value.displayName &&
     !errors.value.email &&
-    !errors.value.scheduledAt
+    !errors.value.scheduledAt &&
+    !errors.value.externalId &&
+    !errors.value.source
   )
+}
+
+/**
+ * Empty is fine (the whole fieldset is optional). Otherwise digits only, and a
+ * SAFE integer of at least 1: `Number('9007199254740993')` silently rounds to
+ * `...992`, so the round trip through `isSafeInteger` is what rejects it.
+ * Decimals, signs, exponents and embedded spaces fail the digits-only test
+ * before the number is ever parsed.
+ */
+function validateExternalId(): string | undefined {
+  const value = externalId.value.trim()
+  if (value === '') return undefined
+
+  if (!/^\d+$/.test(value))
+    return t('externalReference.externalIdInvalid', { max: EXTERNAL_ID_MAX })
+
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    return t('externalReference.externalIdInvalid', { max: EXTERNAL_ID_MAX })
+  }
+
+  return undefined
+}
+
+/** Measured after trimming, because the trimmed value is what is sent. */
+function validateSource(): string | undefined {
+  if (source.value.trim().length > SOURCE_MAX_LENGTH) {
+    return t('entryLink.form.tooLong', { max: SOURCE_MAX_LENGTH })
+  }
+
+  return undefined
 }
 
 /**
@@ -353,6 +478,8 @@ const SERVER_FIELD_TO_ERROR_KEY = {
   display_name: 'displayName',
   email: 'email',
   scheduled_at: 'scheduledAt',
+  external_id: 'externalId',
+  source: 'source',
 } as const satisfies Record<string, keyof typeof errors.value>
 
 async function onSubmit(): Promise<void> {
@@ -378,6 +505,17 @@ async function onSubmit(): Promise<void> {
     } else {
       payload.send_email = sendEmail.value
     }
+
+    // candidate-external-reference: a key only for a value the operator
+    // actually entered, so a form left empty sends exactly the payload it always
+    // did. On BOTH timing modes: the scheduled row is created now, and the
+    // immediate link carries the pair in its token. `external_id` goes out as a
+    // NUMBER (the API rejects a numeric string), `source` trimmed.
+    const externalIdText = externalId.value.trim()
+    if (externalIdText !== '') payload.external_id = Number(externalIdText)
+
+    const sourceText = source.value.trim()
+    if (sourceText !== '') payload.source = sourceText
 
     const response = await generateEntryLink(payload)
     emit('success', response)

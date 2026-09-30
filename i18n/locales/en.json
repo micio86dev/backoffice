@@ -153,7 +153,7 @@
     "subtitle": "Who has been given an entry link, and where each of them got to.",
     "filters": {
       "search": "Search",
-      "searchPlaceholder": "Search by name or reference",
+      "searchPlaceholder": "Search by name, reference, source or external ID",
       "status": "Status",
       "allStatuses": "All statuses"
     },
@@ -270,6 +270,13 @@
       "entry_link_participant_failed": "This candidate's assessment failed. Re-open it before issuing a new link.",
       "entry_link_project_closed": "This project is not open for interviews right now."
     }
+  },
+  "externalReference": {
+    "label": "External reference",
+    "help": "Only needed when another system created this candidate.",
+    "externalId": "External ID",
+    "source": "Source",
+    "externalIdInvalid": "Enter a whole number from 1 to {max}."
   },
   "participantRecovery": {
     "description": "This candidate's assessment failed during the interview. An admin or operator can re-open it so the candidate can resume.",

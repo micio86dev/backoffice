@@ -1565,6 +1565,11 @@ export interface paths {
          * @description Server-paginated (D5 — a fresh authorized query per page, never
          *     fetch-all + client filter). Sort is fixed (created_at desc, id desc):
          *     no client-specified sort column reaches the query builder.
+         *
+         *     `q` matches `candidate_ref`, `display_name` and `source` as a
+         *     case-insensitive substring, taking `%`, `_` and `\` literally, and the
+         *     candidate's `external_id` by exact equality, only when the trimmed term
+         *     is a whole number from 1 to 9007199254740991.
          */
         get: operations["participant.index"];
         put?: never;
@@ -3387,6 +3392,8 @@ export interface components {
             candidate_ref: string;
             display_name: string;
             email: string;
+            external_id: number | null;
+            source: string | null;
             role_code: string | null;
             language: string | null;
             /** @enum {string} */
@@ -3435,12 +3442,46 @@ export interface components {
             };
             created_at: string | null;
         };
+        /** ParticipantEnrolmentResource */
+        ParticipantEnrolmentResource: {
+            id: number;
+            candidate_ref: string;
+            display_name: string;
+            role_code: string | null;
+            language: string | null;
+            /** @enum {string} */
+            status: "in_attesa" | "in_corso" | "in_valutazione" | "completato" | "errore";
+            started_at: string | null;
+            completed_at: string | null;
+            created_at: string | null;
+            scheduled_at: string | null;
+            /** @enum {string|null} */
+            scheduling_status: "pending" | "notice_sent" | "started" | "cancelled" | null;
+            branding: {
+                name: string | null;
+                primary_color: string | null;
+                logo_url: string | null;
+            };
+            project: {
+                id: number;
+                role_code: string | null;
+                language: string;
+                /** @enum {string} */
+                assessment_type: "standard" | "potential";
+                exit_redirect_url: string | null;
+                error_redirect_url: string | null;
+            } | null;
+            external_id: number | null;
+            source: string | null;
+        };
         /** ParticipantResource */
         ParticipantResource: {
             id: number;
             candidate_ref: string;
             display_name: string;
             email: string;
+            external_id: number | null;
+            source: string | null;
             role_code: string | null;
             language: string | null;
             /** @enum {string} */
@@ -3625,6 +3666,10 @@ export interface components {
             recording_ready: boolean;
             created_at: string;
             updated_at: string;
+            /** @description The calling system's own numeric identifier for this candidate, as supplied when the interview was created; `null` when none was given. */
+            external_id: number | null;
+            /** @description The calling system the candidate came from, as supplied when the interview was created; `null` when none was given. */
+            source: string | null;
             project: {
                 id: string;
                 name: string;
@@ -6158,11 +6203,13 @@ export interface operations {
                      *     who wants to deliver the link some other way opts out explicitly.
                      */
                     send_email?: boolean;
+                    external_id?: number | null;
+                    source?: string | null;
                 };
             };
         };
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -6176,7 +6223,7 @@ export interface operations {
                          *     rather than leaving the operator to guess whether it went.
                          */
                         email_sent: boolean;
-                    } | components["schemas"]["App.Http.Resources.ParticipantResource"];
+                    } | components["schemas"]["ParticipantEnrolmentResource"];
                 };
             };
             401: components["responses"]["AuthenticationException"];
@@ -7831,14 +7878,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Paginated set of `App.Http.Resources.ParticipantResource` */
+            /** @description Paginated set of `ParticipantEnrolmentResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["App.Http.Resources.ParticipantResource"][];
+                        data: components["schemas"]["ParticipantEnrolmentResource"][];
                         links: {
                             first: string | null;
                             last: string | null;
@@ -7901,17 +7948,19 @@ export interface operations {
                      *     live in ONE place, never re-typed per surface.
                      */
                     scheduled_at?: string;
+                    external_id?: number | null;
+                    source?: string | null;
                 };
             };
         };
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"];
+                    "application/json": components["schemas"]["ParticipantEnrolmentResource"];
                 };
             };
             401: components["responses"]["AuthenticationException"];
@@ -7944,14 +7993,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data: components["schemas"]["App.Http.Resources.ParticipantResource"];
+                        data: components["schemas"]["ParticipantEnrolmentResource"];
                     };
                 };
             };
@@ -7969,13 +8018,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                    "application/json": components["schemas"]["ParticipantEnrolmentResource"] | string;
                 };
             };
             401: components["responses"]["AuthenticationException"];
@@ -7999,13 +8048,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                    "application/json": components["schemas"]["ParticipantEnrolmentResource"] | string;
                 };
             };
             401: components["responses"]["AuthenticationException"];
@@ -8116,13 +8165,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                    "application/json": components["schemas"]["ParticipantEnrolmentResource"] | string;
                 };
             };
             401: components["responses"]["AuthenticationException"];
@@ -8147,13 +8196,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description `App.Http.Resources.ParticipantResource` */
+            /** @description `ParticipantEnrolmentResource` */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["App.Http.Resources.ParticipantResource"] | string;
+                    "application/json": components["schemas"]["ParticipantEnrolmentResource"] | string;
                 };
             };
             401: components["responses"]["AuthenticationException"];
@@ -9994,6 +10043,8 @@ export interface operations {
                     display_name: string;
                     role_code?: string | null;
                     lang?: string | null;
+                    external_id?: number | null;
+                    source?: string | null;
                 };
             };
         };

@@ -2674,6 +2674,8 @@ describe('a multi-word denied key behind a prefix', () => {
     'queries',
     'emails',
     'entry_url',
+    'external_id',
+    'external_ids',
   ]
 
   const EXPECTED_HANDLED_FIELDS = [
@@ -2757,6 +2759,29 @@ describe('a multi-word denied key behind a prefix', () => {
     })
 
     expect(missing).toEqual([])
+  })
+
+  it('redacts a candidate external reference id under every spelling and depth', () => {
+    // candidate-external-reference: `external_id` is the calling system's own
+    // identifier for the candidate, the same class as `candidate_ref`, so it is
+    // denied exactly as the api scrubber denies it. `source` is deliberately NOT
+    // denied (design DV-4): it is a generic key — Sentry's own
+    // `transaction_info.source` — and its value names a system, not a person.
+    const scrubbed = scrubSentryEvent({
+      extra: {
+        external_id: 88410013,
+        externalId: 88410014,
+        external_ids: [88410015],
+        participant: { external_id: 88410016 },
+        participant_external_id: 88410017,
+        source: 'workday',
+      },
+    } as unknown as ScrubbableEvent)
+
+    const encoded = JSON.stringify(scrubbed.extra)
+
+    expect(encoded).not.toContain('884100')
+    expect(encoded).toContain('workday')
   })
 
   it('denies EXACTLY the documented keys, no more and no fewer', () => {

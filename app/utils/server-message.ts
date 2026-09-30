@@ -26,13 +26,36 @@ export interface ServerMessageTranslator {
   te?: (key: string) => boolean
 }
 
+/**
+ * Codes that mean the same thing on EVERY surface live once, under the
+ * top-level `serverError` namespace, instead of being copied into each form's
+ * own namespace. A namespace that has its own copy still wins.
+ *
+ * `organization_context_required` is the first: any tenant-scoped write from a
+ * superadmin with no acting client answers it, from whichever form they were in.
+ */
+const SHARED_NAMESPACE = 'serverError'
+
+/** The key that has copy for `code`, preferring the caller's own namespace. */
+function resolveKey(
+  translator: ServerMessageTranslator,
+  namespace: string,
+  code: string
+): string | null {
+  if (typeof translator.te !== 'function') return null
+
+  for (const candidate of [`${namespace}.${code}`, `${SHARED_NAMESPACE}.${code}`]) {
+    if (translator.te(candidate)) return candidate
+  }
+
+  return null
+}
+
 export function translateServerCode(
   translator: ServerMessageTranslator,
   namespace: string,
   code: string
 ): string {
-  const key = `${namespace}.${code}`
-
   // FALSE on absence, not true. A translator without `te` cannot answer
   // "does this key exist", and answering YES on its behalf makes the gate
   // structurally incapable of failing: a stub with only `t` reports a hit for
@@ -40,9 +63,9 @@ export function translateServerCode(
   // the test asserting the translation stays green. That is precisely how
   // `users.serverError.role_invalid` shipped missing. Falling back to the raw
   // code is what the docblock above says this does.
-  const hasTranslation = typeof translator.te === 'function' && translator.te(key)
+  const resolved = resolveKey(translator, namespace, code)
 
-  return hasTranslation ? translator.t(key) : code
+  return resolved === null ? code : translator.t(resolved)
 }
 
 /**
@@ -78,8 +101,6 @@ export function translateServerCodes(
 // spaces and punctuation that neither case allows.
 const MACHINE_CODE = /^[A-Z]\w*$/i
 
-const key = (namespace: string, code: string): string => `${namespace}.${code}`
-
 export function translateServerCodeOrFallback(
   translator: ServerMessageTranslator,
   namespace: string,
@@ -89,7 +110,7 @@ export function translateServerCodeOrFallback(
   if (!MACHINE_CODE.test(value)) return translator.t(fallbackKey)
 
   // Same reasoning as `translateServerCode`: an absent `te` answers no.
-  const hasTranslation = typeof translator.te === 'function' && translator.te(key(namespace, value))
+  const resolved = resolveKey(translator, namespace, value)
 
-  return hasTranslation ? translator.t(key(namespace, value)) : translator.t(fallbackKey)
+  return translator.t(resolved ?? fallbackKey)
 }

@@ -22,6 +22,19 @@
         <li v-for="error in unmappedErrors" :key="error">{{ error }}</li>
       </ul>
 
+      <!--
+        Persona sync state (DESIGN.md 16.16): a Tavus persona Tavus refuses to
+        modify silently keeps its OLD voice, so the state of the last sync is
+        shown where the operator edits the settings. Edit only: a template not
+        yet saved has never been synced.
+      -->
+      <PalSyncStatus
+        v-if="!isNew && draft.provider === 'tavus'"
+        :sync="props.template.pal_sync"
+        provider="tavus"
+        layout="banner"
+      />
+
       <Field :data-invalid="Boolean(nameError)">
         <FieldLabel for="template-name">{{ $t('avatar_templates.form.name') }}</FieldLabel>
         <input
@@ -119,34 +132,40 @@
 
         <div data-testid="template-config-fields" :class="configFieldsClass">
           <!--
-        A checkbox lays out horizontally, everything else vertically, and that
-        is a layout fact rather than taste. `fieldVariants`' vertical
-        orientation carries `*:w-full`, which stretches EVERY direct child to
-        the container width. A select or a text input wants exactly that. A
-        16px checkbox does not — and `size-4` on the input cannot win, because
-        `*:w-full` compiles to a child combinator and outranks a class on the
-        element itself. So it rendered as a box the full width of the page.
-        The horizontal variant drops `*:w-full` and gives `flex-row
-        items-center`, which is also what a checkbox beside its label should
-        look like.
+        A boolean knob is a `CheckboxField` (DESIGN.md §16.13), not a `Field`
+        with a raw input: box first, label right of it, hint and error UNDER the
+        label. It is rendered outside `Field` because `fieldVariants`' vertical
+        orientation carries `*:w-full`, which would stretch a 16px box to the
+        grid cell, and the molecule owns its own layout.
       -->
-          <Field
-            v-for="field in activeFields"
-            :key="field.key"
-            :orientation="field.type === 'checkbox' ? 'horizontal' : 'vertical'"
-            :data-invalid="Boolean(configErrors[field.key])"
-          >
-            <FieldLabel :for="`template-config-${field.key}`">
-              {{ $t(field.label_key) }}
-              <abbr
-                v-if="field.required"
-                :title="$t('avatar_templates.form.required')"
-                class="no-underline"
-                >*</abbr
-              >
-            </FieldLabel>
+          <template v-for="field in activeFields" :key="field.key">
+            <CheckboxField
+              v-if="field.type === 'checkbox'"
+              :id="`template-config-${field.key}`"
+              :data-testid="`template-config-${field.key}`"
+              :model-value="draft.config[field.key] === true"
+              :label="$t(field.label_key)"
+              :description="field.hint_key ? $t(field.hint_key) : undefined"
+              :description-id="`template-config-${field.key}-hint`"
+              :error="configErrors[field.key]"
+              :error-id="`template-config-${field.key}-error`"
+              :error-test-id="`template-config-${field.key}-error`"
+              :required="field.required"
+              :required-title="$t('avatar_templates.form.required')"
+              @update:model-value="onFieldChange(field, $event)"
+            />
+            <Field v-else :data-invalid="Boolean(configErrors[field.key])">
+              <FieldLabel :for="`template-config-${field.key}`">
+                {{ $t(field.label_key) }}
+                <abbr
+                  v-if="field.required"
+                  :title="$t('avatar_templates.form.required')"
+                  class="no-underline"
+                  >*</abbr
+                >
+              </FieldLabel>
 
-            <!--
+              <!--
           avatar-template-catalogue PR4 (D7): checked BEFORE the select/text
           branches below. A catalogue-backed field (`avatarId`/`voiceId` for
           heygen, `faceId`/`palId` for tavus — D2) still stores a plain
@@ -156,57 +175,50 @@
           `catalogue_resource` (including `ttsExternalVoiceId`) falls
           through to the branches below, completely unchanged.
         -->
-            <AvatarTemplateProviderCombobox
-              v-if="catalogueFor(field) !== null"
-              :id="`template-config-${field.key}`"
-              :data-testid="`template-config-${field.key}`"
-              :field="catalogueFor(field)!.field"
-              :provider="catalogueFor(field)!.provider"
-              :model-value="stringValue(field.key)"
-              :aria-invalid="Boolean(configErrors[field.key])"
-              :aria-required="field.required ? 'true' : undefined"
-              :aria-describedby="describedBy(field)"
-              @change="onFieldChange(field, $event)"
-              @loaded="onCatalogueLoaded(field.key, $event)"
-            />
+              <AvatarTemplateProviderCombobox
+                v-if="catalogueFor(field) !== null"
+                :id="`template-config-${field.key}`"
+                :data-testid="`template-config-${field.key}`"
+                :field="catalogueFor(field)!.field"
+                :provider="catalogueFor(field)!.provider"
+                :model-value="stringValue(field.key)"
+                :aria-invalid="Boolean(configErrors[field.key])"
+                :aria-required="field.required ? 'true' : undefined"
+                :aria-describedby="describedBy(field)"
+                :preview="voicePreviewFor(field) ?? undefined"
+                @change="onFieldChange(field, $event)"
+                @loaded="onCatalogueLoaded(field.key, $event)"
+              />
 
-            <select
-              v-else-if="field.type === 'select'"
-              :id="`template-config-${field.key}`"
-              :data-testid="`template-config-${field.key}`"
-              :value="stringValue(field.key)"
-              autocomplete="off"
-              :aria-invalid="Boolean(configErrors[field.key])"
-              :aria-required="field.required ? 'true' : undefined"
-              :aria-describedby="describedBy(field)"
-              :class="formSelectClass"
-              @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
-            >
-              <!--
+              <select
+                v-else-if="field.type === 'select'"
+                :id="`template-config-${field.key}`"
+                :data-testid="`template-config-${field.key}`"
+                :value="stringValue(field.key)"
+                :disabled="!dependentOptionsAvailable(field, draft.config)"
+                autocomplete="off"
+                :aria-invalid="Boolean(configErrors[field.key])"
+                :aria-required="field.required ? 'true' : undefined"
+                :aria-describedby="describedBy(field)"
+                :class="formSelectClass"
+                @change="onFieldChange(field, ($event.target as HTMLSelectElement).value)"
+              >
+                <!--
             An empty option is essential, not decoration: absent means "use the
             provider's default", and without a way back to absent an operator
             who opens a select can never unset it again.
           -->
-              <option value="">{{ $t('avatar_templates.form.default') }}</option>
-              <option v-for="option in field.options ?? []" :key="option" :value="option">
-                {{ option }}
-              </option>
-            </select>
+                <option value="">{{ $t('avatar_templates.form.default') }}</option>
+                <option
+                  v-for="option in optionsFor(field, draft.config)"
+                  :key="option"
+                  :value="option"
+                >
+                  {{ option }}
+                </option>
+              </select>
 
-            <input
-              v-else-if="field.type === 'checkbox'"
-              :id="`template-config-${field.key}`"
-              :data-testid="`template-config-${field.key}`"
-              type="checkbox"
-              :checked="draft.config[field.key] === true"
-              :aria-invalid="Boolean(configErrors[field.key])"
-              :aria-required="field.required ? 'true' : undefined"
-              :aria-describedby="describedBy(field)"
-              class="size-4 self-start accent-primary"
-              @change="onFieldChange(field, ($event.target as HTMLInputElement).checked)"
-            />
-
-            <!--
+              <!--
           min/max/step come from the server FieldSpec and used to be dropped on
           the floor: the API has serialised all three since FieldSpec.php:60,
           and this input rendered none of them. A browser then defaults to
@@ -223,34 +235,71 @@
           unvalidated. These attributes drive the spinner increment and the
           mobile numeric keypad, nothing more.
         -->
-            <input
-              v-else
-              :id="`template-config-${field.key}`"
-              :data-testid="`template-config-${field.key}`"
-              :type="field.type === 'number' ? 'number' : 'text'"
-              :value="stringValue(field.key)"
-              autocomplete="off"
-              :min="field.type === 'number' ? field.min : undefined"
-              :max="field.type === 'number' ? field.max : undefined"
-              :step="field.type === 'number' ? (field.step ?? undefined) : undefined"
-              :aria-invalid="Boolean(configErrors[field.key])"
-              :aria-required="field.required ? 'true' : undefined"
-              :aria-describedby="describedBy(field)"
-              :class="formControlClass"
-              @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
-              @blur="validateConfigField(field)"
-            />
-            <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
-              {{ $t(field.hint_key) }}
-            </FieldDescription>
-            <FieldError
-              v-if="configErrors[field.key]"
-              :id="`template-config-${field.key}-error`"
-              :data-testid="`template-config-${field.key}-error`"
-            >
-              {{ configErrors[field.key] }}
-            </FieldError>
-          </Field>
+              <input
+                v-else
+                :id="`template-config-${field.key}`"
+                :data-testid="`template-config-${field.key}`"
+                :type="field.type === 'number' ? 'number' : 'text'"
+                :value="stringValue(field.key)"
+                autocomplete="off"
+                :min="field.type === 'number' ? field.min : undefined"
+                :max="field.type === 'number' ? field.max : undefined"
+                :step="field.type === 'number' ? (field.step ?? undefined) : undefined"
+                :aria-invalid="Boolean(configErrors[field.key])"
+                :aria-required="field.required ? 'true' : undefined"
+                :aria-describedby="describedBy(field)"
+                :class="formControlClass"
+                @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
+                @blur="validateConfigField(field)"
+              />
+              <!--
+          Listen to the voice this field holds (DESIGN.md §16.14). A field with
+          a picker gets its control INSIDE the picker's panel (one control per
+          field, never two players); this one is for a voice field with no
+          panel, such as the plain input used for the Azure voice. Disabled WITH
+          a reason when no sample can exist, so a voice is never picked blind.
+        -->
+              <VoicePreviewButton
+                v-if="voicePreviewFor(field) !== null && catalogueFor(field) === null"
+                labelled
+                v-bind="voicePreviewFor(field)!"
+                :test-id="`template-config-${field.key}-preview`"
+              />
+              <!--
+          What saving does to the persona's voice, said where the TTS settings
+          are chosen. Only the VOICE is claimed: the persona sync replaces the
+          whole `layers` node, so nothing is promised about its other settings.
+        -->
+              <FieldDescription
+                v-if="field.key === 'ttsEngine' && draft.provider === 'tavus'"
+                data-testid="template-tts-voice-note"
+              >
+                {{ $t('avatar_templates.form.ttsVoiceNote') }}
+              </FieldDescription>
+              <!--
+          A dependent select whose parent value offers no choice (Tavus model
+          for azure / tavus-auto / no engine) is disabled WITH its reason, never
+          hidden: an absent control reads as a missing feature.
+        -->
+              <FieldDescription
+                v-if="!dependentOptionsAvailable(field, draft.config)"
+                :id="`template-config-${field.key}-unavailable`"
+                :data-testid="`template-config-${field.key}-unavailable`"
+              >
+                {{ $t('avatar_templates.form.dependentUnavailable') }}
+              </FieldDescription>
+              <FieldDescription v-if="field.hint_key" :id="`template-config-${field.key}-hint`">
+                {{ $t(field.hint_key) }}
+              </FieldDescription>
+              <FieldError
+                v-if="configErrors[field.key]"
+                :id="`template-config-${field.key}-error`"
+                :data-testid="`template-config-${field.key}-error`"
+              >
+                {{ configErrors[field.key] }}
+              </FieldError>
+            </Field>
+          </template>
         </div>
       </fieldset>
 
@@ -348,6 +397,14 @@ import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { getErrorFields } from '@/utils/http-error'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
+import VoicePreviewButton from '@/components/molecules/VoicePreviewButton.vue'
+import PalSyncStatus from '@/components/molecules/PalSyncStatus.vue'
+import {
+  dependentOptionsAvailable,
+  fieldsToResetOnChange,
+  optionsFor,
+} from '@/utils/dependent-options'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
@@ -554,6 +611,9 @@ const nameDescribedBy = computed(() =>
 function describedBy(field: FieldSpec): string | undefined {
   const ids = [
     configErrors.value[field.key] ? `template-config-${field.key}-error` : null,
+    !dependentOptionsAvailable(field, draft.value.config)
+      ? `template-config-${field.key}-unavailable`
+      : null,
     field.hint_key ? `template-config-${field.key}-hint` : null,
   ].filter((id): id is string => id !== null)
 
@@ -614,6 +674,36 @@ function catalogueFor(field: FieldSpec): { field: FieldSpec; provider: Catalogue
   return null
 }
 
+/**
+ * Which voice fields carry a listen control, and for which sample.
+ *
+ * Every voice-typed knob has one: a catalogue `voice` field (HeyGen `voiceId`)
+ * and Tavus's `ttsExternalVoiceId`, which is sampled through the vendor named
+ * by the CURRENT `ttsEngine` value. The control is not hidden for a Tavus stock
+ * voice — it renders disabled with its reason, because a missing control reads
+ * as a missing feature.
+ *
+ * Whole form is superadmin-only (the page gates create/edit on the same
+ * `avatarTemplates.*` abilities the preview endpoint's policy uses), so no
+ * further role check is repeated here.
+ */
+function voicePreviewFor(
+  field: FieldSpec
+): { provider: 'heygen' | 'tavus'; voiceId: string; ttsEngine?: string | null } | null {
+  if (field.catalogue_resource !== 'voice' && field.key !== 'ttsExternalVoiceId') return null
+
+  const provider = draft.value.provider
+  const voiceId = stringValue(field.key)
+
+  if (provider === 'tavus') {
+    const engine = draft.value.config.ttsEngine
+
+    return { provider, voiceId, ttsEngine: typeof engine === 'string' ? engine : null }
+  }
+
+  return { provider, voiceId }
+}
+
 const REFERENCE_ERROR_CODE: Record<string, string> = {
   avatarId: 'avatar_not_found',
   faceId: 'avatar_not_found',
@@ -653,6 +743,13 @@ function onFieldChange(field: FieldSpec, raw: string | boolean): void {
   // change stores an id the new engine has never heard of.
   if (field.key === 'ttsEngine' && raw !== draft.value.config.ttsEngine) {
     draft.value.config = withoutKey(draft.value.config, 'ttsExternalVoiceId')
+  }
+
+  // Dependent selects (`options_depend_on`): a value the new parent value no
+  // longer offers is stale — Tavus's model for the previous engine — and would
+  // be refused by the server, so it is dropped with the change that outdated it.
+  for (const key of fieldsToResetOnChange(activeFields.value, field.key, draft.value.config, raw)) {
+    draft.value.config = withoutKey(draft.value.config, key)
   }
 
   configErrors.value[field.key] = undefined

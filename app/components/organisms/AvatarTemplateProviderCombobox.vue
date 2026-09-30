@@ -14,6 +14,7 @@
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
       :aria-controls="panelId"
+      :aria-busy="state === 'loading' ? 'true' : undefined"
       :class="cn(formSelectClass, 'flex items-center justify-between gap-2 text-left')"
       @click="toggle"
     >
@@ -22,8 +23,24 @@
         <span v-else-if="modelValue !== ''" class="truncate font-mono text-xs">
           {{ modelValue }}
         </span>
-        <span v-else class="truncate text-muted-foreground">
+        <span v-else-if="state !== 'loading'" class="truncate text-muted-foreground">
           {{ t('avatar_templates.form.catalogue.choose') }}
+        </span>
+        <!--
+          The catalogue can load while the panel is closed, and the panel is
+          the only other place that says so. Shown on the trigger so a slow
+          provider never reads as a control that is simply empty. It carries
+          `role="status"` only while the panel is CLOSED: an open panel renders
+          its own status line, and two live regions would announce it twice.
+        -->
+        <span
+          v-if="state === 'loading'"
+          :data-testid="`${testIdPrefix}-trigger-loading`"
+          :role="isOpen ? undefined : 'status'"
+          class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
+          {{ t('avatar_templates.form.catalogue.loading') }}
         </span>
         <span
           v-if="selected === null && modelValue !== '' && loaded"
@@ -59,20 +76,13 @@
         :class="formControlClass"
       />
 
-      <label
+      <CheckboxField
         v-if="resource === 'voice'"
-        class="flex items-center gap-2 text-sm"
-        :for="`${testIdPrefix}-italian-only`"
-      >
-        <input
-          :id="`${testIdPrefix}-italian-only`"
-          v-model="italianOnly"
-          type="checkbox"
-          :data-testid="`${testIdPrefix}-italian-only`"
-          class="size-4 accent-primary"
-        />
-        {{ t('avatar_templates.form.catalogue.italianOnly') }}
-      </label>
+        :id="`${testIdPrefix}-italian-only`"
+        v-model="italianOnly"
+        :data-testid="`${testIdPrefix}-italian-only`"
+        :label="t('avatar_templates.form.catalogue.italianOnly')"
+      />
 
       <p
         v-if="state === 'loading'"
@@ -95,7 +105,7 @@
         <button
           type="button"
           :data-testid="`${testIdPrefix}-retry`"
-          class="self-start rounded-md border border-border px-3 py-1 text-sm hover:bg-accent"
+          class="self-start rounded-md border border-border px-3 py-1 text-sm hover:bg-accent-dark hover:text-white"
           @click="load"
         >
           {{ t('avatar_templates.form.catalogue.retry') }}
@@ -138,8 +148,8 @@
             :data-testid="`${testIdPrefix}-item-${candidate.id}`"
             :class="
               cn(
-                'flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent',
-                candidate.id === modelValue && 'bg-accent'
+                'flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent-dark hover:text-white hover:**:text-white',
+                candidate.id === modelValue && 'bg-primary/10'
               )
             "
             @click="onSelect(candidate.id)"
@@ -153,6 +163,30 @@
                   :data-testid="`${testIdPrefix}-selected-mark-${candidate.id}`"
                 />
                 <span class="truncate font-medium">{{ candidate.label }}</span>
+                <span
+                  v-if="resource === 'pal' && candidate.editable != null"
+                  :data-testid="`${testIdPrefix}-editable-badge-${candidate.id}`"
+                  :data-editable="String(candidate.editable)"
+                  :title="
+                    candidate.editable
+                      ? undefined
+                      : t('avatar_templates.form.catalogue.editable.noTitle')
+                  "
+                  :class="
+                    cn(
+                      'shrink-0 rounded-full px-2 text-xs',
+                      candidate.editable
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-warning-light text-warning-dark dark:bg-warning/15 dark:text-warning'
+                    )
+                  "
+                >
+                  {{
+                    candidate.editable
+                      ? t('avatar_templates.form.catalogue.editable.yes')
+                      : t('avatar_templates.form.catalogue.editable.no')
+                  }}
+                </span>
                 <span
                   v-if="candidate.italian !== null"
                   :data-testid="`${testIdPrefix}-italian-badge-${candidate.id}`"
@@ -189,24 +223,105 @@
               loading="lazy"
             />
           </button>
-          <button
-            v-if="resource === 'voice' && candidate.preview_audio_url !== null"
-            type="button"
-            :data-testid="`${testIdPrefix}-play-${candidate.id}`"
-            :aria-label="
-              playingId === candidate.id
-                ? t('avatar_templates.form.catalogue.preview.pause')
-                : t('avatar_templates.form.catalogue.preview.play')
-            "
-            class="ml-2 rounded p-1 text-muted-foreground hover:bg-accent"
-            @click="togglePreview(candidate)"
-          >
-            <PauseIcon v-if="playingId === candidate.id" class="size-4" />
-            <PlayIcon v-else class="size-4" />
-          </button>
+          <!--
+            Two distinct samples per voice row, labelled so they are never
+            confused: the vendor's free CATALOGUE clip (any language, may not
+            exist) and the synthesised ITALIAN sample from our own endpoint.
+          -->
+          <div v-if="resource === 'voice'" class="flex items-center gap-2 pl-2">
+            <button
+              v-if="candidate.preview_audio_url !== null"
+              type="button"
+              :data-testid="`${testIdPrefix}-play-${candidate.id}`"
+              :aria-label="
+                playingId === candidate.id
+                  ? t('avatar_templates.form.catalogue.preview.pause')
+                  : t('avatar_templates.form.catalogue.preview.play')
+              "
+              :title="t('avatar_templates.form.voicePreview.caption.catalogue')"
+              class="rounded p-1 text-muted-foreground hover:bg-primary/10"
+              @click="togglePreview(candidate)"
+            >
+              <PauseIcon v-if="playingId === candidate.id" class="size-4" />
+              <PlayIcon v-else class="size-4" />
+            </button>
+            <VoicePreviewButton
+              v-if="previewProvider !== null"
+              compact
+              :provider="previewProvider"
+              :voice-id="candidate.id"
+              :voice-name="candidate.label"
+              :test-id="`${testIdPrefix}-italian-preview-${candidate.id}`"
+            />
+          </div>
         </li>
       </ul>
     </div>
+
+    <!--
+      Ownership hint for the SELECTED persona. Tavus refuses to modify a persona
+      the account does not own, so voice/LLM/turn-taking chosen below would be
+      silently dropped. Advisory only: selection is never blocked.
+    -->
+    <p
+      v-if="ownershipHint !== null"
+      :data-testid="`${testIdPrefix}-editable-hint`"
+      class="text-sm text-warning-dark dark:text-warning"
+    >
+      {{ ownershipHint }}
+    </p>
+
+    <!--
+      Voice preview block (DESIGN.md §16.14). A voice has no image, so this
+      takes the place of the face picker's panel. Rendered for ANY voice id,
+      catalogued or typed by hand: the Italian sample needs only provider + id.
+    -->
+    <div
+      v-if="resource === 'voice' || resource === 'pal'"
+      :data-testid="`${testIdPrefix}-voice-preview`"
+      class="flex w-full min-w-0 flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3"
+    >
+      <p class="text-sm font-medium break-words">
+        {{ selected?.label ?? (modelValue !== '' ? modelValue : '') }}
+      </p>
+      <div class="flex flex-wrap items-start gap-2">
+        <VoicePreviewButton
+          v-if="resource === 'pal'"
+          labelled
+          provider="tavus"
+          :pal-id="modelValue"
+          :test-id="`${testIdPrefix}-preview`"
+        />
+        <VoicePreviewButton
+          v-else
+          labelled
+          :provider="blockPreview.provider"
+          :tts-engine="blockPreview.ttsEngine"
+          :voice-id="modelValue"
+          :test-id="`${testIdPrefix}-preview`"
+        />
+        <button
+          v-if="resource === 'voice' && selected?.preview_audio_url"
+          type="button"
+          :data-testid="`${testIdPrefix}-catalogue-sample`"
+          :aria-pressed="playingId === selected.id ? 'true' : 'false'"
+          class="inline-flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          @click="togglePreview(selected)"
+        >
+          <PauseIcon v-if="playingId === selected.id" class="size-4" aria-hidden="true" />
+          <PlayIcon v-else class="size-4" aria-hidden="true" />
+          {{ t('avatar_templates.form.voicePreview.caption.catalogue') }}
+        </button>
+      </div>
+    </div>
+
+    <p
+      v-if="resource === 'pal'"
+      :data-testid="`${testIdPrefix}-pal-note`"
+      class="text-xs text-muted-foreground"
+    >
+      {{ t('avatar_templates.form.voicePreview.palSaveNote') }}
+    </p>
 
     <!--
       Selected-avatar preview. Explicit 160px floors as attributes AND inline
@@ -261,11 +376,14 @@
  * trip, without ever blocking a save just because the provider is down.
  */
 import { computed, onMounted, reactive, ref, useAttrs, watch } from 'vue'
-import { CheckIcon, ChevronDownIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, PauseIcon, PlayIcon } from '@lucide/vue'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
+import VoicePreviewButton from '@/components/molecules/VoicePreviewButton.vue'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { useExclusivePopover } from '@/composables/useExclusivePopover'
+import { useVoicePreview } from '@/composables/useVoicePreview'
 import type {
   CatalogueEntry,
   CatalogueErrorCode,
@@ -283,6 +401,13 @@ const props = defineProps<{
   field: FieldSpec
   provider: CatalogueProvider
   modelValue: string
+  /**
+   * What the listen control samples, as the FORM works it out for this field
+   * (Tavus `ttsExternalVoiceId` = provider `tavus` + the current engine). The
+   * picker's own `provider` is the catalogue it lists, which for that field is
+   * the vendor, not Tavus. Absent: sample the catalogue's own provider.
+   */
+  preview?: { provider: 'heygen' | 'tavus' | 'cartesia' | 'elevenlabs'; ttsEngine?: string | null }
 }>()
 
 const emit = defineEmits<{
@@ -292,6 +417,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { fetchCatalogue } = useAvatarTemplates()
+const { claimPlayback } = useVoicePreview()
 const attrs = useAttrs()
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -300,6 +426,15 @@ const audioRef = ref<HTMLAudioElement | null>(null)
 const { isOpen, close, toggle } = useExclusivePopover(rootRef)
 
 const resource = computed<CatalogueResource>(() => props.field.catalogue_resource ?? 'voice')
+// Tavus's own stock voices have no synthesised sample (the button would only
+// ever be disabled), so a Tavus list row gets none.
+const previewProvider = computed<'heygen' | 'cartesia' | 'elevenlabs' | null>(() =>
+  props.provider === 'tavus' ? null : props.provider
+)
+const blockPreview = computed(() => ({
+  provider: props.preview?.provider ?? props.provider,
+  ttsEngine: props.preview?.ttsEngine ?? null,
+}))
 const testIdPrefix = computed(() => `template-config-${props.field.key}`)
 const panelId = computed(() => `${testIdPrefix.value}-panel`)
 
@@ -381,8 +516,21 @@ function describe(candidate: CatalogueEntry): string {
     .join(' · ')
 }
 
+const ownershipHint = computed<string | null>(() => {
+  if (resource.value !== 'pal' || selected.value === null) return null
+  if (selected.value.editable === true) return null
+
+  return selected.value.editable === false
+    ? t('avatar_templates.form.catalogue.editable.hintNo')
+    : t('avatar_templates.form.catalogue.editable.hintUnknown')
+})
+
 const showsImagePreview = computed(
-  () => resource.value !== 'voice' && props.modelValue !== '' && selected.value !== null
+  () =>
+    resource.value !== 'voice' &&
+    resource.value !== 'pal' &&
+    props.modelValue !== '' &&
+    selected.value !== null
 )
 
 const previewUrl = computed(() => {
@@ -403,6 +551,11 @@ function onEscape(): void {
   triggerRef.value?.focus()
 }
 
+function stopCatalogueSample(): void {
+  audioRef.value?.pause()
+  playingId.value = null
+}
+
 function togglePreview(candidate: CatalogueEntry): void {
   const audio = audioRef.value
   if (audio === null || candidate.preview_audio_url === null) return
@@ -413,6 +566,10 @@ function togglePreview(candidate: CatalogueEntry): void {
 
     return
   }
+
+  // One sample at a time, app-wide: silence the synthesised Italian sample
+  // (and be silenced by it in turn).
+  claimPlayback(stopCatalogueSample)
 
   audio.src = candidate.preview_audio_url
   playingId.value = candidate.id

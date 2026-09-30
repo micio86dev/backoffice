@@ -233,6 +233,6 @@ describe('TemplatePortability', () => {
     expect(description).toContain('Template 1')
     expect(description).toContain('Template 10')
     expect(description).not.toContain('Template 11')
-    expect(description).toContain('+3 more')
+    expect(description).toContain('avatar_templates.confirm.importMore')
   })
 })

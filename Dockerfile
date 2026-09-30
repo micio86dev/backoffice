@@ -184,6 +184,16 @@ RUN test -n "$BEAI_API_ORIGIN" || { \
       exit 1; \
     }
 
+# Optional extra img-src origin(s), for LOCAL docker only. EMPTY by default, so
+# the production CSP is unchanged (https-only). The API builds media URLs from
+# APP_URL (http://localhost:8000 locally), which `img-src ... https:` blocks;
+# docker-compose.yml sets this for the local backoffice service. A build arg for
+# the same reason as BEAI_API_ORIGIN above (non-root runtime stage, no envsubst).
+ARG BEAI_CSP_IMG_EXTRA=""
+RUN test -z "$BEAI_CSP_IMG_EXTRA" \
+  || printf '%s' "$BEAI_CSP_IMG_EXTRA" | grep -Eq '^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?( https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?)*$' \
+  || { echo "ERROR: BEAI_CSP_IMG_EXTRA must be space-separated http(s) origins, got: $BEAI_CSP_IMG_EXTRA"; exit 1; }
+
 # Remove default nginx config; replace with SPA-friendly config
 RUN rm /etc/nginx/conf.d/default.conf
 
@@ -241,7 +251,7 @@ RUN printf 'server {\n\
     # provider and change without notice, so an allow-list would silently break\n\
     # the picker again. Images and media cannot execute script; script-src,\n\
     # connect-src and frame-ancestors stay strict. blob: covers the object-URL\n    # preview of a file the operator has just picked, before it is uploaded.\n\
-    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com __CSP_SCRIPT_HASHES__; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: blob: https:; media-src '"'"'self'"'"' blob: https:; font-src '"'"'self'"'"' data:; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
+    add_header Content-Security-Policy "default-src '"'"'self'"'"'; script-src '"'"'self'"'"' https://www.googletagmanager.com __CSP_SCRIPT_HASHES__; style-src '"'"'self'"'"' '"'"'unsafe-inline'"'"'; img-src '"'"'self'"'"' data: blob: https:__CSP_IMG_EXTRA__; media-src '"'"'self'"'"' blob: https:; font-src '"'"'self'"'"' data:; connect-src '"'"'self'"'"' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.sentry.io; object-src '"'"'none'"'"'; base-uri '"'"'self'"'"'; form-action '"'"'self'"'"'; frame-ancestors '"'"'none'"'"'" always;\n\
 \n\
     # Serve the health page as a static file\n\
     location /health {\n\
@@ -344,6 +354,12 @@ RUN test -s /tmp/csp-script-hashes.txt \
   && sed -i "s|__CSP_SCRIPT_HASHES__|$(sed 's/ *$//' /tmp/csp-script-hashes.txt)|" /etc/nginx/conf.d/default.conf \
   && ! grep -q __CSP_SCRIPT_HASHES__ /etc/nginx/conf.d/default.conf \
   && rm /tmp/csp-script-hashes.txt
+
+# Substitute the optional extra img-src origin(s); empty leaves no trace (no
+# stray space), and the placeholder must never survive into the header.
+RUN if [ -n "$BEAI_CSP_IMG_EXTRA" ]; then extra=" $BEAI_CSP_IMG_EXTRA"; else extra=""; fi \
+  && sed -i "s|__CSP_IMG_EXTRA__|$extra|" /etc/nginx/conf.d/default.conf \
+  && ! grep -q __CSP_IMG_EXTRA__ /etc/nginx/conf.d/default.conf
 
 # Non-root: nginx worker runs as existing nginx user (uid 101 on alpine)
 # We adjust permissions so the nginx user can write to required dirs

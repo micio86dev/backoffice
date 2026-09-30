@@ -5,6 +5,8 @@
       <p class="text-muted-foreground text-sm">{{ $t('projectQuestions.description') }}</p>
     </div>
 
+    <ActingClientNotice v-if="actingClientRequired" />
+
     <FormMessage
       v-if="message"
       :kind="message.kind"
@@ -21,6 +23,7 @@
       :locale="locale"
       :cap="cap"
       :saving="saving"
+      :add-blocked="actingClientRequired"
       :submit-error="submitError"
       @reorder="onReorder"
       @remove="onRemove"
@@ -56,6 +59,8 @@
 import { ref, computed, onMounted } from 'vue'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import QuestionListEditor from '@/components/organisms/QuestionListEditor.vue'
+import ActingClientNotice from '@/components/molecules/ActingClientNotice.vue'
+import { useActingClientRequired } from '@/composables/useActingClientRequired'
 import { resolveResourceErrorState, resourceErrorKey } from '@/utils/error-state'
 import { actionErrorMessage } from '@/utils/action-error-message'
 import { useProjectQuestions, type ProjectQuestion } from '@/composables/useProjectQuestions'
@@ -103,6 +108,7 @@ const questions = ref<ProjectQuestion[]>([])
 const cap = ref<number | null>(null)
 const message = ref<{ kind: FormMessageKind; text: string } | null>(null)
 const saving = ref(false)
+const { actingClientRequired } = useActingClientRequired()
 /** The raw rejection from the last submit attempt — `QuestionListEditor` maps it. */
 const submitError = ref<unknown>(null)
 

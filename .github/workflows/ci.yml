@@ -200,3 +200,32 @@ jobs:
           CODE=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8089/developers/nope.json)
           [ "$CODE" = 404 ] || { echo "::error::A /developers/ miss returned $CODE, not 404."; exit 1; }
           docker rm -f docs-check
+
+      # Regression guard for the blank-page incident (0.42.6): the CSP header
+      # blocked the inline bootstrap script, and no other tier can see it because
+      # the Playwright suite serves the SPA without nginx. Assert against the
+      # image that actually ships: every inline script it serves must be
+      # covered by a hash in the Content-Security-Policy header of its own response.
+      - name: Assert the CSP allows every inline script the image serves
+        run: |
+          docker run -d --name csp-check --add-host ci.example.test:127.0.0.1 -p 8090:80 beai-backoffice:ci
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8090/health > /dev/null && break; sleep 1
+          done
+          for route in / /login/ /developers/; do
+            DIR=$(mktemp -d)
+            curl -sf -D "$DIR/headers" -o "$DIR/index.html" "http://localhost:8090$route" || {
+              echo "::error::$route was not served."; exit 1; }
+            CSP=$(grep -i '^content-security-policy:' "$DIR/headers")
+            HASHES=$(node scripts/csp-script-hashes.mjs "$DIR")
+            [ -n "$HASHES" ] || { echo "::error::$route has no inline script to check."; exit 1; }
+            for h in $HASHES; do
+              case "$CSP" in
+                *"$h"*) ;;
+                *) echo "::error::$route serves an inline script ($h) its CSP does not allow — the page would be blank."; exit 1 ;;
+              esac
+            done
+          done
+          docker exec csp-check grep -q "font-src 'self' data:" /etc/nginx/conf.d/default.conf || {
+            echo "::error::font-src must allow data: (Vite inlines small fonts into the CSS)."; exit 1; }
+          docker rm -f csp-check

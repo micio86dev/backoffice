@@ -234,6 +234,39 @@ describe('BrandingForm — the logo control', () => {
     expect(removeLogo).not.toHaveBeenCalled()
   })
 
+  it('previews a stored http cross-origin logo as a same-origin path (CSP img-src)', () => {
+    const wrapper = mount(BrandingForm, {
+      props: {
+        organization: {
+          primary_color: null,
+          logo_url: 'http://localhost:8000/api/organizations/6/logo?v=abc.png',
+        },
+      },
+      global: { stubs, mocks: { $t: (k: string) => k } },
+    })
+
+    expect(wrapper.get('[data-testid="image-upload-field"]').attributes('data-preview')).toBe(
+      '/api/organizations/6/logo?v=abc.png'
+    )
+  })
+
+  it('normalises the URL returned by a successful upload the same way', async () => {
+    uploadLogo.mockReset().mockResolvedValue({
+      data: { logo_url: 'http://localhost:8000/api/organizations/6/logo?v=new.png' },
+    })
+
+    const wrapper = mountForm('#123456')
+    const file = new File(['bytes'], 'logo.png', { type: 'image/png' })
+
+    await wrapper.findComponent({ name: 'ImageUploadField' }).vm.$emit('cropped', file)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="image-upload-field"]').attributes('data-preview')).toBe(
+      '/api/organizations/6/logo?v=new.png'
+    )
+  })
+
   it('shows the stored logo as the control preview', () => {
     const wrapper = mount(BrandingForm, {
       props: { organization: { primary_color: null, logo_url: 'https://api.test/logo.png' } },

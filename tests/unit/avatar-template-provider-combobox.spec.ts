@@ -115,6 +115,68 @@ afterEach(() => {
 })
 
 describe('loading the catalogue', () => {
+  it('shows the loading state on the trigger while the panel is closed', async () => {
+    let resolve: (value: unknown) => void = () => undefined
+    fetchCatalogue.mockReturnValue(new Promise((r) => (resolve = r)))
+    const wrapper = mountPicker()
+    await flushPromises()
+
+    const trigger = wrapper.get(sel(P))
+    expect(wrapper.find(sel(`${P}-panel`)).exists()).toBe(false)
+    expect(trigger.attributes('aria-busy')).toBe('true')
+    expect(wrapper.get(sel(`${P}-trigger-loading`)).text()).toBe(
+      'avatar_templates.form.catalogue.loading'
+    )
+    // It replaces the idle prompt rather than sitting beside it.
+    expect(trigger.text()).not.toContain('avatar_templates.form.catalogue.choose')
+
+    resolve({ status: 'ok', items: VOICES })
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-trigger-loading`)).exists()).toBe(false)
+    expect(trigger.attributes('aria-busy')).toBeUndefined()
+    expect(trigger.text()).toContain('avatar_templates.form.catalogue.choose')
+  })
+
+  it('keeps the current id visible on the trigger while loading', async () => {
+    fetchCatalogue.mockReturnValue(new Promise(() => undefined))
+    const wrapper = mountPicker({ modelValue: 'v-known' })
+    await flushPromises()
+
+    expect(wrapper.get(sel(P)).text()).toContain('v-known')
+    expect(wrapper.find(sel(`${P}-trigger-loading`)).exists()).toBe(true)
+  })
+
+  it('announces loading once: only one status region while the panel is open', async () => {
+    fetchCatalogue.mockReturnValue(new Promise(() => undefined))
+    const wrapper = mountPicker()
+    await open(wrapper)
+
+    expect(wrapper.findAll('[role="status"]')).toHaveLength(1)
+    expect(wrapper.find(sel(`${P}-loading`)).exists()).toBe(true)
+  })
+
+  it('has a single status region on the closed trigger', async () => {
+    fetchCatalogue.mockReturnValue(new Promise(() => undefined))
+    const wrapper = mountPicker()
+    await flushPromises()
+
+    expect(wrapper.findAll('[role="status"]')).toHaveLength(1)
+  })
+
+  it('does not show the trigger loading state after an error', async () => {
+    fetchCatalogue.mockResolvedValue({
+      status: 'provider_error',
+      items: [],
+      code: 'provider_unreachable',
+    })
+    const wrapper = mountPicker()
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-trigger-loading`)).exists()).toBe(false)
+    expect(wrapper.get(sel(P)).attributes('aria-busy')).toBeUndefined()
+  })
+
   it('asks the API for the field provider and resource', async () => {
     fetchCatalogue.mockResolvedValue({ status: 'ok', items: VOICES })
     mountPicker({ provider: 'cartesia', resource: 'voice' })
@@ -236,7 +298,7 @@ describe('the Italian-only toggle', () => {
     await flushPromises()
     await open(wrapper)
 
-    await wrapper.get(sel(`${P}-italian-only`)).setValue(true)
+    await wrapper.get(sel(`${P}-italian-only`)).trigger('click')
 
     expect(wrapper.find(sel(`${P}-item-v-it`)).exists()).toBe(true)
     expect(wrapper.find(sel(`${P}-item-v-en`)).exists()).toBe(false)

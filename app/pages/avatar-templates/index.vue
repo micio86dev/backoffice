@@ -19,17 +19,30 @@
           <HelpTip term="llmCost" />
         </p>
       </div>
-      <TemplatePortability :is-admin="canCreate" @imported="load" />
+      <TemplatePortability
+        :is-admin="canCreate"
+        :import-blocked="actingClientRequired"
+        @imported="load"
+      />
       <button
         v-if="canCreate"
         type="button"
         data-testid="template-new"
-        class="shrink-0 rounded-md border border-border px-4 py-2 text-sm font-medium"
+        class="shrink-0 rounded-md border border-border px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="actingClientRequired"
+        :aria-describedby="actingClientRequired ? ACTING_CLIENT_NOTICE_ID : undefined"
         @click="startCreate"
       >
         {{ $t('avatar_templates.action.new') }}
       </button>
     </div>
+
+    <!--
+      A superadmin with no acting client cannot create or import (the API
+      answers 409 organization_context_required). Said up front, next to the
+      controls it disables, rather than after a click.
+    -->
+    <ActingClientNotice v-if="canCreate && actingClientRequired" />
 
     <Alert v-if="loadError" variant="destructive" data-testid="templates-error">
       <AlertTitle>{{ $t('avatar_templates.error.load_title') }}</AlertTitle>
@@ -63,7 +76,7 @@
         provider yet, which an operator must be told: without it they would
         believe a setting they configured is live when it is not.
       -->
-      <AlertDescription>{{ $t(`avatar_templates.warning.${warning}`) }}</AlertDescription>
+      <AlertDescription>{{ warningMessage }}</AlertDescription>
     </Alert>
 
     <p
@@ -114,6 +127,12 @@
           >
             {{ forecastLabel(template) }}
           </p>
+          <!--
+            Whether Tavus accepted the persona-level settings (voice, model,
+            behavior) on the last save. Tavus templates only — the component
+            renders nothing for another provider. DESIGN.md 16.16.
+          -->
+          <PalSyncStatus class="mt-2" :sync="template.pal_sync" :provider="template.provider" />
         </div>
 
         <div class="flex shrink-0 gap-2">
@@ -170,6 +189,21 @@
               {{ $t('avatar_templates.action.deactivate') }}
             </button>
           </template>
+          <!--
+            Copy to other organizations: platform-only, the same ability as
+            creating a template (the API answers 403 to every other role).
+            Offered on every row, active or not — the copy is created inactive
+            in its target, so the source's state is irrelevant to it.
+          -->
+          <button
+            v-if="canCreate"
+            type="button"
+            :data-testid="`template-copy-${template.id}`"
+            class="hover:bg-primary/10 focus-visible:ring-ring rounded-md border border-border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+            @click="copyTarget = template"
+          >
+            {{ $t('avatar_templates.action.copy') }}
+          </button>
           <!--
             No delete button on the active template at all. The API answers 409,
             but offering a control whose only outcome is an error is a worse
@@ -231,6 +265,18 @@
       @cancel="activateTarget = null"
     />
 
+    <!--
+      Copies land in OTHER organizations, so this page's list never changes and
+      nothing is refetched after one. Same nullable-ref contract as the
+      confirmations: `:open` derives from the target, closing clears it.
+    -->
+    <CopyTemplateDialog
+      v-if="canCreate"
+      :open="copyTarget !== null"
+      :template="copyTarget"
+      @update:open="(open) => !open && (copyTarget = null)"
+    />
+
     <ConfirmDialog
       :open="deleteTarget !== null"
       :title="$t('avatar_templates.confirm.deleteTitle')"
@@ -245,6 +291,7 @@
 
 <script setup lang="ts">
 import HelpTip from '@/components/atoms/HelpTip.vue'
+import PalSyncStatus from '@/components/molecules/PalSyncStatus.vue'
 import TemplatePortability from '@/components/organisms/TemplatePortability.vue'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 /**
@@ -261,8 +308,14 @@ import { computed, onMounted, ref } from 'vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
+import CopyTemplateDialog from '@/components/organisms/CopyTemplateDialog.vue'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
+import ActingClientNotice from '@/components/molecules/ActingClientNotice.vue'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
+import {
+  ACTING_CLIENT_NOTICE_ID,
+  useActingClientRequired,
+} from '@/composables/useActingClientRequired'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -361,6 +414,13 @@ const writeErrorMessage = computed(() => {
   return writeError.value === null ? null : t(resourceErrorKey(writeError.value, 'message'))
 })
 const warning = ref<string | null>(null)
+// A code this build has no copy for reads as generic copy, never as an i18n key.
+const warningMessage = computed(() => {
+  if (warning.value === null) return ''
+  const key = `avatar_templates.warning.${warning.value}`
+
+  return te(key) ? t(key) : t('avatar_templates.warning.generic')
+})
 const saving = ref(false)
 // The raw rejection, passed down VERBATIM (form-clarity-and-console-warnings,
 // D3) — the form runs `applyServerFieldErrors` and its own "knob: code"
@@ -385,6 +445,7 @@ const formTitle = computed(() =>
 // `@confirm` reads it into a local, clears the ref FIRST, then acts.
 const activateTarget = ref<AvatarTemplate | null>(null)
 const deleteTarget = ref<AvatarTemplate | null>(null)
+const copyTarget = ref<AvatarTemplate | null>(null)
 
 // Names the template being replaced — "activate X" is not the consequence,
 // "X replaces Y for every candidate in your organization" is (design.md D5).
@@ -426,6 +487,7 @@ async function load(): Promise<void> {
 // not an ability the row controls should ever have been inferring from.
 const { can } = useCurrentUser()
 const canCreate = computed(() => can('avatarTemplates.create'))
+const { actingClientRequired } = useActingClientRequired()
 const canUpdate = computed(() => can('avatarTemplates.update'))
 const canActivate = computed(() => can('avatarTemplates.activate'))
 const canDelete = computed(() => can('avatarTemplates.delete'))
@@ -482,7 +544,15 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
     // The API returns every config problem at once, keyed by field. Surfacing
     // one at a time would turn a seventeen-field form into a guessing game —
     // the form itself now owns turning this into per-field placement.
-    submitError.value = error
+    if (serverMessageCode(error) === 'organization_context_required') {
+      // The selection changed under an open form (another tab, an expired
+      // session). No field can carry this refusal, so the page-level write
+      // alert says it, in the operator's language.
+      editing.value = null
+      recordWriteFailure(error)
+    } else {
+      submitError.value = error
+    }
   } finally {
     saving.value = false
   }

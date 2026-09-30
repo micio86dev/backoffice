@@ -112,16 +112,13 @@
           while scheduling is on; it is hidden rather than disabled, since a
           disabled control still asks a question that has no answer here.
         -->
-        <Field v-if="schedulingMode === 'now'" orientation="horizontal">
-          <Checkbox
-            id="entry-link-form-send-email"
-            v-model="sendEmail"
-            data-testid="entry-link-form-send-email"
-          />
-          <FieldLabel for="entry-link-form-send-email">
-            {{ $t('entryLink.form.sendEmail') }}
-          </FieldLabel>
-        </Field>
+        <CheckboxField
+          v-if="schedulingMode === 'now'"
+          id="entry-link-form-send-email"
+          v-model="sendEmail"
+          :label="$t('entryLink.form.sendEmail')"
+          data-testid="entry-link-form-send-email"
+        />
 
         <Field v-else :data-invalid="Boolean(errors.scheduledAt)">
           <FieldLabel for="entry-link-form-scheduled-at">
@@ -194,7 +191,7 @@ import {
   FieldLegend,
   FieldSet,
 } from '@/components/ui/field'
-import { Checkbox } from '@/components/ui/checkbox'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'

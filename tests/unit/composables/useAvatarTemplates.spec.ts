@@ -156,4 +156,80 @@ describe('useAvatarTemplates', () => {
     })
     expect(result).toEqual({ status: 'unavailable', items: [] })
   })
+
+  describe('duplicateTemplate', () => {
+    const rejection = (status: number, data: unknown) =>
+      Object.assign(new Error('x'), { status, data })
+
+    it('POSTs the targets to the duplicate endpoint and returns the created copies', async () => {
+      const created = { data: [{ organization_id: 2, id: 9, name: 'Recruiter' }] }
+      apiFetch.mockResolvedValue(created)
+
+      const result = await useAvatarTemplates().duplicateTemplate(5, [2, 3])
+
+      expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/5/duplicate', {
+        method: 'POST',
+        body: { target_organization_ids: [2, 3] },
+      })
+      expect(result).toEqual(created)
+    })
+
+    it('sends the name override only when one is given', async () => {
+      await useAvatarTemplates().duplicateTemplate(5, [2], 'Custom')
+      expect(apiFetch).toHaveBeenLastCalledWith('/avatar-templates/5/duplicate', {
+        method: 'POST',
+        body: { target_organization_ids: [2], name: 'Custom' },
+      })
+
+      await useAvatarTemplates().duplicateTemplate(5, [2], '   ')
+      expect(apiFetch).toHaveBeenLastCalledWith('/avatar-templates/5/duplicate', {
+        method: 'POST',
+        body: { target_organization_ids: [2] },
+      })
+    })
+
+    it.each([
+      [
+        'source_organization_included',
+        { errors: { target_organization_ids: ['source_organization_included'] } },
+      ],
+      ['source_config_invalid', { errors: { template: ['source_config_invalid'] } }],
+      ['target_organizations_invalid', { errors: { target_organization_ids: ['required'] } }],
+      ['target_organizations_invalid', { errors: { 'target_organization_ids.1': ['exists'] } }],
+      ['validation_failed', { message: 'The given data was invalid.' }],
+    ])('maps a 422 to the typed code %s', async (code, data) => {
+      apiFetch.mockRejectedValue(rejection(422, data))
+
+      await expect(useAvatarTemplates().duplicateTemplate(5, [2])).rejects.toMatchObject({
+        name: 'DuplicateTemplateError',
+        kind: 'validation',
+        code,
+      })
+    })
+
+    it('maps 403 and 404 to their own typed errors', async () => {
+      apiFetch.mockRejectedValueOnce(rejection(403, {}))
+      await expect(useAvatarTemplates().duplicateTemplate(5, [2])).rejects.toMatchObject({
+        kind: 'forbidden',
+        code: 'forbidden',
+      })
+
+      apiFetch.mockRejectedValueOnce(rejection(404, {}))
+      await expect(useAvatarTemplates().duplicateTemplate(5, [2])).rejects.toMatchObject({
+        kind: 'not_found',
+        code: 'template_not_found',
+      })
+    })
+
+    it('wraps anything else as unknown, keeping the cause', async () => {
+      const boom = rejection(500, {})
+      apiFetch.mockRejectedValue(boom)
+
+      await expect(useAvatarTemplates().duplicateTemplate(5, [2])).rejects.toMatchObject({
+        kind: 'unknown',
+        code: 'duplicate_failed',
+        cause: boom,
+      })
+    })
+  })
 })

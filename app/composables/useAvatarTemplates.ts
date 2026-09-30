@@ -10,12 +10,78 @@ import type {
   CatalogueProvider,
   CatalogueResource,
   CatalogueResponse,
+  DuplicateTemplateResponse,
   FieldSpecsResponse,
   TemplateListResponse,
   TemplateOptionsResponse,
   TemplateResponse,
 } from '../types/avatar-template'
 import { useApi } from './useApi'
+
+/**
+ * Why a copy-to-organizations request failed, as a code the UI can translate.
+ *
+ * `kind` is the HTTP class (what the operator can do about it), `code` the
+ * translation key under `avatar_templates.serverError`. Every rejection is
+ * wrapped, so a call site never inspects a raw `$fetch` error.
+ */
+export type DuplicateTemplateErrorKind = 'forbidden' | 'not_found' | 'validation' | 'unknown'
+
+export class DuplicateTemplateError extends Error {
+  readonly kind: DuplicateTemplateErrorKind
+  readonly code: string
+
+  constructor(kind: DuplicateTemplateErrorKind, code: string, cause: unknown) {
+    super(code, { cause })
+    this.name = 'DuplicateTemplateError'
+    this.kind = kind
+    this.code = code
+  }
+}
+
+function errorStatus(error: unknown): number | null {
+  const e = error as { status?: unknown; statusCode?: unknown } | null
+  const status = e?.status ?? e?.statusCode
+
+  return typeof status === 'number' ? status : null
+}
+
+function validationCode(error: unknown): string {
+  const errors = (error as { data?: { errors?: Record<string, unknown> } } | null)?.data?.errors
+
+  if (errors === undefined || errors === null || typeof errors !== 'object') {
+    return 'validation_failed'
+  }
+
+  const first = (key: string): unknown => {
+    const value = errors[key]
+
+    return Array.isArray(value) ? value[0] : undefined
+  }
+
+  if (first('template') === 'source_config_invalid') return 'source_config_invalid'
+  if (first('target_organization_ids') === 'source_organization_included') {
+    return 'source_organization_included'
+  }
+  if (Object.keys(errors).some((key) => key.startsWith('target_organization_ids'))) {
+    return 'target_organizations_invalid'
+  }
+
+  return 'validation_failed'
+}
+
+function toDuplicateError(error: unknown): DuplicateTemplateError {
+  switch (errorStatus(error)) {
+    case 403:
+      return new DuplicateTemplateError('forbidden', 'forbidden', error)
+    case 404:
+      return new DuplicateTemplateError('not_found', 'template_not_found', error)
+    case 422:
+      return new DuplicateTemplateError('validation', validationCode(error), error)
+    default:
+      return new DuplicateTemplateError('unknown', 'duplicate_failed', error)
+  }
+}
 
 export function useAvatarTemplates() {
   const { apiFetch } = useApi()
@@ -130,6 +196,36 @@ export function useAvatarTemplates() {
   }
 
   /**
+   * Superadmin-only: copy one template into other organizations. Each copy is
+   * created INACTIVE in its target (the source's provider-side ids are not
+   * carried over), so nothing a target's candidates meet changes until someone
+   * there activates it. The result is in target order.
+   *
+   * `name` is optional; a blank one is not sent, so the server keeps the
+   * source name (and suffixes "(copy)" where it collides). Failures reject
+   * with a `DuplicateTemplateError`.
+   */
+  async function duplicateTemplate(
+    id: number | string,
+    targetOrganizationIds: number[],
+    name?: string | null
+  ): Promise<DuplicateTemplateResponse> {
+    const trimmed = name?.trim() ?? ''
+
+    try {
+      return await apiFetch<DuplicateTemplateResponse>(`/avatar-templates/${id}/duplicate`, {
+        method: 'POST',
+        body: {
+          target_organization_ids: targetOrganizationIds,
+          ...(trimmed === '' ? {} : { name: trimmed }),
+        },
+      })
+    } catch (error) {
+      throw toDuplicateError(error)
+    }
+  }
+
+  /**
    * Admin-only. Export is a read of configuration an operator can already see
    * field by field, but as one file it is also the fastest way to lift
    * configuration out of a tenant.
@@ -156,5 +252,6 @@ export function useAvatarTemplates() {
     activateTemplate,
     deactivateTemplate,
     deleteTemplate,
+    duplicateTemplate,
   }
 }

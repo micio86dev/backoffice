@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { SidebarProvider } from '../../../../app/components/ui/sidebar'
 import NavBar from '../../../../app/components/organisms/NavBar.vue'
 
@@ -92,6 +92,7 @@ describe('NavBar', () => {
     }))
 
     vi.doMock('../../../../app/composables/useSuperadmin', () => ({
+      clientsRevision: ref(0),
       useSuperadmin: () => ({
         fetchClients: clientsFail
           ? vi.fn().mockRejectedValue(new Error('clients unavailable'))
@@ -157,5 +158,62 @@ describe('NavBar', () => {
     const wrapper = await mountFresh()
 
     expect(wrapper.find('[data-testid="client-switcher"]').exists()).toBe(false)
+  })
+
+  // `useActingClientRequired` reads the selection once per mount, on purpose: a
+  // selection change reloads the app, so no mounted page outlives it. If this
+  // stops reloading, that composable goes stale and must gain a watcher.
+  it('reloads the app after a client is picked in the switcher', async () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { ...window.location, reload })
+    mockIdentity(true)
+    const wrapper = await mountFresh()
+    const ClientSwitcher = (await import('../../../../app/components/organisms/ClientSwitcher.vue'))
+      .default
+
+    wrapper.findComponent(ClientSwitcher).vm.$emit('change', 1)
+    await flushPromises()
+
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes the switcher list when a client is created elsewhere (no reload)', async () => {
+    // The real composable is the point: earlier tests doMock it and the mock
+    // outlives `resetModules`.
+    vi.doUnmock('../../../../app/composables/useSuperadmin')
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockResolvedValue({ user: { name: 'Ada', photo_url: null } }),
+        can: (ability: string) => ability === 'clients.viewAny',
+      }),
+    }))
+    const acme = { id: 1, name: 'Acme' }
+    let listCalls = 0
+    const apiFetch = vi.fn(async (path: string, opts?: { method?: string }) => {
+      if (path === '/admin/organizations' && opts?.method === 'POST') return { data: { id: 2 } }
+      listCalls += 1
+      return {
+        data: listCalls === 1 ? [acme] : [acme, { id: 2, name: 'Newco' }],
+        acting_organization_id: null,
+      }
+    })
+    vi.doMock('../../../../app/composables/useApi', () => ({ useApi: () => ({ apiFetch }) }))
+
+    vi.resetModules()
+    const { SidebarProvider: FreshProvider } = await import('../../../../app/components/ui/sidebar')
+    const Fresh = (await import('../../../../app/components/organisms/NavBar.vue')).default
+    const { useSuperadmin } = await import('../../../../app/composables/useSuperadmin')
+    const ClientSwitcher = (await import('../../../../app/components/organisms/ClientSwitcher.vue'))
+      .default
+    const wrapper = mount(defineComponent({ render: () => h(FreshProvider, () => h(Fresh)) }), {
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+    expect(wrapper.findComponent(ClientSwitcher).props('clients')).toHaveLength(1)
+
+    await useSuperadmin().createClient({ name: 'Newco' })
+    await flushPromises()
+
+    expect(wrapper.findComponent(ClientSwitcher).props('clients')).toHaveLength(2)
   })
 })

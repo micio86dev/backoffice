@@ -14,21 +14,19 @@
       {{ $t('projects.competencyPicker.empty') }}
     </p>
     <div v-else class="grid grid-cols-2 gap-2">
-      <Field v-for="option in options" :key="option.code" orientation="horizontal" class="w-auto">
-        <Checkbox
-          :id="`competency-${option.code}`"
-          :model-value="isSelected(option)"
-          :disabled="!selectable(option)"
-          :aria-describedby="reasonId(option)"
-          @update:model-value="(checked) => toggle(option, checked === true)"
-        />
-        <FieldLabel :for="`competency-${option.code}`" class="font-normal">
-          {{ option.name }}
-        </FieldLabel>
-        <FieldDescription v-if="reasonId(option)" :id="reasonId(option)">
-          {{ $t(`projects.competencyPicker.${reasonKey(option)}`) }}
-        </FieldDescription>
-      </Field>
+      <CheckboxField
+        v-for="option in options"
+        :id="`competency-${option.code}`"
+        :key="option.code"
+        :model-value="isSelected(option)"
+        :disabled="!selectable(option)"
+        :label="option.name"
+        :description="
+          reasonKey(option) ? $t(`projects.competencyPicker.${reasonKey(option)}`) : undefined
+        "
+        :description-id="reasonId(option)"
+        @update:model-value="(checked) => toggle(option, checked)"
+      />
     </div>
   </FieldSet>
 </template>
@@ -41,8 +39,8 @@
 // composes the right `options` list); this molecule only renders what it is
 // given and tracks selection.
 import { computed } from 'vue'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
+import CheckboxField from '@/components/molecules/CheckboxField.vue'
+import { FieldDescription, FieldLegend, FieldSet } from '@/components/ui/field'
 
 export interface CompetencyOption {
   code: string

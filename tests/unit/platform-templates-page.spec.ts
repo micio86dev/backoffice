@@ -410,4 +410,43 @@ describe('PlatformTemplatesPage', () => {
       ).not.toBeNull()
     })
   })
+
+  describe('write safety', () => {
+    it('sends one activation for a double click on Offer', async () => {
+      let release: () => void = () => undefined
+      const { wrapper, api } = await mountPage([template()], () => ({
+        activate: vi.fn().mockReturnValue(new Promise<void>((resolve) => (release = resolve))),
+      }))
+
+      const offer = wrapper.find('[data-testid="platform-template-offer-1"]')
+      await offer.trigger('click')
+      await offer.trigger('click')
+      release()
+      await flushPromises()
+
+      expect(api.activate).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not show stale rows when the reload after a write fails', async () => {
+      const { wrapper, api } = await mountPage([template()])
+      api.list.mockRejectedValueOnce(new Error('boom'))
+
+      await click(wrapper, 'platform-template-offer-1')
+
+      expect(wrapper.find('[data-testid="platform-templates-load-error"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="platform-template-row-1"]').exists()).toBe(false)
+    })
+
+    it('clears a previous notice when a save starts', async () => {
+      const { wrapper, api } = await mountPage([template()])
+      await click(wrapper, 'platform-template-offer-1')
+      expect(wrapper.find('[data-testid="platform-template-notice"]').exists()).toBe(true)
+      api.update.mockRejectedValueOnce(new Error('nope'))
+
+      await click(wrapper, 'platform-template-edit-1')
+      await submitForm()
+
+      expect(wrapper.find('[data-testid="platform-template-notice"]').exists()).toBe(false)
+    })
+  })
 })

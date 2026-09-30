@@ -56,7 +56,7 @@
     </p>
 
     <ul
-      v-else-if="templates.length > 0"
+      v-else-if="!loadError && templates.length > 0"
       class="flex flex-col gap-3"
       data-testid="platform-templates-list"
     >
@@ -115,6 +115,7 @@
             type="button"
             :data-testid="`platform-template-offer-${row.id}`"
             :class="buttonClass"
+            :disabled="busy"
             @click="onOffer(row)"
           >
             {{ $t('platformTemplates.action.offer') }}
@@ -124,6 +125,7 @@
             type="button"
             :data-testid="`platform-template-retire-${row.id}`"
             :class="buttonClass"
+            :disabled="busy"
             @click="onRetire(row)"
           >
             {{ $t('platformTemplates.action.retire') }}
@@ -301,6 +303,8 @@ const usageParams = (row: PlatformTemplate) => ({
 })
 const usageText = (row: PlatformTemplate): string => t('platformTemplates.usage', usageParams(row))
 
+const busy = ref(false)
+
 async function load(): Promise<void> {
   try {
     const [rows, specs] = await Promise.all([list(), fetchFieldSpecs()])
@@ -353,6 +357,9 @@ async function perform(
   noticeKey: string,
   name: string
 ): Promise<boolean> {
+  // One write at a time: a second click while one is in flight would repeat it.
+  if (busy.value) return false
+  busy.value = true
   failure.value = null
   notice.value = null
   warning.value = null
@@ -369,12 +376,15 @@ async function perform(
     return false
   } finally {
     await load()
+    busy.value = false
   }
 }
 
 async function send(payload: Partial<AvatarTemplate>): Promise<void> {
   saving.value = true
   submitError.value = null
+  notice.value = null
+  warning.value = null
 
   try {
     const name = payload.name ?? ''

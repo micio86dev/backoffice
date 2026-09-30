@@ -12,6 +12,11 @@
  *     both lists and maps, and this one is a MAP. Adopting the generated type
  *     would mean the client believing an object is an array — worse than a
  *     hand-written type, because it is confidently wrong rather than absent.
+ *     The generated WRITE bodies (POST/PATCH) say `string[]` for the same
+ *     reason, while the read resource says an object; the api validates it as a
+ *     plain array/map. Pinned in `tests/nuxt/avatar-template-config-contract.ts`
+ *     (types) and `avatar-template-config-shape.spec.ts` (runtime). Follow-up:
+ *     annotate the api request rules so Scramble emits an object schema.
  *
  *   - `provider`, which it reports as `string`. The union lives in a PHP
  *     `match` and a database CHECK, neither of which reaches OpenAPI.

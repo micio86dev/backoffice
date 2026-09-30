@@ -229,6 +229,14 @@ export interface paths {
          *     than no type: both Nuxt apps generate their client from this file, so a
          *     `string` there makes every `abilities.users.viewAny` read a compile
          *     error in the two repositories that consume it.
+         *
+         *     `abilities.avatarTemplates.manageGlobal` is true only for a superadmin: it
+         *     gates the platform (global) avatar template surface under
+         *     `/admin/avatar-templates`, whose templates are offered to every
+         *     organization. It is a rendering hint for the client; the server still
+         *     refuses every other caller with a 403. (A per-flag schema description is
+         *     not expressible here: the shape is an inline PHPDoc type, and a nested
+         *     doc comment would end this block.)
          */
         get: operations["auth.me"];
         put?: never;
@@ -1807,7 +1815,17 @@ export interface paths {
         get: operations["platformAvatarTemplate.show"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a platform avatar template: only when it is retired AND unpinned
+         * @description Two 409s, in this order. `template_active`: deleting what organizations
+         *     are being offered is a decision, not a cleanup — retire it first.
+         *     `template_in_use`: a pin in ANY organization refuses the delete, and the
+         *     body carries the organization and project counts so the superadmin knows
+         *     how far the blast radius reaches. Trashed projects do not count. The
+         *     count-then-delete window is closed by the model's own `deleting` guard,
+         *     whose exception renders as the same 409.
+         */
+        delete: operations["platformAvatarTemplate.destroy"];
         options?: never;
         head?: never;
         /**
@@ -1818,6 +1836,82 @@ export interface paths {
          *     of what happened. It records field NAMES, never config values.
          */
         patch: operations["platformAvatarTemplate.update"];
+        trace?: never;
+    };
+    "/admin/avatar-templates/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Offer a platform avatar template for new project pins
+         * @description "Offered" is not "the one in use": any number of platform templates may
+         *     be offered at once (a single active row per provider is an organization
+         *     rule), so nothing else is deactivated. The stored config is validated
+         *     again HERE because a config goes stale when the field spec changes, and
+         *     offering is the last moment anyone can catch that before an organization
+         *     pins it. Idempotent: offering an offered template changes and audits
+         *     nothing.
+         */
+        post: operations["platformAvatarTemplate.activate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/avatar-templates/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retire a platform avatar template: it is no longer offered for NEW pins
+         * @description Existing pins keep resolving to it (a pin is valid in any state), so
+         *     retiring is reversible bookkeeping and always allowed — including while
+         *     projects in other organizations still use it. No config revalidation:
+         *     withdrawing can only reduce exposure, and an already-invalid template is
+         *     exactly the one an operator most wants to retire. Idempotent.
+         */
+        post: operations["platformAvatarTemplate.deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/avatar-templates/{id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy a platform avatar template into one or more organizations
+         * @description This is the ONLY route that copies a platform template: the organization
+         *     duplicate route answers 404 for a platform id, like every organization
+         *     route. Each copy is an independent, INACTIVE organization template (no
+         *     shared provider-side configuration), so editing the platform template
+         *     afterwards never reaches it. Written OUTSIDE the platform context — the
+         *     copies belong to their target organizations — and audited per target by
+         *     the tenant recorder, with `source_scope: platform`.
+         */
+        post: operations["platformAvatarTemplate.duplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/admin/platform-users": {
@@ -8088,21 +8182,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
-            /** @description An error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /**
-                         * @description Error overview.
-                         * @example
-                         */
-                        message: string;
-                    };
-                };
-            };
+            403: components["responses"]["AuthorizationException"];
         };
     };
     "platformAvatarTemplate.store": {
@@ -8173,18 +8253,43 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
-            /** @description An error */
-            403: {
+            403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "platformAvatarTemplate.destroy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The template was deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": null;
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            /** @description Still offered (`template_active`) or pinned by projects (`template_in_use`, with counts). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /**
-                         * @description Error overview.
-                         * @example
-                         */
+                        /** @enum {string} */
+                        error: "template_active" | "template_in_use";
                         message: string;
+                        project_count?: number;
+                        organization_count?: number;
                     };
                 };
             };
@@ -8226,6 +8331,95 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["PlatformAvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
+        };
+    };
+    "platformAvatarTemplate.activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `PlatformAvatarTemplateResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformAvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "platformAvatarTemplate.deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `PlatformAvatarTemplateResource` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PlatformAvatarTemplateResource"];
+                    };
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+        };
+    };
+    "platformAvatarTemplate.duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    target_organization_ids: number[];
+                    name?: string | null;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            organization_id: number;
+                            id: number;
+                            name: string;
+                        }[];
                     };
                 };
             };

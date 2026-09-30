@@ -427,6 +427,44 @@ describe('PlatformTemplatesPage', () => {
       expect(api.activate).toHaveBeenCalledTimes(1)
     })
 
+    it('ignores a save while an offer is in flight, and disables the form meanwhile', async () => {
+      let release: () => void = () => undefined
+      const { wrapper, api } = await mountPage([template()], () => ({
+        activate: vi.fn().mockReturnValue(new Promise<void>((resolve) => (release = resolve))),
+      }))
+      await click(wrapper, 'platform-template-edit-1')
+      await wrapper.find('[data-testid="platform-template-offer-1"]').trigger('click')
+
+      const form = await waitForTestId<HTMLFormElement>('template-form')
+      expect(form.querySelector('fieldset')?.disabled).toBe(true)
+      await submitForm()
+      expect(api.update).not.toHaveBeenCalled()
+
+      release()
+      await flushPromises()
+    })
+
+    it('disables Offer and ignores a second write while a save is in flight', async () => {
+      let release: () => void = () => undefined
+      const { wrapper, api } = await mountPage([template()], () => ({
+        update: vi
+          .fn()
+          .mockReturnValue(
+            new Promise<object>((resolve) => (release = () => resolve({ data: template() })))
+          ),
+      }))
+      await click(wrapper, 'platform-template-edit-1')
+      await submitForm()
+
+      const offer = wrapper.find('[data-testid="platform-template-offer-1"]')
+      expect((offer.element as HTMLButtonElement).disabled).toBe(true)
+      await submitForm()
+      expect(api.update).toHaveBeenCalledTimes(1)
+
+      release()
+      await flushPromises()
+    })
+
     it('does not show stale rows when the reload after a write fails', async () => {
       const { wrapper, api } = await mountPage([template()])
       api.list.mockRejectedValueOnce(new Error('boom'))

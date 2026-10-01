@@ -51,12 +51,11 @@ const REUSABLE_KEYS = [
 const NORMATIVE_ENGLISH: Record<(typeof REUSABLE_KEYS)[number], string> = {
   'entryLink.reusable.checkbox.label': 'Generate a reusable interview link that never expires',
   'entryLink.reusable.checkbox.description':
-    'Anyone who opens it starts a new interview for this project. Use it for demos, events and testing.',
+    'Anyone who opens it starts a new interview for this project. Each visitor enters their name and email before starting. Use it for demos, events and testing.',
   'entryLink.reusable.linkName.label': 'Link name',
-  'entryLink.reusable.linkName.help':
-    'Names the link and the interviews started from it, e.g. Milan fair stand.',
+  'entryLink.reusable.linkName.help': 'Names the link, e.g. Milan fair stand.',
   'entryLink.reusable.disclosure':
-    'This link does not expire and can be used many times. Anyone who has it can start this interview, so share it only where you mean to. This is the only time the full link is shown.',
+    'This link does not expire and can be used many times. Anyone who has it can start this interview, so share it only where you mean to. This is the only time the full link is shown. Visitors enter their name and email before the interview. On a shared device, use a private browser window.',
   'entryLink.reusable.neverExpires': 'Never expires · Reusable',
   'entryLink.reusable.stopsWhen':
     'It stops working if the project closes or the link is disabled. Desktop browsers only.',
@@ -122,6 +121,26 @@ describe('reusable link copy', () => {
     )
     expect(lookup(it_, 'entryLink.reusable.neverExpires')).toMatch(/non scade/i)
     expect(lookup(it_, 'entryLink.reusable.stopsWhen')).toMatch(/disattivat/i)
+  })
+
+  it('tells the operator, in Italian, that visitors enter name and email and to use a private window', () => {
+    expect(lookup(it_, 'entryLink.reusable.checkbox.description')).toMatch(/nome ed email/i)
+    expect(lookup(it_, 'entryLink.reusable.checkbox.description')).toContain(
+      'Ogni visitatore inserisce nome ed email prima di iniziare.'
+    )
+    expect(lookup(it_, 'entryLink.reusable.disclosure')).toMatch(/nome ed email/i)
+    expect(lookup(it_, 'entryLink.reusable.disclosure')).toMatch(/finestra del browser privata/i)
+    expect(lookup(it_, 'entryLink.reusable.disclosure')).toContain(
+      'I visitatori inseriscono nome ed email prima del colloquio. Su un dispositivo condiviso, usa una finestra del browser privata.'
+    )
+  })
+
+  it('no longer claims that the link name is applied to the interviews started from it', () => {
+    // Visitors now supply their own names, so the label only names the link.
+    expect(lookup(en, 'entryLink.reusable.linkName.help')).not.toMatch(
+      /interviews started from it/i
+    )
+    expect(lookup(it_, 'entryLink.reusable.linkName.help')).not.toMatch(/colloqui avviati da esso/i)
   })
 })
 

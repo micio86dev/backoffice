@@ -153,7 +153,7 @@
     "subtitle": "Who has been given an entry link, and where each of them got to.",
     "filters": {
       "search": "Search",
-      "searchPlaceholder": "Search by name, reference, source or external ID",
+      "searchPlaceholder": "Search by name, email, reference, source or external ID",
       "status": "Status",
       "allStatuses": "All statuses"
     },
@@ -231,13 +231,13 @@
     "reusable": {
       "checkbox": {
         "label": "Generate a reusable interview link that never expires",
-        "description": "Anyone who opens it starts a new interview for this project. Use it for demos, events and testing."
+        "description": "Anyone who opens it starts a new interview for this project. Each visitor enters their name and email before starting. Use it for demos, events and testing."
       },
       "linkName": {
         "label": "Link name",
-        "help": "Names the link and the interviews started from it, e.g. Milan fair stand."
+        "help": "Names the link, e.g. Milan fair stand."
       },
-      "disclosure": "This link does not expire and can be used many times. Anyone who has it can start this interview, so share it only where you mean to. This is the only time the full link is shown.",
+      "disclosure": "This link does not expire and can be used many times. Anyone who has it can start this interview, so share it only where you mean to. This is the only time the full link is shown. Visitors enter their name and email before the interview. On a shared device, use a private browser window.",
       "neverExpires": "Never expires · Reusable",
       "stopsWhen": "It stops working if the project closes or the link is disabled. Desktop browsers only."
     },

@@ -100,3 +100,22 @@ describe('Input control sizing (D12)', () => {
     expect(computedHeight(compiled, classAttr, dataSize)).toBe('36px')
   })
 })
+
+describe('Input disabled affordance (DESIGN.md section 5)', () => {
+  it('shows not-allowed on a disabled input, so it must not also be pointer-events-none', () => {
+    // DESIGN.md section 5: disabled states use `cursor: not-allowed`, vendored
+    // source included. An element with `pointer-events: none` is never the
+    // hit-test target, so the browser takes the cursor from whatever sits beneath
+    // it and `cursor-not-allowed` can never render. `disabled` already blocks
+    // interaction natively, so dropping `pointer-events-none` costs no
+    // protection. This asserts the RENDERED class list: a source grep cannot see
+    // a `cn()` call that dropped or re-added the class.
+    const classes = mount(Input, { attrs: { disabled: true } })
+      .get('input')
+      .classes()
+
+    expect(classes).toContain('disabled:cursor-not-allowed')
+    expect(classes).not.toContain('disabled:pointer-events-none')
+    expect(classes.some((name) => name.includes('pointer-events-none'))).toBe(false)
+  })
+})

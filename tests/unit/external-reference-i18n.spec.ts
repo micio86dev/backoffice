@@ -60,6 +60,9 @@ describe('external reference copy', () => {
       // says "name or reference" hides half of what the box can do.
       expect(placeholder).toMatch(locale === 'en' ? /source/i : /origine/i)
       expect(placeholder).toMatch(locale === 'en' ? /external id/i : /id esterno/i)
+      // The list search also matches the email address a reusable-link visitor
+      // types (api participants `q`): naming it keeps the box honest.
+      expect(placeholder).toMatch(/email/i)
     })
   })
 

@@ -20,6 +20,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 2 : 0,
+  // A test that fails and then passes on a retry is reported as "flaky" and, by
+  // default, leaves the run green. That is exactly how a race (an assertion that
+  // beats the request it checks, a banner that arrives a frame late) stays in a
+  // suite for months: nobody is told. With this set the retry still happens and
+  // its trace is still kept, but the run FAILS, so the flake has to be fixed
+  // rather than absorbed. `retries` stays: it is what produces the trace.
+  failOnFlakyTests: true,
   workers: process.env['CI'] ? 1 : undefined,
   reporter: [['html', { open: 'never' }], ['list']],
 

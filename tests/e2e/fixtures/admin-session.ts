@@ -23,8 +23,8 @@
  *   `test.use(...)`. `abilities` overrides the role-derived map for the one case
  *   that needs a user the role table cannot produce (for example "may edit a
  *   project but may not create participants").
- * - The analytics consent is pre-answered ("denied"), so the fixed banner never
- *   sits on top of a drawer.
+ * - The analytics consent is pre-answered ("denied") and the first-login tour
+ *   marked as seen, so neither overlay ever sits on top of a drawer.
  *
  * TYPES. The factories return the GENERATED resources (`types/api.ts`), so a
  * field the api adds, renames or drops is a type error here instead of a mock
@@ -64,7 +64,7 @@ export const test = base.extend<SessionOptions & SessionFixtures>({
   abilities: [undefined, { option: true }],
 
   adminPage: async ({ page, role, abilities }, use) => {
-    await answerAnalyticsConsent(page)
+    await answerFirstVisitPrompts(page)
     await signIn(page, role, abilities)
     await use(page)
   },
@@ -85,22 +85,36 @@ export function isDataRequest(route: Route): boolean {
   return route.request().resourceType() !== 'document'
 }
 
+/** The id `/auth/me` reports; the onboarding "seen" flag is keyed on it. */
+const USER_ID = 1
+
 /**
- * Seeds the analytics consent as already refused, before any script runs.
+ * Pre-answers the two things a fresh browser profile is asked on first sight,
+ * before any script runs: the analytics consent, and the guided tour.
  *
- * `beai.consent.analytics` is the key `app/utils/analytics-consent.ts` reads;
- * "denied" is one of the two values it accepts as an answer, so the banner stays
- * away. The write sits in a try/catch because the init script also runs in
- * documents with an opaque origin (`about:blank`), where storage throws.
+ * Both are overlays that arrive AFTER the page is interactive. The consent
+ * banner is fixed to the bottom of the viewport and can sit on top of a drawer's
+ * footer; the tour opens over the first page and takes focus. A test that
+ * dismisses them with `if (await x.isVisible())` behaves differently depending
+ * on a race, so they are answered here, deterministically, instead.
+ *
+ * - `beai.consent.analytics` is the key `app/utils/analytics-consent.ts` reads;
+ *   "denied" is one of the two values it accepts as an answer.
+ * - `beai.onboarding.tour-seen.<userId>` is what `onboarding-storage.ts` reads;
+ *   "seen" is its only positive value.
+ *
+ * The write sits in a try/catch because the init script also runs in documents
+ * with an opaque origin (`about:blank`), where storage throws.
  */
-async function answerAnalyticsConsent(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+async function answerFirstVisitPrompts(page: Page): Promise<void> {
+  await page.addInitScript((userId) => {
     try {
       window.localStorage.setItem('beai.consent.analytics', 'denied')
+      window.localStorage.setItem(`beai.onboarding.tour-seen.${userId}`, 'seen')
     } catch {
       // No storage in this document: nothing to answer.
     }
-  })
+  }, USER_ID)
 }
 
 async function signIn(page: Page, role: Role, abilities: Abilities | undefined): Promise<void> {
@@ -118,7 +132,7 @@ async function signIn(page: Page, role: Role, abilities: Abilities | undefined):
       isDataRequest(route)
         ? jsonRoute(route, {
             user: {
-              id: 1,
+              id: USER_ID,
               name: 'Operator One',
               email: 'operator@example.com',
               locale: 'it',

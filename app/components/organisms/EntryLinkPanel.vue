@@ -1,5 +1,43 @@
 <template>
-  <div class="flex flex-col gap-4">
+  <div v-if="kind === 'reusable'" class="flex flex-col gap-4">
+    <!--
+      reusable-interview-links (DESIGN.md 16.18): a link that never expires and
+      can be used many times needs a DIFFERENT disclosure, not the single-use one
+      with a field blanked out. It is its own branch so the single-use branch
+      below stays exactly as it was. The comment lives INSIDE the root element on
+      purpose: a comment beside the `v-if` root would turn the component into a
+      fragment and silently drop the attributes a parent passes down.
+
+      DOM order is load-bearing here too: the disclosure, THEN the never-expires
+      line, THEN the URL, THEN Copy. There is no "Generate new link" — a reusable
+      link is created once and disabled, never re-issued — and no expiry line,
+      because there is no expiry to state.
+    -->
+    <Alert variant="warning" data-testid="entry-link-disclosure">
+      <AlertDescription>{{ $t('entryLink.reusable.disclosure') }}</AlertDescription>
+    </Alert>
+
+    <p class="text-muted-foreground text-sm" data-testid="entry-link-never-expires">
+      <span class="text-foreground font-medium">{{ $t('entryLink.reusable.neverExpires') }}</span>
+      {{ $t('entryLink.reusable.stopsWhen') }}
+    </p>
+
+    <p class="bg-muted rounded-lg p-3 font-mono text-sm break-all" data-testid="entry-link-url">
+      {{ link.entry_url }}
+    </p>
+
+    <Alert v-if="copyHint" variant="default" data-testid="entry-link-copy-hint">
+      <AlertDescription>{{ $t('entryLink.copyBlocked') }}</AlertDescription>
+    </Alert>
+
+    <div class="flex gap-2">
+      <Button :disabled="copyDisabled" data-testid="entry-link-copy" @click="onCopy">
+        {{ copied ? $t('entryLink.copied') : $t('entryLink.copy') }}
+      </Button>
+    </div>
+  </div>
+
+  <div v-else class="flex flex-col gap-4">
     <!--
       DOM order is load-bearing (design D4): disclosure, THEN expiry, THEN
       the URL, THEN Copy/Generate. A toast shown after copy would be too
@@ -13,7 +51,7 @@
 
     <p class="text-muted-foreground text-sm" data-testid="entry-link-expiry">
       {{ $t('entryLink.expiresAt') }}
-      <FormattedDate :value="link.expires_at" :locale="locale" show-zone />
+      <FormattedDate :value="singleUseExpiry" :locale="locale" show-zone />
     </p>
 
     <p class="bg-muted rounded-lg p-3 font-mono text-sm break-all" data-testid="entry-link-url">
@@ -50,10 +88,31 @@ export interface EntryLink {
   expires_at: string
 }
 
-const props = defineProps<{
-  link: EntryLink
-  locale: string
-}>()
+/**
+ * A reusable link NEVER expires, so the type makes an expiry unrepresentable
+ * (`expires_at?: never`) rather than optional: handing a single-use link to the
+ * reusable variant, or the other way round, fails the build.
+ */
+export interface ReusableEntryLink {
+  entry_url: string
+  expires_at?: never
+}
+
+/**
+ * A discriminated union on `kind`: the single-use variant (the default, and the
+ * only one that existed before reusable links) takes an `EntryLink`, the
+ * reusable one a `ReusableEntryLink`.
+ */
+export type EntryLinkPanelProps = { locale: string } & (
+  { kind?: 'single-use'; link: EntryLink } | { kind: 'reusable'; link: ReusableEntryLink }
+)
+
+const props = defineProps<EntryLinkPanelProps>()
+
+// The single-use branch is the only reader of the expiry. `null` is never
+// rendered: that branch is only reached with an `EntryLink`, whose expiry is
+// required.
+const singleUseExpiry = computed(() => props.link.expires_at ?? null)
 
 defineEmits<{
   (e: 'generate'): void

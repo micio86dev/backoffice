@@ -170,7 +170,11 @@ const DESTRUCTIVE_CALL_REGEX =
 // it was blind to `updateProject` before this entry was added. Extend this
 // list — do not trust it as evidence of completeness. (Recorded verbatim in
 // tasks.md alongside this task.)
-const KNOWN_DESTRUCTIVE_METHODS = ['updateProject']
+//
+// `disableReusableLink` (reusable-interview-links): `disable` is not one of the
+// regex's verbs, and a disabled reusable link can never be re-enabled, so it is
+// as final as the `delete`/`revoke` calls the regex was written for.
+const KNOWN_DESTRUCTIVE_METHODS = ['updateProject', 'disableReusableLink']
 
 function callsDestructiveMethod(source: string): boolean {
   const stripped = stripComments(source)
@@ -228,6 +232,15 @@ describe('destructive action confirmation guard (admin-backoffice spec)', () => 
     expect(callsDestructiveMethod("window.removeEventListener('resize', onWindowChange)")).toBe(
       false
     )
+  })
+
+  // `disable` is outside DESTRUCTIVE_CALL_REGEX, and a reusable link CANNOT be
+  // re-enabled: the regex alone is blind to the one call that is final. This
+  // pins that the named list closes that gap, and that the regex still does not
+  // (so the list entry, not luck, is what makes the guard see it).
+  it('R1 — sees disableReusableLink through the known-methods list, not the regex', () => {
+    expect(callsDestructiveMethod('await disableReusableLink(projectId, linkId)')).toBe(true)
+    expect(DESTRUCTIVE_CALL_REGEX.test('await disableReusableLink(projectId, linkId)')).toBe(false)
   })
 
   it('R1 — every non-allowlisted destructive call site imports ConfirmDialog', () => {

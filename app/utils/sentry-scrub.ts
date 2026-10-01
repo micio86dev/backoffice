@@ -324,6 +324,18 @@ export const DENIED_KEYS = new Set([
   // names a system, not a person.
   'external_id',
   'external_ids',
+  // reusable-interview-links: the sha256 the api stores to look a link up. Both
+  // spellings, like every other credential pair. The word `token` already makes
+  // any `token_*` key denied, so this is the NAMED statement of the rule rather
+  // than the only thing holding it: the api scrubber carries `token_hash`
+  // explicitly, and this list is the one that has to agree with it.
+  //
+  // `link_token` needs no entry: it reaches `token` through the last-segment
+  // rule. `token_prefix` is an identification aid and is NOT scrubbed by VALUE
+  // (see `REUSABLE_LINK_TOKEN_PATTERN`); as a KEY it still falls to the `token`
+  // word above, which is the fail-closed side of that ambiguity.
+  'token_hash',
+  'token_hashes',
 ])
 
 const REDACTED = '[redacted]'
@@ -871,7 +883,10 @@ function redactPath(path: string): string {
 }
 
 function redactAddressInPath(url: string): string {
-  return url.replace(EMAIL_PATTERN, REDACTED)
+  // The reusable link token is cut here too: `redactUrl` is the primary URL
+  // sink, and a path segment or a non-URL string handed to it never passes
+  // through `redactSharedPasses`.
+  return redactReusableLinkTokens(url.replace(EMAIL_PATTERN, REDACTED))
 }
 
 /**
@@ -948,6 +963,28 @@ const ABSOLUTE_URL_PATTERN = /https?:\/\/[^\s"'<>]+/gi
 const EMAIL_PATTERN = /(?<![\w.%+-])[\w.%+-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi
 
 /**
+ * The reusable interview link token, cut BY VALUE.
+ *
+ * `beai_rl_` followed by 43 base64url characters (256 bits) is a live,
+ * NON-EXPIRING credential: whoever holds it can start interviews in a project
+ * until an operator disables the link. It first passes through this app in the
+ * `entry_url` of the create response and is then copied by hand into messages,
+ * notes and slides, so a key denylist cannot be the only net — once it sits
+ * inside a string there is no key to deny.
+ *
+ * EXACTLY 43, matching the api's token format, which is also what keeps the
+ * 16-character display prefix (`beai_rl_` + 8) and a near miss such as the
+ * marker followed by 10 characters readable: an over-eager scrubber that eats
+ * ordinary text makes the error report useless. The candidate app applies the
+ * same rule, and both are pinned by one shared fixture set.
+ */
+const REUSABLE_LINK_TOKEN_PATTERN = /beai_rl_[\w-]{43}/g
+
+function redactReusableLinkTokens(text: string): string {
+  return text.replace(REUSABLE_LINK_TOKEN_PATTERN, REDACTED)
+}
+
+/**
  * Every pass that is NOT about how an absolute URL should be treated.
  *
  * `redactFreeText` and `redactStackFrames` were two separate chains, and they
@@ -962,7 +999,14 @@ const EMAIL_PATTERN = /(?<![\w.%+-])[\w.%+-]+@(?:[A-Z0-9-]+\.)+[A-Z]{2,}/gi
  * scrubbed one.
  */
 function redactSharedPasses(text: string): string {
-  return redactSelectorCopy(redactRelativeQuery(redactEmbeddedDocuments(redactEmbeddedPairs(text))))
+  // The token pass is FIRST, so a token is gone before any later pass parses,
+  // splits or re-serialises the text around it, and it reaches both callers of
+  // this chain: free text and stack frames.
+  return redactSelectorCopy(
+    redactRelativeQuery(
+      redactEmbeddedDocuments(redactEmbeddedPairs(redactReusableLinkTokens(text)))
+    )
+  )
 }
 
 /**

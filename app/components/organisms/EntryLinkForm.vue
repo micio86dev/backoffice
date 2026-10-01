@@ -7,80 +7,128 @@
   <form id="entry-link-form" data-testid="entry-link-form" novalidate @submit.prevent="onSubmit">
     <FormFieldset :disabled="submitting">
       <FieldGroup>
-        <Field :data-invalid="Boolean(errors.candidateRef)">
-          <FieldLabel for="entry-link-form-candidate-ref">
-            {{ $t('entryLink.form.candidateRef') }}
-          </FieldLabel>
-          <Input
-            id="entry-link-form-candidate-ref"
-            v-model="candidateRef"
-            autocomplete="off"
-            :aria-invalid="Boolean(errors.candidateRef)"
-            :aria-describedby="
-              errors.candidateRef ? 'entry-link-form-candidate-ref-error' : undefined
-            "
-            data-testid="entry-link-form-candidate-ref"
-          />
-          <FieldError
-            v-if="errors.candidateRef"
-            id="entry-link-form-candidate-ref-error"
-            data-testid="entry-link-form-candidate-ref-error"
-          >
-            {{ errors.candidateRef }}
-          </FieldError>
-        </Field>
+        <!--
+          reusable-interview-links (DESIGN.md 16.18): FIRST, before every other
+          control. A reusable link describes no one, so ticking this swaps the
+          whole candidate form for one optional Link name. The fields are
+          REMOVED (`v-if`), not disabled: a disabled field that can never be
+          filled reads as a bug, an absent one reads as a different mode — and a
+          hidden field's value can never reach the request, because the reusable
+          submit builds its own payload and reads none of them.
 
-        <Field :data-invalid="Boolean(errors.email)">
-          <FieldLabel for="entry-link-form-email">
-            {{ $t('entryLink.form.email') }}
+          Unchecked on every open: it is local state, so a re-mounted form (the
+          drawer reopens it) always starts as the single-use form.
+        -->
+        <CheckboxField
+          id="entry-link-form-reusable"
+          v-model="reusable"
+          :label="$t('entryLink.reusable.checkbox.label')"
+          :description="$t('entryLink.reusable.checkbox.description')"
+          data-testid="entry-link-form-reusable"
+        />
+
+        <Field v-if="reusable" :data-invalid="Boolean(errors.linkName)">
+          <FieldLabel for="entry-link-form-link-name">
+            {{ $t('entryLink.reusable.linkName.label') }}
           </FieldLabel>
           <Input
-            id="entry-link-form-email"
-            v-model="email"
-            type="email"
+            id="entry-link-form-link-name"
+            v-model="linkName"
             autocomplete="off"
-            :aria-invalid="Boolean(errors.email)"
+            :aria-invalid="Boolean(errors.linkName)"
             :aria-describedby="
-              errors.email ? 'entry-link-form-email-error' : 'entry-link-form-email-help'
+              errors.linkName ? 'entry-link-form-link-name-error' : 'entry-link-form-link-name-help'
             "
-            data-testid="entry-link-form-email"
+            data-testid="entry-link-form-link-name"
+            @blur="errors.linkName = validateLinkName()"
           />
-          <FieldDescription id="entry-link-form-email-help">
-            {{ $t('entryLink.form.help.email') }}
+          <FieldDescription id="entry-link-form-link-name-help">
+            {{ $t('entryLink.reusable.linkName.help') }}
           </FieldDescription>
           <FieldError
-            v-if="errors.email"
-            id="entry-link-form-email-error"
-            data-testid="entry-link-form-email-error"
+            v-if="errors.linkName"
+            id="entry-link-form-link-name-error"
+            data-testid="entry-link-form-link-name-error"
           >
-            {{ errors.email }}
+            {{ errors.linkName }}
           </FieldError>
         </Field>
 
-        <Field :data-invalid="Boolean(errors.displayName)">
-          <FieldLabel for="entry-link-form-display-name">
-            {{ $t('entryLink.form.displayName') }}
-          </FieldLabel>
-          <Input
-            id="entry-link-form-display-name"
-            v-model="displayName"
-            autocomplete="off"
-            :aria-invalid="Boolean(errors.displayName)"
-            :aria-describedby="
-              errors.displayName ? 'entry-link-form-display-name-error' : undefined
-            "
-            data-testid="entry-link-form-display-name"
-          />
-          <FieldError
-            v-if="errors.displayName"
-            id="entry-link-form-display-name-error"
-            data-testid="entry-link-form-display-name-error"
-          >
-            {{ errors.displayName }}
-          </FieldError>
-        </Field>
+        <template v-else>
+          <Field :data-invalid="Boolean(errors.candidateRef)">
+            <FieldLabel for="entry-link-form-candidate-ref">
+              {{ $t('entryLink.form.candidateRef') }}
+            </FieldLabel>
+            <Input
+              id="entry-link-form-candidate-ref"
+              v-model="candidateRef"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.candidateRef)"
+              :aria-describedby="
+                errors.candidateRef ? 'entry-link-form-candidate-ref-error' : undefined
+              "
+              data-testid="entry-link-form-candidate-ref"
+            />
+            <FieldError
+              v-if="errors.candidateRef"
+              id="entry-link-form-candidate-ref-error"
+              data-testid="entry-link-form-candidate-ref-error"
+            >
+              {{ errors.candidateRef }}
+            </FieldError>
+          </Field>
 
-        <!--
+          <Field :data-invalid="Boolean(errors.email)">
+            <FieldLabel for="entry-link-form-email">
+              {{ $t('entryLink.form.email') }}
+            </FieldLabel>
+            <Input
+              id="entry-link-form-email"
+              v-model="email"
+              type="email"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.email)"
+              :aria-describedby="
+                errors.email ? 'entry-link-form-email-error' : 'entry-link-form-email-help'
+              "
+              data-testid="entry-link-form-email"
+            />
+            <FieldDescription id="entry-link-form-email-help">
+              {{ $t('entryLink.form.help.email') }}
+            </FieldDescription>
+            <FieldError
+              v-if="errors.email"
+              id="entry-link-form-email-error"
+              data-testid="entry-link-form-email-error"
+            >
+              {{ errors.email }}
+            </FieldError>
+          </Field>
+
+          <Field :data-invalid="Boolean(errors.displayName)">
+            <FieldLabel for="entry-link-form-display-name">
+              {{ $t('entryLink.form.displayName') }}
+            </FieldLabel>
+            <Input
+              id="entry-link-form-display-name"
+              v-model="displayName"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.displayName)"
+              :aria-describedby="
+                errors.displayName ? 'entry-link-form-display-name-error' : undefined
+              "
+              data-testid="entry-link-form-display-name"
+            />
+            <FieldError
+              v-if="errors.displayName"
+              id="entry-link-form-display-name-error"
+              data-testid="entry-link-form-display-name-error"
+            >
+              {{ errors.displayName }}
+            </FieldError>
+          </Field>
+
+          <!--
           candidate-external-reference (design AD-8): OPTIONAL. The calling
           system's own id for this candidate and the name of that system — only
           meaningful when another system created the candidate, so both stay
@@ -96,68 +144,68 @@
           back a float, so an identifier near 2^53 would lose digits before
           validation ever saw it.
         -->
-        <FieldSet class="gap-3" data-testid="entry-link-form-external-reference">
-          <FieldLegend variant="label">{{ $t('externalReference.label') }}</FieldLegend>
-          <FieldDescription id="entry-link-form-external-reference-help">
-            {{ $t('externalReference.help') }}
-          </FieldDescription>
+          <FieldSet class="gap-3" data-testid="entry-link-form-external-reference">
+            <FieldLegend variant="label">{{ $t('externalReference.label') }}</FieldLegend>
+            <FieldDescription id="entry-link-form-external-reference-help">
+              {{ $t('externalReference.help') }}
+            </FieldDescription>
 
-          <Field :data-invalid="Boolean(errors.externalId)">
-            <FieldLabel for="entry-link-form-external-id">
-              {{ $t('externalReference.externalId') }}
-            </FieldLabel>
-            <Input
-              id="entry-link-form-external-id"
-              v-model="externalId"
-              type="text"
-              inputmode="numeric"
-              autocomplete="off"
-              :aria-invalid="Boolean(errors.externalId)"
-              :aria-describedby="
-                errors.externalId
-                  ? 'entry-link-form-external-id-error'
-                  : 'entry-link-form-external-reference-help'
-              "
-              data-testid="entry-link-form-external-id"
-              @blur="errors.externalId = validateExternalId()"
-            />
-            <FieldError
-              v-if="errors.externalId"
-              id="entry-link-form-external-id-error"
-              data-testid="entry-link-form-external-id-error"
-            >
-              {{ errors.externalId }}
-            </FieldError>
-          </Field>
+            <Field :data-invalid="Boolean(errors.externalId)">
+              <FieldLabel for="entry-link-form-external-id">
+                {{ $t('externalReference.externalId') }}
+              </FieldLabel>
+              <Input
+                id="entry-link-form-external-id"
+                v-model="externalId"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                :aria-invalid="Boolean(errors.externalId)"
+                :aria-describedby="
+                  errors.externalId
+                    ? 'entry-link-form-external-id-error'
+                    : 'entry-link-form-external-reference-help'
+                "
+                data-testid="entry-link-form-external-id"
+                @blur="errors.externalId = validateExternalId()"
+              />
+              <FieldError
+                v-if="errors.externalId"
+                id="entry-link-form-external-id-error"
+                data-testid="entry-link-form-external-id-error"
+              >
+                {{ errors.externalId }}
+              </FieldError>
+            </Field>
 
-          <Field :data-invalid="Boolean(errors.source)">
-            <FieldLabel for="entry-link-form-source">
-              {{ $t('externalReference.source') }}
-            </FieldLabel>
-            <Input
-              id="entry-link-form-source"
-              v-model="source"
-              autocomplete="off"
-              :aria-invalid="Boolean(errors.source)"
-              :aria-describedby="
-                errors.source
-                  ? 'entry-link-form-source-error'
-                  : 'entry-link-form-external-reference-help'
-              "
-              data-testid="entry-link-form-source"
-              @blur="errors.source = validateSource()"
-            />
-            <FieldError
-              v-if="errors.source"
-              id="entry-link-form-source-error"
-              data-testid="entry-link-form-source-error"
-            >
-              {{ errors.source }}
-            </FieldError>
-          </Field>
-        </FieldSet>
+            <Field :data-invalid="Boolean(errors.source)">
+              <FieldLabel for="entry-link-form-source">
+                {{ $t('externalReference.source') }}
+              </FieldLabel>
+              <Input
+                id="entry-link-form-source"
+                v-model="source"
+                autocomplete="off"
+                :aria-invalid="Boolean(errors.source)"
+                :aria-describedby="
+                  errors.source
+                    ? 'entry-link-form-source-error'
+                    : 'entry-link-form-external-reference-help'
+                "
+                data-testid="entry-link-form-source"
+                @blur="errors.source = validateSource()"
+              />
+              <FieldError
+                v-if="errors.source"
+                id="entry-link-form-source-error"
+                data-testid="entry-link-form-source-error"
+              >
+                {{ errors.source }}
+              </FieldError>
+            </Field>
+          </FieldSet>
 
-        <!--
+          <!--
           interview-scheduling (design AD-2/AD-3, PR-F): "send now" vs
           "schedule for later". Default "now" preserves today's behaviour
           byte-for-byte (spec: "Omitted scheduled_at preserves today's
@@ -165,74 +213,75 @@
           this repo's own shadcn-vue convention (ReportFilters.vue's status
           filter uses the same FieldSet+FieldLegend+ToggleGroup shape).
         -->
-        <FieldSet class="w-auto gap-2">
-          <FieldLegend variant="label">{{ $t('entryLink.form.timing.legend') }}</FieldLegend>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            :model-value="schedulingMode"
-            data-testid="entry-link-form-timing"
-            @update:model-value="onTimingChange"
-          >
-            <ToggleGroupItem value="now" data-testid="entry-link-form-timing-now">
-              {{ $t('entryLink.form.timing.now') }}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="schedule" data-testid="entry-link-form-timing-schedule">
-              {{ $t('entryLink.form.timing.schedule') }}
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </FieldSet>
+          <FieldSet class="w-auto gap-2">
+            <FieldLegend variant="label">{{ $t('entryLink.form.timing.legend') }}</FieldLegend>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              :model-value="schedulingMode"
+              data-testid="entry-link-form-timing"
+              @update:model-value="onTimingChange"
+            >
+              <ToggleGroupItem value="now" data-testid="entry-link-form-timing-now">
+                {{ $t('entryLink.form.timing.now') }}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="schedule" data-testid="entry-link-form-timing-schedule">
+                {{ $t('entryLink.form.timing.schedule') }}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </FieldSet>
 
-        <!--
+          <!--
           Nothing is sent at creation time on the scheduled path (T-B1) — no
           mint, no email — so "send email now" is not a meaningful choice
           while scheduling is on; it is hidden rather than disabled, since a
           disabled control still asks a question that has no answer here.
         -->
-        <CheckboxField
-          v-if="schedulingMode === 'now'"
-          id="entry-link-form-send-email"
-          v-model="sendEmail"
-          :label="$t('entryLink.form.sendEmail')"
-          data-testid="entry-link-form-send-email"
-        />
-
-        <Field v-else :data-invalid="Boolean(errors.scheduledAt)">
-          <FieldLabel for="entry-link-form-scheduled-at">
-            {{ $t('entryLink.form.scheduledAt') }}
-          </FieldLabel>
-          <Input
-            id="entry-link-form-scheduled-at"
-            v-model="scheduledAt"
-            type="datetime-local"
-            :aria-invalid="Boolean(errors.scheduledAt)"
-            :aria-describedby="
-              errors.scheduledAt
-                ? 'entry-link-form-scheduled-at-error'
-                : 'entry-link-form-scheduled-at-help'
-            "
-            data-testid="entry-link-form-scheduled-at"
+          <CheckboxField
+            v-if="schedulingMode === 'now'"
+            id="entry-link-form-send-email"
+            v-model="sendEmail"
+            :label="$t('entryLink.form.sendEmail')"
+            data-testid="entry-link-form-send-email"
           />
-          <!--
+
+          <Field v-else :data-invalid="Boolean(errors.scheduledAt)">
+            <FieldLabel for="entry-link-form-scheduled-at">
+              {{ $t('entryLink.form.scheduledAt') }}
+            </FieldLabel>
+            <Input
+              id="entry-link-form-scheduled-at"
+              v-model="scheduledAt"
+              type="datetime-local"
+              :aria-invalid="Boolean(errors.scheduledAt)"
+              :aria-describedby="
+                errors.scheduledAt
+                  ? 'entry-link-form-scheduled-at-error'
+                  : 'entry-link-form-scheduled-at-help'
+              "
+              data-testid="entry-link-form-scheduled-at"
+            />
+            <!--
             The 16-minute figure is confirmed from
             `api/app/Support/Scheduling/ScheduledInterviewWindow.php`'s
             `MINIMUM_SCHEDULING_LEAD_MINUTES` — a UX hint only. The server
             (the SAME `ScheduledStartWithinLeadTime` rule object used by every
             surface) is the authority; this never replaces its validation.
           -->
-          <FieldDescription id="entry-link-form-scheduled-at-help">
-            {{
-              $t('entryLink.form.help.scheduledAt', { minutes: MINIMUM_SCHEDULING_LEAD_MINUTES })
-            }}
-          </FieldDescription>
-          <FieldError
-            v-if="errors.scheduledAt"
-            id="entry-link-form-scheduled-at-error"
-            data-testid="entry-link-form-scheduled-at-error"
-          >
-            {{ errors.scheduledAt }}
-          </FieldError>
-        </Field>
+            <FieldDescription id="entry-link-form-scheduled-at-help">
+              {{
+                $t('entryLink.form.help.scheduledAt', { minutes: MINIMUM_SCHEDULING_LEAD_MINUTES })
+              }}
+            </FieldDescription>
+            <FieldError
+              v-if="errors.scheduledAt"
+              id="entry-link-form-scheduled-at-error"
+              data-testid="entry-link-form-scheduled-at-error"
+            >
+              {{ errors.scheduledAt }}
+            </FieldError>
+          </Field>
+        </template>
 
         <Alert
           v-if="formMessage"
@@ -277,9 +326,14 @@ import {
   type GenerateEntryLinkPayload,
   type GenerateEntryLinkResponse,
 } from '@/composables/useEntryLinks'
+import { useReusableLinks, type CreateReusableLinkResponse } from '@/composables/useReusableLinks'
 import { applyServerFieldErrors } from '@/utils/http-error'
 
 const MAX_LENGTH = 255
+
+// reusable-interview-links: mirrors the API's `label` rule (at most 120
+// characters). UX hint only: the server is the authority.
+const LINK_NAME_MAX_LENGTH = 120
 
 // candidate-external-reference: mirror the API's `ExternalReference` rules —
 // `external_id` is an integer between 1 and 2^53 - 1 (the largest value a
@@ -314,6 +368,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'success', link: GenerateEntryLinkResponse): void
   /**
+   * reusable-interview-links. A SEPARATE event on purpose: `success` keeps its
+   * single meaning — "a single-use link, or a scheduled participant, was
+   * created" — and its payload shape, so the parent's existing branch on
+   * `entry_url` is untouched. The two results have nothing in common (no
+   * expiry, no candidate), and overloading one event would force every
+   * listener to tell them apart.
+   */
+  (e: 'reusable-created', result: CreateReusableLinkResponse): void
+  /**
    * feature/form-drawer. This form owns its own request (and therefore its own
    * in-flight flag), but the submit control it belongs to now lives in the
    * drawer footer above it. Publishing the flag is what lets the shared footer
@@ -323,7 +386,14 @@ const emit = defineEmits<{
 }>()
 
 const { generateEntryLink } = useEntryLinks()
+const { createReusableLink } = useReusableLinks()
 const { t } = useI18n()
+
+// reusable-interview-links: unchecked on every open (local state, so a
+// re-mounted form always starts as the single-use form). The Link name is
+// optional and kept as the raw text typed; it is trimmed only when sent.
+const reusable = ref(false)
+const linkName = ref('')
 
 const candidateRef = ref('')
 const displayName = ref('')
@@ -350,6 +420,7 @@ const errors = ref<{
   scheduledAt?: string
   externalId?: string
   source?: string
+  linkName?: string
 }>({})
 const formMessage = ref<string | null>(null)
 const submitting = ref(false)
@@ -367,9 +438,26 @@ function onTimingChange(value: unknown): void {
 // from its own prop default.
 watch(submitting, (value) => emit('update:pending', value), { immediate: true })
 
+// Switching mode starts the other form clean. An error left on a field that is
+// now hidden would otherwise count as "a field was mapped" in the submit
+// handler below and suppress the generic banner for an unrelated failure.
+watch(reusable, () => {
+  errors.value = {}
+  formMessage.value = null
+})
+
 function validateField(value: string, requiredKey: string, tooLongKey: string): string | undefined {
   if (value.trim() === '') return t(requiredKey)
   if (value.length > MAX_LENGTH) return t(tooLongKey, { max: MAX_LENGTH })
+  return undefined
+}
+
+/** Measured after trimming, because the trimmed value is what is sent. */
+function validateLinkName(): string | undefined {
+  if (linkName.value.trim().length > LINK_NAME_MAX_LENGTH) {
+    return t('entryLink.form.tooLong', { max: LINK_NAME_MAX_LENGTH })
+  }
+
   return undefined
 }
 
@@ -482,8 +570,54 @@ const SERVER_FIELD_TO_ERROR_KEY = {
   source: 'source',
 } as const satisfies Record<string, keyof typeof errors.value>
 
+// The reusable path has exactly one field the server can name.
+const REUSABLE_SERVER_FIELD_TO_ERROR_KEY = {
+  label: 'linkName',
+} as const satisfies Record<string, keyof typeof errors.value>
+
+/**
+ * One handler for both submit paths, so the banner rules cannot drift apart:
+ *
+ * Pre-existing bug fixed here (found while adding `scheduled_at`, not
+ * introduced by it — CLAUDE.md "always fix findings"): this used to read
+ * `unmapped && unmapped.length > 0 ? ... : saveError`, which showed the
+ * generic banner on EVERY server error, including one fully mapped onto
+ * a field (`unmapped` is `[]`, which is truthy, so the `&&` never short
+ * circuited). Brought in line with `ProjectForm.vue`'s own
+ * `applyServerErrors` convention:
+ *   - unmapped messages exist -> show them (a field with no control of
+ *     its own, e.g. role_code/project_id, still has to reach the
+ *     operator);
+ *   - nothing unmapped but a field WAS mapped -> suppress the banner,
+ *     the reason is already under its own control;
+ *   - neither (no field-shaped body at all, e.g. network/500) -> the
+ *     generic "could not save" banner.
+ */
+function reportSubmitError(
+  error: unknown,
+  map: Readonly<Record<string, keyof typeof errors.value>>
+) {
+  const unmapped = applyServerFieldErrors(error, map, (key, message) => {
+    errors.value[key] = message
+  })
+  const mapped = Object.values(errors.value).some((value) => value !== undefined)
+
+  formMessage.value =
+    unmapped && unmapped.length > 0
+      ? unmapped.join(' ')
+      : mapped
+        ? null
+        : t('entryLink.form.saveError')
+}
+
 async function onSubmit(): Promise<void> {
   formMessage.value = null
+
+  if (reusable.value) {
+    await submitReusable()
+    return
+  }
+
   if (!validate()) return
 
   submitting.value = true
@@ -520,31 +654,31 @@ async function onSubmit(): Promise<void> {
     const response = await generateEntryLink(payload)
     emit('success', response)
   } catch (error) {
-    const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
-      errors.value[key] = message
-    })
-    const mapped = Object.values(errors.value).some((value) => value !== undefined)
+    reportSubmitError(error, SERVER_FIELD_TO_ERROR_KEY)
+  } finally {
+    submitting.value = false
+  }
+}
 
-    // Pre-existing bug fixed here (found while adding `scheduled_at`, not
-    // introduced by it — CLAUDE.md "always fix findings"): this used to read
-    // `unmapped && unmapped.length > 0 ? ... : saveError`, which showed the
-    // generic banner on EVERY server error, including one fully mapped onto
-    // a field (`unmapped` is `[]`, which is truthy, so the `&&` never short
-    // circuited). Brought in line with `ProjectForm.vue`'s own
-    // `applyServerErrors` convention:
-    //   - unmapped messages exist -> show them (a field with no control of
-    //     its own, e.g. role_code/project_id, still has to reach the
-    //     operator);
-    //   - nothing unmapped but a field WAS mapped -> suppress the banner,
-    //     the reason is already under its own control;
-    //   - neither (no field-shaped body at all, e.g. network/500) -> the
-    //     generic "could not save" banner.
-    formMessage.value =
-      unmapped && unmapped.length > 0
-        ? unmapped.join(' ')
-        : mapped
-          ? null
-          : t('entryLink.form.saveError')
+/**
+ * reusable-interview-links: the payload is built from the Link name ALONE. It
+ * deliberately reads none of the hidden candidate fields, so a value typed
+ * before the box was ticked can never reach the request. An empty name sends
+ * `{}` — the key is omitted, never `{ label: null }` (the API accepts both; the
+ * spec says empty).
+ */
+async function submitReusable(): Promise<void> {
+  errors.value.linkName = validateLinkName()
+  if (errors.value.linkName) return
+
+  submitting.value = true
+  try {
+    const label = linkName.value.trim()
+    const result = await createReusableLink(props.projectId, label === '' ? {} : { label })
+
+    emit('reusable-created', result)
+  } catch (error) {
+    reportSubmitError(error, REUSABLE_SERVER_FIELD_TO_ERROR_KEY)
   } finally {
     submitting.value = false
   }

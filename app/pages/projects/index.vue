@@ -67,6 +67,20 @@
         />
 
         <!--
+          reusable-interview-links (DESIGN.md 16.18): the project's reusable links,
+          and the one place one is disabled. Gated on `participants.create` alone,
+          the same ability that offers the Invite action that creates them: a
+          viewer neither sees the panel nor causes its list request, and the gate
+          sits HERE so the panel never mounts (and so never fetches) without it.
+          Inside `editingProject`, so it is offered only for a SAVED project, and
+          `locale` is the operator's UI language (dates), not the project's.
+        -->
+        <template v-if="canInvite">
+          <Separator class="my-6" />
+          <ReusableLinksPanel :project-id="editingProject.id" :locale="locale" />
+        </template>
+
+        <!--
           Deletion, offered ONLY where the API will accept it. `can.delete`
           carries both halves — the admin-only policy and the not-while-active
           state rule — so an operator never meets this control and an admin
@@ -150,6 +164,11 @@ const ProjectForm = defineAsyncComponent(() => import('@/components/organisms/Pr
 // panel drags the question editor and its composable in with it.
 const ProjectQuestionsPanel = defineAsyncComponent(
   () => import('@/components/organisms/ProjectQuestionsPanel.vue')
+)
+// Async for the same reason: it is only needed once a saved project's drawer
+// opens, and only for someone who may create participants.
+const ReusableLinksPanel = defineAsyncComponent(
+  () => import('@/components/organisms/ReusableLinksPanel.vue')
 )
 
 definePageMeta({

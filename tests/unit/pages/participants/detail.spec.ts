@@ -711,6 +711,30 @@ describe('pages/participants/[id].vue', () => {
       )
     })
 
+    // reusable-interview-links: a reusable link is for a PROJECT, never for one
+    // specific candidate, so the re-issue card on a participant must never
+    // offer the reusable option — before or after it mints. GUARD: it passes
+    // when written, because this page renders EntryLinkPanel and never the
+    // form; it is here so that stays true.
+    it('never offers the reusable link option, before or after minting', async () => {
+      const generateEntryLinkMock = vi.fn().mockResolvedValue({
+        entry_url: 'https://interview.example.com/interview/reissue-tok',
+        expires_at: '2026-08-17T15:32:00.000000Z',
+      })
+      const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
+
+      expect(wrapper.find('[data-testid="entry-link-form-reusable"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="entry-link-form"]').exists()).toBe(false)
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="entry-link-form-reusable"]').exists()).toBe(false)
+      // The single-use panel, with its Generate control and expiry.
+      expect(wrapper.find('[data-testid="entry-link-never-expires"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="entry-link-generate"]').exists()).toBe(true)
+    })
+
     it('shows an inline error and keeps the button available to retry when the mint rejects', async () => {
       const generateEntryLinkMock = vi.fn().mockRejectedValue(new Error('boom'))
       const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })

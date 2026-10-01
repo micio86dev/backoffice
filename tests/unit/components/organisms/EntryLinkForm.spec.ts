@@ -16,8 +16,14 @@ const tMock = (key: string, params?: Record<string, unknown>) =>
   params ? `${key}:${JSON.stringify(params)}` : key
 const generateEntryLinkMock = vi.fn()
 
+const createReusableLinkMock = vi.fn()
+
 vi.mock('../../../../app/composables/useEntryLinks', () => ({
   useEntryLinks: () => ({ generateEntryLink: generateEntryLinkMock }),
+}))
+
+vi.mock('../../../../app/composables/useReusableLinks', () => ({
+  useReusableLinks: () => ({ createReusableLink: createReusableLinkMock }),
 }))
 
 const EntryLinkForm = (await import('../../../../app/components/organisms/EntryLinkForm.vue'))
@@ -521,11 +527,17 @@ describe('EntryLinkForm — external reference (candidate-external-reference, de
       }
     })
 
-    it('keeps the component contract: one prop, the same two emits', () => {
+    it('keeps the component contract: one prop, the same two emits plus reusable-created', () => {
       const component = EntryLinkForm as unknown as { props?: unknown; emits?: unknown }
 
       expect(Object.keys(component.props as object)).toEqual(['projectId'])
-      expect([...(component.emits as string[])].sort()).toEqual(['success', 'update:pending'])
+      // `success` and `update:pending` are unchanged; the reusable path adds its
+      // own event rather than overloading `success` (reusable-interview-links).
+      expect([...(component.emits as string[])].sort()).toEqual([
+        'reusable-created',
+        'success',
+        'update:pending',
+      ])
     })
   })
 
@@ -752,6 +764,438 @@ describe('EntryLinkForm — external reference (candidate-external-reference, de
       expect(error.text()).toBe('The source may not be greater than 180 characters.')
       expect(sourceInput(wrapper).attributes('aria-invalid')).toBe('true')
       expect(wrapper.find('[data-testid="entry-link-form-banner"]').exists()).toBe(false)
+    })
+  })
+})
+
+/**
+ * reusable-interview-links (design AD-17, DESIGN.md 16.18).
+ *
+ * The Invite form gains a checkbox, FIRST, that switches it into a different
+ * mode: a reusable link has no candidate to describe, so the identity fields,
+ * the external reference, the timing and the send-email control are not merely
+ * disabled but ABSENT, replaced by one optional Link name. Unchecked, the form
+ * must be exactly what it was — the whole `describe` blocks above are that
+ * proof — and the single-use `success` event keeps its meaning: the reusable
+ * path emits its own `reusable-created`.
+ */
+describe('EntryLinkForm — the reusable link option (reusable-interview-links)', () => {
+  const REUSABLE_RESPONSE = {
+    data: { id: 'rlk_01HZ0000000000000000000000', label: 'Milan fair stand' },
+    entry_url: 'https://interview.example.com/en/interview/reusable#beai_rl_SECRET',
+  }
+
+  beforeEach(() => {
+    generateEntryLinkMock.mockReset().mockResolvedValue({
+      entry_url: 'https://interview.example.com/interview/tok',
+      expires_at: '2026-08-17T15:32:00.000000Z',
+    })
+    createReusableLinkMock.mockReset().mockResolvedValue(REUSABLE_RESPONSE)
+    // Validation messages come from the script's `t`; render the params so the
+    // `{max}` of the Link name limit is observable (see the sibling block).
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, te: () => true, locale: ref('en') }))
+    )
+  })
+
+  afterEach(() => {
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: (key: string) => key, te: () => true, locale: ref('it') }))
+    )
+  })
+
+  function mountForm() {
+    return mount(EntryLinkForm, {
+      props: { projectId: 42 },
+      global: { mocks: { $t: tMock } },
+    })
+  }
+
+  type Wrapper = ReturnType<typeof mountForm>
+
+  const checkbox = (wrapper: Wrapper) => wrapper.get('[data-testid="entry-link-form-reusable"]')
+  const linkNameInput = (wrapper: Wrapper) =>
+    wrapper.get('[data-testid="entry-link-form-link-name"]')
+
+  async function checkReusable(wrapper: Wrapper) {
+    await checkbox(wrapper).trigger('click')
+    await flushPromises()
+  }
+
+  async function submit(wrapper: Wrapper) {
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+  }
+
+  /**
+   * Every field the checkbox hides, by test id, on the default "send now" mode.
+   * The scheduled-at control only exists on the scheduled mode and has its own
+   * test below.
+   */
+  const HIDDEN_WHEN_REUSABLE = [
+    'entry-link-form-candidate-ref',
+    'entry-link-form-display-name',
+    'entry-link-form-email',
+    'entry-link-form-external-reference',
+    'entry-link-form-external-id',
+    'entry-link-form-source',
+    'entry-link-form-timing',
+    'entry-link-form-timing-now',
+    'entry-link-form-timing-schedule',
+    'entry-link-form-send-email',
+  ]
+
+  describe('the checkbox', () => {
+    it('is the FIRST focusable control of the form, before every identity field', () => {
+      const wrapper = mountForm()
+
+      const first = wrapper
+        .get('[data-testid="entry-link-form"]')
+        .element.querySelector('button, input, select, textarea, [tabindex]')
+
+      expect(first).toBe(checkbox(wrapper).element)
+    })
+
+    it('is unchecked on every open', () => {
+      const wrapper = mountForm()
+
+      expect(checkbox(wrapper).attributes('aria-checked')).toBe('false')
+      expect(wrapper.find('[data-testid="entry-link-form-link-name"]').exists()).toBe(false)
+    })
+
+    it('is a CheckboxField carrying its label and a description inside its own field', () => {
+      const wrapper = mountForm()
+
+      const field = wrapper.get('[data-slot="checkbox-field"]')
+
+      expect(field.text()).toContain('entryLink.reusable.checkbox.label')
+      expect(field.get('[data-slot="field-description"]').text()).toBe(
+        'entryLink.reusable.checkbox.description'
+      )
+      // Wired, not just present: the box is described by that description.
+      expect(checkbox(wrapper).attributes('aria-describedby')).toContain(
+        'entry-link-form-reusable-description'
+      )
+    })
+
+    it('stays unchecked again after the form is re-mounted', async () => {
+      const first = mountForm()
+      await checkReusable(first)
+      first.unmount()
+
+      expect(checkbox(mountForm()).attributes('aria-checked')).toBe('false')
+    })
+  })
+
+  describe('checking it', () => {
+    it.each(HIDDEN_WHEN_REUSABLE)('removes %s from the DOM, not merely disables it', async (id) => {
+      const wrapper = mountForm()
+      expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(true)
+
+      await checkReusable(wrapper)
+
+      expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(false)
+    })
+
+    it('removes the scheduled-at control as well, on the scheduled mode', async () => {
+      const wrapper = mountForm()
+      await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+      expect(wrapper.find('[data-testid="entry-link-form-scheduled-at"]').exists()).toBe(true)
+
+      await checkReusable(wrapper)
+
+      expect(wrapper.find('[data-testid="entry-link-form-scheduled-at"]').exists()).toBe(false)
+    })
+
+    it('shows ONE optional Link name field with its label and help, capped at 120', async () => {
+      const wrapper = mountForm()
+
+      await checkReusable(wrapper)
+
+      const input = linkNameInput(wrapper)
+
+      expect(wrapper.get('label[for="entry-link-form-link-name"]').text()).toBe(
+        'entryLink.reusable.linkName.label'
+      )
+      expect(wrapper.get('#entry-link-form-link-name-help').text()).toBe(
+        'entryLink.reusable.linkName.help'
+      )
+      expect(input.attributes('aria-describedby')).toBe('entry-link-form-link-name-help')
+      expect(input.attributes('aria-invalid')).toBe('false')
+      expect(input.attributes('autocomplete')).toBe('off')
+      expect(input.attributes('required')).toBeUndefined()
+    })
+
+    it('brings the identity fields back when unchecked again', async () => {
+      const wrapper = mountForm()
+
+      await checkReusable(wrapper)
+      await checkReusable(wrapper)
+
+      for (const id of ['entry-link-form-candidate-ref', 'entry-link-form-send-email']) {
+        expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(true)
+      }
+      expect(wrapper.find('[data-testid="entry-link-form-link-name"]').exists()).toBe(false)
+    })
+  })
+
+  describe('submitting in reusable mode', () => {
+    it('calls createReusableLink(projectId, { label }) and never POST /entry-links', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue('Milan fair stand')
+      await submit(wrapper)
+
+      expect(createReusableLinkMock).toHaveBeenCalledTimes(1)
+      expect(createReusableLinkMock).toHaveBeenCalledWith(42, { label: 'Milan fair stand' })
+      expect(generateEntryLinkMock).not.toHaveBeenCalled()
+    })
+
+    it('trims the label before sending it', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue('   Milan fair stand  ')
+      await submit(wrapper)
+
+      expect(createReusableLinkMock).toHaveBeenCalledWith(42, { label: 'Milan fair stand' })
+    })
+
+    it('sends an EMPTY object when the name is empty, never { label: null }', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      expect(createReusableLinkMock).toHaveBeenCalledWith(42, {})
+    })
+
+    it('treats a whitespace-only name as empty', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue('    ')
+      await submit(wrapper)
+
+      expect(createReusableLinkMock).toHaveBeenCalledWith(42, {})
+    })
+
+    it('needs no candidate data: a pristine form submits without a single required-field error', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      expect(createReusableLinkMock).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('[data-testid="entry-link-form-banner"]').exists()).toBe(false)
+    })
+
+    it('never submits a value typed into a field before the box was ticked', async () => {
+      const wrapper = mountForm()
+      await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+      await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
+      await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+      await wrapper.get('[data-testid="entry-link-form-external-id"]').setValue('4471')
+      await wrapper.get('[data-testid="entry-link-form-source"]').setValue('Acme ATS')
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      const payload = createReusableLinkMock.mock.calls[0]?.[1] as Record<string, unknown>
+
+      expect(Object.keys(payload)).toEqual([])
+      expect(JSON.stringify(createReusableLinkMock.mock.calls)).not.toMatch(
+        /cand-1|mario|4471|Acme/
+      )
+    })
+
+    it('emits reusable-created with the response, and NOT success', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      expect(wrapper.emitted('reusable-created')).toHaveLength(1)
+      expect(wrapper.emitted('reusable-created')?.[0]?.[0]).toEqual(REUSABLE_RESPONSE)
+      expect(wrapper.emitted('success')).toBeUndefined()
+    })
+
+    it('publishes its in-flight flag while the request is pending', async () => {
+      let resolve: (value: unknown) => void = () => {}
+      createReusableLinkMock.mockReturnValueOnce(
+        new Promise((done) => {
+          resolve = done
+        })
+      )
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      expect(wrapper.emitted('update:pending')?.at(-1)).toEqual([true])
+
+      resolve(REUSABLE_RESPONSE)
+      await flushPromises()
+
+      expect(wrapper.emitted('update:pending')?.at(-1)).toEqual([false])
+    })
+  })
+
+  describe('the unchecked form is unchanged', () => {
+    it('still posts the single-use payload, byte for byte, and emits success', async () => {
+      const wrapper = mountForm()
+      await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+      await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
+      await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+      await submit(wrapper)
+
+      expect(generateEntryLinkMock).toHaveBeenCalledWith({
+        project_id: 42,
+        candidate_ref: 'cand-1',
+        display_name: 'Mario Rossi',
+        email: 'mario@example.test',
+        send_email: true,
+      })
+      expect(createReusableLinkMock).not.toHaveBeenCalled()
+      expect(wrapper.emitted('success')).toHaveLength(1)
+      expect(wrapper.emitted('reusable-created')).toBeUndefined()
+    })
+
+    it('returns to the single-use form and payload after ticking and unticking', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await checkReusable(wrapper)
+      await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+      await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
+      await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+      await submit(wrapper)
+
+      expect(generateEntryLinkMock).toHaveBeenCalledTimes(1)
+      expect(createReusableLinkMock).not.toHaveBeenCalled()
+    })
+
+    it('does not carry a single-use validation error into the reusable mode', async () => {
+      const wrapper = mountForm()
+      // Provoke the required-field errors, then switch mode.
+      await submit(wrapper)
+      expect(wrapper.find('[data-testid="entry-link-form-candidate-ref-error"]').exists()).toBe(
+        true
+      )
+
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      // The stale hidden-field errors must not block (or banner) the submit.
+      expect(createReusableLinkMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('Link name validation (a hint: the server is the authority)', () => {
+    it('blocks 121 characters with a wired FieldError and sends no request', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue('x'.repeat(121))
+      await submit(wrapper)
+
+      const error = wrapper.get('[data-testid="entry-link-form-link-name-error"]')
+
+      expect(error.text()).toBe('entryLink.form.tooLong:{"max":120}')
+      expect(linkNameInput(wrapper).attributes('aria-invalid')).toBe('true')
+      expect((linkNameInput(wrapper).attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+        error.attributes('id')
+      )
+      expect(createReusableLinkMock).not.toHaveBeenCalled()
+    })
+
+    it('accepts exactly 120 characters', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue('x'.repeat(120))
+      await submit(wrapper)
+
+      expect(wrapper.find('[data-testid="entry-link-form-link-name-error"]').exists()).toBe(false)
+      expect(createReusableLinkMock).toHaveBeenCalledWith(42, { label: 'x'.repeat(120) })
+    })
+
+    it('measures the length after trimming, because the trimmed value is what is sent', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue(`  ${'x'.repeat(120)}  `)
+      await submit(wrapper)
+
+      expect(createReusableLinkMock).toHaveBeenCalledWith(42, { label: 'x'.repeat(120) })
+    })
+
+    it('shows the error after blur, before any submit, and clears it once valid', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+
+      await linkNameInput(wrapper).setValue('x'.repeat(121))
+      await linkNameInput(wrapper).trigger('blur')
+      expect(wrapper.find('[data-testid="entry-link-form-link-name-error"]').exists()).toBe(true)
+
+      await linkNameInput(wrapper).setValue('x'.repeat(10))
+      await linkNameInput(wrapper).trigger('blur')
+      expect(wrapper.find('[data-testid="entry-link-form-link-name-error"]').exists()).toBe(false)
+      expect(linkNameInput(wrapper).attributes('aria-invalid')).toBe('false')
+    })
+
+    it('does not flag an empty, untouched name on blur: the field is optional', async () => {
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+
+      await linkNameInput(wrapper).trigger('blur')
+
+      expect(wrapper.find('[data-testid="entry-link-form-link-name-error"]').exists()).toBe(false)
+    })
+  })
+
+  describe('server errors', () => {
+    it('maps a 422 naming `label` onto the Link name field, not the banner', async () => {
+      createReusableLinkMock.mockRejectedValueOnce(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { label: ['The label may not be greater than 120 characters.'] } },
+        })
+      )
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await linkNameInput(wrapper).setValue('Milan fair stand')
+      await submit(wrapper)
+
+      const error = wrapper.get('[data-testid="entry-link-form-link-name-error"]')
+
+      expect(error.text()).toBe('The label may not be greater than 120 characters.')
+      expect(linkNameInput(wrapper).attributes('aria-invalid')).toBe('true')
+      expect((linkNameInput(wrapper).attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+        error.attributes('id')
+      )
+      expect(wrapper.find('[data-testid="entry-link-form-banner"]').exists()).toBe(false)
+      expect(wrapper.emitted('reusable-created')).toBeUndefined()
+    })
+
+    it('surfaces an unmapped 422 in the form-level role="alert" banner', async () => {
+      createReusableLinkMock.mockRejectedValueOnce(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { project: ['This project has no interview to run.'] } },
+        })
+      )
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      const banner = wrapper.get('[data-testid="entry-link-form-banner"]')
+
+      expect(banner.attributes('role')).toBe('alert')
+      expect(banner.text()).toContain('This project has no interview to run.')
+    })
+
+    it('falls back to the generic banner when the failure has no field-shaped body', async () => {
+      createReusableLinkMock.mockRejectedValueOnce(new Error('network down'))
+      const wrapper = mountForm()
+      await checkReusable(wrapper)
+      await submit(wrapper)
+
+      expect(wrapper.get('[data-testid="entry-link-form-banner"]').text()).toBe(
+        'entryLink.form.saveError'
+      )
+      expect(wrapper.emitted('reusable-created')).toBeUndefined()
     })
   })
 })

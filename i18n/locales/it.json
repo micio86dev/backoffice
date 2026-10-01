@@ -226,6 +226,19 @@
     "copy": "Copia",
     "copied": "Copiato",
     "copyBlocked": "Copia bloccata — seleziona il link sopra e copialo manualmente.",
+    "reusable": {
+      "checkbox": {
+        "label": "Genera un link di colloquio riutilizzabile che non scade mai",
+        "description": "Chiunque lo apra avvia un nuovo colloquio per questo progetto. Utile per demo, eventi e prove."
+      },
+      "linkName": {
+        "label": "Nome del link",
+        "help": "Dà un nome al link e ai colloqui avviati da esso, ad esempio Stand fiera di Milano."
+      },
+      "disclosure": "Questo link non scade e può essere usato molte volte. Chiunque lo possieda può avviare questo colloquio, quindi condividilo solo dove serve. Il link completo viene mostrato solo questa volta.",
+      "neverExpires": "Non scade mai · Riutilizzabile",
+      "stopsWhen": "Smette di funzionare se il progetto si chiude o se il link viene disattivato. Solo browser desktop."
+    },
     "mintError": "Non è stato possibile generare questo link di accesso. Riprova.",
     "disabledReason": {
       "notActive": "Questo progetto non è ancora attivo.",
@@ -270,6 +283,31 @@
       "entry_link_participant_failed": "La valutazione di questo candidato è fallita. Riaprila prima di generare un nuovo link.",
       "entry_link_project_closed": "Questo progetto al momento non accetta colloqui."
     }
+  },
+  "reusableLinks": {
+    "title": "Link riutilizzabili",
+    "description": "Link che non scadono mai e avviano un nuovo colloquio ogni volta che vengono aperti. Il link completo viene mostrato solo al momento della creazione.",
+    "loading": "Caricamento dei link…",
+    "empty": "Nessun link riutilizzabile per ora. Creane uno dalla lista dei progetti: Invita candidato, poi spunta l'opzione del link riutilizzabile.",
+    "unnamed": "Link senza nome",
+    "createdBy": "Creato il {date} da {name}",
+    "createdOn": "Creato il {date}",
+    "used": "Usato {count} volta · ultimo utilizzo {date} | Usato {count} volte · ultimo utilizzo {date}",
+    "neverUsed": "Mai usato",
+    "status": {
+      "active": "Attivo",
+      "disabled": "Disattivato"
+    },
+    "disable": {
+      "action": "Disattiva link",
+      "actionFor": "Disattiva link: {name}",
+      "confirmTitle": "Disattivare questo link?",
+      "confirmDescription": "Nessuno potrà più avviare un nuovo colloquio con questo link. I colloqui già in corso non vengono interrotti. L'azione non può essere annullata.",
+      "confirm": "Disattiva",
+      "error": "Non è stato possibile disattivare il link. Riprova."
+    },
+    "loadError": "Non è stato possibile caricare i link riutilizzabili.",
+    "retry": "Riprova"
   },
   "externalReference": {
     "label": "Riferimento esterno",

@@ -112,12 +112,12 @@ const CLIENT_ROWS = [
  * route — `page.reload()` re-navigates, and Playwright keeps routes
  * registered with `page.route` across a reload.
  */
-function mockClientsList(
+async function mockClientsList(
   page: Page,
   actingOrganizationId: { value: number | null },
   data: typeof CLIENT_ROWS = CLIENT_ROWS
 ): Promise<void> {
-  return page.route(
+  await page.route(
     (url) => url.pathname === '/admin/clients',
     (route) =>
       isDataRequest(route)
@@ -134,11 +134,11 @@ function mockClientsList(
  * so it fails silently) — mocked here so the acting-client state the sidebar
  * shows agrees with what the page shows.
  */
-function mockOrganizationsDirectory(
+async function mockOrganizationsDirectory(
   page: Page,
   actingOrganizationId: { value: number | null }
 ): Promise<void> {
-  return page.route(
+  await page.route(
     (url) => url.pathname === '/admin/organizations',
     (route) =>
       isDataRequest(route)

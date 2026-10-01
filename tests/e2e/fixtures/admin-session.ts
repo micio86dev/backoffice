@@ -28,12 +28,12 @@
  *
  * TYPES. The factories return the GENERATED resources (`types/api.ts`), so a
  * field the api adds, renames or drops is a type error here instead of a mock
- * that quietly stopped looking like the real payload. `tests/e2e/**` is outside
- * `nuxi typecheck` (see `abilities.ts`), so nothing in CI checks this file.
- * Check it by hand with a throwaway tsconfig that extends `tsconfig.app.json`
- * and includes `.nuxt/nuxt.d.ts` plus `tests/e2e/**\/*.ts`, then run
- * `bunx tsc -p <that file>` and read only the lines under `tests/e2e/`: the
- * `app/` errors it also prints are `tsc` not understanding `.vue` files.
+ * that quietly stopped looking like the real payload. `nuxi typecheck` does not
+ * cover `tests/e2e/**` (Nuxt's tsconfig includes `app/**` and `tests/nuxt/**`
+ * only), so `tsconfig.e2e.json` does: `bun run typecheck:e2e` runs `vue-tsc`
+ * over it, and `bun run typecheck` (the CI step "TypeScript type-check" in
+ * `.github/workflows/ci.yml`) runs it after the app check. Rename a field in a
+ * factory below and that step fails.
  */
 import { test as base, type Page, type Route } from '@playwright/test'
 import type { Abilities, CurrentUser } from '../../../app/composables/useCurrentUser'

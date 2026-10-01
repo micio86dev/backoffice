@@ -284,6 +284,31 @@
       "entry_link_project_closed": "This project is not open for interviews right now."
     }
   },
+  "reusableLinks": {
+    "title": "Reusable links",
+    "description": "Links that never expire and start a new interview each time they are opened. The full link is shown only when it is created.",
+    "loading": "Loading links…",
+    "empty": "No reusable links yet. Create one from the project list: Invite candidate, then tick the reusable link option.",
+    "unnamed": "Untitled link",
+    "createdBy": "Created on {date} by {name}",
+    "createdOn": "Created on {date}",
+    "used": "Used {count} time · last used {date} | Used {count} times · last used {date}",
+    "neverUsed": "Never used",
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "disable": {
+      "action": "Disable link",
+      "actionFor": "Disable link: {name}",
+      "confirmTitle": "Disable this link?",
+      "confirmDescription": "Nobody will be able to start a new interview with it. Interviews already in progress are not interrupted. This cannot be undone.",
+      "confirm": "Disable",
+      "error": "The link could not be disabled. Please try again."
+    },
+    "loadError": "The reusable links could not be loaded.",
+    "retry": "Try again"
+  },
   "externalReference": {
     "label": "External reference",
     "help": "Only needed when another system created this candidate.",

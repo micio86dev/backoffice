@@ -908,4 +908,178 @@ describe('pages/projects/index.vue', () => {
       wrapper.unmount()
     })
   })
+
+  // reusable-interview-links (B6b, DESIGN.md 16.18): the saved-project drawer
+  // lists the project's reusable links, after the questions panel. Offered only
+  // for a SAVED project and only to someone who may create participants: a
+  // viewer neither sees it nor causes the list request.
+  describe('the reusable links panel in the saved-project drawer', () => {
+    afterEach(() => {
+      document.body.innerHTML = ''
+    })
+
+    const panelRoot = () => document.body.querySelector('[data-testid="reusable-links-panel"]')
+
+    function italianProjectList() {
+      const response = listResponse()
+
+      response.data[0]!.language = 'it'
+
+      return response
+    }
+
+    /**
+     * `can` as the server would answer it for the given abilities. Built from the
+     * admin stub so every other control the page asks about still answers; only
+     * the keys named here are overridden.
+     */
+    function stubAbilities(overrides: Record<string, boolean>) {
+      const base = currentUserStub('admin')
+
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => ({
+          ...base,
+          can: (key: string) => overrides[key] ?? (base.can as (k: string) => boolean)(key),
+        }),
+      }))
+    }
+
+    async function mountAndOpen(action: 'edit' | 'new' = 'edit') {
+      const listReusableLinks = vi.fn().mockResolvedValue({ data: [] })
+      vi.doMock('../../../../app/composables/useReusableLinks', () => ({
+        useReusableLinks: () => ({
+          listReusableLinks,
+          disableReusableLink: vi.fn(),
+          createReusableLink: vi.fn(),
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({
+          listProjects: vi.fn().mockResolvedValue(italianProjectList()),
+          createProject: vi.fn(),
+          updateProject: vi.fn(),
+          deleteProject: vi.fn(),
+        }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      const trigger =
+        action === 'edit' ? '[data-testid="project-row-edit-1"]' : '[data-testid="projects-new"]'
+
+      await wrapper.get(trigger).trigger('click')
+      await waitFor(
+        () => document.body.querySelector('[data-testid="project-form"]'),
+        'the project form to mount inside the drawer'
+      )
+      await flushPromises()
+
+      return { wrapper, listReusableLinks }
+    }
+
+    it('renders the panel for a saved project, for the project and the UI locale', async () => {
+      const { wrapper, listReusableLinks } = await mountAndOpen()
+
+      await waitFor(panelRoot, 'the reusable links panel to mount')
+
+      const panel = wrapper.findComponent({ name: 'ReusableLinksPanel' })
+
+      expect(panel.props('projectId')).toBe(1)
+      // The OPERATOR's language, for dates: the page's UI locale (`en`), never the
+      // project's language (the fixture project is Italian), which is what the
+      // candidate hears and has nothing to do with how a date is written here.
+      expect(panel.props('locale')).toBe('en')
+      expect(listReusableLinks).toHaveBeenCalledTimes(1)
+      expect(listReusableLinks).toHaveBeenCalledWith(1)
+
+      wrapper.unmount()
+    })
+
+    it('puts the panel AFTER the questions panel', async () => {
+      const { wrapper } = await mountAndOpen()
+
+      await waitFor(panelRoot, 'the reusable links panel to mount')
+      const questions = await waitFor(
+        () => document.body.querySelector('[data-testid="project-questions-panel"]'),
+        'the questions panel to mount'
+      )
+
+      expect(
+        questions.compareDocumentPosition(panelRoot()!) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+
+      wrapper.unmount()
+    })
+
+    it('renders no panel and sends no list request when the project is being CREATED', async () => {
+      const { wrapper, listReusableLinks } = await mountAndOpen('new')
+
+      expect(panelRoot()).toBeNull()
+      expect(wrapper.findComponent({ name: 'ReusableLinksPanel' }).exists()).toBe(false)
+      expect(listReusableLinks).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    // The two abilities agree for every role today, which is exactly why the
+    // gate cannot be proven by a role alone: only an identity that may edit a
+    // project but may NOT create participants separates "gated on the right
+    // ability" from "not gated at all".
+    it('withholds the panel, and its request, from someone who may edit but not create participants', async () => {
+      stubAbilities({ 'projects.update': true, 'participants.create': false })
+
+      const { wrapper, listReusableLinks } = await mountAndOpen()
+
+      // The drawer is open and the questions panel is there ...
+      await waitFor(
+        () => document.body.querySelector('[data-testid="project-questions-panel"]'),
+        'the questions panel to mount'
+      )
+      await flushPromises()
+
+      // ... and the links panel is not, and nothing was asked for.
+      expect(panelRoot()).toBeNull()
+      expect(wrapper.findComponent({ name: 'ReusableLinksPanel' }).exists()).toBe(false)
+      expect(listReusableLinks).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('gives a viewer neither the panel nor the request (a viewer cannot even open the drawer)', async () => {
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => currentUserStub('viewer'),
+      }))
+      const listReusableLinks = vi.fn().mockResolvedValue({ data: [] })
+      vi.doMock('../../../../app/composables/useReusableLinks', () => ({
+        useReusableLinks: () => ({
+          listReusableLinks,
+          disableReusableLink: vi.fn(),
+          createReusableLink: vi.fn(),
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({ listProjects: vi.fn().mockResolvedValue(listResponse()) }),
+      }))
+
+      const IndexPage = (await import('../../../../app/pages/projects/index.vue')).default
+      const wrapper = mount(IndexPage, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+
+      // The row renders, so the page loaded; it just offers no way in.
+      expect(wrapper.text()).toContain('Demo Project')
+      expect(wrapper.find('[data-testid="project-row-edit-1"]').exists()).toBe(false)
+      expect(panelRoot()).toBeNull()
+      expect(listReusableLinks).not.toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+  })
 })

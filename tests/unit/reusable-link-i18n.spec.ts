@@ -9,8 +9,10 @@
  * so they are asserted verbatim. The Italian ones must carry the same meaning
  * and are asserted to be translated, not copied.
  *
- * This slice owns the create flow's namespace, `entryLink.reusable`. The links
- * panel's `reusableLinks.*` keys arrive with that panel.
+ * Two namespaces: `entryLink.reusable` (the create flow, B6a) and
+ * `reusableLinks` (the links panel, B6b). The panel's vocabulary is "Disable" /
+ * "Disattiva" and nothing else: a reusable link has a real, immediate disable,
+ * and "revoke" / "regenerate" would name things it does not do.
  */
 import { describe, expect, it } from 'vitest'
 import en from '../../i18n/locales/en.json'
@@ -120,5 +122,126 @@ describe('reusable link copy', () => {
     )
     expect(lookup(it_, 'entryLink.reusable.neverExpires')).toMatch(/non scade/i)
     expect(lookup(it_, 'entryLink.reusable.stopsWhen')).toMatch(/disattivat/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// reusableLinks.* — the links panel (B6b)
+// ---------------------------------------------------------------------------
+
+const PANEL_KEYS = [
+  'reusableLinks.title',
+  'reusableLinks.description',
+  'reusableLinks.loading',
+  'reusableLinks.empty',
+  'reusableLinks.unnamed',
+  'reusableLinks.createdBy',
+  'reusableLinks.createdOn',
+  'reusableLinks.used',
+  'reusableLinks.neverUsed',
+  'reusableLinks.status.active',
+  'reusableLinks.status.disabled',
+  'reusableLinks.disable.action',
+  'reusableLinks.disable.actionFor',
+  'reusableLinks.disable.confirmTitle',
+  'reusableLinks.disable.confirmDescription',
+  'reusableLinks.disable.confirm',
+  'reusableLinks.disable.error',
+  'reusableLinks.loadError',
+  'reusableLinks.retry',
+] as const
+
+/** The strings DESIGN.md 16.18 and the admin-backoffice spec quote word for word. */
+const NORMATIVE_PANEL_ENGLISH: Partial<Record<(typeof PANEL_KEYS)[number], string>> = {
+  'reusableLinks.empty':
+    'No reusable links yet. Create one from the project list: Invite candidate, then tick the reusable link option.',
+  'reusableLinks.unnamed': 'Untitled link',
+  'reusableLinks.neverUsed': 'Never used',
+  'reusableLinks.status.active': 'Active',
+  'reusableLinks.status.disabled': 'Disabled',
+  'reusableLinks.disable.action': 'Disable link',
+  'reusableLinks.disable.confirmTitle': 'Disable this link?',
+  'reusableLinks.disable.confirmDescription':
+    'Nobody will be able to start a new interview with it. Interviews already in progress are not interrupted. This cannot be undone.',
+  'reusableLinks.disable.confirm': 'Disable',
+}
+
+describe('reusable links panel copy', () => {
+  describe.each(Object.entries(TABLES))('%s', (_locale, table) => {
+    it.each(PANEL_KEYS)('has non-empty copy for %s', (key) => {
+      const value = lookup(table, key)
+
+      expect(typeof value).toBe('string')
+      expect((value as string).trim()).not.toBe('')
+    })
+
+    it('holds exactly the keys the panel asks for, under ONE namespace', () => {
+      expect(
+        leaves(lookup(table, 'reusableLinks'))
+          .map(([path]) => path)
+          .sort()
+      ).toEqual(PANEL_KEYS.map((key) => key.replace('reusableLinks.', '')).sort())
+    })
+
+    it('uses neither revoke nor regenerate wording in any panel string', () => {
+      const banned = /revoke|regenerat|revoca|rigener/i
+
+      const strings = leaves(lookup(table, 'reusableLinks'))
+
+      // Not a ghost loop: with no strings the loop below would pass vacuously.
+      expect(strings.length).toBeGreaterThan(0)
+      for (const [path, text] of strings) {
+        expect({ path, text, banned: banned.test(text) }).toEqual({ path, text, banned: false })
+      }
+    })
+
+    it('keeps the placeholders the panel fills in', () => {
+      expect(lookup(table, 'reusableLinks.createdBy')).toMatch(
+        /\{date\}.*\{name\}|\{name\}.*\{date\}/
+      )
+      expect(lookup(table, 'reusableLinks.createdOn')).toMatch(/\{date\}/)
+      expect(lookup(table, 'reusableLinks.disable.actionFor')).toMatch(/\{name\}/)
+    })
+
+    it('has a singular and a plural form for the usage line, each with count and date', () => {
+      const forms = (lookup(table, 'reusableLinks.used') as string).split('|')
+
+      expect(forms).toHaveLength(2)
+      for (const form of forms) {
+        expect(form).toMatch(/\{count\}/)
+        expect(form).toMatch(/\{date\}/)
+      }
+    })
+  })
+
+  it.each(Object.entries(NORMATIVE_PANEL_ENGLISH))(
+    '%s carries the normative English text',
+    (key, text) => {
+      expect(lookup(en, key)).toBe(text)
+    }
+  )
+
+  it.each(PANEL_KEYS)('%s is translated, not copied, into Italian', (key) => {
+    expect(lookup(it_, key)).not.toBe(lookup(en, key))
+  })
+
+  it('says Disable in English and Disattiva in Italian, on the action and its confirmation', () => {
+    expect(lookup(en, 'reusableLinks.disable.action')).toMatch(/\bdisable\b/i)
+    expect(lookup(en, 'reusableLinks.disable.confirm')).toMatch(/\bdisable\b/i)
+    expect(lookup(it_, 'reusableLinks.disable.action')).toMatch(/disattiv/i)
+    expect(lookup(it_, 'reusableLinks.disable.confirm')).toMatch(/disattiv/i)
+  })
+
+  it('conveys the same consequence in Italian: no new interviews, in-progress ones kept, final', () => {
+    const description = lookup(it_, 'reusableLinks.disable.confirmDescription') as string
+
+    expect(description).toMatch(/nuovo colloquio/i)
+    expect(description).toMatch(/già in corso/i)
+    expect(description).toMatch(/non può essere annullata/i)
+  })
+
+  it('tells the operator how to create a link, in both languages', () => {
+    expect(lookup(en, 'reusableLinks.empty')).toMatch(/Invite candidate/)
+    expect(lookup(it_, 'reusableLinks.empty')).toMatch(/Invita candidato/)
   })
 })

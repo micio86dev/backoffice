@@ -8,13 +8,6 @@ import { abilitiesFor } from './fixtures/abilities'
  * backend, API calls intercepted at the network layer with fixtures shaped
  * exactly like the real resources. Role-based locators ONLY
  * (getByRole/getByLabel), per this project's E2E convention.
- *
- * KNOWN PRE-EXISTING BLOCKER (documented in `entry-link.spec.ts` /
- * `projects-crud.spec.ts`, verified independently for this file too): the
- * `login()` helper times out on `getByLabel('Email')` on an unmodified
- * checkout, unrelated to this change. This spec is written to the same
- * standard as the rest of the suite so it is ready the moment that blocker
- * is fixed.
  */
 
 const ACTIVE_PROJECT = {

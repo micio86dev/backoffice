@@ -1,183 +1,38 @@
-import { test, expect, type Route } from '@playwright/test'
-import { abilitiesFor } from './fixtures/abilities'
+import type { Page } from '@playwright/test'
+import {
+  expect,
+  isDataRequest,
+  jsonRoute,
+  mockParticipantsApi,
+  mockProjectsApi,
+  participantDetail,
+  participantResource,
+  projectResource,
+  test,
+} from './fixtures/admin-session'
 
 /**
  * Entry link mint, end to end (operator-interview-link, design D4).
  *
  * Mirrors `projects-crud.spec.ts`'s network-interception convention: no live
  * backend, API calls intercepted at the network layer with fixtures shaped
- * exactly like the real resources. Role-based locators ONLY
- * (getByRole/getByLabel), per this project's E2E convention.
+ * exactly like the real resources (typed from the generated client in
+ * `fixtures/admin-session.ts`). Role-based locators ONLY (getByRole/getByLabel),
+ * per this project's E2E convention.
  *
- * KNOWN PRE-EXISTING BLOCKER (documented in `projects-crud.spec.ts`, verified
- * independently for this file too): the `login()` helper times out on
- * `getByLabel('Email')` on an unmodified checkout, unrelated to this change.
- * This spec is written to the same standard as the rest of the suite so it
- * is ready the moment that blocker is fixed.
+ * The session is the shared `adminPage` fixture: signed in through the mocked
+ * boot refresh rather than by typing credentials, so each test starts on the
+ * page it is about. (An earlier header here described the sign-in helper as
+ * timing out on `getByLabel('Email')` against an unmodified checkout. That was
+ * true once and has not been for a long time: this file ran green through that
+ * helper, which is why the claim was removed rather than carried along. Sign-in
+ * itself is covered by `admin-flow.spec.ts`.)
  */
 
-const ACTIVE_PROJECT = {
-  id: 2,
-  organization_id: 1,
-  framework_version_id: 3,
-  slug: 'active-project',
-  name: 'Active Project',
-  assessment_type: 'standard',
-  role_code: 'FLL',
-  language: 'en',
-  status: 'active',
-  pause_every_n_competencies: 3,
-  nudge_min_chars: 40,
-  exit_redirect_url: null,
-  webhook_url: null,
-  webhook_events: [],
-  has_webhook_secret: false,
-  deadline_at: null,
-  goes_live_at: null,
-  created_at: '2026-03-01T10:00:00Z',
-  updated_at: '2026-03-01T10:00:00Z',
-  pin_context: null,
-  // NOT empty. A project with no competencies cannot run an interview, and the
-  // table now says so and withholds the invite action rather than offering a
-  // link that would 422 at /start with `no_competency_remaining`. This fixture
-  // is meant to be a project an operator CAN invite to, so it carries one.
-  competencies: [{ id: 11, code: 'COM', position: 0 }],
-}
+const PROJECT = projectResource()
+const PARTICIPANT = participantResource()
 
-const PARTICIPANT = {
-  id: 1,
-  candidate_ref: 'ref-001',
-  display_name: 'Mario Rossi',
-  role_code: 'FLL',
-  language: 'it',
-  status: 'in_attesa',
-  project_id: 2,
-  started_at: null,
-  completed_at: null,
-  created_at: '2026-03-14T08:30:00Z',
-}
-
-const PARTICIPANT_DETAIL = {
-  ...PARTICIPANT,
-  // operator-interview-link, design D5: nested project gate fields — an
-  // ELIGIBLE project by default (active, no goes_live_at/deadline_at gate).
-  project: {
-    id: ACTIVE_PROJECT.id,
-    name: ACTIVE_PROJECT.name,
-    status: ACTIVE_PROJECT.status,
-    goes_live_at: ACTIVE_PROJECT.goes_live_at,
-    deadline_at: ACTIVE_PROJECT.deadline_at,
-  },
-  timeline: { started_at: null, completed_at: null, session_count: 0 },
-  // The participant detail contract gained progress/elapsed/cost. These mocks
-  // are typed the same as the real payload on purpose: leaving them short and
-  // making the page defensive instead would hide a genuine API regression
-  // behind an optional-chain.
-  progress: { done: 0, total: 3 },
-  elapsed: { seconds: null, sessions_counted: 0, sessions_total: 0 },
-  cost: {
-    amount: null,
-    currency: 'USD',
-    is_estimate: true,
-    sessions_estimated: 0,
-    sessions_total: 0,
-  },
-  files: {
-    transcript: {
-      type: 'text/plain',
-      ref: 'transcript',
-      url: '/participants/1/transcript/download',
-    },
-    evaluation_raw: {
-      type: 'application/json',
-      ref: 'evaluation',
-      url: '/participants/1/evaluation/download',
-    },
-  },
-}
-
-async function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
-  await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-}
-
-function isDataRequest(route: Route): boolean {
-  return route.request().resourceType() !== 'document'
-}
-
-async function mockAdminApi(page: import('@playwright/test').Page): Promise<void> {
-  await page.route(
-    (url) => url.pathname === '/auth/login',
-    (route) =>
-      jsonRoute(route, {
-        access_token: 'e2e-access-token',
-        refresh_token: 'e2e-refresh',
-        token_type: 'bearer',
-      })
-  )
-
-  // `/auth/me` — the ABILITY MAP, and the reason this suite went red.
-  //
-  // The UI gates its controls on `can()`, which reads this endpoint and fails
-  // CLOSED when it is unmocked: no map, no abilities, and the mint button is
-  // not disabled but absent, so every locator here waited for an element that
-  // was never going to render. `/profile` below is a different endpoint and
-  // carries no abilities, which is why mocking it was not enough.
-  //
-  // `abilitiesFor` derives the map from the role rather than hardcoding it —
-  // a second copy of an authorization rule drifts, and a fixture that drifts
-  // makes every test using it quietly stop testing what it says it tests.
-  await page.route(
-    (url) => url.pathname === '/auth/me',
-    (route) =>
-      isDataRequest(route)
-        ? jsonRoute(route, {
-            user: {
-              id: 1,
-              name: 'Operator One',
-              email: 'operator@example.com',
-              locale: 'it',
-              photo_url: null,
-            },
-            organization: { id: 1, name: 'Acme' },
-            roles: ['operator'],
-            abilities: abilitiesFor(['operator']),
-          })
-        : route.continue()
-  )
-
-  // operator role — eligible to mint (ParticipantPolicy::create, design D2).
-  await page.route(
-    (url) => url.pathname === '/profile',
-    (route) =>
-      jsonRoute(route, {
-        data: {
-          id: 1,
-          name: 'Operator One',
-          email: 'operator@example.com',
-          locale: 'en',
-          role: 'operator',
-          organization: { id: 1, name: 'Acme' },
-          photo_url: null,
-        },
-      })
-  )
-
-  await page.route(
-    (url) => url.pathname === '/projects',
-    (route) => {
-      if (!isDataRequest(route)) return route.continue()
-      return jsonRoute(route, { data: [ACTIVE_PROJECT] })
-    }
-  )
-
-  await page.route(
-    (url) => /^\/framework\/roles\/[A-Z]+\/competencies$/.test(url.pathname),
-    (route) => {
-      if (!isDataRequest(route)) return route.continue()
-      return jsonRoute(route, { data: [] })
-    }
-  )
-
+async function mockEntryLinkMint(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === '/entry-links',
     (route) =>
@@ -190,75 +45,16 @@ async function mockAdminApi(page: import('@playwright/test').Page): Promise<void
         201
       )
   )
-
-  await page.route(
-    (url) => url.pathname === '/participants',
-    (route) => {
-      if (!isDataRequest(route)) return route.continue()
-      return jsonRoute(route, {
-        data: [PARTICIPANT],
-        links: { first: null, last: null, prev: null, next: null },
-        meta: { current_page: 1, last_page: 1, total: 1, from: 1, to: 1, per_page: 20 },
-      })
-    }
-  )
-
-  // apiBase is '' (same-origin) — `/participants/1` matches BOTH the API
-  // path and the SPA route, so document navigations must fall through
-  // (isDataRequest guard, mirrors admin-flow.spec.ts's own documented fix).
-  await page.route(
-    (url) => url.pathname === '/participants/1',
-    (route) =>
-      isDataRequest(route) ? jsonRoute(route, { data: PARTICIPANT_DETAIL }) : route.continue()
-  )
-  await page.route(
-    (url) => url.pathname === '/participants/1/evaluation',
-    (route) =>
-      route.fulfill({
-        status: 409,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: 'lifecycle_not_ready',
-          resource: 'evaluation',
-          current_status: 'in_attesa',
-          required_status: 'completato',
-        }),
-      })
-  )
-}
-
-async function login(page: import('@playwright/test').Page): Promise<void> {
-  // The access token is memory-only (backoffice-session-refresh-hardening D2)
-  // — 00.auth-bootstrap.client.ts (D9) fires POST /auth/refresh on EVERY full
-  // page load, including any later page.goto() in this test to a DIFFERENT
-  // route (a real browser navigation, not a client-side SPA transition). Without
-  // this mock the boot refresh fails against the unmocked real apiBase, the
-  // session never rehydrates, and the auth guard bounces back to /login.
-  await page.route(
-    (url) => url.pathname === '/auth/refresh',
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ access_token: 'e2e-access-token', token_type: 'bearer' }),
-      })
-  )
-  await page.goto('/login')
-  await page.getByLabel('Email').fill('operator@example.com')
-  await page.getByLabel('Password').fill('secret-password')
-  await page.getByRole('button', { name: 'Accedi' }).click()
-  await expect(page).toHaveURL('/')
 }
 
 test.describe('Entry link mint (operator-interview-link)', () => {
   test('an operator mints an entry link from a project row; disclosure is visible before copy', async ({
-    page,
+    adminPage: page,
   }) => {
-    await mockAdminApi(page)
-    await login(page)
+    await mockProjectsApi(page, [PROJECT])
+    await mockEntryLinkMint(page)
 
-    await page.getByRole('link', { name: 'Progetti' }).click()
-    await expect(page).toHaveURL('/projects')
+    await page.goto('/projects')
 
     await page
       .getByRole('row', { name: /Active Project/ })
@@ -288,13 +84,12 @@ test.describe('Entry link mint (operator-interview-link)', () => {
 // participant detail page, pre-filled from the participant row.
 test.describe('Entry link re-issue (participant detail)', () => {
   test('an operator generates a new link for an existing participant; disclosure is visible before copy', async ({
-    page,
+    adminPage: page,
   }) => {
-    await mockAdminApi(page)
-    await login(page)
+    await mockParticipantsApi(page, [PARTICIPANT])
+    await mockEntryLinkMint(page)
 
-    await page.getByRole('link', { name: 'Candidati' }).click()
-    await expect(page).toHaveURL('/participants')
+    await page.goto('/participants')
     await page.getByRole('link', { name: 'Mario Rossi' }).click()
     await expect(page).toHaveURL('/participants/1')
 
@@ -305,22 +100,23 @@ test.describe('Entry link re-issue (participant detail)', () => {
     await expect(page.getByRole('button', { name: 'Copia' })).toBeVisible()
   })
 
-  test('a draft project disables the re-issue action with a stated reason', async ({ page }) => {
-    await mockAdminApi(page)
-    // Override AFTER mockAdminApi — last-registered route wins.
+  test('a draft project disables the re-issue action with a stated reason', async ({
+    adminPage: page,
+  }) => {
+    await mockParticipantsApi(page, [PARTICIPANT])
+    // Override AFTER the shared mock — last-registered route wins.
     await page.route(
       (url) => url.pathname === '/participants/1',
       (route) =>
         isDataRequest(route)
           ? jsonRoute(route, {
-              data: {
-                ...PARTICIPANT_DETAIL,
-                project: { ...PARTICIPANT_DETAIL.project, status: 'draft' },
-              },
+              data: participantDetail(PARTICIPANT, {
+                project: { ...participantDetail(PARTICIPANT).project, status: 'draft' },
+              }),
             })
           : route.continue()
     )
-    await login(page)
+
     await page.goto('/participants/1')
 
     const button = page.getByRole('button', { name: 'Genera nuovo link' })

@@ -61,7 +61,14 @@ test.describe('Analytics consent', () => {
 
     await page.goto(SAFE_PAGE)
     await expect(page.getByTestId('analytics-consent')).toBeVisible()
-    await page.waitForTimeout(500)
+
+    // The plugin that would load the tags runs while the app boots, BEFORE the
+    // banner it shares that boot with is on screen, and it injects the script
+    // element synchronously. So once the banner is visible the decision has been
+    // taken and the DOM says what it was: no sleep is needed to give a request
+    // time to leave. `#beai-ga4` is the same element the positive case below
+    // waits for after the visitor accepts.
+    await expect(page.locator('#beai-ga4')).toHaveCount(0)
 
     // The assertion the whole feature rests on. A banner that appears while the
     // tags have already loaded is theatre, and it is the single most common way
@@ -101,12 +108,13 @@ test.describe('Analytics consent', () => {
 
     await page.goto(SAFE_PAGE)
     await page.getByTestId('analytics-consent-accept').click()
-    await page.waitForTimeout(500)
 
     // Consenting and then seeing nothing happen reads as a broken button — and
     // "fixing" that with a page reload would throw away whatever the visitor
-    // was doing. The banner announces; the plugin acts.
-    expect(attempted.length).toBeGreaterThan(0)
+    // was doing. The banner announces; the plugin acts. Both are awaited as
+    // events: the script element appears, and a request for it is attempted.
+    await expect(page.locator('#beai-ga4')).toHaveCount(1)
+    await expect.poll(() => attempted.length).toBeGreaterThan(0)
   })
 
   test('it does NOT appear on login, where credentials are typed', async ({ page }) => {

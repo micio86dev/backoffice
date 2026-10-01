@@ -244,8 +244,12 @@ test.describe('Profile page (user-profile-self-service)', () => {
     // without asserting on the ambiguous "Cambia password" text (both the
     // section heading and the submit button carry it).
     await expect(page.getByLabel('Password attuale', { exact: true })).toHaveValue('')
-    await page.waitForTimeout(200)
-    expect(sawNewToken).toBe(true)
+
+    // The request that carries the new token follows the reset of the fields by
+    // an unspecified moment (the identity is re-read after the swap), so the
+    // observation is awaited rather than slept on: a fixed 200 ms wait was either
+    // too short on a slow run or dead time on a fast one.
+    await expect.poll(() => sawNewToken).toBe(true)
   })
 
   // user-avatar-image (design D6, task 9.1). This case doubles as the

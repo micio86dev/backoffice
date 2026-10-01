@@ -153,7 +153,7 @@
     "subtitle": "Chi ha ricevuto un link di accesso e a che punto è arrivato.",
     "filters": {
       "search": "Cerca",
-      "searchPlaceholder": "Cerca per nome, riferimento, origine o ID esterno",
+      "searchPlaceholder": "Cerca per nome, email, riferimento, origine o ID esterno",
       "status": "Stato",
       "allStatuses": "Tutti gli stati"
     },
@@ -231,13 +231,13 @@
     "reusable": {
       "checkbox": {
         "label": "Genera un link di colloquio riutilizzabile che non scade mai",
-        "description": "Chiunque lo apra avvia un nuovo colloquio per questo progetto. Utile per demo, eventi e prove."
+        "description": "Chiunque lo apra avvia un nuovo colloquio per questo progetto. Ogni visitatore inserisce nome ed email prima di iniziare. Utile per demo, eventi e prove."
       },
       "linkName": {
         "label": "Nome del link",
-        "help": "Dà un nome al link e ai colloqui avviati da esso, ad esempio Stand fiera di Milano."
+        "help": "Dà un nome al link, ad esempio Stand fiera di Milano."
       },
-      "disclosure": "Questo link non scade e può essere usato molte volte. Chiunque lo possieda può avviare questo colloquio, quindi condividilo solo dove serve. Il link completo viene mostrato solo questa volta.",
+      "disclosure": "Questo link non scade e può essere usato molte volte. Chiunque lo possieda può avviare questo colloquio, quindi condividilo solo dove serve. Il link completo viene mostrato solo questa volta. I visitatori inseriscono nome ed email prima del colloquio. Su un dispositivo condiviso, usa una finestra del browser privata.",
       "neverExpires": "Non scade mai · Riutilizzabile",
       "stopsWhen": "Smette di funzionare se il progetto si chiude o se il link viene disattivato. Solo browser desktop."
     },

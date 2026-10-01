@@ -356,6 +356,12 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
     await expect(checkbox).toBeVisible()
     await expect(checkbox).not.toBeChecked()
 
+    // Operators are told BEFORE they mint the link that every visitor types
+    // their own name and email (owner decision 2026-10-01).
+    await expect(
+      page.getByText('Ogni visitatore inserisce nome ed email prima di iniziare.')
+    ).toBeVisible()
+
     await checkbox.check()
 
     // HIDDEN, not disabled: the candidate fields are gone from the page.
@@ -374,6 +380,8 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
 
     await expect(disclosure).toBeVisible()
     await expect(disclosure).toContainText('non scade')
+    await expect(disclosure).toContainText('I visitatori inseriscono nome ed email')
+    await expect(disclosure).toContainText('finestra del browser privata')
     await expect(neverExpires).toContainText('Non scade mai · Riutilizzabile')
     await expect(url).toHaveText(ENTRY_URL)
     await expect(copy).toBeVisible()

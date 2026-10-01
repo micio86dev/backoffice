@@ -319,6 +319,18 @@ const LINK_NAME_LABEL = 'Nome del link'
 const SUBMIT_NAME = 'Genera link'
 const SAVE_ERROR = 'Non è stato possibile generare questo link di accesso.'
 
+/** The X in the corner of the drawer: the vendored `SheetContent` close control. */
+function cornerClose(page: Page): Locator {
+  return page.locator('button[data-slot="sheet-close"]')
+}
+
+/** The "Chiudi" button of the footer, shown once a link exists. Not the corner X. */
+function footerClose(page: Page): Locator {
+  return page
+    .getByRole('button', { name: 'Chiudi' })
+    .and(page.locator(':not([data-slot="sheet-close"])'))
+}
+
 function reusableCheckbox(page: Page): Locator {
   return page.getByRole('checkbox', { name: CHECKBOX_NAME })
 }
@@ -419,7 +431,12 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
     await createReusableLink(page, null)
     await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
 
-    await page.getByRole('button', { name: 'Chiudi' }).click()
+    // Both ways out of the drawer are named in the UI language. The corner X used
+    // to carry a hard-coded English "Close", read out in English by a screen reader.
+    await expect(cornerClose(page)).toHaveAccessibleName('Chiudi')
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0)
+
+    await footerClose(page).click()
     await expect(page.getByTestId('entry-link-url')).toHaveCount(0)
 
     await page
@@ -681,7 +698,7 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     // Create ...
     await createReusableLink(page, 'Stand fiera di Milano')
     await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
-    await page.getByRole('button', { name: 'Chiudi' }).click()
+    await footerClose(page).click()
 
     // ... reopen the SAVED project's drawer: the link is listed with its prefix and
     // zero uses, and the URL is nowhere (it was shown once and is gone).
@@ -909,6 +926,7 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
 
     await page.getByTestId('projects-new').click()
     await expect(page.getByTestId('project-form')).toBeVisible()
+    await expect(cornerClose(page)).toHaveAccessibleName('Chiudi')
     await expect(page.getByRole('region', { name: PANEL_NAME })).toHaveCount(0)
 
     // Compare with a SAVED project in the same session. That drawer does ask, so

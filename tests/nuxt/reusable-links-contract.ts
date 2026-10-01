@@ -13,9 +13,13 @@
  *   cannot be handed one by mistake, and a single-use link cannot be handed to
  *   it either, because `EntryLink` still requires the field.
  *
- * Not covered here, on purpose: the admin participant `reusable_link` marker
- * and the list/disable operations. They ship with the api read marker and the
- * links panel (the next slice), together with their own contract assertions.
+ * - The LIST result and the DISABLE call derive from the same generated client:
+ *   a row is the generated `ReusableInterviewLinkResource`, whose status is the
+ *   closed union `active | disabled` and which carries NO url, token or hash.
+ *   The panel can therefore never render a secret it was never given.
+ *
+ * Not covered here, on purpose: the admin participant `reusable_link` marker.
+ * It ships with the api read marker, together with its own assertions.
  */
 import type {
   EntryLink,
@@ -24,8 +28,11 @@ import type {
 import type {
   CreateReusableLinkPayload,
   CreateReusableLinkResponse,
+  ReusableLink,
+  ReusableLinkList,
+  useReusableLinks,
 } from '../../app/composables/useReusableLinks'
-import type { paths } from '../../types/api'
+import type { components, paths } from '../../types/api'
 
 /** Resolves to `true` only when A and B are mutually assignable. */
 type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
@@ -117,3 +124,48 @@ export const createResultFeedsThePanel = (
 ): ReusableEntryLink => ({
   entry_url: result.entry_url,
 })
+
+// -- List: the generated resource, and nothing that could carry a secret -----
+
+type ListOperation = paths['/projects/{project}/reusable-links']['get']
+type DisableOperation = paths['/projects/{project}/reusable-links/{link}']['delete']
+
+export const listIsDerivedFromPaths: MutuallyAssignable<
+  ReusableLinkList,
+  ListOperation['responses']['200']['content']['application/json']
+> = true
+
+export const rowIsTheGeneratedResource: MutuallyAssignable<
+  ReusableLink,
+  components['schemas']['ReusableInterviewLinkResource']
+> = true
+
+/** A closed union: the badge cannot be handed a state the api never sends. */
+export const statusIsAClosedUnion: MutuallyAssignable<
+  ReusableLink['status'],
+  'active' | 'disabled'
+> = true
+
+export const rowHasNoUrl: LacksKey<ReusableLink, 'entry_url'> = true
+export const rowHasNoBareToken: LacksKey<ReusableLink, 'token'> = true
+export const rowHasNoHash: LacksKey<ReusableLink, 'token_hash'> = true
+
+/** The label is nullable: the panel owns the "Untitled link" fallback. */
+export const labelIsNullable: MutuallyAssignable<ReusableLink['label'], string | null> = true
+
+/** The disable path takes the link's public id, a string, never an integer. */
+export const disableLinkParameterIsAString: MutuallyAssignable<
+  DisableOperation['parameters']['path']['link'],
+  string
+> = true
+
+type Composable = ReturnType<typeof useReusableLinks>
+
+/** A disable answers 204: nothing to read, so the call resolves to void. */
+export const disableResolvesToVoid: MutuallyAssignable<
+  Awaited<ReturnType<Composable['disableReusableLink']>>,
+  void
+> = true
+
+export const disableTakesAProjectIdAndAPublicLinkId: Parameters<Composable['disableReusableLink']> =
+  [1, 'rlk_01HZ0000000000000000000000']

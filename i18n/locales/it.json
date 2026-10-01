@@ -226,6 +226,19 @@
     "copy": "Copia",
     "copied": "Copiato",
     "copyBlocked": "Copia bloccata — seleziona il link sopra e copialo manualmente.",
+    "reusable": {
+      "checkbox": {
+        "label": "Genera un link di colloquio riutilizzabile che non scade mai",
+        "description": "Chiunque lo apra avvia un nuovo colloquio per questo progetto. Utile per demo, eventi e prove."
+      },
+      "linkName": {
+        "label": "Nome del link",
+        "help": "Dà un nome al link e ai colloqui avviati da esso, ad esempio Stand fiera di Milano."
+      },
+      "disclosure": "Questo link non scade e può essere usato molte volte. Chiunque lo possieda può avviare questo colloquio, quindi condividilo solo dove serve. Il link completo viene mostrato solo questa volta.",
+      "neverExpires": "Non scade mai · Riutilizzabile",
+      "stopsWhen": "Smette di funzionare se il progetto si chiude o se il link viene disattivato. Solo browser desktop."
+    },
     "mintError": "Non è stato possibile generare questo link di accesso. Riprova.",
     "disabledReason": {
       "notActive": "Questo progetto non è ancora attivo.",

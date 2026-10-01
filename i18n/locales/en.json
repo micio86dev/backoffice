@@ -226,6 +226,19 @@
     "copy": "Copy",
     "copied": "Copied",
     "copyBlocked": "Copy was blocked — select the link above and copy it manually.",
+    "reusable": {
+      "checkbox": {
+        "label": "Generate a reusable interview link that never expires",
+        "description": "Anyone who opens it starts a new interview for this project. Use it for demos, events and testing."
+      },
+      "linkName": {
+        "label": "Link name",
+        "help": "Names the link and the interviews started from it, e.g. Milan fair stand."
+      },
+      "disclosure": "This link does not expire and can be used many times. Anyone who has it can start this interview, so share it only where you mean to. This is the only time the full link is shown.",
+      "neverExpires": "Never expires · Reusable",
+      "stopsWhen": "It stops working if the project closes or the link is disabled. Desktop browsers only."
+    },
     "mintError": "This entry link could not be generated. Please try again.",
     "disabledReason": {
       "notActive": "This project is not yet active.",

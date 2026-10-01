@@ -19,8 +19,11 @@ import { abilitiesFor } from './fixtures/abilities'
  * Managing the links (B6b) lives in the second describe block: the saved-project
  * drawer's links panel, its list, Disable behind the destructive confirmation
  * (including the idempotent second disable), the empty and load-error states and
- * who is never offered any of it. The participant origin line is not covered
- * here: it needs the api marker the generated client does not carry yet.
+ * who is never offered any of it.
+ *
+ * The third block is the participant detail origin line (B6c): "Avviato da link
+ * riutilizzabile: <label>", the bare line when the link has no label, and
+ * nothing at all for an ordinary participant, for every role that can read it.
  */
 
 const ACTIVE_PROJECT = {
@@ -110,6 +113,66 @@ function linkRow(overrides: Partial<LinkRow> = {}): LinkRow {
   }
 }
 
+/** The origin an admin participant read carries: `null` for an ordinary participant. */
+type ReusableLinkMarker = { id: string; label: string | null } | null
+
+/** An admin participants list row, as `Admin\ParticipantResource` returns it. */
+function participantRow(id: number, displayName: string, reusableLink: ReusableLinkMarker) {
+  return {
+    id,
+    candidate_ref: `ref-00${id}`,
+    display_name: displayName,
+    email: `candidate-${id}@example.test`,
+    external_id: null,
+    source: null,
+    reusable_link: reusableLink,
+    role_code: 'FLL',
+    language: 'it',
+    status: 'in_attesa',
+    project_id: 2,
+    project_name: 'Active Project',
+    started_at: null,
+    completed_at: null,
+    created_at: '2026-03-14T08:30:00Z',
+  }
+}
+
+/** The admin participant detail, as `Admin\ParticipantDetailResource` returns it. */
+function participantDetail(row: ReturnType<typeof participantRow>) {
+  return {
+    ...row,
+    project: {
+      id: ACTIVE_PROJECT.id,
+      name: ACTIVE_PROJECT.name,
+      status: ACTIVE_PROJECT.status,
+      goes_live_at: ACTIVE_PROJECT.goes_live_at,
+      deadline_at: ACTIVE_PROJECT.deadline_at,
+    },
+    timeline: { started_at: null, completed_at: null, session_count: 0 },
+    progress: { done: 0, total: 3 },
+    elapsed: { seconds: null, sessions_counted: 0, sessions_total: 0 },
+    cost: {
+      amount: null,
+      currency: 'USD',
+      is_estimate: true,
+      sessions_estimated: 0,
+      sessions_total: 0,
+    },
+    files: {
+      transcript: {
+        type: 'text/plain',
+        ref: 'transcript',
+        url: `/participants/${row.id}/transcript`,
+      },
+      evaluation_raw: {
+        type: 'application/json',
+        ref: 'evaluation',
+        url: `/participants/${row.id}/evaluation`,
+      },
+    },
+  }
+}
+
 async function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
@@ -149,6 +212,8 @@ interface Options {
    * view that has not caught up with another tab's write would.
    */
   staleListAfterDisable?: number
+  /** The participants the admin API holds; the list and the detail both serve them. */
+  participants?: ReturnType<typeof participantRow>[]
 }
 
 async function mockAdminApi(page: Page, options: Options = {}): Promise<Captured> {
@@ -303,6 +368,53 @@ async function mockAdminApi(page: Page, options: Options = {}): Promise<Captured
       return route.fulfill({ status: 204 })
     }
   )
+
+  const participants = options.participants ?? []
+
+  if (participants.length > 0) {
+    await page.route(
+      (url) => url.pathname === '/participants',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              data: participants,
+              links: { first: null, last: null, prev: null, next: null },
+              meta: {
+                current_page: 1,
+                last_page: 1,
+                total: participants.length,
+                from: 1,
+                to: participants.length,
+                per_page: 20,
+              },
+            })
+          : route.continue()
+    )
+  }
+
+  // The API path and the SPA route share `/participants/:id`, so a document
+  // navigation must fall through (same guard `entry-link.spec.ts` documents).
+  for (const row of participants) {
+    await page.route(
+      (url) => url.pathname === `/participants/${row.id}`,
+      (route) =>
+        isDataRequest(route) ? jsonRoute(route, { data: participantDetail(row) }) : route.continue()
+    )
+    await page.route(
+      (url) => url.pathname === `/participants/${row.id}/evaluation`,
+      (route) =>
+        jsonRoute(
+          route,
+          {
+            error: 'lifecycle_not_ready',
+            resource: 'evaluation',
+            current_status: 'in_attesa',
+            required_status: 'completato',
+          },
+          409
+        )
+    )
+  }
 
   // What the saved-project drawer asks for besides the links.
   await page.route(
@@ -849,5 +961,115 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     await expect(page.getByRole('button', { name: 'Modifica' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: PANEL_NAME })).toHaveCount(0)
     expect(captured.listCalls).toBe(0)
+  })
+})
+
+test.describe('Participant detail: reusable link origin (reusable-interview-links, B6c)', () => {
+  const LINK_ID = 'rlk_01HZ0000000000000000000000'
+
+  test('a visitor shows "Started from reusable link: <label>" under the candidate reference', async ({
+    page,
+  }) => {
+    await mockAdminApi(page, {
+      participants: [
+        participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
+      ],
+    })
+    await login(page)
+    await page.goto('/participants/1')
+
+    await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
+
+    const line = page.getByText('Avviato da link riutilizzabile: Stand fiera di Milano')
+
+    await expect(line).toBeVisible()
+    // UNDER the candidate reference, never above the name.
+    const heading = await page.getByRole('heading', { name: 'Visitor One' }).boundingBox()
+    const reference = await page.getByText(/^ref-001 · FLL/).boundingBox()
+    const lineBox = await line.boundingBox()
+
+    expect(heading!.y).toBeLessThan(reference!.y)
+    expect(reference!.y).toBeLessThan(lineBox!.y)
+  })
+
+  test('a link with no label shows the bare line, with no colon and no label', async ({ page }) => {
+    await mockAdminApi(page, {
+      participants: [participantRow(1, 'Visitor One', { id: LINK_ID, label: null })],
+    })
+    await login(page)
+    await page.goto('/participants/1')
+
+    await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
+    await expect(page.getByText('Avviato da link riutilizzabile', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Avviato da link riutilizzabile:/)).toHaveCount(0)
+  })
+
+  test('an ordinary participant shows no origin line at all', async ({ page }) => {
+    await mockAdminApi(page, {
+      participants: [participantRow(1, 'Mario Rossi', null)],
+    })
+    await login(page)
+    await page.goto('/participants/1')
+
+    await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
+    await expect(page.getByText(/Avviato da link riutilizzabile/)).toHaveCount(0)
+  })
+
+  test('the label is rendered as text: markup in it is shown literally, never injected', async ({
+    page,
+  }) => {
+    await mockAdminApi(page, {
+      participants: [
+        participantRow(1, 'Visitor One', {
+          id: LINK_ID,
+          label: '<b>x</b><img src=x alt=injected>',
+        }),
+      ],
+    })
+    await login(page)
+    await page.goto('/participants/1')
+
+    await expect(
+      page.getByText('Avviato da link riutilizzabile: <b>x</b><img src=x alt=injected>')
+    ).toBeVisible()
+    await expect(page.getByRole('img', { name: 'injected' })).toHaveCount(0)
+    await expect(page.getByText('x', { exact: true })).toHaveCount(0)
+  })
+
+  test('a viewer sees the origin line too: it is a read', async ({ page }) => {
+    await mockAdminApi(page, {
+      role: 'viewer',
+      participants: [
+        participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
+      ],
+    })
+    await login(page)
+    await page.goto('/participants/1')
+
+    await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
+    await expect(
+      page.getByText('Avviato da link riutilizzabile: Stand fiera di Milano')
+    ).toBeVisible()
+  })
+
+  test('the participants list shows no origin column or sub-line for a visitor', async ({
+    page,
+  }) => {
+    await mockAdminApi(page, {
+      participants: [
+        participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
+        participantRow(2, 'Mario Rossi', null),
+      ],
+    })
+    await login(page)
+    await page.getByRole('link', { name: 'Candidati' }).click()
+    await expect(page).toHaveURL('/participants')
+
+    await expect(page.getByRole('row', { name: /Visitor One/ })).toBeVisible()
+    await expect(page.getByRole('row', { name: /Mario Rossi/ })).toBeVisible()
+    await expect(page.getByText(/Stand fiera di Milano/)).toHaveCount(0)
+    await expect(page.getByText(/Avviato da link riutilizzabile/)).toHaveCount(0)
+    // Header cells are unchanged: candidate, project, role, status, created.
+    await expect(page.getByRole('columnheader')).toHaveCount(5)
   })
 })

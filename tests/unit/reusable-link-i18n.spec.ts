@@ -245,3 +245,59 @@ describe('reusable links panel copy', () => {
     expect(lookup(it_, 'reusableLinks.empty')).toMatch(/Invita candidato/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// participants.detail.reusableLink* — the participant detail origin line (B6c)
+// ---------------------------------------------------------------------------
+
+const MARKER_KEYS = [
+  'participants.detail.reusableLink',
+  'participants.detail.reusableLinkUnlabelled',
+] as const
+
+/** The strings the admin-backoffice spec and DESIGN.md 16.18 quote word for word. */
+const NORMATIVE_MARKER_ENGLISH: Record<(typeof MARKER_KEYS)[number], string> = {
+  'participants.detail.reusableLink': 'Started from reusable link: {label}',
+  'participants.detail.reusableLinkUnlabelled': 'Started from reusable link',
+}
+
+describe('participant detail origin line copy', () => {
+  describe.each(Object.entries(TABLES))('%s', (_locale, table) => {
+    it.each(MARKER_KEYS)('has non-empty copy for %s', (key) => {
+      const value = lookup(table, key)
+
+      expect(typeof value).toBe('string')
+      expect((value as string).trim()).not.toBe('')
+    })
+
+    it('keeps the {label} placeholder on the labelled line, and only there', () => {
+      expect(lookup(table, 'participants.detail.reusableLink')).toMatch(/\{label\}/)
+      expect(lookup(table, 'participants.detail.reusableLinkUnlabelled')).not.toMatch(/[{}:]/)
+    })
+
+    it('uses neither revoke nor regenerate wording', () => {
+      const banned = /revoke|regenerat|revoca|rigener/i
+
+      for (const key of MARKER_KEYS) {
+        const text = lookup(table, key) as string
+
+        expect({ key, text, banned: banned.test(text) }).toEqual({ key, text, banned: false })
+      }
+    })
+  })
+
+  it.each(MARKER_KEYS)('%s carries the normative English text', (key) => {
+    expect(lookup(en, key)).toBe(NORMATIVE_MARKER_ENGLISH[key])
+  })
+
+  it.each(MARKER_KEYS)('%s is translated, not copied, into Italian', (key) => {
+    expect(lookup(it_, key)).not.toBe(lookup(en, key))
+  })
+
+  it('says the same thing in Italian: started from a reusable link, with and without a name', () => {
+    expect(lookup(it_, 'participants.detail.reusableLink')).toMatch(/link riutilizzabile/i)
+    expect(lookup(it_, 'participants.detail.reusableLinkUnlabelled')).toMatch(
+      /link riutilizzabile/i
+    )
+  })
+})

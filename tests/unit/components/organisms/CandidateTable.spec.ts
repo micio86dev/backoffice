@@ -185,6 +185,28 @@ describe('CandidateTable', () => {
     })
   })
 
+  // reusable-interview-links (admin-backoffice "Participant Detail Shows The
+  // Reusable Link Origin"): the origin is read on the DETAIL page only. A row
+  // that carries `reusable_link` gains no column and no sub-line.
+  it('adds no column or sub-line for a participant that started from a reusable link', () => {
+    const plain = mountTable({ participants: [baseParticipant()] })
+    const visitor = mountTable({
+      participants: [
+        baseParticipant({
+          reusable_link: { id: 'rlk_01HZ0000000000000000000000', label: 'Milan fair stand' },
+        }),
+      ],
+    })
+
+    expect(visitor.findAll('thead th').map((th) => th.text())).toEqual(
+      plain.findAll('thead th').map((th) => th.text())
+    )
+    expect(visitor.findAll('tbody tr td')).toHaveLength(5)
+    expect(visitor.text()).not.toContain('Milan fair stand')
+    expect(visitor.text()).not.toContain('rlk_')
+    expect(visitor.html()).toBe(plain.html())
+  })
+
   it('renders the pagination summary and enables Next when not on the last page', () => {
     const wrapper = mountTable({
       participants: [baseParticipant()],

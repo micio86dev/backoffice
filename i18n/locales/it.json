@@ -180,6 +180,8 @@
     "detail": {
       "backToList": "Torna ai candidati",
       "language": "Lingua",
+      "reusableLink": "Avviato da link riutilizzabile: {label}",
+      "reusableLinkUnlabelled": "Avviato da link riutilizzabile",
       "timeline": {
         "title": "Cronologia del colloquio",
         "startedAt": "Iniziato",

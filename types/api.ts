@@ -2424,6 +2424,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reusable-links/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redeem a reusable interview link
+         * @description Exchanges the secret of a reusable interview link for a candidate access
+         *     token. Every successful call starts a NEW anonymous candidate in the
+         *     link's project, in the link's language, so one link serves any number of
+         *     people. The link never expires: it works until it is disabled or its
+         *     project closes. The token comes only from the `link_token` body field.
+         *
+         *     A token that is unknown, malformed, or disabled is answered with the same
+         *     404, so a response never reveals whether a link exists. A 403 means the
+         *     link is valid but its project is not open for interviews right now.
+         */
+        post: operations["reusableLinkRedeem.redeem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/catalogue/revisions/current": {
         parameters: {
             query?: never;
@@ -3459,6 +3487,10 @@ export interface components {
             email: string;
             external_id: number | null;
             source: string | null;
+            reusable_link: {
+                id: string;
+                label: string | null;
+            } | null;
             role_code: string | null;
             language: string | null;
             /** @enum {string} */
@@ -3547,6 +3579,10 @@ export interface components {
             email: string;
             external_id: number | null;
             source: string | null;
+            reusable_link: {
+                id: string;
+                label: string | null;
+            } | null;
             role_code: string | null;
             language: string | null;
             /** @enum {string} */
@@ -9584,6 +9620,69 @@ export interface operations {
             };
             /** @description A superadmin must first select the organization to act for (`organization_context_required`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+        };
+    };
+    "reusableLinkRedeem.redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The link token from the reusable link URL: `beai_rl_` followed by 43 URL-safe base64 characters (51 characters in all). */
+                    link_token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description A candidate access token for a new anonymous candidate in the link's project. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        access_token: string;
+                    };
+                };
+            };
+            /** @description The link is valid but its project is not open for interviews. `redirect_url` is the project's error redirect, when it has one. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                        redirect_url: string | null;
+                    };
+                };
+            };
+            /** @description No such link: the token is unknown, malformed or disabled. The body is identical for every such case. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description Too many attempts. Retry after the number of seconds in the `Retry-After` header. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

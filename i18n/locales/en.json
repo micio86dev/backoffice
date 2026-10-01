@@ -180,6 +180,8 @@
     "detail": {
       "backToList": "Back to candidates",
       "language": "Language",
+      "reusableLink": "Started from reusable link: {label}",
+      "reusableLinkUnlabelled": "Started from reusable link",
       "timeline": {
         "title": "Lifecycle timeline",
         "startedAt": "Started",

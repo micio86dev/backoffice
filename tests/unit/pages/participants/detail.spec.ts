@@ -26,7 +26,11 @@ function detailResponse(
     progress?: Record<string, unknown>
     elapsed?: Record<string, unknown>
     cost?: Record<string, unknown>
-  }
+  },
+  // candidate-external-reference: omitted by default, so every pre-existing
+  // test keeps the payload it was written against (an older response, or a
+  // participant without a reference, carries neither key's value).
+  reference?: { external_id?: number | null; source?: string | null }
 ) {
   return {
     data: {
@@ -36,6 +40,7 @@ function detailResponse(
       display_name: 'Jane Doe',
       role_code: 'FLL',
       language: 'it',
+      ...reference,
       status,
       project_id: 1,
       // operator-interview-link, design D5: nested gate fields, defaulted to
@@ -167,6 +172,7 @@ describe('pages/participants/[id].vue', () => {
   async function mountDetailPage(options: {
     status?: string
     interview?: Parameters<typeof detailResponse>[2]
+    reference?: Parameters<typeof detailResponse>[3]
     fetchEvaluationImpl?: () => Promise<typeof EVALUATION_FIXTURE>
     fetchTranscriptImpl?: () => Promise<typeof TRANSCRIPT_FIXTURE>
     downloadTranscriptMock?: ReturnType<typeof vi.fn>
@@ -175,6 +181,7 @@ describe('pages/participants/[id].vue', () => {
     const {
       status = 'completato',
       interview,
+      reference,
       fetchEvaluationImpl = () => Promise.resolve(EVALUATION_FIXTURE),
       fetchTranscriptImpl = () => Promise.resolve(TRANSCRIPT_FIXTURE),
       downloadTranscriptMock = vi.fn().mockResolvedValue(undefined),
@@ -183,7 +190,7 @@ describe('pages/participants/[id].vue', () => {
 
     const fetchParticipantMock = vi
       .fn()
-      .mockResolvedValue(detailResponse(status, undefined, interview))
+      .mockResolvedValue(detailResponse(status, undefined, interview, reference))
     vi.doMock('../../../../app/composables/useParticipants', () => ({
       useParticipants: () => ({ fetchParticipant: fetchParticipantMock }),
     }))
@@ -512,13 +519,16 @@ describe('pages/participants/[id].vue', () => {
     async function mountEntryLinkCard(options: {
       role?: string
       project?: Record<string, unknown>
+      reference?: Parameters<typeof detailResponse>[3]
       generateEntryLinkMock?: ReturnType<typeof vi.fn>
     }) {
-      const { role = 'operator', project, generateEntryLinkMock = vi.fn() } = options
+      const { role = 'operator', project, reference, generateEntryLinkMock = vi.fn() } = options
 
       vi.doMock('../../../../app/composables/useParticipants', () => ({
         useParticipants: () => ({
-          fetchParticipant: vi.fn().mockResolvedValue(detailResponse('in_attesa', project)),
+          fetchParticipant: vi
+            .fn()
+            .mockResolvedValue(detailResponse('in_attesa', project, undefined, reference)),
         }),
       }))
       vi.doMock('../../../../app/composables/useCurrentUser', () => ({
@@ -743,6 +753,124 @@ describe('pages/participants/[id].vue', () => {
       expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(
         'https://interview.example.com/interview/second-tok'
       )
+    })
+
+    // candidate-external-reference: the re-issue carries the stored reference
+    // through, so the minted link describes the same enrolment.
+    it('shows the line to a viewer too: it is a read, not an action', async () => {
+      const wrapper = await mountEntryLinkCard({
+        role: 'viewer',
+        reference: { external_id: 4471, source: 'Acme ATS' },
+      })
+
+      expect(wrapper.get('[data-testid="external-reference"]').text()).toContain('Acme ATS')
+      // ...while the viewer still has no re-issue control.
+      expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(false)
+    })
+
+    it('re-issues the link with the stored external_id and source', async () => {
+      const generateEntryLinkMock = vi.fn().mockResolvedValue({
+        entry_url: 'https://interview.example.com/interview/reissue-tok',
+        expires_at: '2026-08-17T15:32:00.000000Z',
+      })
+      const wrapper = await mountEntryLinkCard({
+        role: 'operator',
+        reference: { external_id: 4471, source: 'Acme ATS' },
+        generateEntryLinkMock,
+      })
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+
+      expect(generateEntryLinkMock).toHaveBeenCalledWith({
+        project_id: 1,
+        candidate_ref: 'ref-042',
+        display_name: 'Jane Doe',
+        email: 'jane@example.test',
+        role_code: 'FLL',
+        lang: 'it',
+        send_email: false,
+        external_id: 4471,
+        source: 'Acme ATS',
+      })
+    })
+
+    it.each([
+      [{ external_id: 4471, source: null }, ['external_id']],
+      [{ external_id: null, source: 'Acme ATS' }, ['source']],
+      [{ external_id: null, source: null }, []],
+      // A blank source is not a reference: the molecule renders nothing for it,
+      // so the re-issue must not send it either.
+      [{ external_id: null, source: '   ' }, []],
+      [undefined, []],
+    ])(
+      'sends only the stored values for %j: a null is never sent as a key',
+      async (reference, expectedKeys) => {
+        const generateEntryLinkMock = vi.fn().mockResolvedValue({
+          entry_url: 'https://interview.example.com/interview/reissue-tok',
+          expires_at: '2026-08-17T15:32:00.000000Z',
+        })
+        const wrapper = await mountEntryLinkCard({
+          role: 'operator',
+          reference,
+          generateEntryLinkMock,
+        })
+
+        await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+        await flushPromises()
+
+        const payload = generateEntryLinkMock.mock.calls[0]?.[0] as Record<string, unknown>
+        const sentKeys = Object.keys(payload).filter((key) =>
+          ['external_id', 'source'].includes(key)
+        )
+
+        expect(sentKeys.sort()).toEqual(expectedKeys)
+      }
+    )
+  })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // External reference (candidate-external-reference, design AD-8): the
+  // calling system's own `source` / `external_id`, shown in the header under
+  // the `candidate_ref · role · language` line and carried through by the
+  // re-issue action so the new link describes the same enrolment.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('External reference (candidate-external-reference)', () => {
+    it('shows the labelled line under the candidate_ref line when both values are present', async () => {
+      const { wrapper } = await mountDetailPage({
+        reference: { external_id: 4471, source: 'Acme ATS' },
+      })
+
+      const line = wrapper.get('[data-testid="external-reference"]')
+      // `t` is the identity stub: the labelled variant composes
+      // `<label key> <value>` for each present part, joined by a middle dot.
+      expect(line.text()).toBe(
+        'externalReference.externalId 4471 · externalReference.source Acme ATS'
+      )
+
+      const header = wrapper.get('h1').element.parentElement!
+      const text = header.textContent ?? ''
+      expect(text.indexOf('ref-042')).toBeGreaterThan(-1)
+      expect(text.indexOf('ref-042')).toBeLessThan(text.indexOf('externalReference.externalId'))
+    })
+
+    it.each([
+      [{ external_id: 4471, source: null }, 'externalReference.externalId 4471'],
+      [{ external_id: null, source: 'Acme ATS' }, 'externalReference.source Acme ATS'],
+    ])('shows a single field alone for %j, with no separator', async (reference, expected) => {
+      const { wrapper } = await mountDetailPage({ reference })
+
+      expect(wrapper.get('[data-testid="external-reference"]').text()).toBe(expected)
+    })
+
+    it.each([
+      ['both null', { external_id: null, source: null }],
+      ['keys absent (older payload)', undefined],
+    ])('renders nothing for a participant with %s', async (_label, reference) => {
+      const { wrapper } = await mountDetailPage({ reference })
+
+      expect(wrapper.find('[data-testid="external-reference"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('externalReference.')
     })
   })
 

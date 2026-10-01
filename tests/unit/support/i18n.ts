@@ -45,3 +45,19 @@ function has(key: string): boolean {
 export function realI18n() {
   return { t: (key: string) => key, te: has, locale: ref('it') }
 }
+
+/**
+ * `useI18n` stub that resolves REAL English copy with `{param}` interpolation,
+ * for specs that assert on what an operator reads (a count in a sentence)
+ * rather than on a key. `te` is the truthful two-locale check above.
+ */
+export function englishI18n() {
+  const t = (key: string, params?: Record<string, unknown>): string => {
+    const found = lookup(en, key)
+    const text = typeof found === 'string' ? found : key
+
+    return text.replace(/\{(\w+)\}/g, (_, name: string) => String(params?.[name] ?? `{${name}}`))
+  }
+
+  return { t, te: has, locale: ref('en') }
+}

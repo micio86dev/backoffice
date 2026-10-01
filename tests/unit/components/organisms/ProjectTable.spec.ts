@@ -482,4 +482,35 @@ describe('ProjectTable — a project with no competencies', () => {
     expect(button.attributes('aria-describedby')).toBe('project-row-invite-disabled-reason-7')
     expect(wrapper.find('#project-row-invite-disabled-reason-7').exists()).toBe(true)
   })
+
+  it('marks a project pinned to a platform template with the Platform badge', () => {
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [
+          project({
+            id: 1,
+            avatar_template: { id: 7, name: 'Global voice', provider: 'tavus', scope: 'platform' },
+          }),
+          project({
+            id: 2,
+            avatar_template: {
+              id: 8,
+              name: 'Own voice',
+              provider: 'heygen',
+              scope: 'organization',
+            },
+          }),
+        ],
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const platformCell = wrapper.get('[data-testid="project-row-template-1"]')
+    const ownCell = wrapper.get('[data-testid="project-row-template-2"]')
+
+    expect(platformCell.text()).toContain('Global voice')
+    expect(platformCell.text()).toContain('projects.table.platformBadge')
+    expect(ownCell.text()).toContain('Own voice')
+    expect(ownCell.text()).not.toContain('projects.table.platformBadge')
+  })
 })

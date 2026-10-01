@@ -116,7 +116,8 @@
     "avatarTemplates": "Avatar templates",
     "clients": "Clients",
     "catalogue": "Catalogue",
-    "profileLabel": "{name}'s profile"
+    "profileLabel": "{name}'s profile",
+    "platformTemplates": "Platform templates"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -152,7 +153,7 @@
     "subtitle": "Who has been given an entry link, and where each of them got to.",
     "filters": {
       "search": "Search",
-      "searchPlaceholder": "Search by name or reference",
+      "searchPlaceholder": "Search by name, reference, source or external ID",
       "status": "Status",
       "allStatuses": "All statuses"
     },
@@ -270,6 +271,13 @@
       "entry_link_project_closed": "This project is not open for interviews right now."
     }
   },
+  "externalReference": {
+    "label": "External reference",
+    "help": "Only needed when another system created this candidate.",
+    "externalId": "External ID",
+    "source": "Source",
+    "externalIdInvalid": "Enter a whole number from 1 to {max}."
+  },
   "participantRecovery": {
     "description": "This candidate's assessment failed during the interview. An admin or operator can re-open it so the candidate can resume.",
     "action": "Re-open assessment",
@@ -306,7 +314,8 @@
       "avatarProvider": "Avatar service",
       "avatarTemplate": "Template",
       "noCompetencies": "No competencies selected — this project cannot run an interview.",
-      "noAvatarTemplate": "No avatar template assigned"
+      "noAvatarTemplate": "No avatar template assigned",
+      "platformBadge": "Platform"
     },
     "action": {
       "new": "New project",
@@ -421,6 +430,12 @@
       },
       "competenciesLoadError": "The competency list could not be loaded. Please try again.",
       "templatesLoadError": "The avatar template list could not be loaded. Please try again.",
+      "templateGroup": {
+        "organization": "Your organization",
+        "platform": "Platform"
+      },
+      "platformBadge": "Platform",
+      "templateRetired": "(retired)",
       "frameworkVersionsLoadError": "The framework version list could not be loaded. Please try again."
     },
     "secret": {
@@ -1236,7 +1251,8 @@
       "close": "Close",
       "resultTitle": "1 copy created | {count} copies created",
       "resultInactive": "Copies are inactive. Activate each one inside its organization before it is used.",
-      "resultItem": "{organization} — \"{name}\""
+      "resultItem": "{organization} — \"{name}\"",
+      "platformIndependent": "This is a platform template. The copy is independent of it: later edits to the platform template never reach the copy."
     }
   },
   "help": {
@@ -1401,6 +1417,9 @@
     },
     "clients": {
       "description": "The directory of every organization on the platform. Switch into one to see its projects, candidates and reports."
+    },
+    "platformTemplates": {
+      "description": "Avatar templates that BEAI offers to every organization. Editing one reaches every project that uses it."
     }
   },
   "review": {
@@ -1759,6 +1778,62 @@
       "roleLabel": "Role",
       "roleOption": {
         "none": "None — role-less (potential competency only)"
+      }
+    }
+  },
+  "platformTemplates": {
+    "title": "Platform templates",
+    "intro": "Avatar templates BEAI offers to every organization. Organizations pin one from the project form and never see its configuration. An edit reaches every project that uses it.",
+    "empty": "No platform templates yet.",
+    "badge": "Platform",
+    "action": {
+      "new": "New platform template",
+      "edit": "Edit",
+      "offer": "Offer to organizations",
+      "retire": "Retire",
+      "delete": "Delete",
+      "copy": "Copy to organizations"
+    },
+    "state": {
+      "offered": "Offered",
+      "retired": "Retired"
+    },
+    "usage": "{organizations} organizations / {projects} projects",
+    "deleteBlocked": "Cannot be deleted while {organizations} organizations / {projects} projects use it.",
+    "llmSyncFailed": "The conversation model did not sync to the provider. Save the template again to retry.",
+    "notice": {
+      "saved": "\"{name}\" saved.",
+      "offered": "\"{name}\" is now offered to every organization.",
+      "retired": "\"{name}\" retired. Projects that already use it keep working.",
+      "deleted": "\"{name}\" deleted."
+    },
+    "error": {
+      "title": "That did not work",
+      "loadTitle": "Could not load platform templates",
+      "loadBody": "Check that you are signed in as a platform administrator and try again.",
+      "stillUsed": "{organizations} organizations / {projects} projects still use this template."
+    },
+    "serverError": {
+      "template_active": "This template is still offered to organizations. Retire it first, then delete it.",
+      "template_in_use": "This template cannot be deleted while projects use it.",
+      "forbidden": "Only platform administrators can manage platform templates."
+    },
+    "impact": {
+      "usage": "{organizations} organizations / {projects} projects use this template.",
+      "edit": {
+        "title": "Save changes to \"{name}\"?",
+        "effect": "The change applies immediately to every project that uses it, including interviews in progress the next time they resume.",
+        "confirm": "Save changes"
+      },
+      "retire": {
+        "title": "Retire \"{name}\"?",
+        "effect": "It will no longer be offered for new projects. Projects that already use it keep working.",
+        "confirm": "Retire"
+      },
+      "delete": {
+        "title": "Delete \"{name}\"?",
+        "effect": "This cannot be undone.",
+        "confirm": "Delete"
       }
     }
   }

@@ -12,6 +12,11 @@
  *     both lists and maps, and this one is a MAP. Adopting the generated type
  *     would mean the client believing an object is an array — worse than a
  *     hand-written type, because it is confidently wrong rather than absent.
+ *     The generated WRITE bodies (POST/PATCH) say `string[]` for the same
+ *     reason, while the read resource says an object; the api validates it as a
+ *     plain array/map. Pinned in `tests/nuxt/avatar-template-config-contract.ts`
+ *     (types) and `avatar-template-config-shape.spec.ts` (runtime). Follow-up:
+ *     annotate the api request rules so Scramble emits an object schema.
  *
  *   - `provider`, which it reports as `string`. The union lives in a PHP
  *     `match` and a database CHECK, neither of which reaches OpenAPI.
@@ -238,6 +243,9 @@ export type TemplateListResponse = Omit<
 export type TemplateOption =
   paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']['data'][number]
 
+/** Who owns a template: the caller's organization, or the platform (a global). */
+export type TemplateScope = components['schemas']['AvatarTemplateScope']
+
 export type TemplateOptionsResponse =
   paths['/avatar-templates/options']['get']['responses']['200']['content']['application/json']
 
@@ -250,3 +258,52 @@ export type DuplicateTemplateResponse =
   paths['/avatar-templates/{id}/duplicate']['post']['responses']['201']['content']['application/json']
 
 export type DuplicatedTemplate = DuplicateTemplateResponse['data'][number]
+
+type GeneratedPlatformTemplate = components['schemas']['PlatformAvatarTemplateResource']
+
+/**
+ * A platform (global) template as the superadmin's management page reads it:
+ * the same narrowings as `AvatarTemplate`, plus how far its reach extends.
+ * `usage` counts non-deleted pinning projects across EVERY organization and is
+ * the only cross-tenant number the api exposes (never organization names).
+ */
+export type PlatformTemplate = Omit<
+  GeneratedPlatformTemplate,
+  'config' | 'provider' | 'description' | 'pal_sync'
+> & {
+  config: Record<string, unknown>
+  provider: ProviderName
+  description: string | null
+  pal_sync: PalSync
+}
+
+export type PlatformTemplateUsage = GeneratedPlatformTemplate['usage']
+
+/** Same conditional `warning` code as `TemplateResponse`, for the platform routes. */
+export interface PlatformTemplateResponse {
+  data: PlatformTemplate
+  warning?: string
+}
+
+export interface PlatformTemplateListResponse {
+  data: PlatformTemplate[]
+}
+
+type PlatformStoreBody =
+  paths['/admin/avatar-templates']['post']['requestBody']['content']['application/json']
+type PlatformUpdateBody = NonNullable<
+  paths['/admin/avatar-templates/{id}']['patch']['requestBody']
+>['content']['application/json']
+
+/**
+ * The platform write bodies, with `config` re-narrowed to the string-keyed MAP
+ * the api really validates (the generated `string[]` is Scramble reading a PHP
+ * `array` rule as a list) — the same narrowing `AvatarTemplate['config']` has,
+ * pinned by `tests/nuxt/avatar-template-config-contract.ts`.
+ */
+export type PlatformTemplateCreatePayload = Omit<PlatformStoreBody, 'config'> & {
+  config: Record<string, unknown>
+}
+export type PlatformTemplateUpdatePayload = Omit<PlatformUpdateBody, 'config'> & {
+  config?: Record<string, unknown>
+}

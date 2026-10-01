@@ -313,6 +313,17 @@ export const DENIED_KEYS = new Set([
   // is sufficient to start a specific candidate's interview. Treated the
   // same as an access token because it functions as one.
   'entry_url',
+  // candidate-external-reference: the calling system's own identifier for the
+  // candidate, the same class as `candidate_ref` above and denied for the same
+  // reason — alone it is opaque, but it is the join key back to the calling
+  // system's record. `external_ids` is the plural (both-spellings rule), and
+  // `externalId` reaches the first through the camelCase fold.
+  //
+  // `source` is deliberately NOT denied, as in the api scrubber: it is a
+  // generic key (Sentry's own `transaction_info.source` uses it) and its value
+  // names a system, not a person.
+  'external_id',
+  'external_ids',
 ])
 
 const REDACTED = '[redacted]'

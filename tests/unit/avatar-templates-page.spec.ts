@@ -955,7 +955,7 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
       ;(document.body.querySelector('[data-testid="copy-template-submit"]') as HTMLElement).click()
       await waitForTestId('copy-template-result')
 
-      expect(duplicateTemplate).toHaveBeenCalledWith(1, [2], '')
+      expect(duplicateTemplate).toHaveBeenCalledWith(1, [2], '', 'organization')
       expect(api.listTemplates).toHaveBeenCalledTimes(1)
     })
   })

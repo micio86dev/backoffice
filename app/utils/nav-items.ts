@@ -16,6 +16,7 @@ import {
   Cog6ToothIcon,
   BuildingOffice2Icon,
   BookOpenIcon,
+  GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
 import type { AbilityKey } from '../composables/useCurrentUser'
 import type { NavScope } from './nav-visibility'
@@ -50,6 +51,13 @@ export const NAV_ITEMS = [
     labelKey: 'nav.avatarTemplates',
     icon: Cog6ToothIcon,
     requires: 'avatarTemplates.viewAny',
+    scope: 'platform',
+  },
+  {
+    to: '/platform-templates',
+    labelKey: 'nav.platformTemplates',
+    icon: GlobeAltIcon,
+    requires: 'avatarTemplates.manageGlobal',
     scope: 'platform',
   },
   {

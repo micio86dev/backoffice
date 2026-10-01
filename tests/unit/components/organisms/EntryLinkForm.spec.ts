@@ -8,8 +8,9 @@
  * (required + `max:255`), `applyServerFieldErrors` with unmapped messages
  * surfacing in the form-level `role="alert"` banner.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
 
 const tMock = (key: string, params?: Record<string, unknown>) =>
   params ? `${key}:${JSON.stringify(params)}` : key
@@ -399,5 +400,358 @@ describe('EntryLinkForm — the email is required, because it is the identity', 
     expect(generateEntryLinkMock).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'mario+recruiting@sub.example.engineering' })
     )
+  })
+})
+
+describe('EntryLinkForm — external reference (candidate-external-reference, design AD-8)', () => {
+  beforeEach(() => {
+    generateEntryLinkMock.mockReset().mockResolvedValue({
+      entry_url: 'https://interview.example.com/interview/tok',
+      expires_at: '2026-08-17T15:32:00.000000Z',
+    })
+    // The validation messages are produced by the script's `t` (from `useI18n`),
+    // not by the template's `$t`. The suite-wide stub is the identity on the key
+    // and drops the params, so the `{max}` the two limits interpolate would be
+    // unobservable; this one renders them exactly like `$t` does above.
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: tMock, te: () => true, locale: ref('en') }))
+    )
+  })
+
+  afterEach(() => {
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: (key: string) => key, te: () => true, locale: ref('it') }))
+    )
+  })
+
+  const BASE_PAYLOAD = {
+    project_id: 42,
+    candidate_ref: 'cand-1',
+    display_name: 'Mario Rossi',
+    email: 'mario@example.test',
+    send_email: true,
+  }
+
+  function mountForm() {
+    return mount(EntryLinkForm, {
+      props: { projectId: 42 },
+      global: { mocks: { $t: tMock } },
+    })
+  }
+
+  type Wrapper = ReturnType<typeof mountForm>
+
+  async function fillRequiredFields(wrapper: Wrapper) {
+    await wrapper.get('[data-testid="entry-link-form-candidate-ref"]').setValue('cand-1')
+    await wrapper.get('[data-testid="entry-link-form-email"]').setValue('mario@example.test')
+    await wrapper.get('[data-testid="entry-link-form-display-name"]').setValue('Mario Rossi')
+  }
+
+  async function submit(wrapper: Wrapper) {
+    await wrapper.get('[data-testid="entry-link-form"]').trigger('submit')
+    await flushPromises()
+  }
+
+  const externalIdInput = (wrapper: Wrapper) =>
+    wrapper.get('[data-testid="entry-link-form-external-id"]')
+  const sourceInput = (wrapper: Wrapper) => wrapper.get('[data-testid="entry-link-form-source"]')
+
+  /** The single payload `generateEntryLink` received. */
+  function sentPayload(): Record<string, unknown> {
+    expect(generateEntryLinkMock).toHaveBeenCalledTimes(1)
+
+    return generateEntryLinkMock.mock.calls[0]?.[0] as Record<string, unknown>
+  }
+
+  describe('the fieldset', () => {
+    it('renders an optional External reference fieldset with both inputs and ONE help line', () => {
+      const wrapper = mountForm()
+      const fieldset = wrapper.get('[data-testid="entry-link-form-external-reference"]')
+
+      expect(fieldset.element.tagName).toBe('FIELDSET')
+      expect(fieldset.get('legend').text()).toBe('externalReference.label')
+      expect(fieldset.find('[data-testid="entry-link-form-external-id"]').exists()).toBe(true)
+      expect(fieldset.find('[data-testid="entry-link-form-source"]').exists()).toBe(true)
+      expect(fieldset.findAll('[data-slot="field-description"]')).toHaveLength(1)
+      expect(fieldset.get('#entry-link-form-external-reference-help').text()).toBe(
+        'externalReference.help'
+      )
+    })
+
+    it('labels each input through its own <label for>', () => {
+      const wrapper = mountForm()
+
+      expect(wrapper.get('label[for="entry-link-form-external-id"]').text()).toBe(
+        'externalReference.externalId'
+      )
+      expect(wrapper.get('label[for="entry-link-form-source"]').text()).toBe(
+        'externalReference.source'
+      )
+    })
+
+    it('makes External ID a text input with a numeric keypad hint, not type=number', () => {
+      const wrapper = mountForm()
+      const input = externalIdInput(wrapper)
+
+      // `type="number"` wheel-scrolls, accepts `e` notation and hands back a
+      // float: an identifier above 2^53 silently loses digits before validation.
+      expect(input.attributes('type')).toBe('text')
+      expect(input.attributes('inputmode')).toBe('numeric')
+      expect(input.attributes('autocomplete')).toBe('off')
+    })
+
+    it('nests the help line in the fieldset it describes, never as a loose sibling in the FieldGroup', () => {
+      const wrapper = mountForm()
+      const help = wrapper.get('#entry-link-form-external-reference-help')
+
+      expect(help.element.parentElement?.tagName).toBe('FIELDSET')
+      expect(help.element.closest('[data-slot="field-group"]')).not.toBe(help.element.parentElement)
+    })
+
+    it('points both inputs at the help line while they are valid', () => {
+      const wrapper = mountForm()
+
+      for (const input of [externalIdInput(wrapper), sourceInput(wrapper)]) {
+        expect((input.attributes('aria-describedby') ?? '').split(/\s+/)).toEqual([
+          'entry-link-form-external-reference-help',
+        ])
+        expect(input.attributes('aria-invalid')).toBe('false')
+      }
+    })
+
+    it('keeps the component contract: one prop, the same two emits', () => {
+      const component = EntryLinkForm as unknown as { props?: unknown; emits?: unknown }
+
+      expect(Object.keys(component.props as object)).toEqual(['projectId'])
+      expect([...(component.emits as string[])].sort()).toEqual(['success', 'update:pending'])
+    })
+  })
+
+  describe('payload', () => {
+    it('is byte-for-byte the pre-existing payload when both inputs are empty', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await submit(wrapper)
+
+      expect(sentPayload()).toStrictEqual(BASE_PAYLOAD)
+      expect(Object.keys(sentPayload())).not.toContain('external_id')
+      expect(Object.keys(sentPayload())).not.toContain('source')
+    })
+
+    it('treats whitespace-only inputs as empty: no key, not a blank string', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await externalIdInput(wrapper).setValue('   ')
+      await sourceInput(wrapper).setValue('   ')
+      await submit(wrapper)
+
+      expect(sentPayload()).toStrictEqual(BASE_PAYLOAD)
+    })
+
+    it('sends external_id as a NUMBER and source trimmed when both are filled', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await externalIdInput(wrapper).setValue(' 4471 ')
+      await sourceInput(wrapper).setValue('  Acme ATS  ')
+      await submit(wrapper)
+
+      const payload = sentPayload()
+      expect(payload).toStrictEqual({ ...BASE_PAYLOAD, external_id: 4471, source: 'Acme ATS' })
+      expect(typeof payload['external_id']).toBe('number')
+    })
+
+    it('omits source when only External ID is entered', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await externalIdInput(wrapper).setValue('4471')
+      await submit(wrapper)
+
+      expect(sentPayload()).toStrictEqual({ ...BASE_PAYLOAD, external_id: 4471 })
+    })
+
+    it('omits external_id when only Source is entered', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await sourceInput(wrapper).setValue('Acme ATS')
+      await submit(wrapper)
+
+      expect(sentPayload()).toStrictEqual({ ...BASE_PAYLOAD, source: 'Acme ATS' })
+    })
+
+    it('sends both values on the scheduled path too, next to scheduled_at', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await externalIdInput(wrapper).setValue('4471')
+      await sourceInput(wrapper).setValue('Acme ATS')
+      await wrapper.get('[data-testid="entry-link-form-timing-schedule"]').trigger('click')
+
+      const future = new Date(Date.now() + 60 * 60_000)
+      const localValue = new Date(future.getTime() - future.getTimezoneOffset() * 60_000)
+        .toISOString()
+        .slice(0, 16)
+      await wrapper.get('[data-testid="entry-link-form-scheduled-at"]').setValue(localValue)
+      await submit(wrapper)
+
+      expect(sentPayload()).toEqual({
+        project_id: 42,
+        candidate_ref: 'cand-1',
+        display_name: 'Mario Rossi',
+        email: 'mario@example.test',
+        scheduled_at: expect.any(String),
+        external_id: 4471,
+        source: 'Acme ATS',
+      })
+    })
+  })
+
+  describe('client validation (a hint: the server is the authority)', () => {
+    const INVALID_EXTERNAL_IDS = ['0', '-3', '1.5', 'abc', '9007199254740992', '1e3', '12 34']
+
+    it.each(INVALID_EXTERNAL_IDS)(
+      'blocks submit for External ID "%s" with a wired FieldError',
+      async (value) => {
+        const wrapper = mountForm()
+        await fillRequiredFields(wrapper)
+        await externalIdInput(wrapper).setValue(value)
+        await submit(wrapper)
+
+        const input = externalIdInput(wrapper)
+        const error = wrapper.get('[data-testid="entry-link-form-external-id-error"]')
+
+        expect(error.text()).toBe('externalReference.externalIdInvalid:{"max":9007199254740991}')
+        expect(input.attributes('aria-invalid')).toBe('true')
+        expect((input.attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+          error.attributes('id')
+        )
+        expect(generateEntryLinkMock).not.toHaveBeenCalled()
+      }
+    )
+
+    it.each(['1', '4471', '9007199254740991'])('accepts External ID "%s"', async (value) => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await externalIdInput(wrapper).setValue(value)
+      await submit(wrapper)
+
+      expect(wrapper.find('[data-testid="entry-link-form-external-id-error"]').exists()).toBe(false)
+      expect(sentPayload()['external_id']).toBe(Number(value))
+    })
+
+    it('blocks a 181-character Source with a wired FieldError, and sends nothing', async () => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await sourceInput(wrapper).setValue('a'.repeat(181))
+      await submit(wrapper)
+
+      const error = wrapper.get('[data-testid="entry-link-form-source-error"]')
+      expect(error.text()).toBe('entryLink.form.tooLong:{"max":180}')
+      expect(sourceInput(wrapper).attributes('aria-invalid')).toBe('true')
+      expect((sourceInput(wrapper).attributes('aria-describedby') ?? '').split(/\s+/)).toContain(
+        error.attributes('id')
+      )
+      expect(generateEntryLinkMock).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['180 ASCII characters', 'a'.repeat(180)],
+      ['180 multibyte characters', 'è'.repeat(180)],
+      [
+        '180 characters padded with spaces (length is measured after trimming)',
+        `  ${'a'.repeat(180)}  `,
+      ],
+    ])('accepts a Source of %s', async (_label, value) => {
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await sourceInput(wrapper).setValue(value)
+      await submit(wrapper)
+
+      expect(wrapper.find('[data-testid="entry-link-form-source-error"]').exists()).toBe(false)
+      expect(sentPayload()['source']).toBe(value.trim())
+    })
+
+    it('flags every invalid field at once on submit, never one at a time', async () => {
+      const wrapper = mountForm()
+      await externalIdInput(wrapper).setValue('abc')
+      await sourceInput(wrapper).setValue('a'.repeat(181))
+      await submit(wrapper)
+
+      expect(wrapper.find('[data-testid="entry-link-form-candidate-ref-error"]').exists()).toBe(
+        true
+      )
+      expect(wrapper.find('[data-testid="entry-link-form-external-id-error"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="entry-link-form-source-error"]').exists()).toBe(true)
+    })
+
+    it('shows the External ID error after blur, before any submit, and clears it once valid', async () => {
+      const wrapper = mountForm()
+
+      await externalIdInput(wrapper).setValue('abc')
+      await externalIdInput(wrapper).trigger('blur')
+      expect(wrapper.find('[data-testid="entry-link-form-external-id-error"]').exists()).toBe(true)
+
+      await externalIdInput(wrapper).setValue('4471')
+      await externalIdInput(wrapper).trigger('blur')
+      expect(wrapper.find('[data-testid="entry-link-form-external-id-error"]').exists()).toBe(false)
+      expect(externalIdInput(wrapper).attributes('aria-invalid')).toBe('false')
+    })
+
+    it('shows the Source error after blur, before any submit', async () => {
+      const wrapper = mountForm()
+
+      await sourceInput(wrapper).setValue('a'.repeat(181))
+      await sourceInput(wrapper).trigger('blur')
+
+      expect(wrapper.find('[data-testid="entry-link-form-source-error"]').exists()).toBe(true)
+    })
+
+    it('does not flag an empty, untouched fieldset on blur: the fields are optional', async () => {
+      const wrapper = mountForm()
+
+      await externalIdInput(wrapper).trigger('blur')
+      await sourceInput(wrapper).trigger('blur')
+
+      expect(wrapper.find('[data-testid="entry-link-form-external-id-error"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="entry-link-form-source-error"]').exists()).toBe(false)
+    })
+  })
+
+  describe('server 422 mapping', () => {
+    function reject422(errors: Record<string, string[]>) {
+      generateEntryLinkMock.mockRejectedValueOnce(
+        Object.assign(new Error('422'), { status: 422, data: { errors } })
+      )
+    }
+
+    it('maps an external_id error onto the External ID field, not the banner', async () => {
+      reject422({ external_id: ['The external id must be an integer.'] })
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await externalIdInput(wrapper).setValue('4471')
+      await submit(wrapper)
+
+      const error = wrapper.get('[data-testid="entry-link-form-external-id-error"]')
+      expect(error.text()).toBe('The external id must be an integer.')
+      expect(externalIdInput(wrapper).attributes('aria-invalid')).toBe('true')
+      expect(
+        (externalIdInput(wrapper).attributes('aria-describedby') ?? '').split(/\s+/)
+      ).toContain(error.attributes('id'))
+      // A mapped field error is its own explanation: no generic banner on top.
+      expect(wrapper.find('[data-testid="entry-link-form-banner"]').exists()).toBe(false)
+    })
+
+    it('maps a source error onto the Source field, not the banner', async () => {
+      reject422({ source: ['The source may not be greater than 180 characters.'] })
+      const wrapper = mountForm()
+      await fillRequiredFields(wrapper)
+      await sourceInput(wrapper).setValue('Acme ATS')
+      await submit(wrapper)
+
+      const error = wrapper.get('[data-testid="entry-link-form-source-error"]')
+      expect(error.text()).toBe('The source may not be greater than 180 characters.')
+      expect(sourceInput(wrapper).attributes('aria-invalid')).toBe('true')
+      expect(wrapper.find('[data-testid="entry-link-form-banner"]').exists()).toBe(false)
+    })
   })
 })

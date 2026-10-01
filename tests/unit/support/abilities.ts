@@ -123,6 +123,8 @@ export function abilitiesForRole(input: MirroredIdentityInput | TenantRole): Abi
       update: platform,
       activate: platform,
       delete: platform,
+      // Platform (global) templates: superadmin only, published by /auth/me.
+      manageGlobal: platform,
     },
     projects: { viewAny: viewer, create: operator, update: operator, delete: admin },
     participants: { viewAny: viewer, create: operator, recover: operator },

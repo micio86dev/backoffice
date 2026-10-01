@@ -161,6 +161,28 @@ describe('useAvatarTemplates', () => {
     const rejection = (status: number, data: unknown) =>
       Object.assign(new Error('x'), { status, data })
 
+    it('routes a PLATFORM template to the platform duplicate endpoint, same body', async () => {
+      apiFetch.mockResolvedValue({ data: [] })
+
+      await useAvatarTemplates().duplicateTemplate(5, [2, 3], 'Copy', 'platform')
+
+      expect(apiFetch).toHaveBeenCalledWith('/admin/avatar-templates/5/duplicate', {
+        method: 'POST',
+        body: { target_organization_ids: [2, 3], name: 'Copy' },
+      })
+    })
+
+    it('keeps the organization route for an explicit organization scope', async () => {
+      apiFetch.mockResolvedValue({ data: [] })
+
+      await useAvatarTemplates().duplicateTemplate(5, [2], undefined, 'organization')
+
+      expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/5/duplicate', {
+        method: 'POST',
+        body: { target_organization_ids: [2] },
+      })
+    })
+
     it('POSTs the targets to the duplicate endpoint and returns the created copies', async () => {
       const created = { data: [{ organization_id: 2, id: 9, name: 'Recruiter' }] }
       apiFetch.mockResolvedValue(created)

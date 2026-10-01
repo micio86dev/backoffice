@@ -114,6 +114,77 @@ describe('CandidateTable', () => {
     expect(row.text()).toContain('–')
   })
 
+  describe('external reference sub-line (candidate-external-reference)', () => {
+    const subLine = (row: { find: (selector: string) => { exists: () => boolean } }) =>
+      row.find('[data-testid="external-reference"]')
+
+    it.each([
+      [{ external_id: 4471, source: 'Acme ATS' }, 'Acme ATS · #4471'],
+      [{ external_id: 4471, source: null }, '#4471'],
+      [{ external_id: null, source: 'Acme ATS' }, 'Acme ATS'],
+    ])('shows %j as "%s" under the candidate reference', (reference, expected) => {
+      const wrapper = mountTable({ participants: [baseParticipant(reference)] })
+      const cell = wrapper.get('tbody tr td')
+      const line = cell.get('[data-testid="external-reference-value"]')
+
+      expect(line.text()).toBe(expected)
+      // UNDER the candidate_ref, in the same first cell — never a new column.
+      expect(cell.text().indexOf('ref-001')).toBeLessThan(cell.text().indexOf(expected))
+    })
+
+    it('renders no sub-line element at all when the participant has neither value', () => {
+      const wrapper = mountTable({
+        participants: [baseParticipant({ external_id: null, source: null })],
+      })
+
+      expect(subLine(wrapper.get('tbody tr')).exists()).toBe(false)
+    })
+
+    it('renders no sub-line for a payload that does not carry the keys at all', () => {
+      const wrapper = mountTable({ participants: [baseParticipant()] })
+
+      expect(subLine(wrapper.get('tbody tr')).exists()).toBe(false)
+    })
+
+    it('decides per row, so one row with a reference does not give its neighbour a sub-line', () => {
+      const wrapper = mountTable({
+        participants: [
+          baseParticipant({ id: 1, external_id: 4471, source: 'Acme ATS' }),
+          baseParticipant({ id: 2, external_id: null, source: null }),
+        ],
+      })
+      const rows = wrapper.findAll('tbody tr')
+
+      expect(subLine(rows[0]!).exists()).toBe(true)
+      expect(subLine(rows[1]!).exists()).toBe(false)
+    })
+
+    it('mutes the sub-line so it reads as secondary to the candidate reference', () => {
+      const wrapper = mountTable({
+        participants: [baseParticipant({ external_id: 4471, source: 'Acme ATS' })],
+      })
+
+      expect(wrapper.get('[data-testid="external-reference"]').classes()).toEqual(
+        expect.arrayContaining(['text-muted-foreground', 'text-xs'])
+      )
+    })
+
+    it('does not change the column set', () => {
+      const wrapper = mountTable({
+        participants: [baseParticipant({ external_id: 4471, source: 'Acme ATS' })],
+      })
+
+      expect(wrapper.findAll('thead th').map((th) => th.text())).toEqual([
+        'participants.table.candidate',
+        'participants.table.project',
+        'participants.table.role',
+        'participants.table.status',
+        'participants.table.createdAt',
+      ])
+      expect(wrapper.findAll('tbody tr td')).toHaveLength(5)
+    })
+  })
+
   it('renders the pagination summary and enables Next when not on the last page', () => {
     const wrapper = mountTable({
       participants: [baseParticipant()],

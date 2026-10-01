@@ -21,6 +21,18 @@
           {{ participant.candidate_ref }} · {{ participant.role_code }} ·
           {{ $t('participants.detail.language') }}: {{ participant.language }}
         </p>
+        <!--
+          candidate-external-reference: the calling system's own reference, one
+          line under the identifiers above. Read-only data, so every role that
+          may view the participant sees it (no ability gate); the molecule
+          renders nothing at all when the participant has no reference.
+        -->
+        <ExternalReference
+          variant="labelled"
+          :external-id="participant.external_id"
+          :source="participant.source"
+          class="text-muted-foreground text-sm"
+        />
         <StatusBadge :status="participant.status" class="mt-2" />
       </div>
 
@@ -368,6 +380,7 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import StatusBadge from '@/components/atoms/StatusBadge.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
+import ExternalReference from '@/components/molecules/ExternalReference.vue'
 import EvaluationReport from '@/components/organisms/EvaluationReport.vue'
 import EvaluationAuditPanel from '@/components/organisms/EvaluationAuditPanel.vue'
 import TranscriptPanel from '@/components/organisms/TranscriptPanel.vue'
@@ -636,6 +649,23 @@ const entryLinkAccessibility = computed<{
   return { eligible: true, reason: null }
 })
 
+/**
+ * The stored external reference as entry-link payload keys — a key only when its
+ * value is present. `null` (and a key an older payload never carried) is
+ * OMITTED rather than sent as `null`, matching the invite form.
+ */
+function externalReferencePayload(detail: { external_id: number | null; source: string | null }): {
+  external_id?: number
+  source?: string
+} {
+  return {
+    ...(typeof detail.external_id === 'number' ? { external_id: detail.external_id } : {}),
+    ...(typeof detail.source === 'string' && detail.source.trim() !== ''
+      ? { source: detail.source }
+      : {}),
+  }
+}
+
 async function onGenerateEntryLink(): Promise<void> {
   if (!participant.value) return
   entryLinkError.value = null
@@ -654,6 +684,13 @@ async function onGenerateEntryLink(): Promise<void> {
       // Mailing again silently, to the address that already failed, would be
       // the least useful thing this button could do.
       send_email: false,
+      // candidate-external-reference: carried through ONLY when stored, so the
+      // minted link describes the same enrolment and a participant without a
+      // reference sends exactly the payload it always did. The api would keep a
+      // stored value for a link that carries none (COALESCE in the exchange);
+      // sending it here makes the link self-describing rather than relying on
+      // that safety net.
+      ...externalReferencePayload(participant.value),
     })
     // interview-scheduling (PR-F): `generateEntryLink`'s response type widened
     // to a union once `POST /entry-links` grew a scheduled branch (T-B1) that

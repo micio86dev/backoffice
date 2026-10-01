@@ -1,0 +1,48 @@
+/**
+ * Pins the assumption that avatar-template `config` is a string-keyed MAP on
+ * read AND write. The generated write bodies say `string[]` (Scramble infers a
+ * list from the PHP `array` rule); the api actually validates a plain map.
+ * Type-level half: tests/nuxt/avatar-template-config-contract.ts (typecheck).
+ */
+import { describe, expect, it, vi } from 'vitest'
+import type { AvatarTemplate } from '../../app/types/avatar-template'
+
+const apiFetch = vi.fn().mockResolvedValue({ data: {} })
+vi.mock('../../app/composables/useApi', () => ({ useApi: () => ({ apiFetch }) }))
+const { useAvatarTemplates } = await import('../../app/composables/useAvatarTemplates')
+const { usePlatformAvatarTemplates } =
+  await import('../../app/composables/usePlatformAvatarTemplates')
+
+describe('avatar template config shape', () => {
+  it('round-trips a config map through the payload builders unchanged', async () => {
+    const read: AvatarTemplate['config'] = { avatarId: 'a', voiceId: 'v' }
+    const edited = { ...read, voiceId: 'v2' }
+
+    await useAvatarTemplates().updateTemplate(1, { config: edited })
+    await useAvatarTemplates().createTemplate({ name: 'X', provider: 'heygen', config: edited })
+
+    // Exactly one call per builder: an empty call list must fail, not pass vacuously.
+    expect(apiFetch).toHaveBeenCalledTimes(2)
+    const bodies = apiFetch.mock.calls.map((c) => (c[1] as { body: { config: unknown } }).body)
+    expect(bodies.map((b) => Array.isArray(b.config))).toEqual([false, false])
+    expect(bodies.map((b) => b.config)).toEqual([
+      { avatarId: 'a', voiceId: 'v2' },
+      { avatarId: 'a', voiceId: 'v2' },
+    ])
+  })
+
+  it('round-trips a config map through the PLATFORM payload builders unchanged', async () => {
+    // R3-platform-template-config-gap: the platform write bodies carry the same
+    // generated `string[]` for `config`, and need the same narrowing.
+    apiFetch.mockClear()
+    const edited = { avatarId: 'a', voiceId: 'v2' }
+
+    await usePlatformAvatarTemplates().update(1, { config: edited })
+    await usePlatformAvatarTemplates().create({ name: 'X', provider: 'tavus', config: edited })
+
+    expect(apiFetch).toHaveBeenCalledTimes(2)
+    const bodies = apiFetch.mock.calls.map((c) => (c[1] as { body: { config: unknown } }).body)
+    expect(bodies.map((b) => Array.isArray(b.config))).toEqual([false, false])
+    expect(bodies.map((b) => b.config)).toEqual([edited, edited])
+  })
+})

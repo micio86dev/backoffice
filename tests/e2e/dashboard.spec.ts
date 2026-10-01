@@ -152,23 +152,27 @@ const ACTIVITY_ROWS = [
   },
 ]
 
-function mockMetrics(page: Page, body: unknown = METRICS_FIXTURE, status = 200): Promise<void> {
-  return page.route(
+async function mockMetrics(
+  page: Page,
+  body: unknown = METRICS_FIXTURE,
+  status = 200
+): Promise<void> {
+  await page.route(
     (url) => url.pathname === '/dashboard/metrics',
     (route) => (isDataRequest(route) ? jsonRoute(route, body, status) : route.continue())
   )
 }
 
-function mockActivity(page: Page, rows: typeof ACTIVITY_ROWS = ACTIVITY_ROWS): Promise<void> {
-  return page.route(
+async function mockActivity(page: Page, rows: typeof ACTIVITY_ROWS = ACTIVITY_ROWS): Promise<void> {
+  await page.route(
     (url) => url.pathname === '/dashboard/activity',
     (route) => (isDataRequest(route) ? jsonRoute(route, { data: rows }) : route.continue())
   )
 }
 
 /** The feed's OWN read failing, with the metrics read perfectly fine. */
-function mockActivityFailure(page: Page, status = 500): Promise<void> {
-  return page.route(
+async function mockActivityFailure(page: Page, status = 500): Promise<void> {
+  await page.route(
     (url) => url.pathname === '/dashboard/activity',
     (route) =>
       isDataRequest(route) ? jsonRoute(route, { message: 'boom' }, status) : route.continue()

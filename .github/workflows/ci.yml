@@ -63,6 +63,8 @@ jobs:
       - name: Prettier format-check
         run: bun run format:check
 
+      # `typecheck` is `nuxi typecheck` (app) followed by `typecheck:e2e`
+      # (vue-tsc over tsconfig.e2e.json), so tests/e2e is type-checked here too.
       - name: TypeScript type-check
         run: bun run typecheck
 

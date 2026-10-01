@@ -128,15 +128,18 @@ const DRAFT_REVISION = revision({
 })
 
 /** A mutable box, same pattern as `clients.spec.ts`'s `actingOrganizationId` — flips BETWEEN requests without re-registering the route. */
-function mockRevision(page: Page, box: { value: Record<string, unknown> | null }): Promise<void> {
-  return page.route(
+async function mockRevision(
+  page: Page,
+  box: { value: Record<string, unknown> | null }
+): Promise<void> {
+  await page.route(
     (url) => url.pathname === '/catalogue/revisions/current',
     (route) => (isDataRequest(route) ? jsonRoute(route, { data: box.value }) : route.continue())
   )
 }
 
-function mockCompetencies(page: Page, data: Record<string, unknown>[] = []): Promise<void> {
-  return page.route(
+async function mockCompetencies(page: Page, data: Record<string, unknown>[] = []): Promise<void> {
+  await page.route(
     (url) => url.pathname === '/catalogue/competencies',
     (route) =>
       isDataRequest(route) && route.request().method() === 'GET'
@@ -145,8 +148,11 @@ function mockCompetencies(page: Page, data: Record<string, unknown>[] = []): Pro
   )
 }
 
-function mockDefaultQuestions(page: Page, data: Record<string, unknown>[] = []): Promise<void> {
-  return page.route(
+async function mockDefaultQuestions(
+  page: Page,
+  data: Record<string, unknown>[] = []
+): Promise<void> {
+  await page.route(
     (url) => url.pathname === '/catalogue/default-questions',
     (route) =>
       isDataRequest(route) && route.request().method() === 'GET'

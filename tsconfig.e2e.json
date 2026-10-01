@@ -1,0 +1,17 @@
+{
+  // Type-checks tests/e2e, which `nuxi typecheck` does not cover: Nuxt's
+  // generated tsconfig includes `app/**` and `tests/nuxt/**` and nothing else.
+  // Without this, `tests/e2e/fixtures/admin-session.ts` claiming that its
+  // factories are checked against the generated API types was a claim no step
+  // ever verified.
+  "extends": "./.nuxt/tsconfig.app.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  // `.nuxt/nuxt.d.ts` supplies the auto-import and module types the app files
+  // the specs import (`useCurrentUser`, `abilities`) depend on. Run through
+  // `vue-tsc`, as `nuxi typecheck` does, so those `.vue` imports resolve.
+  "include": ["./.nuxt/nuxt.d.ts", "./tests/e2e/**/*.ts"],
+  "exclude": ["node_modules", ".nuxt/dist", ".output"]
+}

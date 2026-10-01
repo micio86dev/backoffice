@@ -11,8 +11,9 @@
  * templates became platform-only. Prose cannot fail a build. Annotating the
  * return as `Abilities` means a group the server adds, renames or drops is a
  * compile error, and `tests/nuxt/abilities-contract.ts` is what makes that
- * annotation bite (`typecheck` covers neither `tests/e2e/**` nor
- * `tests/unit/**` on its own).
+ * annotation bite (`nuxi typecheck` alone covers neither `tests/e2e/**` nor
+ * `tests/unit/**`; `typecheck:e2e` now covers the former, the latter is still
+ * reached only through the contract file).
  *
  * DERIVED FROM THE ROLE rather than hardcoded per spec, for the same reason the
  * production code does not hardcode it in Vue: a second copy of an

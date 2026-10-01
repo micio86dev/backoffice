@@ -1,5 +1,15 @@
-import { test, expect, type Page, type Route } from '@playwright/test'
-import { abilitiesFor } from './fixtures/abilities'
+import type { Locator, Page } from '@playwright/test'
+import { checkA11y } from './fixtures/a11y'
+import {
+  expect,
+  jsonRoute,
+  mockParticipantsApi,
+  mockProjectsApi,
+  participantResource,
+  projectResource,
+  test,
+  type Participant,
+} from './fixtures/admin-session'
 
 /**
  * Candidate external reference, end to end (candidate-external-reference,
@@ -19,33 +29,16 @@ import { abilitiesFor } from './fixtures/abilities'
  * and locators are role/label based. The UI runs in Italian (`locale: 'it-IT'`
  * in playwright.config.ts), so every accessible name below is the Italian copy.
  * Runs on both the chromium and webkit projects.
+ *
+ * HOW "NO REQUEST WAS SENT" IS PROVEN. A count read straight after a click can be
+ * zero only because the request has not left yet, and a negative that holds at
+ * one instant proves nothing about the next. So a refused submit is followed by
+ * a CORRECTED submit, and the assertion is that the captured traffic is exactly
+ * the corrected request: had the refused one gone out, it would be the first
+ * body (or a second one), whatever the timing.
  */
 
-const ACTIVE_PROJECT = {
-  id: 2,
-  organization_id: 1,
-  framework_version_id: 3,
-  slug: 'active-project',
-  name: 'Active Project',
-  assessment_type: 'standard',
-  role_code: 'FLL',
-  language: 'en',
-  status: 'active',
-  pause_every_n_competencies: 3,
-  nudge_min_chars: 40,
-  exit_redirect_url: null,
-  webhook_url: null,
-  webhook_events: [],
-  has_webhook_secret: false,
-  deadline_at: null,
-  goes_live_at: null,
-  created_at: '2026-03-01T10:00:00Z',
-  updated_at: '2026-03-01T10:00:00Z',
-  pin_context: null,
-  // A project with no competencies cannot run an interview, and the table
-  // withholds the invite action for it, so this one carries a competency.
-  competencies: [{ id: 11, code: 'COM', position: 0 }],
-}
+const PROJECT = projectResource()
 
 interface Reference {
   external_id: number | null
@@ -54,67 +47,19 @@ interface Reference {
 
 const NO_REFERENCE: Reference = { external_id: null, source: null }
 const ACME_REFERENCE: Reference = { external_id: 4471, source: 'Acme ATS' }
+const ID_ONLY: Reference = { external_id: 4471, source: null }
+const SOURCE_ONLY: Reference = { external_id: null, source: 'Acme ATS' }
+const MARKUP = '<b>x</b><img src=x alt=injected>'
 
-/** An admin participants list row, as `Admin\ParticipantResource` returns it. */
-function listRow(id: number, displayName: string, reference: Reference) {
-  return {
+/** An admin participants row, as `Admin\ParticipantResource` returns it. */
+function row(id: number, displayName: string, reference: Reference): Participant {
+  return participantResource({
     id,
     candidate_ref: `ref-00${id}`,
     display_name: displayName,
     email: `candidate-${id}@example.test`,
-    role_code: 'FLL',
-    language: 'it',
-    status: 'in_attesa',
-    project_id: 2,
-    project_name: 'Active Project',
-    started_at: null,
-    completed_at: null,
-    created_at: '2026-03-14T08:30:00Z',
-    // reusable-interview-links: always present on the wire, `null` for a
-    // participant that did not start from a reusable link.
-    reusable_link: null,
     ...reference,
-  }
-}
-
-/** The admin participant detail, as `Admin\ParticipantDetailResource` returns it. */
-function detail(id: number, displayName: string, reference: Reference) {
-  return {
-    ...listRow(id, displayName, reference),
-    project: {
-      id: ACTIVE_PROJECT.id,
-      name: ACTIVE_PROJECT.name,
-      status: ACTIVE_PROJECT.status,
-      goes_live_at: ACTIVE_PROJECT.goes_live_at,
-      deadline_at: ACTIVE_PROJECT.deadline_at,
-    },
-    timeline: { started_at: null, completed_at: null, session_count: 0 },
-    progress: { done: 0, total: 3 },
-    elapsed: { seconds: null, sessions_counted: 0, sessions_total: 0 },
-    cost: {
-      amount: null,
-      currency: 'USD',
-      is_estimate: true,
-      sessions_estimated: 0,
-      sessions_total: 0,
-    },
-    files: {
-      transcript: { type: 'text/plain', ref: 'transcript', url: `/participants/${id}/transcript` },
-      evaluation_raw: {
-        type: 'application/json',
-        ref: 'evaluation',
-        url: `/participants/${id}/evaluation`,
-      },
-    },
-  }
-}
-
-async function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
-  await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-}
-
-function isDataRequest(route: Route): boolean {
-  return route.request().resourceType() !== 'document'
+  })
 }
 
 interface Captured {
@@ -124,151 +69,85 @@ interface Captured {
   searchTerms: (string | null)[]
 }
 
+interface Options {
+  /** What `POST /entry-links` answers; defaults to a 201 with an entry URL. */
+  entryLinkAnswer?: () => { status: number; body: unknown }
+}
+
 /**
- * Intercepts the admin API. `participants` is what the list returns; the detail
- * route serves whichever of them is asked for, so the list and the detail agree
- * on each participant's reference.
+ * What `GET /participants?q=` does in `Api\ParticipantController::index`: a
+ * case-insensitive substring on `candidate_ref`, `display_name` and `source`,
+ * plus EXACT equality on `external_id` when the trimmed term is a whole number.
+ * Mirroring it is what lets a test assert on the rows that change, not just on
+ * the parameter that was sent.
  */
+function matchesTerm(participant: Participant, rawTerm: string | null): boolean {
+  if (rawTerm === null || rawTerm === '') return true
+
+  const term = rawTerm.toLowerCase()
+  const text = [participant.candidate_ref, participant.display_name, participant.source ?? '']
+
+  if (text.some((value) => value.toLowerCase().includes(term))) return true
+
+  return /^\d+$/.test(rawTerm.trim()) && participant.external_id === Number(rawTerm.trim())
+}
+
+/** Intercepts the admin API. The detail route serves whichever participant it is asked for. */
 async function mockAdminApi(
   page: Page,
-  participants: ReturnType<typeof listRow>[]
+  participants: Participant[],
+  options: Options = {}
 ): Promise<Captured> {
   const captured: Captured = { entryLinkBodies: [], searchTerms: [] }
 
-  await page.route(
-    (url) => url.pathname === '/auth/login',
-    (route) =>
-      jsonRoute(route, {
-        access_token: 'e2e-access-token',
-        refresh_token: 'e2e-refresh',
-        token_type: 'bearer',
-      })
-  )
-
-  await page.route(
-    (url) => url.pathname === '/auth/me',
-    (route) =>
-      isDataRequest(route)
-        ? jsonRoute(route, {
-            user: {
-              id: 1,
-              name: 'Operator One',
-              email: 'operator@example.com',
-              locale: 'it',
-              photo_url: null,
-            },
-            organization: { id: 1, name: 'Acme' },
-            roles: ['operator'],
-            abilities: abilitiesFor(['operator']),
-          })
-        : route.continue()
-  )
-
-  await page.route(
-    (url) => url.pathname === '/projects',
-    (route) =>
-      isDataRequest(route) ? jsonRoute(route, { data: [ACTIVE_PROJECT] }) : route.continue()
-  )
-
-  await page.route(
-    (url) => /^\/framework\/roles\/[A-Z]+\/competencies$/.test(url.pathname),
-    (route) => (isDataRequest(route) ? jsonRoute(route, { data: [] }) : route.continue())
-  )
+  await mockProjectsApi(page, [PROJECT])
 
   await page.route(
     (url) => url.pathname === '/entry-links',
     async (route) => {
       captured.entryLinkBodies.push(route.request().postDataJSON() as Record<string, unknown>)
-      await jsonRoute(
-        route,
-        {
+
+      const answer = options.entryLinkAnswer?.() ?? {
+        status: 201,
+        body: {
           entry_url: 'https://interview.example.com/interview/e2e-token',
           expires_at: '2026-08-17T15:32:00.000000Z',
         },
-        201
-      )
+      }
+
+      await jsonRoute(route, answer.body, answer.status)
     }
   )
 
-  await page.route(
-    (url) => url.pathname === '/participants',
-    (route) => {
-      if (!isDataRequest(route)) return route.continue()
+  await mockParticipantsApi(
+    page,
+    (url) => {
+      const term = url.searchParams.get('q')
 
-      captured.searchTerms.push(new URL(route.request().url()).searchParams.get('q'))
+      captured.searchTerms.push(term)
 
-      return jsonRoute(route, {
-        data: participants,
-        links: { first: null, last: null, prev: null, next: null },
-        meta: {
-          current_page: 1,
-          last_page: 1,
-          total: participants.length,
-          from: 1,
-          to: participants.length,
-          per_page: 20,
-        },
-      })
-    }
+      return participants.filter((participant) => matchesTerm(participant, term))
+    },
+    participants
   )
-
-  // The API path and the SPA route share `/participants/:id`, so a document
-  // navigation must fall through (same guard entry-link.spec.ts documents).
-  for (const row of participants) {
-    await page.route(
-      (url) => url.pathname === `/participants/${row.id}`,
-      (route) =>
-        isDataRequest(route)
-          ? jsonRoute(route, {
-              data: detail(row.id, row.display_name, {
-                external_id: row.external_id,
-                source: row.source,
-              }),
-            })
-          : route.continue()
-    )
-    await page.route(
-      (url) => url.pathname === `/participants/${row.id}/evaluation`,
-      (route) =>
-        route.fulfill({
-          status: 409,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            error: 'lifecycle_not_ready',
-            resource: 'evaluation',
-            current_status: 'in_attesa',
-            required_status: 'completato',
-          }),
-        })
-    )
-  }
 
   return captured
 }
 
-async function login(page: Page): Promise<void> {
-  // The access token is memory-only: every full page load fires a boot
-  // refresh, so it must be mocked or the auth guard bounces back to /login.
-  await page.route(
-    (url) => url.pathname === '/auth/refresh',
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ access_token: 'e2e-access-token', token_type: 'bearer' }),
-      })
-  )
-  await page.goto('/login')
-  await page.getByLabel('Email').fill('operator@example.com')
-  await page.getByLabel('Password').fill('secret-password')
-  await page.getByRole('button', { name: 'Accedi' }).click()
-  await expect(page).toHaveURL('/')
+const ENTRY_URL = 'https://interview.example.com/interview/e2e-token'
+
+/** The request the invite form sends when only the three required fields are filled. */
+const REQUIRED_ONLY_BODY = {
+  project_id: PROJECT.id,
+  candidate_ref: 'e2e-candidate',
+  display_name: 'E2E Candidate',
+  email: 'e2e-candidate@example.test',
+  send_email: true,
 }
 
 /** Opens the invite form from the project row and fills the required fields. */
 async function openInviteForm(page: Page): Promise<void> {
-  await page.getByRole('link', { name: 'Progetti' }).click()
-  await expect(page).toHaveURL('/projects')
+  await page.goto('/projects')
 
   await page
     .getByRole('row', { name: /Active Project/ })
@@ -280,130 +159,461 @@ async function openInviteForm(page: Page): Promise<void> {
   await page.getByLabel('Email del candidato').fill('e2e-candidate@example.test')
 }
 
+function externalIdField(page: Page): Locator {
+  return page.getByLabel('ID esterno', { exact: true })
+}
+
+function sourceField(page: Page): Locator {
+  return page.getByLabel('Origine', { exact: true })
+}
+
+async function submitInvite(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Genera link' }).click()
+}
+
+const EXTERNAL_ID_INVALID = 'Inserisci un numero intero da 1 a 9007199254740991.'
+
 test.describe('Invite form: external reference fieldset', () => {
   test('an operator invites a candidate with a reference; both values reach the request', async ({
-    page,
+    adminPage: page,
   }) => {
-    const captured = await mockAdminApi(page, [listRow(1, 'Mario Rossi', NO_REFERENCE)])
-    await login(page)
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
     await openInviteForm(page)
 
-    await page.getByLabel('ID esterno', { exact: true }).fill('4471')
-    await page.getByLabel('Origine', { exact: true }).fill('  Acme ATS  ')
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await externalIdField(page).fill('4471')
+    await sourceField(page).fill('  Acme ATS  ')
+    await submitInvite(page)
 
-    await expect(page.getByText('https://interview.example.com/interview/e2e-token')).toBeVisible()
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
 
-    expect(captured.entryLinkBodies).toHaveLength(1)
-    const body = captured.entryLinkBodies[0]!
-    expect(body).toMatchObject({ external_id: 4471, source: 'Acme ATS' })
+    // The WHOLE body, not a subset: nothing else rides along with the pair.
+    expect(captured.entryLinkBodies).toEqual([
+      { ...REQUIRED_ONLY_BODY, external_id: 4471, source: 'Acme ATS' },
+    ])
     // A NUMBER, not "4471": the API rejects a numeric string.
-    expect(typeof body['external_id']).toBe('number')
+    expect(typeof captured.entryLinkBodies[0]!['external_id']).toBe('number')
   })
 
-  test('an invite without a reference sends neither key', async ({ page }) => {
-    const captured = await mockAdminApi(page, [listRow(1, 'Mario Rossi', NO_REFERENCE)])
-    await login(page)
+  test('an invite without a reference sends neither key', async ({ adminPage: page }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
     await openInviteForm(page)
 
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await submitInvite(page)
 
-    await expect(page.getByText('https://interview.example.com/interview/e2e-token')).toBeVisible()
-    expect(captured.entryLinkBodies).toHaveLength(1)
-    expect(Object.keys(captured.entryLinkBodies[0]!)).not.toContain('external_id')
-    expect(Object.keys(captured.entryLinkBodies[0]!)).not.toContain('source')
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([REQUIRED_ONLY_BODY])
   })
 
-  test('an invalid External ID is refused in the form, before any request', async ({ page }) => {
-    const captured = await mockAdminApi(page, [listRow(1, 'Mario Rossi', NO_REFERENCE)])
-    await login(page)
+  test('an invite with only an External ID sends exactly that key', async ({ adminPage: page }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
     await openInviteForm(page)
 
-    const externalId = page.getByLabel('ID esterno', { exact: true })
+    await externalIdField(page).fill('4471')
+    await submitInvite(page)
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, external_id: 4471 }])
+  })
+
+  test('an invite with only a Source sends exactly that key', async ({ adminPage: page }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await openInviteForm(page)
+
+    await sourceField(page).fill('Acme ATS')
+    await submitInvite(page)
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, source: 'Acme ATS' }])
+  })
+
+  test('values that are only whitespace count as empty and send neither key', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await openInviteForm(page)
+
+    await externalIdField(page).fill('   ')
+    await sourceField(page).fill('   ')
+    await submitInvite(page)
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([REQUIRED_ONLY_BODY])
+  })
+
+  test('an invalid External ID is refused in the form, before any request', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await openInviteForm(page)
+
+    const externalId = externalIdField(page)
     await externalId.fill('abc')
     await externalId.blur()
 
-    await expect(
-      page.getByText('Inserisci un numero intero da 1 a 9007199254740991.')
-    ).toBeVisible()
+    await expect(page.getByText(EXTERNAL_ID_INVALID)).toBeVisible()
     await expect(externalId).toHaveAttribute('aria-invalid', 'true')
 
-    await page.getByRole('button', { name: 'Genera link' }).click()
-    await expect(
-      page.getByText('Inserisci un numero intero da 1 a 9007199254740991.')
-    ).toBeVisible()
-    expect(captured.entryLinkBodies).toHaveLength(0)
+    await submitInvite(page)
+    await expect(page.getByText(EXTERNAL_ID_INVALID)).toBeVisible()
+
+    // Correct it and submit again: the ONLY request is the corrected one.
+    await externalId.fill('4471')
+    await submitInvite(page)
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, external_id: 4471 }])
+  })
+
+  // `0` and below, decimals, signs, exponents, an embedded space and 2^53: every
+  // one of them fails validateExternalId, and every one must stop at the form.
+  for (const value of ['0', '-1', '1.5', '+5', '1e3', '4 471', '9007199254740992']) {
+    test(`an External ID of "${value}" is refused client-side and nothing is sent`, async ({
+      adminPage: page,
+    }) => {
+      const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+      await openInviteForm(page)
+
+      const externalId = externalIdField(page)
+      await externalId.fill(value)
+      await submitInvite(page)
+
+      await expect(page.getByTestId('entry-link-form-external-id-error')).toHaveText(
+        EXTERNAL_ID_INVALID
+      )
+      await expect(externalId).toHaveAttribute('aria-invalid', 'true')
+
+      await externalId.fill('4471')
+      await submitInvite(page)
+
+      await expect(page.getByText(ENTRY_URL)).toBeVisible()
+      expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, external_id: 4471 }])
+    })
+  }
+
+  // The two ends of the accepted range, and a value padded with spaces that is
+  // trimmed before it is parsed.
+  const ACCEPTED_IDS: [string, number][] = [
+    ['1', 1],
+    ['9007199254740991', Number.MAX_SAFE_INTEGER],
+    ['  12  ', 12],
+  ]
+
+  for (const [typed, sent] of ACCEPTED_IDS) {
+    test(`an External ID of "${typed}" is accepted and sent as the number ${sent}`, async ({
+      adminPage: page,
+    }) => {
+      const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+      await openInviteForm(page)
+
+      await externalIdField(page).fill(typed)
+      await submitInvite(page)
+
+      await expect(page.getByText(ENTRY_URL)).toBeVisible()
+      expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, external_id: sent }])
+    })
+  }
+
+  test('a Source of 181 characters is refused client-side and nothing is sent', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await openInviteForm(page)
+
+    const source = sourceField(page)
+    await source.fill('a'.repeat(181))
+    await submitInvite(page)
+
+    await expect(page.getByTestId('entry-link-form-source-error')).toHaveText(
+      'Inserisci al massimo 180 caratteri.'
+    )
+    await expect(source).toHaveAttribute('aria-invalid', 'true')
+
+    await source.fill('Acme ATS')
+    await submitInvite(page)
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, source: 'Acme ATS' }])
+  })
+
+  test('a Source of exactly 180 characters is accepted, measured after trimming', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await openInviteForm(page)
+
+    // 180 characters plus padding: 184 typed, 180 sent.
+    await sourceField(page).fill(`  ${'a'.repeat(180)}  `)
+    await submitInvite(page)
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toEqual([{ ...REQUIRED_ONLY_BODY, source: 'a'.repeat(180) }])
+  })
+
+  test('a server 422 on external_id lands under the External ID field only', async ({
+    adminPage: page,
+  }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)], {
+      entryLinkAnswer: () => ({
+        status: 422,
+        body: {
+          message: 'The external id is invalid.',
+          errors: { external_id: ['Questo ID esterno non è accettato.'] },
+        },
+      }),
+    })
+    await openInviteForm(page)
+
+    await externalIdField(page).fill('4471')
+    await submitInvite(page)
+
+    const error = page.getByTestId('entry-link-form-external-id-error')
+
+    await expect(error).toHaveText('Questo ID esterno non è accettato.')
+    await expect(externalIdField(page)).toHaveAttribute('aria-invalid', 'true')
+    await expect(externalIdField(page)).toHaveAttribute(
+      'aria-describedby',
+      'entry-link-form-external-id-error'
+    )
+
+    // Not under the sibling field, and the reason is not repeated in a banner.
+    await expect(sourceField(page)).toHaveAttribute('aria-invalid', 'false')
+    await expect(page.getByTestId('entry-link-form-source-error')).toHaveCount(0)
+    await expect(page.getByTestId('entry-link-form-banner')).toHaveCount(0)
+    await expect(page.getByText(ENTRY_URL)).toHaveCount(0)
+  })
+
+  test('a server 422 on source lands under the Source field only', async ({ adminPage: page }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)], {
+      entryLinkAnswer: () => ({
+        status: 422,
+        body: {
+          message: 'The source is invalid.',
+          errors: { source: ['Questa origine non è accettata.'] },
+        },
+      }),
+    })
+    await openInviteForm(page)
+
+    await sourceField(page).fill('Acme ATS')
+    await submitInvite(page)
+
+    await expect(page.getByTestId('entry-link-form-source-error')).toHaveText(
+      'Questa origine non è accettata.'
+    )
+    await expect(sourceField(page)).toHaveAttribute('aria-invalid', 'true')
+    await expect(sourceField(page)).toHaveAttribute(
+      'aria-describedby',
+      'entry-link-form-source-error'
+    )
+
+    await expect(externalIdField(page)).toHaveAttribute('aria-invalid', 'false')
+    await expect(page.getByTestId('entry-link-form-external-id-error')).toHaveCount(0)
+    await expect(page.getByTestId('entry-link-form-banner')).toHaveCount(0)
+  })
+
+  test('a server error with no field in it shows the generic banner and no field error', async ({
+    adminPage: page,
+  }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)], {
+      entryLinkAnswer: () => ({ status: 500, body: { message: 'Server Error' } }),
+    })
+    await openInviteForm(page)
+
+    await externalIdField(page).fill('4471')
+    await submitInvite(page)
+
+    await expect(page.getByTestId('entry-link-form-banner')).toContainText(
+      'Non è stato possibile generare questo link di accesso.'
+    )
+    await expect(page.getByTestId('entry-link-form-external-id-error')).toHaveCount(0)
+    await expect(page.getByTestId('entry-link-form-source-error')).toHaveCount(0)
+  })
+
+  test('the drawer with the fieldset, and with a field error showing, is accessible', async ({
+    adminPage: page,
+  }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await openInviteForm(page)
+
+    await expect(page.getByTestId('entry-link-form-external-reference')).toBeVisible()
+    await checkA11y(page)
+
+    await externalIdField(page).fill('abc')
+    await externalIdField(page).blur()
+    await expect(page.getByTestId('entry-link-form-external-id-error')).toBeVisible()
+    await checkA11y(page)
   })
 })
 
 test.describe('Participants list: external reference sub-line', () => {
-  test('a row with a reference shows it under the candidate reference; a row without shows nothing', async ({
-    page,
+  test('each row shows the parts of the reference it has, and a row without one shows nothing', async ({
+    adminPage: page,
   }) => {
     await mockAdminApi(page, [
-      listRow(1, 'Mario Rossi', ACME_REFERENCE),
-      listRow(2, 'Giulia Bianchi', NO_REFERENCE),
+      row(1, 'Mario Rossi', ACME_REFERENCE),
+      row(2, 'Giulia Bianchi', ID_ONLY),
+      row(3, 'Luca Verdi', SOURCE_ONLY),
+      row(4, 'Anna Neri', NO_REFERENCE),
     ])
-    await login(page)
+    await page.goto('/participants')
 
-    await page.getByRole('link', { name: 'Candidati' }).click()
-    await expect(page).toHaveURL('/participants')
+    // The same test id on every assertion below: a renamed id fails the
+    // positive checks first, so the negative one can never pass vacuously.
+    const lineOf = (name: RegExp) =>
+      page.getByRole('row', { name }).getByTestId('external-reference-value')
 
-    const withReference = page.getByRole('row', { name: /Mario Rossi/ })
-    await expect(withReference.getByText('Acme ATS · #4471')).toBeVisible()
+    await expect(lineOf(/Mario Rossi/)).toHaveText('Acme ATS · #4471')
+    await expect(lineOf(/Giulia Bianchi/)).toHaveText('#4471')
+    await expect(lineOf(/Luca Verdi/)).toHaveText('Acme ATS')
 
-    const withoutReference = page.getByRole('row', { name: /Giulia Bianchi/ })
+    const withoutReference = page.getByRole('row', { name: /Anna Neri/ })
+
     await expect(withoutReference).toBeVisible()
     await expect(withoutReference.getByTestId('external-reference')).toHaveCount(0)
+    await expect(page.getByTestId('external-reference')).toHaveCount(3)
   })
 
-  test('searching sends the term as q, so a source or an external id finds the row', async ({
-    page,
+  test('markup in the Source is shown as text in the list, never injected', async ({
+    adminPage: page,
   }) => {
-    const captured = await mockAdminApi(page, [listRow(1, 'Mario Rossi', ACME_REFERENCE)])
-    await login(page)
+    await mockAdminApi(page, [row(1, 'Mario Rossi', { external_id: 7, source: MARKUP })])
+    await page.goto('/participants')
 
-    await page.getByRole('link', { name: 'Candidati' }).click()
-    await expect(page).toHaveURL('/participants')
+    const reference = page
+      .getByRole('row', { name: /Mario Rossi/ })
+      .getByTestId('external-reference')
+
+    await expect(reference.getByTestId('external-reference-value')).toHaveText(`${MARKUP} · #7`)
+    await expect(reference.locator('b, img')).toHaveCount(0)
+    await expect(page.getByRole('img', { name: 'injected' })).toHaveCount(0)
+  })
+
+  test('searching filters the rows: by source, by exact External ID, and back to all', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, [
+      row(1, 'Mario Rossi', ACME_REFERENCE),
+      row(2, 'Giulia Bianchi', { external_id: 9001, source: 'Workday' }),
+      row(3, 'Luca Verdi', NO_REFERENCE),
+    ])
+    await page.goto('/participants')
+
+    const mario = page.getByRole('row', { name: /Mario Rossi/ })
+    const giulia = page.getByRole('row', { name: /Giulia Bianchi/ })
+    const luca = page.getByRole('row', { name: /Luca Verdi/ })
+
+    // Everyone is listed before any search.
+    await expect(mario).toBeVisible()
+    await expect(giulia).toBeVisible()
+    await expect(luca).toBeVisible()
 
     const search = page.getByLabel('Cerca', { exact: true })
-    await search.fill('acme')
-    await search.press('Enter')
-    await expect.poll(() => captured.searchTerms.at(-1)).toBe('acme')
 
-    await search.fill('4471')
+    // By source, case-insensitively.
+    await search.fill('ACME')
     await search.press('Enter')
-    await expect.poll(() => captured.searchTerms.at(-1)).toBe('4471')
+    await expect.poll(() => captured.searchTerms.at(-1)).toBe('ACME')
+    await expect(mario).toBeVisible()
+    await expect(giulia).toHaveCount(0)
+    await expect(luca).toHaveCount(0)
+
+    // By External ID: exact, so a number the id merely CONTAINS finds nothing.
+    await search.fill('9001')
+    await search.press('Enter')
+    await expect.poll(() => captured.searchTerms.at(-1)).toBe('9001')
+    await expect(giulia).toBeVisible()
+    await expect(mario).toHaveCount(0)
+
+    await search.fill('900')
+    await search.press('Enter')
+    await expect.poll(() => captured.searchTerms.at(-1)).toBe('900')
+    await expect(
+      page.getByText('Nessun candidato corrisponde ai filtri selezionati.')
+    ).toBeVisible()
+    await expect(giulia).toHaveCount(0)
+
+    // Clearing the term sends no `q` at all, and everyone is back.
+    await search.fill('')
+    await search.press('Enter')
+    await expect.poll(() => captured.searchTerms.at(-1)).toBeNull()
+    await expect(mario).toBeVisible()
+    await expect(giulia).toBeVisible()
+    await expect(luca).toBeVisible()
+  })
+
+  test('the list with reference sub-lines is accessible', async ({ adminPage: page }) => {
+    await mockAdminApi(page, [
+      row(1, 'Mario Rossi', ACME_REFERENCE),
+      row(2, 'Anna Neri', NO_REFERENCE),
+    ])
+    await page.goto('/participants')
+
+    await expect(
+      page.getByRole('row', { name: /Mario Rossi/ }).getByTestId('external-reference')
+    ).toBeVisible()
+    await checkA11y(page)
   })
 })
 
 test.describe('Participant detail: external reference line and re-issue', () => {
-  test('the detail header shows the labelled reference line', async ({ page }) => {
-    await mockAdminApi(page, [listRow(1, 'Mario Rossi', ACME_REFERENCE)])
-    await login(page)
+  test('the detail header shows the labelled reference line', async ({ adminPage: page }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', ACME_REFERENCE)])
     await page.goto('/participants/1')
 
     await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
-    await expect(page.getByText('ID esterno 4471 · Origine Acme ATS')).toBeVisible()
+    await expect(page.getByTestId('external-reference')).toHaveText(
+      'ID esterno 4471 · Origine Acme ATS'
+    )
   })
 
-  test('a participant without a reference shows no reference line', async ({ page }) => {
-    await mockAdminApi(page, [listRow(1, 'Mario Rossi', NO_REFERENCE)])
-    await login(page)
+  const ONE_PART: [string, Reference, string][] = [
+    ['an External ID alone', ID_ONLY, 'ID esterno 4471'],
+    ['a Source alone', SOURCE_ONLY, 'Origine Acme ATS'],
+  ]
+
+  for (const [name, reference, line] of ONE_PART) {
+    test(`the detail header shows ${name} with no separator and no empty label`, async ({
+      adminPage: page,
+    }) => {
+      await mockAdminApi(page, [row(1, 'Mario Rossi', reference)])
+      await page.goto('/participants/1')
+
+      await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
+      await expect(page.getByTestId('external-reference')).toHaveText(line)
+    })
+  }
+
+  test('markup in the Source is shown as text on the detail page, never injected', async ({
+    adminPage: page,
+  }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', { external_id: null, source: MARKUP })])
+    await page.goto('/participants/1')
+
+    const reference = page.getByTestId('external-reference')
+
+    await expect(reference.getByTestId('external-reference-value')).toHaveText(`Origine ${MARKUP}`)
+    await expect(reference.locator('b, img')).toHaveCount(0)
+    await expect(page.getByRole('img', { name: 'injected' })).toHaveCount(0)
+  })
+
+  test('a participant without a reference shows no reference line', async ({ adminPage: page }) => {
+    // The positive twin of this negative is 'the detail header shows the
+    // labelled reference line', which finds the SAME test id: renaming it fails
+    // that test first, so this count of zero cannot pass for the wrong reason.
+    await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
     await page.goto('/participants/1')
 
     await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
     await expect(page.getByTestId('external-reference')).toHaveCount(0)
   })
 
-  test('re-issuing a link carries the stored reference through', async ({ page }) => {
-    const captured = await mockAdminApi(page, [listRow(1, 'Mario Rossi', ACME_REFERENCE)])
-    await login(page)
+  test('re-issuing a link carries the stored reference through', async ({ adminPage: page }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', ACME_REFERENCE)])
     await page.goto('/participants/1')
 
     await page.getByRole('button', { name: 'Genera nuovo link' }).click()
 
-    await expect(page.getByText('https://interview.example.com/interview/e2e-token')).toBeVisible()
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
     expect(captured.entryLinkBodies).toHaveLength(1)
     expect(captured.entryLinkBodies[0]).toMatchObject({
       candidate_ref: 'ref-001',
@@ -412,18 +622,39 @@ test.describe('Participant detail: external reference line and re-issue', () => 
     })
   })
 
-  test('re-issuing a link for a participant without a reference sends neither key', async ({
-    page,
+  test('re-issuing a link carries only the half of the reference that is stored', async ({
+    adminPage: page,
   }) => {
-    const captured = await mockAdminApi(page, [listRow(1, 'Mario Rossi', NO_REFERENCE)])
-    await login(page)
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', ID_ONLY)])
     await page.goto('/participants/1')
 
     await page.getByRole('button', { name: 'Genera nuovo link' }).click()
 
-    await expect(page.getByText('https://interview.example.com/interview/e2e-token')).toBeVisible()
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
+    expect(captured.entryLinkBodies).toHaveLength(1)
+    expect(captured.entryLinkBodies[0]).toMatchObject({ external_id: 4471 })
+    expect(Object.keys(captured.entryLinkBodies[0]!)).not.toContain('source')
+  })
+
+  test('re-issuing a link for a participant without a reference sends neither key', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, [row(1, 'Mario Rossi', NO_REFERENCE)])
+    await page.goto('/participants/1')
+
+    await page.getByRole('button', { name: 'Genera nuovo link' }).click()
+
+    await expect(page.getByText(ENTRY_URL)).toBeVisible()
     expect(captured.entryLinkBodies).toHaveLength(1)
     expect(Object.keys(captured.entryLinkBodies[0]!)).not.toContain('external_id')
     expect(Object.keys(captured.entryLinkBodies[0]!)).not.toContain('source')
+  })
+
+  test('the detail page with the reference line is accessible', async ({ adminPage: page }) => {
+    await mockAdminApi(page, [row(1, 'Mario Rossi', ACME_REFERENCE)])
+    await page.goto('/participants/1')
+
+    await expect(page.getByTestId('external-reference')).toBeVisible()
+    await checkA11y(page)
   })
 })

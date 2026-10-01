@@ -160,7 +160,10 @@ test.describe('Avatar templates — provider catalogue picker (avatar-template-c
   test('picks a HeyGen voice from the catalogue, showing its language, and the manual-entry path stays unchanged', async ({
     page,
   }) => {
-    let patchBody: Record<string, unknown> | null = null
+    // Assigned inside the route handler below. The assertion keeps the declared
+    // union: without it, control-flow analysis narrows this to `null` (it cannot
+    // see the closure's write) and `patchBody?.config` is typed `never`.
+    let patchBody = null as Record<string, unknown> | null
 
     await mockApi(page, [templateFixture()])
 

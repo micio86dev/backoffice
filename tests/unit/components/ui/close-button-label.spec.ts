@@ -13,7 +13,7 @@
  * resolves REAL copy from the locale files, so the assertion is on what the
  * operator hears, and a key missing from either locale fails here.
  */
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { afterEach, describe, expect, it } from 'vitest'
 import en from '../../../../i18n/locales/en.json'
@@ -62,12 +62,18 @@ const CASES = [
 ] as const
 
 describe.each(CASES)('$name close button', ({ component, slot }) => {
+  // Each case mounts one tree; unmounting it runs the primitives' teardown (the
+  // Teleport/portal included) so the next case starts from a clean document.
+  let mounted: VueWrapper | undefined
+
   afterEach(() => {
+    mounted?.unmount()
+    mounted = undefined
     document.body.innerHTML = ''
   })
 
   async function closeLabel(locale: unknown): Promise<string | null | undefined> {
-    mount(component, {
+    mounted = mount(component, {
       attachTo: document.body,
       global: { mocks: { $t: (key: string) => copy(locale, key) } },
     })

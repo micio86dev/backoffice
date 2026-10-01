@@ -5,7 +5,7 @@
  * `<button>` (D8 — `avatar-templates/index.vue` is explicitly NOT the
  * model).
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ProjectTable from '../../../../app/components/organisms/ProjectTable.vue'
 import EntryLinkForm from '../../../../app/components/organisms/EntryLinkForm.vue'
@@ -280,6 +280,190 @@ describe('ProjectTable — Invite candidate (operator-interview-link)', () => {
 
       wrapper.unmount()
     })
+  })
+})
+
+/**
+ * reusable-interview-links (design AD-17, DESIGN.md 16.18): a reusable link is
+ * created from the same Invite drawer, and its result lives in the same drawer.
+ *
+ * The form's own behaviour is covered by EntryLinkForm.spec.ts; here only the
+ * parent's wiring is under test, so the form's `reusable-created` event is
+ * emitted directly, exactly as the single-use tests above emit `success`.
+ */
+describe('ProjectTable — reusable link (reusable-interview-links)', () => {
+  // The drawer teleports into <body>: a test that fails before its own
+  // `unmount()` would otherwise leave an open drawer for every test after it,
+  // and one real failure would read as a dozen unrelated ones.
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  const ENTRY_URL = 'https://interview.example.com/en/interview/reusable#beai_rl_SECRETSECRET'
+  const CREATED = {
+    data: { id: 'rlk_01HZ0000000000000000000000', label: 'Milan fair stand' },
+    entry_url: ENTRY_URL,
+  }
+
+  async function openInvite(overrides: Record<string, unknown> = {}, canInvite = true) {
+    const wrapper = mount(ProjectTable, {
+      props: {
+        projects: [project({ id: 1, status: 'active', ...overrides })],
+        canInvite,
+        locale: 'en',
+      },
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+
+    return wrapper
+  }
+
+  async function createReusable(wrapper: Awaited<ReturnType<typeof openInvite>>) {
+    wrapper.findComponent(EntryLinkForm).vm.$emit('reusable-created', CREATED)
+    await wrapper.vm.$nextTick()
+  }
+
+  const inBody = (testId: string) => document.body.querySelector(`[data-testid="${testId}"]`)
+
+  it('offers the reusable checkbox, first, in the invite form for an eligible project', async () => {
+    const wrapper = await openInvite()
+
+    expect(inBody('entry-link-form-reusable')).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('swaps the drawer to the REUSABLE panel when the form reports a created link', async () => {
+    const wrapper = await openInvite()
+
+    await createReusable(wrapper)
+
+    expect(inBody('entry-link-form')).toBeNull()
+    expect(inBody('entry-link-url')?.textContent?.trim()).toBe(ENTRY_URL)
+    expect(inBody('entry-link-disclosure')?.textContent).toContain('entryLink.reusable.disclosure')
+    expect(inBody('entry-link-never-expires')).not.toBeNull()
+    // The reusable variant, not the single-use one with a field blanked out.
+    expect(inBody('entry-link-expiry')).toBeNull()
+    expect(inBody('entry-link-generate')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('replaces the submit pair with a Close control, and Close ends the session', async () => {
+    const wrapper = await openInvite()
+
+    await createReusable(wrapper)
+
+    expect(inBody('form-drawer-save')).toBeNull()
+    expect(inBody('entry-link-close')).not.toBeNull()
+
+    ;(inBody('entry-link-close') as HTMLButtonElement).click()
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as { inviteTarget: unknown }).inviteTarget).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('shows no URL when the drawer is reopened for the same project: the link is show-once', async () => {
+    const wrapper = await openInvite()
+    await createReusable(wrapper)
+    expect(document.body.textContent).toContain('beai_rl_SECRETSECRET')
+
+    ;(inBody('entry-link-close') as HTMLButtonElement).click()
+    await wrapper.vm.$nextTick()
+    expect(document.body.textContent).not.toContain('beai_rl_SECRETSECRET')
+
+    await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+
+    expect(inBody('entry-link-url')).toBeNull()
+    expect(inBody('entry-link-form')).not.toBeNull()
+    expect(document.body.textContent).not.toContain('beai_rl_SECRETSECRET')
+    // And the component no longer holds it anywhere reachable.
+    expect(
+      JSON.stringify((wrapper.vm as unknown as { $: { setupState: unknown } }).$.setupState)
+    ).not.toContain('beai_rl_SECRETSECRET')
+
+    wrapper.unmount()
+  })
+
+  it('resets the reusable state on a plain open too, not only on close', async () => {
+    const wrapper = await openInvite()
+    await createReusable(wrapper)
+
+    // Open the drawer for the same project again WITHOUT closing it first: the
+    // row action is the only way in, and it must not resurrect the link.
+    await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+
+    expect(inBody('entry-link-url')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('offers no invite action, drawer or reusable checkbox to someone who may not invite', async () => {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1, status: 'active' })], canInvite: false, locale: 'en' },
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="project-row-invite-1"]').exists()).toBe(false)
+    expect(inBody('form-drawer')).toBeNull()
+    expect(inBody('entry-link-form-reusable')).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  const IN_THE_FUTURE = '2999-01-01T00:00:00Z'
+  const IN_THE_PAST = '2001-01-01T00:00:00Z'
+
+  it.each([
+    ['a draft project', { status: 'draft' }],
+    ['a project that is not yet live', { goes_live_at: IN_THE_FUTURE }],
+    ['a project past its deadline', { deadline_at: IN_THE_PAST }],
+  ])(
+    'keeps the invite action disabled for %s, so the checkbox is unreachable',
+    async (_label, overrides) => {
+      const wrapper = mount(ProjectTable, {
+        props: {
+          projects: [project({ id: 1, status: 'active', ...overrides })],
+          canInvite: true,
+          locale: 'en',
+        },
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+
+      const invite = wrapper.get('[data-testid="project-row-invite-1"]')
+
+      expect(invite.attributes('disabled')).toBeDefined()
+
+      await invite.trigger('click')
+
+      expect(inBody('entry-link-form')).toBeNull()
+      expect(inBody('entry-link-form-reusable')).toBeNull()
+
+      wrapper.unmount()
+    }
+  )
+
+  it('keeps the single-use success swap exactly as it was', async () => {
+    const wrapper = await openInvite()
+
+    wrapper.findComponent(EntryLinkForm).vm.$emit('success', {
+      entry_url: 'https://interview.example.com/interview/tok',
+      expires_at: '2026-08-17T15:32:00.000000Z',
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(inBody('entry-link-expiry')).not.toBeNull()
+    expect(inBody('entry-link-generate')).not.toBeNull()
+    expect(inBody('entry-link-never-expires')).toBeNull()
+
+    wrapper.unmount()
   })
 })
 

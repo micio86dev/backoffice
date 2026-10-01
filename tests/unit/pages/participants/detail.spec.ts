@@ -16,8 +16,35 @@ import { ref } from 'vue'
 // to stand in for the layout.
 import { withTooltipProvider } from '../../support/tooltip-host'
 import { currentUserStub } from '../../support/abilities'
+import en from '../../../../i18n/locales/en.json'
+import it_ from '../../../../i18n/locales/it.json'
 
 const tMock = (key: string) => key
+
+type ReusableLinkMarker = { id: string; label: string | null } | null
+
+/**
+ * A `$t` that resolves keys against the REAL locale tables and fills `{name}`
+ * placeholders, so the origin line is asserted as the words an operator reads
+ * (and a missing key fails here instead of printing its own name).
+ */
+function realT(table: unknown) {
+  return (key: string, params: Record<string, unknown> = {}): string => {
+    const value = key
+      .split('.')
+      .reduce<unknown>(
+        (node, segment) =>
+          typeof node === 'object' && node !== null
+            ? (node as Record<string, unknown>)[segment]
+            : undefined,
+        table
+      )
+
+    if (typeof value !== 'string') return key
+
+    return value.replace(/\{(\w+)\}/g, (_match, name: string) => String(params[name] ?? ''))
+  }
+}
 
 function detailResponse(
   status: string,
@@ -30,7 +57,11 @@ function detailResponse(
   // candidate-external-reference: omitted by default, so every pre-existing
   // test keeps the payload it was written against (an older response, or a
   // participant without a reference, carries neither key's value).
-  reference?: { external_id?: number | null; source?: string | null }
+  reference?: { external_id?: number | null; source?: string | null },
+  // reusable-interview-links: ALWAYS on the real response (the key is required
+  // in the generated type), `null` for a participant that did not start from a
+  // reusable link, so every pre-existing test carries the ordinary shape.
+  reusableLink: ReusableLinkMarker = null
 ) {
   return {
     data: {
@@ -41,6 +72,7 @@ function detailResponse(
       role_code: 'FLL',
       language: 'it',
       ...reference,
+      reusable_link: reusableLink,
       status,
       project_id: 1,
       // operator-interview-link, design D5: nested gate fields, defaulted to
@@ -173,6 +205,8 @@ describe('pages/participants/[id].vue', () => {
     status?: string
     interview?: Parameters<typeof detailResponse>[2]
     reference?: Parameters<typeof detailResponse>[3]
+    reusableLink?: ReusableLinkMarker
+    translate?: (key: string, params?: Record<string, unknown>) => string
     fetchEvaluationImpl?: () => Promise<typeof EVALUATION_FIXTURE>
     fetchTranscriptImpl?: () => Promise<typeof TRANSCRIPT_FIXTURE>
     downloadTranscriptMock?: ReturnType<typeof vi.fn>
@@ -182,6 +216,8 @@ describe('pages/participants/[id].vue', () => {
       status = 'completato',
       interview,
       reference,
+      reusableLink = null,
+      translate = tMock,
       fetchEvaluationImpl = () => Promise.resolve(EVALUATION_FIXTURE),
       fetchTranscriptImpl = () => Promise.resolve(TRANSCRIPT_FIXTURE),
       downloadTranscriptMock = vi.fn().mockResolvedValue(undefined),
@@ -190,7 +226,7 @@ describe('pages/participants/[id].vue', () => {
 
     const fetchParticipantMock = vi
       .fn()
-      .mockResolvedValue(detailResponse(status, undefined, interview, reference))
+      .mockResolvedValue(detailResponse(status, undefined, interview, reference, reusableLink))
     vi.doMock('../../../../app/composables/useParticipants', () => ({
       useParticipants: () => ({ fetchParticipant: fetchParticipantMock }),
     }))
@@ -212,7 +248,7 @@ describe('pages/participants/[id].vue', () => {
     const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
     const wrapper = mount(withTooltipProvider(DetailPage), {
       global: {
-        mocks: { $t: tMock },
+        mocks: { $t: translate },
         stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
       },
     })
@@ -520,15 +556,26 @@ describe('pages/participants/[id].vue', () => {
       role?: string
       project?: Record<string, unknown>
       reference?: Parameters<typeof detailResponse>[3]
+      reusableLink?: ReusableLinkMarker
+      translate?: (key: string, params?: Record<string, unknown>) => string
       generateEntryLinkMock?: ReturnType<typeof vi.fn>
     }) {
-      const { role = 'operator', project, reference, generateEntryLinkMock = vi.fn() } = options
+      const {
+        role = 'operator',
+        project,
+        reference,
+        reusableLink = null,
+        translate = tMock,
+        generateEntryLinkMock = vi.fn(),
+      } = options
 
       vi.doMock('../../../../app/composables/useParticipants', () => ({
         useParticipants: () => ({
           fetchParticipant: vi
             .fn()
-            .mockResolvedValue(detailResponse('in_attesa', project, undefined, reference)),
+            .mockResolvedValue(
+              detailResponse('in_attesa', project, undefined, reference, reusableLink)
+            ),
         }),
       }))
       vi.doMock('../../../../app/composables/useCurrentUser', () => ({
@@ -552,7 +599,7 @@ describe('pages/participants/[id].vue', () => {
       const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
       const wrapper = mount(withTooltipProvider(DetailPage), {
         global: {
-          mocks: { $t: tMock },
+          mocks: { $t: translate },
           stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
         },
       })
@@ -711,6 +758,30 @@ describe('pages/participants/[id].vue', () => {
       )
     })
 
+    // reusable-interview-links: a reusable link is for a PROJECT, never for one
+    // specific candidate, so the re-issue card on a participant must never
+    // offer the reusable option — before or after it mints. GUARD: it passes
+    // when written, because this page renders EntryLinkPanel and never the
+    // form; it is here so that stays true.
+    it('never offers the reusable link option, before or after minting', async () => {
+      const generateEntryLinkMock = vi.fn().mockResolvedValue({
+        entry_url: 'https://interview.example.com/interview/reissue-tok',
+        expires_at: '2026-08-17T15:32:00.000000Z',
+      })
+      const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
+
+      expect(wrapper.find('[data-testid="entry-link-form-reusable"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="entry-link-form"]').exists()).toBe(false)
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="entry-link-form-reusable"]').exists()).toBe(false)
+      // The single-use panel, with its Generate control and expiry.
+      expect(wrapper.find('[data-testid="entry-link-never-expires"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="entry-link-generate"]').exists()).toBe(true)
+    })
+
     it('shows an inline error and keeps the button available to retry when the mint rejects', async () => {
       const generateEntryLinkMock = vi.fn().mockRejectedValue(new Error('boom'))
       const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
@@ -765,6 +836,21 @@ describe('pages/participants/[id].vue', () => {
 
       expect(wrapper.get('[data-testid="external-reference"]').text()).toContain('Acme ATS')
       // ...while the viewer still has no re-issue control.
+      expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(false)
+    })
+
+    // reusable-interview-links: the origin line is a read, so a viewer sees it
+    // exactly like an operator, while still having no re-issue control.
+    it('shows the reusable link origin line to a viewer too', async () => {
+      const wrapper = await mountEntryLinkCard({
+        role: 'viewer',
+        reusableLink: { id: 'rlk_01HZ0000000000000000000000', label: 'Milan fair stand' },
+        translate: realT(en),
+      })
+
+      expect(wrapper.get('[data-testid="participant-reusable-link"]').text()).toBe(
+        'Started from reusable link: Milan fair stand'
+      )
       expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(false)
     })
 
@@ -871,6 +957,116 @@ describe('pages/participants/[id].vue', () => {
 
       expect(wrapper.find('[data-testid="external-reference"]').exists()).toBe(false)
       expect(wrapper.text()).not.toContain('externalReference.')
+    })
+  })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Reusable link origin (reusable-interview-links, B6c; DESIGN.md 16.18):
+  // one line under the candidate reference and the external-reference line
+  // saying the participant started from a reusable link. Read-only data, so
+  // every role that may view the participant sees it.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('Reusable link origin (reusable-interview-links)', () => {
+    const LINK_ID = 'rlk_01HZ0000000000000000000000'
+
+    it('shows "Started from reusable link: {label}" when the link has a label', async () => {
+      const { wrapper } = await mountDetailPage({
+        reusableLink: { id: LINK_ID, label: 'Milan fair stand' },
+        translate: realT(en),
+      })
+
+      expect(wrapper.get('[data-testid="participant-reusable-link"]').text()).toBe(
+        'Started from reusable link: Milan fair stand'
+      )
+    })
+
+    it('shows the BARE line, with no colon and no label segment, when the label is null', async () => {
+      const { wrapper } = await mountDetailPage({
+        reusableLink: { id: LINK_ID, label: null },
+        translate: realT(en),
+      })
+
+      expect(wrapper.get('[data-testid="participant-reusable-link"]').text()).toBe(
+        'Started from reusable link'
+      )
+    })
+
+    it.each([
+      ['an empty string', ''],
+      ['whitespace only', '   '],
+    ])('treats %s as no label, never a dangling "link: "', async (_name, label) => {
+      const { wrapper } = await mountDetailPage({
+        reusableLink: { id: LINK_ID, label },
+        translate: realT(en),
+      })
+
+      expect(wrapper.get('[data-testid="participant-reusable-link"]').text()).toBe(
+        'Started from reusable link'
+      )
+    })
+
+    it('renders NOTHING for an ordinary participant: no line, no placeholder, no empty container', async () => {
+      const { wrapper } = await mountDetailPage({ reusableLink: null, translate: realT(en) })
+
+      expect(wrapper.find('[data-testid="participant-reusable-link"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Started from reusable link')
+      expect(wrapper.html()).not.toContain('participant-reusable-link')
+    })
+
+    it('renders nothing for an older payload that does not carry the key at all', async () => {
+      const { wrapper } = await mountDetailPage({
+        reusableLink: undefined,
+        translate: realT(en),
+      })
+
+      expect(wrapper.find('[data-testid="participant-reusable-link"]').exists()).toBe(false)
+    })
+
+    it('renders the label as escaped text: no element is injected', async () => {
+      const { wrapper } = await mountDetailPage({
+        reusableLink: { id: LINK_ID, label: '<b>x</b><img src=x onerror=alert(1)>' },
+        translate: realT(en),
+      })
+
+      const line = wrapper.get('[data-testid="participant-reusable-link"]')
+
+      expect(line.text()).toBe('Started from reusable link: <b>x</b><img src=x onerror=alert(1)>')
+      expect(line.find('b').exists()).toBe(false)
+      expect(line.find('img').exists()).toBe(false)
+      expect(line.element.children).toHaveLength(0)
+    })
+
+    it('says the same thing in Italian, with the label unchanged', async () => {
+      const { wrapper } = await mountDetailPage({
+        reusableLink: { id: LINK_ID, label: 'Milan fair stand' },
+        translate: realT(it_),
+      })
+
+      const text = wrapper.get('[data-testid="participant-reusable-link"]').text()
+
+      expect(text).toContain('Milan fair stand')
+      expect(text).not.toBe('Started from reusable link: Milan fair stand')
+      expect(text).toMatch(/link riutilizzabile/i)
+    })
+
+    it('sits under the candidate reference line and after the external reference line', async () => {
+      const { wrapper } = await mountDetailPage({
+        reference: { external_id: 4471, source: 'Acme ATS' },
+        reusableLink: { id: LINK_ID, label: 'Milan fair stand' },
+        translate: realT(en),
+      })
+
+      const header = wrapper.get('h1').element.parentElement!
+      const text = header.textContent ?? ''
+
+      expect(header.querySelector('[data-testid="participant-reusable-link"]')).not.toBeNull()
+      expect(text.indexOf('ref-042')).toBeLessThan(text.indexOf('Started from reusable link'))
+      // `useI18n().t` is the identity stub inside the molecule, so the
+      // external reference line reads as its keys here.
+      const externalAt = text.indexOf('externalReference.externalId 4471')
+
+      expect(externalAt).toBeGreaterThan(-1)
+      expect(externalAt).toBeLessThan(text.indexOf('Started from reusable link'))
     })
   })
 

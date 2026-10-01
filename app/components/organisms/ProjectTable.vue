@@ -187,8 +187,16 @@
     :title="$t('entryLink.invite')"
     @update:open="(open) => !open && closeInvite()"
   >
+    <!--
+      reusable-interview-links (DESIGN.md 16.18): the result of the form's
+      reusable mode. Same drawer, same place the form was, for the same reason
+      as the single-use link below — but its OWN variant of the panel, because a
+      link that never expires is not a single-use link with the expiry removed.
+      No `generate` listener: the reusable panel has no such control.
+    -->
+    <EntryLinkPanel v-if="reusableLink" kind="reusable" :link="reusableLink" :locale="locale" />
     <EntryLinkPanel
-      v-if="mintedLink"
+      v-else-if="mintedLink"
       :link="mintedLink"
       :locale="locale"
       @generate="onRequestAnotherLink"
@@ -219,6 +227,7 @@
       :project-id="inviteTarget.id"
       @update:pending="(value) => (minting = value)"
       @success="onInviteSuccess"
+      @reusable-created="onReusableCreated"
     />
 
     <template #footer>
@@ -228,7 +237,7 @@
         the DOM would be inert.
       -->
       <Button
-        v-if="mintedLink || scheduledParticipant"
+        v-if="mintedLink || scheduledParticipant || reusableLink"
         variant="outline"
         data-testid="entry-link-close"
         @click="closeInvite"
@@ -265,10 +274,14 @@ import ProjectStatusBadge from '@/components/atoms/ProjectStatusBadge.vue'
 import PlatformTemplateBadge from '@/components/atoms/PlatformTemplateBadge.vue'
 import FormattedDate from '@/components/atoms/FormattedDate.vue'
 import EntryLinkForm from '@/components/organisms/EntryLinkForm.vue'
-import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
+import EntryLinkPanel, {
+  type EntryLink,
+  type ReusableEntryLink,
+} from '@/components/organisms/EntryLinkPanel.vue'
 import { projectAccessibility } from '@/utils/project-accessibility'
 import type { Project } from '@/composables/useProjects'
 import type { GenerateEntryLinkResponse } from '@/composables/useEntryLinks'
+import type { CreateReusableLinkResponse } from '@/composables/useReusableLinks'
 
 // interview-scheduling (PR-F): only what the scheduled-success surface
 // renders — the full `ParticipantResource` carries far more than this view
@@ -340,6 +353,12 @@ function uncoveredCount(project: Project): number {
 
 const inviteTarget = ref<Project | null>(null)
 const mintedLink = ref<EntryLink | null>(null)
+// reusable-interview-links: the show-once URL of a link the form just created.
+// Only `entry_url` is kept — the rest of the response describes a link the
+// panel does not render — and it lives in this component's state for ONE drawer
+// session: never in storage, a query cache, the route or history, and reset on
+// every open and every close.
+const reusableLink = ref<ReusableEntryLink | null>(null)
 // interview-scheduling (PR-F): set instead of `mintedLink` when the response
 // carries no `entry_url` (the scheduled branch never mints/sends anything at
 // creation time — T-B1).
@@ -352,12 +371,14 @@ function openInvite(project: Project): void {
   inviteTarget.value = project
   mintedLink.value = null
   scheduledParticipant.value = null
+  reusableLink.value = null
 }
 
 function closeInvite(): void {
   inviteTarget.value = null
   mintedLink.value = null
   scheduledParticipant.value = null
+  reusableLink.value = null
 }
 
 // The two success shapes are mutually exclusive on the wire (T-B1): the
@@ -372,6 +393,15 @@ function onInviteSuccess(response: GenerateEntryLinkResponse): void {
     scheduledParticipant.value = response
     mintedLink.value = null
   }
+}
+
+// A separate handler from `onInviteSuccess`: the form emits a different event
+// for a different outcome, and the single-use branch on `entry_url` above must
+// not have to tell the two apart.
+function onReusableCreated(result: CreateReusableLinkResponse): void {
+  reusableLink.value = { entry_url: result.entry_url }
+  mintedLink.value = null
+  scheduledParticipant.value = null
 }
 
 // "Generate new link" from inside the invite dialog: EntryLinkForm's

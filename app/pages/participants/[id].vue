@@ -33,6 +33,25 @@
           :source="participant.source"
           class="text-muted-foreground text-sm"
         />
+        <!--
+          reusable-interview-links (DESIGN.md 16.18): where the participant came
+          from, one line under the lines above. Read-only data, so every role
+          that may view the participant sees it (no ability gate). Nothing at
+          all is rendered for a participant that did not start from a reusable
+          link: no placeholder, no empty container. The label is interpolated
+          (escaped) text, never HTML.
+        -->
+        <p
+          v-if="participant.reusable_link"
+          data-testid="participant-reusable-link"
+          class="text-muted-foreground text-sm"
+        >
+          {{
+            reusableLinkLabel === null
+              ? $t('participants.detail.reusableLinkUnlabelled')
+              : $t('participants.detail.reusableLink', { label: reusableLinkLabel })
+          }}
+        </p>
         <StatusBadge :status="participant.status" class="mt-2" />
       </div>
 
@@ -453,6 +472,14 @@ const participantErrorTitleKey = computed(() =>
 const participantErrorMessageKey = computed(() =>
   resourceErrorKey(participantErrorState.value, 'message')
 )
+
+// The reusable link's label, or `null` when the link has none. A blank label
+// is "no label" too: the line must never end in a dangling "reusable link: ".
+const reusableLinkLabel = computed<string | null>(() => {
+  const label = participant.value?.reusable_link?.label?.trim() ?? ''
+
+  return label === '' ? null : label
+})
 
 const transcriptReady = computed(() =>
   participant.value ? isParticipantResourceReady(participant.value.status, 'transcript') : false

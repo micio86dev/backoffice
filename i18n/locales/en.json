@@ -180,6 +180,8 @@
     "detail": {
       "backToList": "Back to candidates",
       "language": "Language",
+      "reusableLink": "Started from reusable link: {label}",
+      "reusableLinkUnlabelled": "Started from reusable link",
       "timeline": {
         "title": "Lifecycle timeline",
         "startedAt": "Started",
@@ -226,6 +228,19 @@
     "copy": "Copy",
     "copied": "Copied",
     "copyBlocked": "Copy was blocked — select the link above and copy it manually.",
+    "reusable": {
+      "checkbox": {
+        "label": "Generate a reusable interview link that never expires",
+        "description": "Anyone who opens it starts a new interview for this project. Use it for demos, events and testing."
+      },
+      "linkName": {
+        "label": "Link name",
+        "help": "Names the link and the interviews started from it, e.g. Milan fair stand."
+      },
+      "disclosure": "This link does not expire and can be used many times. Anyone who has it can start this interview, so share it only where you mean to. This is the only time the full link is shown.",
+      "neverExpires": "Never expires · Reusable",
+      "stopsWhen": "It stops working if the project closes or the link is disabled. Desktop browsers only."
+    },
     "mintError": "This entry link could not be generated. Please try again.",
     "disabledReason": {
       "notActive": "This project is not yet active.",
@@ -270,6 +285,31 @@
       "entry_link_participant_failed": "This candidate's assessment failed. Re-open it before issuing a new link.",
       "entry_link_project_closed": "This project is not open for interviews right now."
     }
+  },
+  "reusableLinks": {
+    "title": "Reusable links",
+    "description": "Links that never expire and start a new interview each time they are opened. The full link is shown only when it is created.",
+    "loading": "Loading links…",
+    "empty": "No reusable links yet. Create one from the project list: Invite candidate, then tick the reusable link option.",
+    "unnamed": "Untitled link",
+    "createdBy": "Created on {date} by {name}",
+    "createdOn": "Created on {date}",
+    "used": "Used {count} time · last used {date} | Used {count} times · last used {date}",
+    "neverUsed": "Never used",
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "disable": {
+      "action": "Disable link",
+      "actionFor": "Disable link: {name}",
+      "confirmTitle": "Disable this link?",
+      "confirmDescription": "Nobody will be able to start a new interview with it. Interviews already in progress are not interrupted. This cannot be undone.",
+      "confirm": "Disable",
+      "error": "The link could not be disabled. Please try again."
+    },
+    "loadError": "The reusable links could not be loaded.",
+    "retry": "Try again"
   },
   "externalReference": {
     "label": "External reference",

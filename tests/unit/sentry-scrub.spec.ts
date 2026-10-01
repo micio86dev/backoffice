@@ -11,6 +11,13 @@ import {
 } from '~/utils/sentry-scrub'
 import { sentryPosture } from '~/utils/sentry-init'
 import { isAnalyticsSafeRoute, redactAnalyticsPath } from '~/utils/analytics-path'
+import {
+  REUSABLE_LINK_HASH,
+  REUSABLE_LINK_SCRUB_CASES,
+  REUSABLE_LINK_SECRET,
+  REUSABLE_LINK_TOKEN,
+  REUSABLE_LINK_UNTOUCHED_CASES,
+} from './fixtures/reusable-link-scrub-cases'
 
 /**
  * Nothing confidential leaves for Sentry from the backoffice
@@ -2676,6 +2683,11 @@ describe('a multi-word denied key behind a prefix', () => {
     'entry_url',
     'external_id',
     'external_ids',
+    // reusable-interview-links: the sha256 the api stores to look a link up.
+    // `link_token` needs no entry of its own — it reaches `token` through the
+    // last-segment rule — and the fixture suite below pins that.
+    'token_hash',
+    'token_hashes',
   ]
 
   const EXPECTED_HANDLED_FIELDS = [
@@ -2726,6 +2738,7 @@ describe('a multi-word denied key behind a prefix', () => {
     // tomorrow's cannot slip in the same way.
     const irregular: Record<string, string> = {
       key_hash: 'key_hashes',
+      token_hash: 'token_hashes',
       query: 'queries',
       search: 'searches',
     }
@@ -2741,6 +2754,7 @@ describe('a multi-word denied key behind a prefix', () => {
       // Irregular plurals: the `+s` rule cannot recognise these as plurals, so
       // it asks them for a plural of their own.
       'key_hashes',
+      'token_hashes',
       'queries',
       'searches',
     ]
@@ -4997,5 +5011,84 @@ describe('a denied name sitting anywhere inside a compound key', () => {
 
     expect(JSON.stringify(scrubbed.contexts)).not.toContain('FALLBACK99')
     expect(JSON.stringify(scrubbed.contexts)).toContain('[redacted]')
+  })
+})
+
+/**
+ * reusable-interview-links (C-T10): the reusable link token is a live,
+ * NON-EXPIRING credential. It first transits this app in the 201 response of
+ * the create flow, in `entry_url`, and the creation call is the only moment it
+ * exists anywhere in the browser.
+ *
+ * A key denylist cannot reach it once it has been copied into a string — a
+ * message, a breadcrumb, a stack — so it is also cut BY VALUE. The fixture set
+ * is shared with the candidate app's scrubber, which must answer the same way.
+ */
+describe('scrubSentryEvent — the reusable link token', () => {
+  it('pins the fixture itself: a 43-character secret and a 64-character hash', () => {
+    // A typo in the shared fixture would make every case below vacuous.
+    expect(REUSABLE_LINK_TOKEN).toMatch(/^beai_rl_[\w-]{43}$/)
+    expect(REUSABLE_LINK_SECRET).toHaveLength(43)
+    expect(REUSABLE_LINK_HASH).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it.each(REUSABLE_LINK_SCRUB_CASES)('removes the token or its hash: $name', ({ event }) => {
+    const encoded = JSON.stringify(scrubSentryEvent(event as ScrubbableEvent))
+
+    expect(encoded).not.toContain(REUSABLE_LINK_SECRET)
+    expect(encoded).not.toContain(REUSABLE_LINK_HASH)
+  })
+
+  it.each(REUSABLE_LINK_UNTOUCHED_CASES)('leaves a near miss alone: $name', (testCase) => {
+    const encoded = JSON.stringify(scrubSentryEvent(testCase.event as ScrubbableEvent))
+
+    expect(encoded).toContain(testCase.survives)
+  })
+
+  it('cuts the token out of free text and keeps the sentence readable', () => {
+    const scrubbed = redactFreeText(`could not copy ${REUSABLE_LINK_TOKEN} to the clipboard`)
+
+    expect(scrubbed).not.toContain(REUSABLE_LINK_SECRET)
+    expect(scrubbed).toContain('could not copy')
+    expect(scrubbed).toContain('to the clipboard')
+  })
+
+  it('cuts a token carried in the path or fragment of a url', () => {
+    expect(redactUrl(`/projects/${REUSABLE_LINK_TOKEN}/open`)).not.toContain(REUSABLE_LINK_SECRET)
+    expect(redactUrl(`not a url ${REUSABLE_LINK_TOKEN}`)).not.toContain(REUSABLE_LINK_SECRET)
+    expect(redactUrl(`https://bo.test/x#${REUSABLE_LINK_TOKEN}`)).not.toContain(
+      REUSABLE_LINK_SECRET
+    )
+  })
+
+  it('cuts every occurrence, not only the first', () => {
+    const scrubbed = redactFreeText(`${REUSABLE_LINK_TOKEN} and again ${REUSABLE_LINK_TOKEN}`)
+
+    expect(scrubbed).not.toContain(REUSABLE_LINK_SECRET)
+  })
+
+  it('cuts a token in a stack message line and keeps the frames symbolicatable', () => {
+    const error = new Error(`bad ${REUSABLE_LINK_TOKEN}`)
+
+    error.stack = `Error: bad ${REUSABLE_LINK_TOKEN}\n    at copy (https://bo.test/_nuxt/app.js:10:5)`
+
+    const encoded = JSON.stringify(scrubSentryEvent({ extra: { cause: error } }))
+
+    expect(encoded).not.toContain(REUSABLE_LINK_SECRET)
+    expect(encoded).toContain('/_nuxt/app.js:10:5')
+  })
+
+  it('denies a `link_token` key whatever its spelling or depth', () => {
+    const scrubbed = scrubSentryEvent({
+      extra: {
+        link_token: 'LINK-SECRET-1',
+        linkToken: 'LINK-SECRET-2',
+        body: { link_token: 'LINK-SECRET-3' },
+      },
+    } as ScrubbableEvent)
+
+    const encoded = JSON.stringify(scrubbed.extra)
+
+    expect(encoded).not.toContain('LINK-SECRET')
   })
 })

@@ -70,6 +70,9 @@ function listRow(id: number, displayName: string, reference: Reference) {
     started_at: null,
     completed_at: null,
     created_at: '2026-03-14T08:30:00Z',
+    // reusable-interview-links: always present on the wire, `null` for a
+    // participant that did not start from a reusable link.
+    reusable_link: null,
     ...reference,
   }
 }

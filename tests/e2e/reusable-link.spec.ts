@@ -1,5 +1,19 @@
-import { test, expect, type Page, type Route } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
+import {
+  expect,
+  jsonRoute,
+  isDataRequest,
+  mockParticipantsApi,
+  mockProjectsApi,
+  participantResource,
+  projectResource,
+  reusableLinkResource,
+  test,
+  type Participant,
+  type ReusableLink,
+} from './fixtures/admin-session'
 
 /**
  * Reusable interview link, create flow, end to end (reusable-interview-links,
@@ -24,162 +38,60 @@ import { abilitiesFor } from './fixtures/abilities'
  * The third block is the participant detail origin line (B6c): "Avviato da link
  * riutilizzabile: <label>", the bare line when the link has no label, and
  * nothing at all for an ordinary participant, for every role that can read it.
+ *
+ * TWO RULES THIS FILE FOLLOWS, because both were broken here once:
+ *
+ * - A value captured by a mock is read only AFTER a web-first assertion has seen
+ *   the UI state that follows the request. A bare `expect(captured...)` straight
+ *   after `click()` races the request it is checking.
+ * - "No request was sent" is never proven by a count read at one instant, which
+ *   is zero just as well when the request has not left yet. It is proven by what
+ *   happens next: a refused submit is followed by a corrected one and the traffic
+ *   must be exactly the corrected request; a panel that must not mount is
+ *   compared with a drawer that must, in the same test.
  */
 
-const ACTIVE_PROJECT = {
-  id: 2,
-  organization_id: 1,
-  framework_version_id: 3,
-  slug: 'active-project',
-  name: 'Active Project',
-  assessment_type: 'standard',
-  role_code: 'FLL',
-  language: 'en',
-  status: 'active',
-  pause_every_n_competencies: 3,
-  nudge_min_chars: 40,
-  exit_redirect_url: null,
-  webhook_url: null,
-  webhook_events: [],
-  has_webhook_secret: false,
-  deadline_at: null,
-  goes_live_at: null,
-  created_at: '2026-03-01T10:00:00Z',
-  updated_at: '2026-03-01T10:00:00Z',
-  pin_context: null,
-  // A project with no competencies cannot run an interview, and the table
-  // withholds the invite action for it, so this one carries a competency.
-  competencies: [{ id: 11, code: 'COM', position: 0 }],
-}
-
-const DRAFT_PROJECT = {
-  ...ACTIVE_PROJECT,
+const ACTIVE_PROJECT = projectResource()
+const DRAFT_PROJECT = projectResource({
   id: 3,
   slug: 'draft-project',
   name: 'Draft Project',
   status: 'draft',
-}
+})
 
 /** 43 base64url characters after the marker, as the api generates them. */
 const ENTRY_URL =
   'https://interview.example.com/it/interview/reusable#beai_rl_9AuXUvnfk8dgg-mOHfBcWFbQ98k_MXZ5SChgVAqzCpY'
 
+const LINK_ID = 'rlk_01HZ0000000000000000000000'
+
 /** The create response, as `ReusableInterviewLinkController::store` returns it. */
 function createdResponse(label: string | null) {
   return {
-    data: {
-      id: 'rlk_01HZ0000000000000000000000',
-      label,
-      token_prefix: 'beai_rl_9AuXUvnf',
-      lang: 'en',
-      status: 'active',
-      uses_count: 0,
-      last_used_at: null,
-      created_by: { name: 'Operator One' },
-      created_at: '2026-10-01T10:00:00.000000Z',
-      disabled_at: null,
-    },
+    data: reusableLinkResource({ label, uses_count: 0, last_used_at: null }),
     entry_url: ENTRY_URL,
   }
 }
 
-/** One row of `GET /projects/2/reusable-links`, as the api serialises it. */
-interface LinkRow {
-  id: string
-  label: string | null
-  token_prefix: string
-  lang: string
-  status: 'active' | 'disabled'
-  uses_count: number
-  last_used_at: string | null
-  created_by: { name: string } | null
-  created_at: string
-  disabled_at: string | null
-}
-
-function linkRow(overrides: Partial<LinkRow> = {}): LinkRow {
-  return {
-    id: 'rlk_01HZ0000000000000000000000',
-    label: 'Stand fiera di Milano',
-    token_prefix: 'beai_rl_9AuXUvnf',
-    lang: 'en',
-    status: 'active',
-    uses_count: 3,
-    last_used_at: '2026-10-02T09:30:00.000000Z',
-    created_by: { name: 'Operator One' },
-    created_at: '2026-10-01T10:00:00.000000Z',
-    disabled_at: null,
-    ...overrides,
-  }
-}
-
 /** The origin an admin participant read carries: `null` for an ordinary participant. */
-type ReusableLinkMarker = { id: string; label: string | null } | null
+type ReusableLinkMarker = Participant['reusable_link']
 
-/** An admin participants list row, as `Admin\ParticipantResource` returns it. */
-function participantRow(id: number, displayName: string, reusableLink: ReusableLinkMarker) {
-  return {
+function participantRow(
+  id: number,
+  displayName: string,
+  reusableLink: ReusableLinkMarker
+): Participant {
+  return participantResource({
     id,
     candidate_ref: `ref-00${id}`,
     display_name: displayName,
     email: `candidate-${id}@example.test`,
-    external_id: null,
-    source: null,
     reusable_link: reusableLink,
-    role_code: 'FLL',
-    language: 'it',
-    status: 'in_attesa',
-    project_id: 2,
-    project_name: 'Active Project',
-    started_at: null,
-    completed_at: null,
-    created_at: '2026-03-14T08:30:00Z',
-  }
+  })
 }
 
-/** The admin participant detail, as `Admin\ParticipantDetailResource` returns it. */
-function participantDetail(row: ReturnType<typeof participantRow>) {
-  return {
-    ...row,
-    project: {
-      id: ACTIVE_PROJECT.id,
-      name: ACTIVE_PROJECT.name,
-      status: ACTIVE_PROJECT.status,
-      goes_live_at: ACTIVE_PROJECT.goes_live_at,
-      deadline_at: ACTIVE_PROJECT.deadline_at,
-    },
-    timeline: { started_at: null, completed_at: null, session_count: 0 },
-    progress: { done: 0, total: 3 },
-    elapsed: { seconds: null, sessions_counted: 0, sessions_total: 0 },
-    cost: {
-      amount: null,
-      currency: 'USD',
-      is_estimate: true,
-      sessions_estimated: 0,
-      sessions_total: 0,
-    },
-    files: {
-      transcript: {
-        type: 'text/plain',
-        ref: 'transcript',
-        url: `/participants/${row.id}/transcript`,
-      },
-      evaluation_raw: {
-        type: 'application/json',
-        ref: 'evaluation',
-        url: `/participants/${row.id}/evaluation`,
-      },
-    },
-  }
-}
-
-async function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
-  await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-}
-
-function isDataRequest(route: Route): boolean {
-  return route.request().resourceType() !== 'document'
-}
+/** What `POST /projects/2/reusable-links` answers when it is not the default 201. */
+type CreateAnswer = { status: number; body: unknown } | 'network-error'
 
 interface Captured {
   /** JSON bodies of every `POST /projects/2/reusable-links`, in order. */
@@ -190,14 +102,19 @@ interface Captured {
   listCalls: number
   /** The link id of every `DELETE /projects/2/reusable-links/{id}`, in order. */
   disableCalls: string[]
+  /**
+   * EVERY request the page made to a reusable-links path, whatever the project id
+   * or the method (`"GET /projects/2/reusable-links"`). Counting only the
+   * project-2 route would miss a panel that asked about some other project.
+   */
+  reusableRequests: string[]
 }
 
 interface Options {
-  role?: 'operator' | 'viewer'
   /** What `POST /projects/2/reusable-links` answers; defaults to a 201. */
-  createAnswer?: (body: Record<string, unknown>) => { status: number; body: unknown }
+  createAnswer?: (body: Record<string, unknown>) => CreateAnswer | undefined
   /** The links the server holds for project 2 before the test starts. */
-  links?: LinkRow[]
+  links?: ReusableLink[]
   /**
    * Answer the first N list requests with a 500 before answering normally. The
    * http client retries an idempotent GET once on a 5xx, so ONE load failure the
@@ -213,82 +130,31 @@ interface Options {
    */
   staleListAfterDisable?: number
   /** The participants the admin API holds; the list and the detail both serve them. */
-  participants?: ReturnType<typeof participantRow>[]
+  participants?: Participant[]
 }
 
 async function mockAdminApi(page: Page, options: Options = {}): Promise<Captured> {
-  const role = options.role ?? 'operator'
   const captured: Captured = {
     reusableBodies: [],
     entryLinkCalls: 0,
     listCalls: 0,
     disableCalls: [],
+    reusableRequests: [],
   }
   // The server's own state: a create appends, a DELETE disables, a list reads.
-  const links: LinkRow[] = [...(options.links ?? [])]
+  const links: ReusableLink[] = [...(options.links ?? [])]
   let listFailures = options.failListTimes ?? 0
   let staleReads = 0
 
-  await page.route(
-    (url) => url.pathname === '/auth/login',
-    (route) =>
-      jsonRoute(route, {
-        access_token: 'e2e-access-token',
-        refresh_token: 'e2e-refresh',
-        token_type: 'bearer',
-      })
-  )
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url())
 
-  // The ability map, not `/profile`: the UI gates its controls on `can()` and
-  // fails CLOSED without it, so an unmocked `/auth/me` means no Invite action at
-  // all (see `entry-link.spec.ts`).
-  await page.route(
-    (url) => url.pathname === '/auth/me',
-    (route) =>
-      isDataRequest(route)
-        ? jsonRoute(route, {
-            user: {
-              id: 1,
-              name: 'Operator One',
-              email: 'operator@example.com',
-              locale: 'it',
-              photo_url: null,
-            },
-            organization: { id: 1, name: 'Acme' },
-            roles: [role],
-            abilities: abilitiesFor([role]),
-          })
-        : route.continue()
-  )
+    if (/\/reusable-links(?:\/|$)/.test(pathname)) {
+      captured.reusableRequests.push(`${request.method()} ${pathname}`)
+    }
+  })
 
-  await page.route(
-    (url) => url.pathname === '/profile',
-    (route) =>
-      jsonRoute(route, {
-        data: {
-          id: 1,
-          name: 'Operator One',
-          email: 'operator@example.com',
-          locale: 'en',
-          role,
-          organization: { id: 1, name: 'Acme' },
-          photo_url: null,
-        },
-      })
-  )
-
-  await page.route(
-    (url) => url.pathname === '/projects',
-    (route) =>
-      isDataRequest(route)
-        ? jsonRoute(route, { data: [ACTIVE_PROJECT, DRAFT_PROJECT] })
-        : route.continue()
-  )
-
-  await page.route(
-    (url) => /^\/framework\/roles\/[A-Z]+\/competencies$/.test(url.pathname),
-    (route) => (isDataRequest(route) ? jsonRoute(route, { data: [] }) : route.continue())
-  )
+  await mockProjectsApi(page, [ACTIVE_PROJECT, DRAFT_PROJECT])
 
   await page.route(
     (url) => url.pathname === '/entry-links',
@@ -333,12 +199,13 @@ async function mockAdminApi(page: Page, options: Options = {}): Promise<Captured
 
       const answer = options.createAnswer?.(body)
 
+      if (answer === 'network-error') return route.abort('failed')
       if (answer) return jsonRoute(route, answer.body, answer.status)
 
       const created = createdResponse(typeof body['label'] === 'string' ? body['label'] : null)
 
       // The server remembers it: it is the first row of the project's list from now on.
-      links.unshift(linkRow({ ...created.data, uses_count: 0, last_used_at: null }))
+      links.unshift(created.data)
 
       return jsonRoute(route, created, 201)
     }
@@ -369,51 +236,8 @@ async function mockAdminApi(page: Page, options: Options = {}): Promise<Captured
     }
   )
 
-  const participants = options.participants ?? []
-
-  if (participants.length > 0) {
-    await page.route(
-      (url) => url.pathname === '/participants',
-      (route) =>
-        isDataRequest(route)
-          ? jsonRoute(route, {
-              data: participants,
-              links: { first: null, last: null, prev: null, next: null },
-              meta: {
-                current_page: 1,
-                last_page: 1,
-                total: participants.length,
-                from: 1,
-                to: participants.length,
-                per_page: 20,
-              },
-            })
-          : route.continue()
-    )
-  }
-
-  // The API path and the SPA route share `/participants/:id`, so a document
-  // navigation must fall through (same guard `entry-link.spec.ts` documents).
-  for (const row of participants) {
-    await page.route(
-      (url) => url.pathname === `/participants/${row.id}`,
-      (route) =>
-        isDataRequest(route) ? jsonRoute(route, { data: participantDetail(row) }) : route.continue()
-    )
-    await page.route(
-      (url) => url.pathname === `/participants/${row.id}/evaluation`,
-      (route) =>
-        jsonRoute(
-          route,
-          {
-            error: 'lifecycle_not_ready',
-            resource: 'evaluation',
-            current_status: 'in_attesa',
-            required_status: 'completato',
-          },
-          409
-        )
-    )
+  if ((options.participants ?? []).length > 0) {
+    await mockParticipantsApi(page, options.participants ?? [])
   }
 
   // What the saved-project drawer asks for besides the links.
@@ -456,25 +280,6 @@ async function mockAdminApi(page: Page, options: Options = {}): Promise<Captured
   return captured
 }
 
-async function login(page: Page): Promise<void> {
-  // The access token is memory-only: every full page load fires
-  // `POST /auth/refresh`, so it needs a mock or the session never rehydrates.
-  await page.route(
-    (url) => url.pathname === '/auth/refresh',
-    (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ access_token: 'e2e-access-token', token_type: 'bearer' }),
-      })
-  )
-  await page.goto('/login')
-  await page.getByLabel('Email').fill('operator@example.com')
-  await page.getByLabel('Password').fill('secret-password')
-  await page.getByRole('button', { name: 'Accedi' }).click()
-  await expect(page).toHaveURL('/')
-}
-
 /**
  * Records what the app writes to the clipboard.
  *
@@ -501,8 +306,7 @@ async function recordClipboardWrites(page: Page): Promise<void> {
 }
 
 async function openInviteDrawer(page: Page): Promise<void> {
-  await page.getByRole('link', { name: 'Progetti' }).click()
-  await expect(page).toHaveURL('/projects')
+  await page.goto('/projects')
 
   await page
     .getByRole('row', { name: /Active Project/ })
@@ -512,17 +316,30 @@ async function openInviteDrawer(page: Page): Promise<void> {
 
 const CHECKBOX_NAME = /link di colloquio riutilizzabile che non scade mai/
 const LINK_NAME_LABEL = 'Nome del link'
+const SUBMIT_NAME = 'Genera link'
+const SAVE_ERROR = 'Non è stato possibile generare questo link di accesso.'
+
+function reusableCheckbox(page: Page): Locator {
+  return page.getByRole('checkbox', { name: CHECKBOX_NAME })
+}
+
+async function createReusableLink(page: Page, label: string | null): Promise<void> {
+  await reusableCheckbox(page).check()
+
+  if (label !== null) await page.getByLabel(LINK_NAME_LABEL).fill(label)
+
+  await page.getByRole('button', { name: SUBMIT_NAME }).click()
+}
 
 test.describe('Reusable interview link: create flow (reusable-interview-links)', () => {
   test('an operator creates a reusable link; the disclosure precedes the URL and Copy', async ({
-    page,
+    adminPage: page,
   }) => {
     const captured = await mockAdminApi(page)
     await recordClipboardWrites(page)
-    await login(page)
     await openInviteDrawer(page)
 
-    const checkbox = page.getByRole('checkbox', { name: CHECKBOX_NAME })
+    const checkbox = reusableCheckbox(page)
 
     await expect(checkbox).toBeVisible()
     await expect(checkbox).not.toBeChecked()
@@ -535,12 +352,7 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
     await expect(page.getByTestId('entry-link-form-email')).toHaveCount(0)
 
     await page.getByLabel(LINK_NAME_LABEL).fill('Stand fiera di Milano')
-    await page.getByRole('button', { name: 'Genera link' }).click()
-
-    // The request: ONLY the label, to the reusable endpoint, never the
-    // single-use one.
-    expect(captured.reusableBodies).toEqual([{ label: 'Stand fiera di Milano' }])
-    expect(captured.entryLinkCalls).toBe(0)
+    await page.getByRole('button', { name: SUBMIT_NAME }).click()
 
     // The disclosure is visible without any interaction ...
     const disclosure = page.getByTestId('entry-link-disclosure')
@@ -553,6 +365,10 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
     await expect(neverExpires).toContainText('Non scade mai · Riutilizzabile')
     await expect(url).toHaveText(ENTRY_URL)
     await expect(copy).toBeVisible()
+
+    // The request: ONLY the label, to the reusable endpoint. Read after the UI
+    // state that follows the response, never straight after the click.
+    expect(captured.reusableBodies).toEqual([{ label: 'Stand fiera di Milano' }])
 
     // ... and ABOVE the URL and the Copy control.
     const [disclosureBox, neverExpiresBox, urlBox, copyBox] = await Promise.all([
@@ -573,33 +389,34 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
 
     // Copy puts the COMPLETE URL, fragment included, on the clipboard.
     await copy.click()
-    const writes = await page.evaluate(
-      () => (window as unknown as { __clipboardWrites: string[] }).__clipboardWrites
-    )
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __clipboardWrites: string[] }).__clipboardWrites
+        )
+      )
+      .toEqual([ENTRY_URL])
 
-    expect(writes).toEqual([ENTRY_URL])
-    expect(writes[0]).toContain('#beai_rl_')
+    // The single-use endpoint was never involved: read last, once everything the
+    // flow does has happened.
+    expect(captured.entryLinkCalls).toBe(0)
   })
 
-  test('an empty Link name creates the link with an empty payload', async ({ page }) => {
+  test('an empty Link name creates the link with an empty payload', async ({ adminPage: page }) => {
     const captured = await mockAdminApi(page)
-    await login(page)
     await openInviteDrawer(page)
 
-    await page.getByRole('checkbox', { name: CHECKBOX_NAME }).check()
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await createReusableLink(page, null)
 
     await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
     expect(captured.reusableBodies).toEqual([{}])
   })
 
-  test('the link is shown once: reopening the drawer shows no URL', async ({ page }) => {
+  test('the link is shown once: reopening the drawer shows no URL', async ({ adminPage: page }) => {
     await mockAdminApi(page)
-    await login(page)
     await openInviteDrawer(page)
 
-    await page.getByRole('checkbox', { name: CHECKBOX_NAME }).check()
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await createReusableLink(page, null)
     await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
 
     await page.getByRole('button', { name: 'Chiudi' }).click()
@@ -611,12 +428,12 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
       .click()
 
     // A fresh form, with the checkbox unticked again, and the token nowhere.
-    await expect(page.getByRole('checkbox', { name: CHECKBOX_NAME })).not.toBeChecked()
+    await expect(reusableCheckbox(page)).not.toBeChecked()
     await expect(page.getByTestId('entry-link-url')).toHaveCount(0)
     await expect(page.locator('body')).not.toContainText('beai_rl_')
   })
 
-  test('a server 422 on the label lands under the Link name field', async ({ page }) => {
+  test('a server 422 on the label lands under the Link name field', async ({ adminPage: page }) => {
     await mockAdminApi(page, {
       createAnswer: () => ({
         status: 422,
@@ -626,78 +443,215 @@ test.describe('Reusable interview link: create flow (reusable-interview-links)',
         },
       }),
     })
-    await login(page)
     await openInviteDrawer(page)
 
-    await page.getByRole('checkbox', { name: CHECKBOX_NAME }).check()
-    await page.getByLabel(LINK_NAME_LABEL).fill('Stand')
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await createReusableLink(page, 'Stand')
 
     const field = page.getByLabel(LINK_NAME_LABEL)
 
     await expect(field).toHaveAttribute('aria-invalid', 'true')
     await expect(page.getByText('Il nome del link e troppo lungo.')).toBeVisible()
     await expect(page.getByTestId('entry-link-url')).toHaveCount(0)
+    // Mapped onto its own field, so the generic banner stays away.
+    await expect(page.getByTestId('entry-link-form-banner')).toHaveCount(0)
   })
 
-  test('a Link name over 120 characters is refused before any request', async ({ page }) => {
+  test('a Link name over 120 characters is refused before any request; 120 is accepted', async ({
+    adminPage: page,
+  }) => {
     const captured = await mockAdminApi(page)
-    await login(page)
     await openInviteDrawer(page)
 
-    await page.getByRole('checkbox', { name: CHECKBOX_NAME }).check()
-    await page.getByLabel(LINK_NAME_LABEL).fill('x'.repeat(121))
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await reusableCheckbox(page).check()
 
-    await expect(page.getByLabel(LINK_NAME_LABEL)).toHaveAttribute('aria-invalid', 'true')
-    expect(captured.reusableBodies).toEqual([])
+    const name = page.getByLabel(LINK_NAME_LABEL)
+
+    await name.fill('x'.repeat(121))
+    await page.getByRole('button', { name: SUBMIT_NAME }).click()
+
+    await expect(page.getByTestId('entry-link-form-link-name-error')).toHaveText(
+      'Inserisci al massimo 120 caratteri.'
+    )
+    await expect(name).toHaveAttribute('aria-invalid', 'true')
+
+    // One character fewer and the SAME form submits. The ONLY request the server
+    // saw is this one: had the refused submit gone out, it would be the first body.
+    await name.fill('x'.repeat(120))
+    await page.getByRole('button', { name: SUBMIT_NAME }).click()
+
+    await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
+    expect(captured.reusableBodies).toEqual([{ label: 'x'.repeat(120) }])
   })
 
-  test('a draft project keeps the Invite action disabled, so the checkbox is unreachable', async ({
-    page,
+  // 403 (not allowed), 500 (the server broke) and a dropped connection are three
+  // different ways for the create call to end WITHOUT a link. None of them may
+  // show a URL, leave a token in the page, or leave the form stuck.
+  const FAILURES: [string, CreateAnswer][] = [
+    ['a 403', { status: 403, body: { message: 'This action is unauthorized.' } }],
+    ['a 500', { status: 500, body: { message: 'Server Error' } }],
+    ['a network error', 'network-error'],
+  ]
+
+  for (const [name, answer] of FAILURES) {
+    test(`creating a link that ends in ${name} shows an error and never a link`, async ({
+      adminPage: page,
+    }) => {
+      const captured = await mockAdminApi(page, { createAnswer: () => answer })
+      await openInviteDrawer(page)
+
+      await createReusableLink(page, 'Stand')
+
+      await expect(page.getByTestId('entry-link-form-banner')).toContainText(SAVE_ERROR)
+      await expect(page.getByTestId('entry-link-url')).toHaveCount(0)
+      await expect(page.getByTestId('entry-link-disclosure')).toHaveCount(0)
+      await expect(page.locator('body')).not.toContainText('beai_rl_')
+
+      // The failure is not pinned on the Link name field, and the form can be
+      // submitted again (the in-flight flag was released).
+      await expect(page.getByLabel(LINK_NAME_LABEL)).toHaveAttribute('aria-invalid', 'false')
+      await expect(page.getByRole('button', { name: SUBMIT_NAME })).toBeEnabled()
+
+      // A create is not idempotent, so the client must not have retried it.
+      expect(captured.reusableBodies).toEqual([{ label: 'Stand' }])
+    })
+  }
+
+  test('ticking the checkbox removes the whole candidate form; unticking brings it back', async ({
+    adminPage: page,
   }) => {
     await mockAdminApi(page)
-    await login(page)
-    await page.getByRole('link', { name: 'Progetti' }).click()
-    await expect(page).toHaveURL('/projects')
+    await openInviteDrawer(page)
+
+    // The pieces of the single-use form, each by the SAME locator before and after.
+    const singleUsePieces: Locator[] = [
+      page.getByLabel('Riferimento candidato'),
+      page.getByLabel('Nome visualizzato'),
+      page.getByTestId('entry-link-form-email'),
+      page.getByTestId('entry-link-form-external-reference'),
+      page.getByRole('group', { name: 'Riferimento esterno' }),
+      page.getByTestId('entry-link-form-timing'),
+      page.getByRole('group', { name: 'Quando' }),
+      page.getByTestId('entry-link-form-send-email'),
+    ]
+
+    for (const piece of singleUsePieces) await expect(piece).toBeVisible()
+    await expect(page.getByLabel(LINK_NAME_LABEL)).toHaveCount(0)
+
+    await reusableCheckbox(page).check()
+
+    for (const piece of singleUsePieces) await expect(piece).toHaveCount(0)
+    await expect(page.getByLabel(LINK_NAME_LABEL)).toBeVisible()
+    await expect(page.getByRole('button', { name: SUBMIT_NAME })).toBeVisible()
+
+    await reusableCheckbox(page).uncheck()
+
+    for (const piece of singleUsePieces) await expect(piece).toBeVisible()
+    await expect(page.getByLabel(LINK_NAME_LABEL)).toHaveCount(0)
+  })
+
+  // The candidate fields are REMOVED, but the values typed into them are still
+  // held by the form. The reusable submit must read none of them.
+  const TYPED_BEFORE_TICKING: [string, string | null, unknown][] = [
+    ['with a name', 'Stand', { label: 'Stand' }],
+    ['without a name', null, {}],
+  ]
+
+  for (const [name, label, expectedBody] of TYPED_BEFORE_TICKING) {
+    test(`candidate values and a reference typed before ticking stay out of the request, ${name}`, async ({
+      adminPage: page,
+    }) => {
+      const captured = await mockAdminApi(page)
+      await openInviteDrawer(page)
+
+      await page.getByLabel('Riferimento candidato').fill('typed-before')
+      await page.getByLabel('Nome visualizzato').fill('Typed Before')
+      await page.getByTestId('entry-link-form-email').fill('typed-before@example.test')
+      await page.getByLabel('ID esterno', { exact: true }).fill('4471')
+      await page.getByLabel('Origine', { exact: true }).fill('Acme ATS')
+
+      await createReusableLink(page, label)
+
+      await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
+      expect(captured.reusableBodies).toEqual([expectedBody])
+      expect(captured.entryLinkCalls).toBe(0)
+    })
+  }
+
+  test('a draft project keeps the Invite action disabled, so the checkbox is unreachable', async ({
+    adminPage: page,
+  }) => {
+    await mockAdminApi(page)
+    await page.goto('/projects')
 
     const invite = page
       .getByRole('row', { name: /Draft Project/ })
       .getByRole('button', { name: 'Invita candidato' })
 
     await expect(invite).toBeDisabled()
-    await expect(page.getByRole('checkbox', { name: CHECKBOX_NAME })).toHaveCount(0)
+    await expect(reusableCheckbox(page)).toHaveCount(0)
   })
 
-  test('a viewer gets no Invite action and therefore no reusable checkbox', async ({ page }) => {
-    await mockAdminApi(page, { role: 'viewer' })
-    await login(page)
-    await page.getByRole('link', { name: 'Progetti' }).click()
-    await expect(page).toHaveURL('/projects')
+  test('the created link panel is accessible', async ({ adminPage: page }) => {
+    await mockAdminApi(page)
+    await openInviteDrawer(page)
+
+    await checkA11y(page)
+
+    await createReusableLink(page, 'Stand fiera di Milano')
+    await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
+
+    await checkA11y(page)
+  })
+})
+
+test.describe('Reusable interview link: a viewer', () => {
+  test.use({ role: 'viewer' })
+
+  test('gets no Invite action and therefore no reusable checkbox', async ({ adminPage: page }) => {
+    await mockAdminApi(page)
+    await page.goto('/projects')
     await expect(page.getByRole('row', { name: /Active Project/ })).toBeVisible()
 
     await expect(page.getByRole('button', { name: 'Invita candidato' })).toHaveCount(0)
-    await expect(page.getByRole('checkbox', { name: CHECKBOX_NAME })).toHaveCount(0)
+    await expect(reusableCheckbox(page)).toHaveCount(0)
   })
 })
 
 const PANEL_NAME = 'Link riutilizzabili'
 
-/** Opens the saved-project drawer of "Active Project" and returns its links panel. */
-async function openLinksPanel(page: Page) {
-  await page.getByRole('link', { name: 'Progetti' }).click()
-  await expect(page).toHaveURL('/projects')
-
-  // The analytics banner is fixed to the bottom of the viewport and can sit on top
-  // of the drawer's lower controls; answering it is part of arriving here.
-  const reject = page.getByTestId('analytics-consent-reject')
-
-  if (await reject.isVisible()) await reject.click()
+/**
+ * Opens the saved-project drawer of "Active Project" and waits until the part of
+ * it that sits NEXT TO the links panel has finished loading.
+ *
+ * The questions panel is rendered in the same pass, behind the same
+ * `editingProject` check, so once its request has been answered and its content
+ * is on screen, any sibling that is going to mount has had its chance to. That is
+ * what makes a check for the ABSENCE of the links panel mean something.
+ */
+async function openSavedProjectDrawer(page: Page): Promise<void> {
+  const questions = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/projects/2/questions'
+  )
 
   await page
     .getByRole('row', { name: /Active Project/ })
     .getByRole('button', { name: 'Modifica' })
     .click()
+
+  await questions
+  await expect(page.getByTestId('project-questions-panel')).toBeVisible()
+  // Two frames, so what the response triggered has been rendered and painted.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  )
+}
+
+/** Opens the saved-project drawer of "Active Project" and returns its links panel. */
+async function openLinksPanel(page: Page): Promise<Locator> {
+  await openSavedProjectDrawer(page)
 
   const panel = page.getByRole('region', { name: PANEL_NAME })
 
@@ -706,22 +660,26 @@ async function openLinksPanel(page: Page) {
   return panel
 }
 
-function rowOf(panel: ReturnType<Page['getByRole']>, name: string) {
+function rowOf(panel: Locator, name: string): Locator {
   return panel.getByRole('listitem').filter({ hasText: name })
+}
+
+function confirmDisable(page: Page): Promise<void> {
+  return page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Disattiva', exact: true })
+    .click()
 }
 
 test.describe('Reusable interview links: managing them (reusable-interview-links, B6b)', () => {
   test('an operator creates a link, finds it in the saved-project drawer and disables it', async ({
-    page,
+    adminPage: page,
   }) => {
     const captured = await mockAdminApi(page)
-    await login(page)
     await openInviteDrawer(page)
 
     // Create ...
-    await page.getByRole('checkbox', { name: CHECKBOX_NAME }).check()
-    await page.getByLabel(LINK_NAME_LABEL).fill('Stand fiera di Milano')
-    await page.getByRole('button', { name: 'Genera link' }).click()
+    await createReusableLink(page, 'Stand fiera di Milano')
     await expect(page.getByTestId('entry-link-url')).toHaveText(ENTRY_URL)
     await page.getByRole('button', { name: 'Chiudi' }).click()
 
@@ -746,21 +704,21 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     await expect(dialog).toContainText('non può essere annullata')
     expect(captured.disableCalls).toEqual([])
 
-    await dialog.getByRole('button', { name: 'Disattiva', exact: true }).click()
+    await confirmDisable(page)
 
     // The row is Disabled in place, with no action left and no reload.
     await expect(row).toContainText('Disattivato')
     await expect(row.getByRole('button', { name: /Disattiva link/ })).toHaveCount(0)
-    expect(captured.disableCalls).toEqual(['rlk_01HZ0000000000000000000000'])
+    expect(captured.disableCalls).toEqual([LINK_ID])
   })
 
   test('lists each link with its prefix, creator, usage and status, active ones first', async ({
-    page,
+    adminPage: page,
   }) => {
     await mockAdminApi(page, {
       links: [
-        linkRow(),
-        linkRow({
+        reusableLinkResource(),
+        reusableLinkResource({
           id: 'rlk_01HZ1111111111111111111111',
           label: null,
           token_prefix: 'beai_rl_ZyXwVuTs',
@@ -772,7 +730,7 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
         }),
       ],
     })
-    await login(page)
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
     const items = panel.getByRole('listitem')
@@ -805,11 +763,14 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     await expect(panel).not.toContainText('https://')
   })
 
-  test('each Disable control says which link it disables', async ({ page }) => {
+  test('each Disable control says which link it disables', async ({ adminPage: page }) => {
     await mockAdminApi(page, {
-      links: [linkRow(), linkRow({ id: 'rlk_01HZ2222222222222222222222', label: 'Evento Roma' })],
+      links: [
+        reusableLinkResource(),
+        reusableLinkResource({ id: 'rlk_01HZ2222222222222222222222', label: 'Evento Roma' }),
+      ],
     })
-    await login(page)
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
 
@@ -819,9 +780,11 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     await expect(panel.getByRole('button', { name: 'Disattiva link: Evento Roma' })).toBeVisible()
   })
 
-  test('cancelling the confirmation sends nothing and leaves the link Active', async ({ page }) => {
-    const captured = await mockAdminApi(page, { links: [linkRow()] })
-    await login(page)
+  test('cancelling the confirmation sends nothing and leaves the link Active', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, { links: [reusableLinkResource()] })
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
     const row = rowOf(panel, 'Stand fiera di Milano')
@@ -836,61 +799,63 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     await page.keyboard.press('Escape')
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
-    expect(captured.disableCalls).toEqual([])
+    // Still Active, and nothing sent so far.
     await expect(row).toContainText('Attivo')
     await expect(row.getByRole('button', { name: /Disattiva link/ })).toBeVisible()
+
+    // Now CONFIRM once. The server saw exactly this one DELETE: had either
+    // cancel (the button, then Escape) sent one, there would be more entries, and
+    // the same list proves the recorder works, so silence before was evidence.
+    await row.getByRole('button', { name: /Disattiva link/ }).click()
+    await confirmDisable(page)
+    await expect(row).toContainText('Disattivato')
+
+    expect(captured.disableCalls).toEqual([LINK_ID])
   })
 
   // The api answers 204 whether this call disabled the link or it already was. The
   // list below is stale (another tab got there first), so the operator is offered
   // the action again and disables a link that is already disabled.
-  test('disabling a link that was already disabled is a plain success', async ({ page }) => {
+  test('disabling a link that was already disabled is a plain success', async ({
+    adminPage: page,
+  }) => {
     const captured = await mockAdminApi(page, {
-      links: [linkRow()],
+      links: [reusableLinkResource()],
       staleListAfterDisable: 1,
     })
-    await login(page)
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
     const row = rowOf(panel, 'Stand fiera di Milano')
 
     // First disable: the refetch is still stale, so the row reads Active.
     await row.getByRole('button', { name: /Disattiva link/ }).click()
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'Disattiva', exact: true })
-      .click()
+    await confirmDisable(page)
     await expect.poll(() => captured.disableCalls.length).toBe(1)
     await expect(row).toContainText('Attivo')
 
     // Second disable of the SAME link: the server answers 204 again.
     await row.getByRole('button', { name: /Disattiva link/ }).click()
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'Disattiva', exact: true })
-      .click()
+    await confirmDisable(page)
 
     await expect(row).toContainText('Disattivato')
-    expect(captured.disableCalls).toEqual([
-      'rlk_01HZ0000000000000000000000',
-      'rlk_01HZ0000000000000000000000',
-    ])
+    expect(captured.disableCalls).toEqual([LINK_ID, LINK_ID])
     // No error was reported for either call.
     await expect(panel.getByRole('alert')).toHaveCount(0)
   })
 
-  test('a failed disable keeps the link Active and says so', async ({ page }) => {
-    const captured = await mockAdminApi(page, { links: [linkRow()], disableStatus: 500 })
-    await login(page)
+  test('a failed disable keeps the link Active and says so', async ({ adminPage: page }) => {
+    const captured = await mockAdminApi(page, {
+      links: [reusableLinkResource()],
+      disableStatus: 500,
+    })
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
     const row = rowOf(panel, 'Stand fiera di Milano')
 
     await row.getByRole('button', { name: /Disattiva link/ }).click()
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'Disattiva', exact: true })
-      .click()
+    await confirmDisable(page)
 
     await expect(panel.getByRole('alert')).toContainText(
       'Non è stato possibile disattivare il link. Riprova.'
@@ -900,9 +865,9 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     expect(captured.disableCalls).toHaveLength(1)
   })
 
-  test('a project with no links explains how to create one', async ({ page }) => {
+  test('a project with no links explains how to create one', async ({ adminPage: page }) => {
     await mockAdminApi(page, { links: [] })
-    await login(page)
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
 
@@ -912,11 +877,14 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
   })
 
   test('a failed load says so with a retry, never the empty state, and retry recovers', async ({
-    page,
+    adminPage: page,
   }) => {
     // Two 500s: the client's own single retry fails too, so the panel gives up.
-    const captured = await mockAdminApi(page, { links: [linkRow()], failListTimes: 2 })
-    await login(page)
+    const captured = await mockAdminApi(page, {
+      links: [reusableLinkResource()],
+      failListTimes: 2,
+    })
+    await page.goto('/projects')
 
     const panel = await openLinksPanel(page)
 
@@ -933,49 +901,128 @@ test.describe('Reusable interview links: managing them (reusable-interview-links
     expect(captured.listCalls).toBe(3)
   })
 
-  test('a project being created has no links panel and asks for no links', async ({ page }) => {
-    const captured = await mockAdminApi(page, { links: [linkRow()] })
-    await login(page)
-    await page.getByRole('link', { name: 'Progetti' }).click()
-    await expect(page).toHaveURL('/projects')
-
-    const reject = page.getByTestId('analytics-consent-reject')
-
-    if (await reject.isVisible()) await reject.click()
+  test('a project being created has no links panel and asks for no links', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, { links: [reusableLinkResource()] })
+    await page.goto('/projects')
 
     await page.getByTestId('projects-new').click()
     await expect(page.getByTestId('project-form')).toBeVisible()
-
     await expect(page.getByRole('region', { name: PANEL_NAME })).toHaveCount(0)
-    expect(captured.listCalls).toBe(0)
+
+    // Compare with a SAVED project in the same session. That drawer does ask, so
+    // the requests recorded here are exactly its own: the create form added none
+    // (a new project has no id, so its panel could not have asked about project 2
+    // either, which is why every reusable-links path is recorded, not just that one).
+    await page.getByRole('button', { name: 'Annulla' }).click()
+    await expect(page.getByTestId('project-form')).toHaveCount(0)
+
+    const panel = await openLinksPanel(page)
+
+    await expect(rowOf(panel, 'Stand fiera di Milano')).toBeVisible()
+    expect(captured.reusableRequests).toEqual(['GET /projects/2/reusable-links'])
   })
 
-  test('a viewer gets no links panel, and no request for the links', async ({ page }) => {
-    const captured = await mockAdminApi(page, { role: 'viewer', links: [linkRow()] })
-    await login(page)
-    await page.getByRole('link', { name: 'Progetti' }).click()
-    await expect(page).toHaveURL('/projects')
+  test('the links panel is accessible', async ({ adminPage: page }) => {
+    await mockAdminApi(page, {
+      links: [
+        reusableLinkResource(),
+        reusableLinkResource({
+          id: 'rlk_01HZ1111111111111111111111',
+          label: null,
+          token_prefix: 'beai_rl_ZyXwVuTs',
+          status: 'disabled',
+          uses_count: 0,
+          last_used_at: null,
+          disabled_at: '2026-09-25T08:00:00.000000Z',
+        }),
+      ],
+    })
+    await page.goto('/projects')
+
+    const panel = await openLinksPanel(page)
+
+    await expect(panel.getByRole('listitem')).toHaveCount(2)
+    await checkA11y(page)
+  })
+
+  test('the destructive confirmation is accessible', async ({ adminPage: page }) => {
+    await mockAdminApi(page, { links: [reusableLinkResource()] })
+    await page.goto('/projects')
+
+    const panel = await openLinksPanel(page)
+
+    await rowOf(panel, 'Stand fiera di Milano')
+      .getByRole('button', { name: /Disattiva link/ })
+      .click()
+    await expect(page.getByRole('alertdialog')).toBeVisible()
+
+    await checkA11y(page)
+  })
+})
+
+test.describe('Reusable interview links: a viewer in the saved-project drawer', () => {
+  test.use({ role: 'viewer' })
+
+  // The viewer's drawer is unreachable because editing is gated on
+  // `projects.update`. That is ALL this proves; the gate on the panel itself is
+  // exercised in the describe below, with a user who CAN open the drawer.
+  test('cannot open the drawer, so never meets the links panel', async ({ adminPage: page }) => {
+    await mockAdminApi(page, { links: [reusableLinkResource()] })
+    await page.goto('/projects')
     await expect(page.getByRole('row', { name: /Active Project/ })).toBeVisible()
 
-    // A viewer cannot edit, so the saved-project drawer is not reachable at all.
     await expect(page.getByRole('button', { name: 'Modifica' })).toHaveCount(0)
+  })
+})
+
+// Who may open the saved-project drawer is `projects.update`; who may see the
+// links panel inside it is `participants.create`. No stock role splits the two
+// (an operator has both, a viewer neither), so the gate on the PANEL can only be
+// observed with an ability map no role produces: able to edit a project, unable
+// to create participants.
+const OPERATOR_ABILITIES = abilitiesFor(['operator'])
+
+test.describe('Reusable interview links: an editor who may not create participants', () => {
+  test.use({
+    abilities: {
+      ...OPERATOR_ABILITIES,
+      projects: { ...OPERATOR_ABILITIES.projects, update: true },
+      participants: { ...OPERATOR_ABILITIES.participants, create: false },
+    },
+  })
+
+  test('opens the saved-project drawer and gets no links panel and no request for the links', async ({
+    adminPage: page,
+  }) => {
+    const captured = await mockAdminApi(page, { links: [reusableLinkResource()] })
+    await page.goto('/projects')
+
+    // The drawer IS reachable for this user, and the Invite action is not.
+    await expect(
+      page.getByRole('row', { name: /Active Project/ }).getByRole('button', { name: 'Modifica' })
+    ).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Invita candidato' })).toHaveCount(0)
+
+    await openSavedProjectDrawer(page)
+
+    await expect(page.getByTestId('project-form')).toBeVisible()
+    await expect(page.getByTestId('project-questions-panel')).toBeVisible()
     await expect(page.getByRole('region', { name: PANEL_NAME })).toHaveCount(0)
-    expect(captured.listCalls).toBe(0)
+    expect(captured.reusableRequests).toEqual([])
   })
 })
 
 test.describe('Participant detail: reusable link origin (reusable-interview-links, B6c)', () => {
-  const LINK_ID = 'rlk_01HZ0000000000000000000000'
-
   test('a visitor shows "Started from reusable link: <label>" under the candidate reference', async ({
-    page,
+    adminPage: page,
   }) => {
     await mockAdminApi(page, {
       participants: [
         participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
       ],
     })
-    await login(page)
     await page.goto('/participants/1')
 
     await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
@@ -992,11 +1039,12 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
     expect(reference!.y).toBeLessThan(lineBox!.y)
   })
 
-  test('a link with no label shows the bare line, with no colon and no label', async ({ page }) => {
+  test('a link with no label shows the bare line, with no colon and no label', async ({
+    adminPage: page,
+  }) => {
     await mockAdminApi(page, {
       participants: [participantRow(1, 'Visitor One', { id: LINK_ID, label: null })],
     })
-    await login(page)
     await page.goto('/participants/1')
 
     await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
@@ -1004,11 +1052,10 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
     await expect(page.getByText(/Avviato da link riutilizzabile:/)).toHaveCount(0)
   })
 
-  test('an ordinary participant shows no origin line at all', async ({ page }) => {
+  test('an ordinary participant shows no origin line at all', async ({ adminPage: page }) => {
     await mockAdminApi(page, {
       participants: [participantRow(1, 'Mario Rossi', null)],
     })
-    await login(page)
     await page.goto('/participants/1')
 
     await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
@@ -1016,7 +1063,7 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
   })
 
   test('the label is rendered as text: markup in it is shown literally, never injected', async ({
-    page,
+    adminPage: page,
   }) => {
     await mockAdminApi(page, {
       participants: [
@@ -1026,7 +1073,6 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
         }),
       ],
     })
-    await login(page)
     await page.goto('/participants/1')
 
     await expect(
@@ -1036,24 +1082,8 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
     await expect(page.getByText('x', { exact: true })).toHaveCount(0)
   })
 
-  test('a viewer sees the origin line too: it is a read', async ({ page }) => {
-    await mockAdminApi(page, {
-      role: 'viewer',
-      participants: [
-        participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
-      ],
-    })
-    await login(page)
-    await page.goto('/participants/1')
-
-    await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
-    await expect(
-      page.getByText('Avviato da link riutilizzabile: Stand fiera di Milano')
-    ).toBeVisible()
-  })
-
   test('the participants list shows no origin column or sub-line for a visitor', async ({
-    page,
+    adminPage: page,
   }) => {
     await mockAdminApi(page, {
       participants: [
@@ -1061,9 +1091,7 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
         participantRow(2, 'Mario Rossi', null),
       ],
     })
-    await login(page)
-    await page.getByRole('link', { name: 'Candidati' }).click()
-    await expect(page).toHaveURL('/participants')
+    await page.goto('/participants')
 
     await expect(page.getByRole('row', { name: /Visitor One/ })).toBeVisible()
     await expect(page.getByRole('row', { name: /Mario Rossi/ })).toBeVisible()
@@ -1071,5 +1099,37 @@ test.describe('Participant detail: reusable link origin (reusable-interview-link
     await expect(page.getByText(/Avviato da link riutilizzabile/)).toHaveCount(0)
     // Header cells are unchanged: candidate, project, role, status, created.
     await expect(page.getByRole('columnheader')).toHaveCount(5)
+  })
+
+  test('the detail page with the origin line is accessible', async ({ adminPage: page }) => {
+    await mockAdminApi(page, {
+      participants: [
+        participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
+      ],
+    })
+    await page.goto('/participants/1')
+
+    await expect(
+      page.getByText('Avviato da link riutilizzabile: Stand fiera di Milano')
+    ).toBeVisible()
+    await checkA11y(page)
+  })
+})
+
+test.describe('Participant detail: reusable link origin, as a viewer', () => {
+  test.use({ role: 'viewer' })
+
+  test('a viewer sees the origin line too: it is a read', async ({ adminPage: page }) => {
+    await mockAdminApi(page, {
+      participants: [
+        participantRow(1, 'Visitor One', { id: LINK_ID, label: 'Stand fiera di Milano' }),
+      ],
+    })
+    await page.goto('/participants/1')
+
+    await expect(page.getByRole('heading', { name: 'Visitor One' })).toBeVisible()
+    await expect(
+      page.getByText('Avviato da link riutilizzabile: Stand fiera di Milano')
+    ).toBeVisible()
   })
 })

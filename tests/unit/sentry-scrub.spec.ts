@@ -1587,60 +1587,92 @@ describe('a literal unset misses every other spelling', () => {
 })
 
 /**
- * Complexity guards measure GROWTH, never absolute milliseconds. An absolute
- * threshold ("under 250 ms") passes or fails with the machine: a loaded CI
- * runner or a laptop under a parallel test run blew the bound on linear code
- * while a genuinely quadratic regression on a fast machine could still pass.
+ * Proves an operation is LINEAR in its input, independently of how fast the machine
+ * is, by comparing the same operation at `n` and at `k * n` instead of against an
+ * absolute number of milliseconds. A threshold in milliseconds measures the machine
+ * as much as the code: one of these assertions failed at 415 ms against a 400 ms
+ * limit while the host was under load, and passed three times out of three alone.
  *
- * `build(n)` prepares the hostile input of size `n` OUTSIDE the timed region and
- * returns the operation to time. The same operation is timed at `n` and at
- * `GROWTH_FACTOR * n`, taking the FASTEST of a few runs per side after a
- * warm-up: load only ever adds time, so the minimum is the least disturbed
- * sample, where a median still moves when most of a run's neighbours are busy.
- * Linear code grows about `GROWTH_FACTOR` times, quadratic about
- * `GROWTH_FACTOR ** 2` times, and cubic far more. The bound sits at three times
- * the linear expectation, far from both.
+ * A linear scan takes about `k` times longer at `k * n`, a quadratic one about `k^2`
+ * times (8 -> 64), a cubic one about `k^3`. The bound is `3 * k`: well clear of the
+ * noise a loaded machine adds to a ratio of about `k`, well under quadratic growth.
  *
- * The small side is floored at one millisecond: below that a timing is clock
- * granularity, and the ratio of two near-zero numbers is noise. A real
- * regression is not masked by the floor, because the large side then dominates.
- * The sizes stay small on purpose: a deliberately quadratic implementation has
- * to FAIL this test in seconds, not hang the suite.
+ * A ratio is only meaningful when the small side is long enough to be measured, and
+ * how long an operation takes is exactly what differs between machines. So each
+ * measurement is a SAMPLE: the operation repeated inside one timed block. The repeat
+ * count is calibrated ONCE, at the small size, until the sample takes at least
+ * `TARGET_SAMPLE_MS`, and the SAME count is then used at the large size, so the two
+ * sides do the same number of operations and only the input size differs. Each side
+ * is the FASTEST of a few samples after a warm-up, because interruptions (a busy host,
+ * a GC pause) only ever add time. There is no floor on the small side: it is
+ * measurable by construction.
+ *
+ * `build(size)` prepares the input and returns the operation to time, so building the
+ * hostile input is never part of the measurement.
  */
-const GROWTH_FACTOR = 8
-const GROWTH_BOUND = GROWTH_FACTOR * 3
-const TIMED_RUNS = 5
-const TIMER_FLOOR_MS = 1
-/** Generous on purpose: only a broken implementation gets anywhere near it. */
-const COMPLEXITY_TEST_TIMEOUT_MS = 60_000
+const GROWTH = 8
+const TIMING_RUNS = 5
+const CALIBRATION_RUNS = 3
+const TARGET_SAMPLE_MS = 5
+const MAX_REPEATS = 2 ** 20
 
-function fastestMs(operation: () => void): number {
-  operation() // warm-up: keeps JIT compilation out of the smaller sample
+function sampleMs(operation: () => void, repeats: number): number {
+  const started = performance.now()
 
+  for (let i = 0; i < repeats; i += 1) {
+    operation()
+  }
+
+  return performance.now() - started
+}
+
+function fastestSampleMs(operation: () => void, repeats: number, runs: number): number {
   let fastest = Infinity
 
-  for (let run = 0; run < TIMED_RUNS; run += 1) {
-    const started = performance.now()
-
-    operation()
-
-    fastest = Math.min(fastest, performance.now() - started)
+  for (let run = 0; run < runs; run += 1) {
+    fastest = Math.min(fastest, sampleMs(operation, repeats))
   }
 
   return fastest
 }
 
-function expectLinearGrowth(build: (n: number) => () => void, n: number): void {
-  const small = fastestMs(build(n))
-  const large = fastestMs(build(n * GROWTH_FACTOR))
-  const ratio = large / Math.max(small, TIMER_FLOOR_MS)
+/** The smallest power-of-two repeat count whose FASTEST sample reaches the target duration. */
+function calibrateRepeats(operation: () => void): number {
+  operation()
+
+  let repeats = 1
+
+  while (
+    repeats < MAX_REPEATS &&
+    fastestSampleMs(operation, repeats, CALIBRATION_RUNS) < TARGET_SAMPLE_MS
+  ) {
+    repeats *= 2
+  }
+
+  return repeats
+}
+
+function expectLinearGrowth(build: (size: number) => () => void, size: number): void {
+  const small = build(size)
+  const large = build(size * GROWTH)
+  const repeats = calibrateRepeats(small)
+
+  large()
+
+  const smallMs = fastestSampleMs(small, repeats, TIMING_RUNS)
+  const largeMs = fastestSampleMs(large, repeats, TIMING_RUNS)
+  const ratio = largeMs / smallMs
 
   expect(
     ratio,
-    `${n} -> ${n * GROWTH_FACTOR} took ${small.toFixed(2)} ms -> ${large.toFixed(2)} ms ` +
-      `(x${ratio.toFixed(1)}; linear is about x${GROWTH_FACTOR}, quadratic about x${GROWTH_FACTOR ** 2})`
-  ).toBeLessThan(GROWTH_BOUND)
+    `${GROWTH}x the input took ${ratio.toFixed(1)}x as long over ${repeats} repeat(s) ` +
+      `(${smallMs.toFixed(2)} ms -> ${largeMs.toFixed(2)} ms); ` +
+      `linear is about ${GROWTH}x, quadratic about ${GROWTH * GROWTH}x`
+  ).toBeLessThan(GROWTH * 3)
 }
+
+/** Per-test timeout: a quadratic regression must reach the ratio assertion, not the default 5 s. */
+const TIMING_TEST_TIMEOUT_MS = 60_000
 
 describe('what the measurements settled', () => {
   it(
@@ -1655,7 +1687,7 @@ describe('what the measurements settled', () => {
         return () => redactFreeText(hostile)
       }, 4_000)
     },
-    COMPLEXITY_TEST_TIMEOUT_MS
+    TIMING_TEST_TIMEOUT_MS
   )
 
   it('redacts an address sitting in a URL PATH', () => {
@@ -1873,7 +1905,7 @@ describe('pinned on the branch delta, not on what another rule already cuts', ()
         return () => redactUrl(hostile)
       }, 4_000)
     },
-    COMPLEXITY_TEST_TIMEOUT_MS
+    TIMING_TEST_TIMEOUT_MS
   )
 })
 
@@ -3800,7 +3832,7 @@ describe('a multi-word denied key behind a prefix', () => {
         return () => scrubSentryEvent({ message: hostile } as unknown as ScrubbableEvent)
       }, 10_000)
     },
-    COMPLEXITY_TEST_TIMEOUT_MS
+    TIMING_TEST_TIMEOUT_MS
   )
 
   it('gives the stack HEAD the free-text rule and the FRAMES the url rule', () => {
@@ -3964,7 +3996,7 @@ describe('a multi-word denied key behind a prefix', () => {
         return () => scrubSentryEvent({ extra } as unknown as ScrubbableEvent)
       }, 1_000)
     },
-    COMPLEXITY_TEST_TIMEOUT_MS
+    TIMING_TEST_TIMEOUT_MS
   )
 
   it('cuts a whole JWT query, and ends a prose query at the space', () => {
@@ -4373,7 +4405,7 @@ describe('a multi-word denied key behind a prefix', () => {
           scrubSentryEvent({ extra: { [hostileKey]: 'x' } } as unknown as ScrubbableEvent)
       }, 75)
     },
-    COMPLEXITY_TEST_TIMEOUT_MS
+    TIMING_TEST_TIMEOUT_MS
   )
 
   it('quotes the marker the way the DOCUMENT is quoted', () => {

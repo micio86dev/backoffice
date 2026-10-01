@@ -5,11 +5,6 @@ import { checkA11y } from './fixtures/a11y'
  * Reports index (Unit 7, task 27.7/29.1): filter + row-click-navigates-to-
  * participant-detail flow, role-based locators, network fixtures;
  * `@axe-core/playwright` clean.
- *
- * KNOWN PRE-EXISTING BLOCKER (confirmed unrelated to this change): same
- * `login()` helper / same blocker already documented in tasks.md task 4.3,
- * `projects-crud.spec.ts`, and `settings-tabs.spec.ts`. Written to the same
- * standard as the rest of the suite; could not run to completion here.
  */
 
 const EVALUATION_ROW = {

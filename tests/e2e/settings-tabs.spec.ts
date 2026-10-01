@@ -7,11 +7,6 @@ import type { TenantRole } from '../unit/support/abilities'
  * Settings tabs (Unit 6, task 24.9/26.1): role-based locators, network
  * fixtures for `/organization`, `/users`, `/m2m/clients`; `@axe-core/playwright`
  * clean on all four tab panels.
- *
- * KNOWN PRE-EXISTING BLOCKER (confirmed unrelated to this change): same
- * `login()` helper / same blocker already documented in tasks.md task 4.3
- * and `projects-crud.spec.ts`. Written to the same standard as the rest of
- * the suite; could not run to completion in this environment.
  */
 
 const ORGANIZATION = {

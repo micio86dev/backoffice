@@ -10,14 +10,6 @@ import { checkA11y } from './fixtures/a11y'
  * backend in this environment, API calls intercepted at the network layer
  * with fixtures shaped exactly like the real `ProjectResource`. Role-based
  * locators ONLY (getByRole/getByLabel), per this project's E2E convention.
- *
- * KNOWN PRE-EXISTING BLOCKER (confirmed unrelated to this change): the
- * `login()` helper below is copied from `admin-flow.spec.ts`, which times
- * out on `getByLabel('Email')` on an unmodified `develop` checkout — verified
- * by `git stash` + rerun during PR 1b (see tasks.md task 4.3). This spec
- * inherits that same blocker and could not be run to completion in this
- * environment; it is written to the same standard as the rest of the suite
- * so it is ready the moment the login blocker is fixed.
  */
 
 const DRAFT_PROJECT = {

@@ -1586,18 +1586,77 @@ describe('a literal unset misses every other spelling', () => {
   })
 })
 
-describe('what the measurements settled', () => {
-  it('scans a long hostile string in linear time', () => {
-    // Unanchored, the local part re-ran from every start position: 24ms at 10k,
-    // 393ms at 40k, 1,544ms at 80k — a second and a half of main-thread freeze
-    // inside beforeSend. The leading lookbehind makes each start O(1) to reject.
-    const hostile = 'x@' + 'a'.repeat(80_000)
+/**
+ * Complexity guards measure GROWTH, never absolute milliseconds. An absolute
+ * threshold ("under 250 ms") passes or fails with the machine: a loaded CI
+ * runner or a laptop under a parallel test run blew the bound on linear code
+ * while a genuinely quadratic regression on a fast machine could still pass.
+ *
+ * `build(n)` prepares the hostile input of size `n` OUTSIDE the timed region and
+ * returns the operation to time. The same operation is timed at `n` and at
+ * `GROWTH_FACTOR * n`, taking the FASTEST of a few runs per side after a
+ * warm-up: load only ever adds time, so the minimum is the least disturbed
+ * sample, where a median still moves when most of a run's neighbours are busy.
+ * Linear code grows about `GROWTH_FACTOR` times, quadratic about
+ * `GROWTH_FACTOR ** 2` times, and cubic far more. The bound sits at three times
+ * the linear expectation, far from both.
+ *
+ * The small side is floored at one millisecond: below that a timing is clock
+ * granularity, and the ratio of two near-zero numbers is noise. A real
+ * regression is not masked by the floor, because the large side then dominates.
+ * The sizes stay small on purpose: a deliberately quadratic implementation has
+ * to FAIL this test in seconds, not hang the suite.
+ */
+const GROWTH_FACTOR = 8
+const GROWTH_BOUND = GROWTH_FACTOR * 3
+const TIMED_RUNS = 5
+const TIMER_FLOOR_MS = 1
+/** Generous on purpose: only a broken implementation gets anywhere near it. */
+const COMPLEXITY_TEST_TIMEOUT_MS = 60_000
+
+function fastestMs(operation: () => void): number {
+  operation() // warm-up: keeps JIT compilation out of the smaller sample
+
+  let fastest = Infinity
+
+  for (let run = 0; run < TIMED_RUNS; run += 1) {
     const started = performance.now()
 
-    redactFreeText(hostile)
+    operation()
 
-    expect(performance.now() - started).toBeLessThan(250)
-  })
+    fastest = Math.min(fastest, performance.now() - started)
+  }
+
+  return fastest
+}
+
+function expectLinearGrowth(build: (n: number) => () => void, n: number): void {
+  const small = fastestMs(build(n))
+  const large = fastestMs(build(n * GROWTH_FACTOR))
+  const ratio = large / Math.max(small, TIMER_FLOOR_MS)
+
+  expect(
+    ratio,
+    `${n} -> ${n * GROWTH_FACTOR} took ${small.toFixed(2)} ms -> ${large.toFixed(2)} ms ` +
+      `(x${ratio.toFixed(1)}; linear is about x${GROWTH_FACTOR}, quadratic about x${GROWTH_FACTOR ** 2})`
+  ).toBeLessThan(GROWTH_BOUND)
+}
+
+describe('what the measurements settled', () => {
+  it(
+    'scans a long hostile string in linear time',
+    () => {
+      // Unanchored, the local part re-ran from every start position: 24ms at 10k,
+      // 393ms at 40k, 1,544ms at 80k — a second and a half of main-thread freeze
+      // inside beforeSend. The leading lookbehind makes each start O(1) to reject.
+      expectLinearGrowth((n) => {
+        const hostile = 'x@' + 'a'.repeat(n)
+
+        return () => redactFreeText(hostile)
+      }, 4_000)
+    },
+    COMPLEXITY_TEST_TIMEOUT_MS
+  )
 
   it('redacts an address sitting in a URL PATH', () => {
     // `redactAnalyticsPath` collapses the segments it knows; an address in one
@@ -1803,15 +1862,19 @@ describe('pinned on the branch delta, not on what another rule already cuts', ()
     expect(encoded).not.toContain('BCTOKEN9')
   })
 
-  it('anchors the address pass inside a URL path too', () => {
-    // Without the lookbehind the scan restarts from every position — the same
-    // deletion that is pinned on the prose pattern.
-    const started = performance.now()
+  it(
+    'anchors the address pass inside a URL path too',
+    () => {
+      // Without the lookbehind the scan restarts from every position — the same
+      // deletion that is pinned on the prose pattern.
+      expectLinearGrowth((n) => {
+        const hostile = '/downloads/' + 'a'.repeat(n)
 
-    redactUrl('/downloads/' + 'a'.repeat(60_000))
-
-    expect(performance.now() - started).toBeLessThan(250)
-  })
+        return () => redactUrl(hostile)
+      }, 4_000)
+    },
+    COMPLEXITY_TEST_TIMEOUT_MS
+  )
 })
 
 describe('the fast path and the miss path must answer the same', () => {
@@ -3719,24 +3782,26 @@ describe('a multi-word denied key behind a prefix', () => {
     expect((scrubbed.extra as Record<string, unknown>)[key]).toBe('application/json')
   })
 
-  it('scans a long BRACE RUN in linear time', () => {
-    // The embedded-document scan called `embeddedValueEnd` at every `{`, and on
-    // an unbalanced opener that scan runs to the end of the string — O(n^2),
-    // with the length check sitting AFTER it so it bounded `JSON.parse` and
-    // nothing else. Measured before the fix: 671 ms at 20k, 2.3 s at 40k,
-    // 14.1 s at 99k — fourteen seconds of blocked main thread inside
-    // `beforeSend`, on the operator's tab.
-    //
-    // Same shape as the two timing assertions this suite already carries, for
-    // the same reason: a bound only a performance test can see.
-    const hostile = '{'.repeat(99_000)
+  it(
+    'scans a long BRACE RUN in linear time',
+    () => {
+      // The embedded-document scan called `embeddedValueEnd` at every `{`, and on
+      // an unbalanced opener that scan runs to the end of the string — O(n^2),
+      // with the length check sitting AFTER it so it bounded `JSON.parse` and
+      // nothing else. Measured before the fix: 671 ms at 20k, 2.3 s at 40k,
+      // 14.1 s at 99k — fourteen seconds of blocked main thread inside
+      // `beforeSend`, on the operator's tab.
+      //
+      // Same shape as the two timing assertions this suite already carries, for
+      // the same reason: a bound only a performance test can see.
+      expectLinearGrowth((n) => {
+        const hostile = '{'.repeat(n)
 
-    const started = performance.now()
-
-    scrubSentryEvent({ message: hostile } as unknown as ScrubbableEvent)
-
-    expect(performance.now() - started).toBeLessThan(250)
-  })
+        return () => scrubSentryEvent({ message: hostile } as unknown as ScrubbableEvent)
+      }, 10_000)
+    },
+    COMPLEXITY_TEST_TIMEOUT_MS
+  )
 
   it('gives the stack HEAD the free-text rule and the FRAMES the url rule', () => {
     // The split is what makes `redactStack` two things at once, and collapsing it
@@ -3881,24 +3946,26 @@ describe('a multi-word denied key behind a prefix', () => {
     }
   )
 
-  it('resolves a COLLIDING key map in linear time', () => {
-    // Every colliding key restarted the suffix search at 2, so n keys redacting
-    // to the same marker cost O(n^2) probes — 82 ms at 1000, 806 ms at 4000,
-    // 2.9 s at 8000, inside `beforeSend` on the main thread. A map keyed by
-    // address is the ordinary shape of a delivery-result map, and a map keyed by
-    // absolute URL collides just as hard.
-    const extra: Record<string, unknown> = {}
+  it(
+    'resolves a COLLIDING key map in linear time',
+    () => {
+      // Every colliding key restarted the suffix search at 2, so n keys redacting
+      // to the same marker cost O(n^2) probes — 82 ms at 1000, 806 ms at 4000,
+      // 2.9 s at 8000, inside `beforeSend` on the main thread. A map keyed by
+      // address is the ordinary shape of a delivery-result map, and a map keyed by
+      // absolute URL collides just as hard.
+      expectLinearGrowth((n) => {
+        const extra: Record<string, unknown> = {}
 
-    for (let i = 0; i < 8_000; i += 1) {
-      extra[`user${i}@acme.test`] = 'x'
-    }
+        for (let i = 0; i < n; i += 1) {
+          extra[`user${i}@acme.test`] = 'x'
+        }
 
-    const started = performance.now()
-
-    scrubSentryEvent({ extra } as unknown as ScrubbableEvent)
-
-    expect(performance.now() - started).toBeLessThan(400)
-  })
+        return () => scrubSentryEvent({ extra } as unknown as ScrubbableEvent)
+      }, 1_000)
+    },
+    COMPLEXITY_TEST_TIMEOUT_MS
+  )
 
   it('cuts a whole JWT query, and ends a prose query at the space', () => {
     // The boundary this module and `redactUrl` answer differently, made visible
@@ -4289,22 +4356,25 @@ describe('a multi-word denied key behind a prefix', () => {
     }
   )
 
-  it('bounds the denied-key run walk, so a long key cannot freeze beforeSend', () => {
-    // The bound is a performance guard and only a performance test can see it.
-    // Unbounded, the walk is cubic — every start, every end, and a `join` inside
-    // both — on a key whose length a request body influences: measured 845 ms of
-    // main-thread freeze inside `beforeSend` against 1 ms with the bound.
-    //
-    // The twin guard already had this test ('scans a long hostile string in
-    // linear time'); the key walk never got it.
-    const hostileKey = Array.from({ length: 600 }, (_, i) => `seg${i}`).join('_')
+  it(
+    'bounds the denied-key run walk, so a long key cannot freeze beforeSend',
+    () => {
+      // The bound is a performance guard and only a performance test can see it.
+      // Unbounded, the walk is cubic — every start, every end, and a `join` inside
+      // both — on a key whose length a request body influences: measured 845 ms of
+      // main-thread freeze inside `beforeSend` against 1 ms with the bound.
+      //
+      // The twin guard already had this test ('scans a long hostile string in
+      // linear time'); the key walk never got it.
+      expectLinearGrowth((n) => {
+        const hostileKey = Array.from({ length: n }, (_, i) => `seg${i}`).join('_')
 
-    const started = performance.now()
-
-    scrubSentryEvent({ extra: { [hostileKey]: 'x' } } as unknown as ScrubbableEvent)
-
-    expect(performance.now() - started).toBeLessThan(250)
-  })
+        return () =>
+          scrubSentryEvent({ extra: { [hostileKey]: 'x' } } as unknown as ScrubbableEvent)
+      }, 75)
+    },
+    COMPLEXITY_TEST_TIMEOUT_MS
+  )
 
   it('quotes the marker the way the DOCUMENT is quoted', () => {
     // A plain-quoted marker inside an escaped document closes the outer string

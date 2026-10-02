@@ -282,3 +282,22 @@ describe('CompetencyPicker — coverage-aware selection (D2)', () => {
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[3]])
   })
 })
+
+describe('CompetencyPicker — role-less (potential) copy', () => {
+  const OPTS = [{ id: 1, code: 'MTG', name: 'Motivation', barsAvailable: false }]
+  const textFor = (roleless: boolean, modelValue: number[]) =>
+    mount(CompetencyPicker, {
+      props: { options: OPTS, modelValue, roleless },
+      global: { mocks: { $t: tMock } },
+    }).text()
+
+  it('keeps the role-scoped copy when the project has a role', () => {
+    expect(textFor(false, [])).not.toContain('Roleless')
+  })
+
+  it('uses role-free copy for the reason and the summary when role-less', () => {
+    expect(textFor(true, [])).toContain('competencyPicker.noBarsRoleless')
+    expect(textFor(true, [1])).toContain('competencyPicker.attachedNoBarsRoleless')
+    expect(textFor(true, [])).toContain('coverageSummaryRoleless {"missing":1,"total":1}')
+  })
+})

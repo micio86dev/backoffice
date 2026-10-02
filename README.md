@@ -46,6 +46,38 @@ bunx eslint .
 > environment variables Playwright injects, and fails for reasons unrelated to
 > the code. Stop it first.
 
+## Real-stack e2e (opt-in)
+
+Every other Playwright suite is fully mocked (`page.route`), so none of them can
+see an api whose database schema is behind its code. The `stack` tier is the one
+that can: it drives the REAL running stack (backoffice nginx -> api -> Postgres)
+with no mocks, and fails on any `/api/` answer with status >= 500.
+
+```bash
+task stack:check   # precondition, from the wrapper repo: the stack must be up and ready
+BEAI_E2E_ADMIN_EMAIL=... BEAI_E2E_ADMIN_PASSWORD=... bun run test:e2e:stack
+```
+
+- Runs on the HOST against `http://localhost:3001`; override with `BEAI_E2E_STACK_URL`.
+- Origin guard: the config, the global setup and the spec all refuse any
+  `BEAI_E2E_STACK_URL` whose parsed hostname is not exactly `localhost`, `127.0.0.1` or
+  `[::1]` (http or https, no embedded credentials). The tier signs in and writes data, so a
+  stray export pointing at staging or production must fail before any request. Setting
+  `BEAI_E2E_ALLOW_NON_LOCAL=1` lifts the host check; it is for deliberate use only.
+- `BEAI_E2E_ADMIN_EMAIL` / `BEAI_E2E_ADMIN_PASSWORD`: the admin of a DEDICATED e2e
+  organization in your local dev data (no default credentials are committed). Never reuse
+  a production or personal account.
+- Never run it with `--trace on` or `trace: 'on'`: the trace records the typed password.
+  The config keeps `on-first-retry`, and the stack tier has no retries, so it records none.
+- Before any test, a global setup calls `/api/health` then `/api/health/ready` through
+  the same origin and aborts with the exact fix (for example
+  `docker compose exec api php artisan migrate --force`) when the stack is not ready.
+- It WRITES a real row in the local dev database only (a reusable link labelled
+  `e2e-stack-<timestamp>` on the first project it finds) and deletes it through the real
+  api afterwards; a leftover is recognisable by that prefix. It never creates projects.
+- Specs: `reusable-link.stack.spec.ts` (creates and removes a link) and `project-potential.stack.spec.ts` (opens the create-project drawer on the `potential` type and checks MTG and LAT are selectable; read-only, never submits).
+- Not part of `bun run test:e2e` or CI: `tests/e2e/stack/**` is ignored by the mocked projects.
+
 ## API client
 
 `types/api.ts` is GENERATED from `openapi.json`, which is exported from the api

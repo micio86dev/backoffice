@@ -489,7 +489,10 @@
       "empty": "Nessuna competenza disponibile per questa selezione.",
       "noBars": "Nessuna ancora comportamentale per questo ruolo — non è valutabile, quindi non è selezionabile.",
       "attachedNoBars": "Già presente in questo progetto ma senza ancore comportamentali per questo ruolo — non verrà valutata. Rimuovila per correggere il report.",
-      "coverageSummary": "{missing} competenze su {total} non hanno ancora ancore comportamentali per questo ruolo."
+      "noBarsRoleless": "Nessuna ancora comportamentale — non è valutabile, quindi non è selezionabile.",
+      "attachedNoBarsRoleless": "Già presente in questo progetto ma senza ancore comportamentali — non verrà valutata. Rimuovila per correggere il report.",
+      "coverageSummary": "{missing} competenze su {total} non hanno ancora ancore comportamentali per questo ruolo.",
+      "coverageSummaryRoleless": "{missing} competenze su {total} non hanno ancora ancore comportamentali."
     },
     "avatarProvider": {
       "heygen": "HeyGen",
@@ -1795,6 +1798,7 @@
         "addLabel": "Aggiungi una competenza",
         "add": "Aggiungi",
         "noneAvailable": "Ogni competenza standard di questa bozza è già assegnata.",
+        "potentialNote": "Le competenze di potenziale (MTG e LAT) non appartengono a nessun ruolo. Vengono valutate nei progetti di tipo Potenziale e si scelgono lì, non qui.",
         "confirmDetachTitle": "Rimuovere queste competenze?",
         "confirmDetachBody": "Il salvataggio rimuove ogni competenza tolta dall'elenco sottostante. Una competenza la cui coppia ruolo/competenza ha ancora indicatori BARS in questa bozza non può essere rimossa — il salvataggio viene rifiutato, indicandola, finché quegli indicatori non vengono rimossi prima.",
         "saveError": "Non è stato possibile salvare le competenze di questo ruolo."

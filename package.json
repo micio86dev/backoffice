@@ -1,6 +1,6 @@
 {
   "name": "backoffice",
-  "version": "0.47.1",
+  "version": "0.47.2",
   "type": "module",
   "private": true,
   "scripts": {
@@ -16,6 +16,7 @@
     "test:unit": "node node_modules/.bin/vitest run",
     "test:unit:coverage": "node node_modules/.bin/vitest run --coverage",
     "test:e2e": "node node_modules/.bin/playwright test",
+    "test:e2e:stack": "BEAI_E2E_STACK=1 node node_modules/.bin/playwright test --project=stack-chromium --project=stack-webkit",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
     "codegen": "bunx openapi-typescript openapi.json -o types/api.ts",

@@ -1251,6 +1251,21 @@ describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-
     expect(payload.competency_ids).toEqual([91])
   })
 
+  it('tells the picker the project is role-less only for a potential assessment', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+    expect(wrapper.findComponent(CompetencyPicker).props('roleless')).toBe(false)
+
+    await wrapper
+      .get('[data-testid="project-form-assessment-type"] button:last-child')
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent(CompetencyPicker).props('roleless')).toBe(true)
+  })
+
   it('says a failed catalogue load FAILED, rather than showing an empty list', async () => {
     // "No competencies available for this selection" is a claim about the
     // catalogue, and a failed request supports no claim about it — it would

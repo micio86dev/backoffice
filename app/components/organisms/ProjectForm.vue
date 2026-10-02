@@ -237,6 +237,7 @@
           v-model="competencyIds"
           :options="competencyOptions"
           :persisted-ids="persistedIds"
+          :roleless="assessmentType === 'potential'"
         />
 
         <!--

@@ -4,7 +4,7 @@
     <FieldDescription>{{ $t('projects.form.help.competencies') }}</FieldDescription>
     <FieldDescription v-if="missingCount > 0">
       {{
-        $t('projects.competencyPicker.coverageSummary', {
+        $t(`projects.competencyPicker.coverageSummary${suffix}`, {
           missing: missingCount,
           total: options.length,
         })
@@ -22,7 +22,9 @@
         :disabled="!selectable(option)"
         :label="option.name"
         :description="
-          reasonKey(option) ? $t(`projects.competencyPicker.${reasonKey(option)}`) : undefined
+          reasonKey(option)
+            ? $t(`projects.competencyPicker.${reasonKey(option)}${suffix}`)
+            : undefined
         "
         :description-id="reasonId(option)"
         @update:model-value="(checked) => toggle(option, checked)"
@@ -69,8 +71,10 @@ const props = withDefaults(
     // uncovered option is disabled — there is no existing commitment to
     // honour.
     persistedIds?: number[]
+    // A `potential` project has no role: use the role-free coverage copy.
+    roleless?: boolean
   }>(),
-  { persistedIds: () => [] }
+  { persistedIds: () => [], roleless: false }
 )
 
 const emit = defineEmits<{
@@ -118,6 +122,8 @@ function reasonKey(option: CompetencyOption): 'noBars' | 'attachedNoBars' | null
 function reasonId(option: CompetencyOption): string | undefined {
   return reasonKey(option) === null ? undefined : `competency-${option.code}-reason`
 }
+
+const suffix = computed(() => (props.roleless ? 'Roleless' : ''))
 
 const missingCount = computed(
   () => props.options.filter((option) => option.barsAvailable === false).length

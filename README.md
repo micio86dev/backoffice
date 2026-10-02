@@ -46,6 +46,29 @@ bunx eslint .
 > environment variables Playwright injects, and fails for reasons unrelated to
 > the code. Stop it first.
 
+## Real-stack e2e (opt-in)
+
+Every other Playwright suite is fully mocked (`page.route`), so none of them can
+see an api whose database schema is behind its code. The `stack` tier is the one
+that can: it drives the REAL running stack (backoffice nginx -> api -> Postgres)
+with no mocks, and fails on any `/api/` answer with status >= 500.
+
+```bash
+task stack:check   # precondition, from the wrapper repo: the stack must be up and ready
+BEAI_E2E_ADMIN_EMAIL=... BEAI_E2E_ADMIN_PASSWORD=... bun run test:e2e:stack
+```
+
+- Runs on the HOST against `http://localhost:3001`; override with `BEAI_E2E_STACK_URL`.
+- `BEAI_E2E_ADMIN_EMAIL` / `BEAI_E2E_ADMIN_PASSWORD`: an admin of your local dev data
+  (no default credentials are committed). Never reuse a production account.
+- Before any test, a global setup calls `/api/health` then `/api/health/ready` through
+  the same origin and aborts with the exact fix (for example
+  `docker compose exec api php artisan migrate --force`) when the stack is not ready.
+- It WRITES a real row in the local dev database only (a reusable link labelled
+  `e2e-stack-<timestamp>` on the first project it finds) and deletes it through the real
+  api afterwards; a leftover is recognisable by that prefix. It never creates projects.
+- Not part of `bun run test:e2e` or CI: `tests/e2e/stack/**` is ignored by the mocked projects.
+
 ## API client
 
 `types/api.ts` is GENERATED from `openapi.json`, which is exported from the api

@@ -1251,6 +1251,21 @@ describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-
     expect(payload.competency_ids).toEqual([91])
   })
 
+  it('tells the picker the project is role-less only for a potential assessment', async () => {
+    const wrapper = mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+    expect(wrapper.findComponent(CompetencyPicker).props('roleless')).toBe(false)
+
+    await wrapper
+      .get('[data-testid="project-form-assessment-type"] button:last-child')
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent(CompetencyPicker).props('roleless')).toBe(true)
+  })
+
   it('leaves MTG and LAT selectable when the catalogue answers bars_available true, and disabled with the reason when false', async () => {
     // The picker disables an option on an EXPLICIT `false` only. This pins both
     // sides for the potential set, which the real catalogue once answered
@@ -1296,7 +1311,7 @@ describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-
     for (const code of ['MTG', 'LAT']) {
       expect(uncovered.get(`#competency-${code}`).attributes('disabled')).toBeDefined()
     }
-    expect(uncovered.text()).toContain('projects.competencyPicker.noBars')
+    expect(uncovered.text()).toContain('projects.competencyPicker.noBarsRoleless')
   })
 
   it('says a failed catalogue load FAILED, rather than showing an empty list', async () => {

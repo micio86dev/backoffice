@@ -68,6 +68,10 @@
             }}</FieldError>
           </div>
 
+          <p class="text-muted-foreground text-sm" data-testid="role-competencies-potential-note">
+            {{ $t('catalogue.roles.competencies.potentialNote') }}
+          </p>
+
           <Field v-if="available.length > 0">
             <FieldLabel id="role-competencies-add-label">{{
               $t('catalogue.roles.competencies.addLabel')

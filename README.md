@@ -59,8 +59,16 @@ BEAI_E2E_ADMIN_EMAIL=... BEAI_E2E_ADMIN_PASSWORD=... bun run test:e2e:stack
 ```
 
 - Runs on the HOST against `http://localhost:3001`; override with `BEAI_E2E_STACK_URL`.
-- `BEAI_E2E_ADMIN_EMAIL` / `BEAI_E2E_ADMIN_PASSWORD`: an admin of your local dev data
-  (no default credentials are committed). Never reuse a production account.
+- Origin guard: the config, the global setup and the spec all refuse any
+  `BEAI_E2E_STACK_URL` whose parsed hostname is not exactly `localhost`, `127.0.0.1` or
+  `[::1]` (http or https, no embedded credentials). The tier signs in and writes data, so a
+  stray export pointing at staging or production must fail before any request. Setting
+  `BEAI_E2E_ALLOW_NON_LOCAL=1` lifts the host check; it is for deliberate use only.
+- `BEAI_E2E_ADMIN_EMAIL` / `BEAI_E2E_ADMIN_PASSWORD`: the admin of a DEDICATED e2e
+  organization in your local dev data (no default credentials are committed). Never reuse
+  a production or personal account.
+- Never run it with `--trace on` or `trace: 'on'`: the trace records the typed password.
+  The config keeps `on-first-retry`, and the stack tier has no retries, so it records none.
 - Before any test, a global setup calls `/api/health` then `/api/health/ready` through
   the same origin and aborts with the exact fix (for example
   `docker compose exec api php artisan migrate --force`) when the stack is not ready.

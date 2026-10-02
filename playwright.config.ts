@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { resolveStackUrl } from './tests/e2e/support/stack-url'
 
 /**
  * Playwright E2E configuration — 2 required browser projects.
@@ -26,7 +27,8 @@ import { defineConfig, devices } from '@playwright/test'
  * ignore `tests/e2e/stack/**` entirely, so they behave exactly as before.
  */
 const STACK = process.env['BEAI_E2E_STACK'] === '1'
-const STACK_URL = process.env['BEAI_E2E_STACK_URL'] ?? 'http://localhost:3001'
+// Resolved (and origin-checked) only for the stack tier, so a bad value never affects CI.
+const STACK_URL = STACK ? resolveStackUrl() : ''
 
 export default defineConfig({
   testDir: './tests/e2e',

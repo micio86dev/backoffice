@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { resolveStackUrl } from '../support/stack-url'
 
 /**
  * Reusable interview link against the REAL stack (opt-in tier, BEAI_E2E_STACK=1).
@@ -26,36 +27,48 @@ interface LinkRow {
   label: string | null
 }
 
+const CREATE_PATH = /^\/api\/projects\/([^/]+)\/reusable-links$/
+
 // Per-test state, reset in beforeEach: both browser projects run this file in one
-// worker, and a stale label, token or error list must never leak from one to the next.
+// worker, and a stale label or error list must never leak from one to the next.
 let label = ''
-let accessToken: string | null = null
+let createAttempted = false
 let projectId: string | null = null
 let serverErrors: string[] = []
 
 test.beforeEach(() => {
   label = `${LABEL_PREFIX}${Date.now()}`
-  accessToken = null
+  createAttempted = false
   projectId = null
   serverErrors = []
 })
+
+function credentials(): { email: string; password: string } {
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    throw new Error(
+      'Set BEAI_E2E_ADMIN_EMAIL and BEAI_E2E_ADMIN_PASSWORD to the admin of a DEDICATED e2e ' +
+        'organization in your LOCAL dev data (provisioned with `php artisan ' +
+        'beai:provision-organization`, see docs/dev-setup.md). No default credentials are committed.'
+    )
+  }
+
+  return { email: ADMIN_EMAIL, password: ADMIN_PASSWORD }
+}
 
 function describe5xx(method: string, url: string, status: number): string {
   return `${status} ${method} ${new URL(url).pathname}`
 }
 
 async function signIn(page: Page): Promise<void> {
-  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-    throw new Error(
-      'Set BEAI_E2E_ADMIN_EMAIL and BEAI_E2E_ADMIN_PASSWORD to an admin of your LOCAL dev data ' +
-        '(the one you provisioned with `php artisan beai:provision-organization`, see ' +
-        'docs/dev-setup.md). No default credentials are committed.'
-    )
-  }
+  // Safe even if this spec is run without the config: refuse a non-local origin
+  // before the password is typed anywhere.
+  resolveStackUrl()
+
+  const { email, password } = credentials()
 
   await page.goto('/login')
-  await page.getByTestId('login-email').fill(ADMIN_EMAIL)
-  await page.getByTestId('login-password').fill(ADMIN_PASSWORD)
+  await page.getByTestId('login-email').fill(email)
+  await page.getByTestId('login-password').fill(password)
 
   const login = page.waitForResponse(
     (response) =>
@@ -74,45 +87,82 @@ async function signIn(page: Page): Promise<void> {
     )
   }
 
-  accessToken = ((await response.json()) as { access_token?: string }).access_token ?? null
   await expect(page).not.toHaveURL(/\/login/)
 }
 
-async function sweep(request: APIRequestContext): Promise<number> {
-  if (accessToken === null || projectId === null) return 0
+/**
+ * Remove every link this test created. It must never fail silently: a swallowed
+ * error here leaves a live `e2e-stack-*` link in the database while the test
+ * stays green. It signs in again for a fresh token (the test's own may have
+ * expired, or never been obtained) and throws, with status and path only, on any
+ * non-ok answer. The list endpoint is not paginated (it returns `->get()`), so one
+ * call sees every link of the project.
+ */
+async function sweep(request: APIRequestContext): Promise<void> {
+  if (!createAttempted) return
 
-  const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }
-  const list = await request.get(`/api/projects/${projectId}/reusable-links`, { headers })
+  resolveStackUrl()
 
-  if (!list.ok()) return 0
-
-  const rows = ((await list.json()) as { data: LinkRow[] }).data
-  let removed = 0
-
-  for (const row of rows.filter((candidate) => candidate.label === label)) {
-    const gone = await request.delete(`/api/projects/${projectId}/reusable-links/${row.id}`, {
-      headers,
-    })
-
-    expect([204, 404]).toContain(gone.status())
-    removed += 1
+  if (projectId === null) {
+    throw new Error(`Cleanup: a create was attempted for "${label}" but its project id is unknown.`)
   }
 
-  return removed
+  const login = await request.post('/api/auth/login', {
+    data: credentials(),
+    headers: { Accept: 'application/json' },
+  })
+
+  if (!login.ok()) throw new Error(`Cleanup sign-in failed: HTTP ${login.status()} /api/auth/login`)
+
+  const token = ((await login.json()) as { access_token?: string }).access_token
+
+  if (!token) throw new Error('Cleanup sign-in returned no access token.')
+
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+  const base = `/api/projects/${projectId}/reusable-links`
+  const list = await request.get(base, { headers })
+
+  if (!list.ok()) throw new Error(`Cleanup list failed: HTTP ${list.status()} ${base}`)
+
+  const rows = ((await list.json()) as { data: LinkRow[] }).data
+
+  for (const row of rows.filter((candidate) => candidate.label === label)) {
+    const gone = await request.delete(`${base}/${row.id}`, { headers })
+
+    if (![204, 404].includes(gone.status())) {
+      throw new Error(`Cleanup delete failed: HTTP ${gone.status()} ${base}/${row.id}`)
+    }
+  }
 }
 
 test.afterEach(async ({ request }) => {
+  // Surfaced on ANY outcome (a failed earlier expect must not hide it), softly so
+  // it never masks the original failure. Method, path and status only.
+  if (serverErrors.length > 0) {
+    test.info().annotations.push({ type: '5xx', description: serverErrors.join(', ') })
+  }
+
+  expect.soft(serverErrors, `5xx answers from /api/: ${serverErrors.join(', ')}`).toEqual([])
+
   await sweep(request)
 })
 
 test('creating a reusable link on the real stack answers 201 and no /api call is a 5xx', async ({
   page,
 }) => {
+  // Captured from the REQUEST at the moment the create is issued, so a page that
+  // closes before the response arrives cannot lose the project id.
+  page.on('request', (request) => {
+    const create = CREATE_PATH.exec(new URL(request.url()).pathname)
+
+    if (create && request.method() === 'POST') {
+      createAttempted = true
+      projectId = create[1] ?? null
+    }
+  })
+
   page.on('response', (response) => {
     const { pathname } = new URL(response.url())
-    const create = /^\/api\/projects\/([^/]+)\/reusable-links$/.exec(pathname)
-
-    if (create && response.request().method() === 'POST') projectId = create[1] ?? null
 
     if (pathname.startsWith('/api/') && response.status() >= 500) {
       serverErrors.push(describe5xx(response.request().method(), response.url(), response.status()))
@@ -159,6 +209,4 @@ test('creating a reusable link on the real stack answers 201 and no /api call is
   const panel = page.getByRole('region', { name: PANEL_NAME })
 
   await expect(panel.getByRole('listitem').filter({ hasText: label })).toBeVisible()
-
-  expect(serverErrors, `5xx answers from /api/: ${serverErrors.join(', ')}`).toEqual([])
 })

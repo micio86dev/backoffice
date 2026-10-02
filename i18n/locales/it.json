@@ -1795,6 +1795,7 @@
         "addLabel": "Aggiungi una competenza",
         "add": "Aggiungi",
         "noneAvailable": "Ogni competenza standard di questa bozza è già assegnata.",
+        "potentialNote": "Le competenze di potenziale (MTG e LAT) non appartengono a nessun ruolo. Vengono valutate nei progetti di tipo Potenziale e si scelgono lì, non qui.",
         "confirmDetachTitle": "Rimuovere queste competenze?",
         "confirmDetachBody": "Il salvataggio rimuove ogni competenza tolta dall'elenco sottostante. Una competenza la cui coppia ruolo/competenza ha ancora indicatori BARS in questa bozza non può essere rimossa — il salvataggio viene rifiutato, indicandola, finché quegli indicatori non vengono rimossi prima.",
         "saveError": "Non è stato possibile salvare le competenze di questo ruolo."

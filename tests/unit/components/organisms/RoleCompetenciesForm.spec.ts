@@ -11,6 +11,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { realI18n } from '../../support/i18n'
+import en from '../../../../i18n/locales/en.json'
+import itLocale from '../../../../i18n/locales/it.json'
 import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
@@ -260,6 +262,51 @@ describe('RoleCompetenciesForm', () => {
     expect(wrapper.get('[data-testid="role-competencies-empty"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="role-competencies-add-select"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="role-competencies-none-available"]').exists()).toBe(true)
+  })
+
+  describe('potential competencies note', () => {
+    const NOTE_KEY = 'catalogue.roles.competencies.potentialNote'
+
+    it('explains where MTG and LAT went, whatever the form currently holds', () => {
+      const cases = [
+        { role: ROLE, competencies: COMPETENCIES }, // assigned + something to add
+        { role: { ...ROLE, competency_ids: [] }, competencies: [] }, // empty
+        { role: { ...ROLE, competency_ids: [11, 22, 33] }, competencies: COMPETENCIES }, // all assigned
+      ]
+
+      for (const props of cases) {
+        const wrapper = mount(RoleCompetenciesForm, { props, global: { mocks: { $t: tMock } } })
+        expect(wrapper.get('[data-testid="role-competencies-potential-note"]').text()).toBe(
+          NOTE_KEY
+        )
+        wrapper.unmount()
+      }
+    })
+
+    it('ships real copy naming MTG and LAT in both locales', () => {
+      for (const locale of [en, itLocale]) {
+        const note = locale.catalogue.roles.competencies.potentialNote
+        expect(note).toContain('MTG')
+        expect(note).toContain('LAT')
+      }
+    })
+
+    it('does not add potential competencies to the add control', () => {
+      const potential = {
+        id: 44,
+        code: 'MTG',
+        revision_id: 1,
+        type: 'potential',
+        name: {},
+        definition: {},
+      }
+      // The parent filters to standard; the note must not change what is offered.
+      const wrapper = mount(RoleCompetenciesForm, {
+        props: { role: ROLE, competencies: COMPETENCIES.filter((c) => c.id !== potential.id) },
+        global: { mocks: { $t: tMock } },
+      })
+      expect(wrapper.text()).not.toContain('MTG')
+    })
   })
 
   it('surfaces the detach refusal naming the still-anchored competency codes, verbatim', async () => {

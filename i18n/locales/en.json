@@ -1795,6 +1795,7 @@
         "addLabel": "Add a competency",
         "add": "Add",
         "noneAvailable": "Every standard competency in this draft is already assigned.",
+        "potentialNote": "Potential competencies (MTG and LAT) belong to no role. They are scored on Potential projects and are chosen there, not here.",
         "confirmDetachTitle": "Detach these competencies?",
         "confirmDetachBody": "Saving detaches every competency removed from the list below. A competency whose role/competency pair still carries BARS indicators in this draft cannot be detached — the save is refused, naming it, until those indicators are removed first.",
         "saveError": "Could not save this role's competencies."

@@ -75,6 +75,7 @@ BEAI_E2E_ADMIN_EMAIL=... BEAI_E2E_ADMIN_PASSWORD=... bun run test:e2e:stack
 - It WRITES a real row in the local dev database only (a reusable link labelled
   `e2e-stack-<timestamp>` on the first project it finds) and deletes it through the real
   api afterwards; a leftover is recognisable by that prefix. It never creates projects.
+- Specs: `reusable-link.stack.spec.ts` (creates and removes a link) and `project-potential.stack.spec.ts` (opens the create-project drawer on the `potential` type and checks MTG and LAT are selectable; read-only, never submits).
 - Not part of `bun run test:e2e` or CI: `tests/e2e/stack/**` is ignored by the mocked projects.
 
 ## API client

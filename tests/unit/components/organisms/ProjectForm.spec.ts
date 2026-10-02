@@ -1266,6 +1266,54 @@ describe('ProjectForm — competency_ids hydration and submission (Phase 1 data-
     expect(wrapper.findComponent(CompetencyPicker).props('roleless')).toBe(true)
   })
 
+  it('leaves MTG and LAT selectable when the catalogue answers bars_available true, and disabled with the reason when false', async () => {
+    // The picker disables an option on an EXPLICIT `false` only. This pins both
+    // sides for the potential set, which the real catalogue once answered
+    // `false` for and made the pair unselectable.
+    const mountPotential = async () => {
+      const wrapper = mount(ProjectForm, {
+        props: { project: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+      await wrapper.get('[data-testid="project-form-framework-version"]').setValue('1')
+      await wrapper
+        .get('[data-testid="project-form-assessment-type"] button:last-child')
+        .trigger('click')
+      await flushPromises()
+
+      return wrapper
+    }
+
+    fetchPotentialCompetenciesMock.mockReset().mockResolvedValue({
+      data: [
+        { id: 91, code: 'MTG', name: 'Motivation', bars_available: true },
+        { id: 92, code: 'LAT', name: 'Learning agility', bars_available: true },
+      ],
+    })
+
+    const covered = await mountPotential()
+
+    for (const code of ['MTG', 'LAT']) {
+      expect(covered.get(`#competency-${code}`).attributes('disabled')).toBeUndefined()
+    }
+    expect(covered.text()).not.toContain('projects.competencyPicker.noBars')
+
+    fetchPotentialCompetenciesMock.mockReset().mockResolvedValue({
+      data: [
+        { id: 91, code: 'MTG', name: 'Motivation', bars_available: false },
+        { id: 92, code: 'LAT', name: 'Learning agility', bars_available: false },
+      ],
+    })
+
+    const uncovered = await mountPotential()
+
+    for (const code of ['MTG', 'LAT']) {
+      expect(uncovered.get(`#competency-${code}`).attributes('disabled')).toBeDefined()
+    }
+    expect(uncovered.text()).toContain('projects.competencyPicker.noBarsRoleless')
+  })
+
   it('says a failed catalogue load FAILED, rather than showing an empty list', async () => {
     // "No competencies available for this selection" is a claim about the
     // catalogue, and a failed request supports no claim about it — it would

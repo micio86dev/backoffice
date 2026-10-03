@@ -106,6 +106,19 @@ export interface FieldSpec {
    */
   options_depend_on?: string
   options_by_value?: Record<string, string[]>
+  /**
+   * Present (and true) only on a field that belongs to PLATFORM templates: an
+   * organization's templates cannot carry it and the organization field-spec
+   * route does not list it (the external HeyGen voice).
+   */
+  platform_only?: boolean
+  /**
+   * This field is REPLACED by another's value: while `superseded_by_key` holds
+   * one of `superseded_by_values` it is not required and must be absent (the
+   * HeyGen native `voiceId` beside an external speech engine).
+   */
+  superseded_by_key?: string
+  superseded_by_values?: string[]
 }
 
 /**

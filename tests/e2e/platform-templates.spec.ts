@@ -24,6 +24,36 @@ interface Row {
   usage: { organization_count: number; project_count: number }
 }
 
+/** What `GET /admin/avatar-templates/field-specs` serves for the two providers. */
+const PLATFORM_FIELD_SPECS = {
+  heygen: [
+    { key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId' },
+    {
+      key: 'voiceId',
+      type: 'text',
+      label_key: 'avatar_templates.field.voiceId',
+      superseded_by_key: 'ttsEngine',
+      superseded_by_values: ['cartesia', 'elevenlabs'],
+    },
+    {
+      key: 'ttsEngine',
+      type: 'select',
+      label_key: 'avatar_templates.field.ttsEngine',
+      hint_key: 'avatar_templates.hint.heygenTtsEngine',
+      options: ['none', 'cartesia', 'elevenlabs'],
+      platform_only: true,
+    },
+    {
+      key: 'ttsExternalVoiceId',
+      type: 'text',
+      label_key: 'avatar_templates.field.ttsExternalVoiceId',
+      hint_key: 'avatar_templates.hint.heygenTtsExternalVoiceId',
+      platform_only: true,
+    },
+  ],
+  tavus: [],
+}
+
 const isDataRequest = (route: Route): boolean => route.request().resourceType() !== 'document'
 
 const jsonRoute = (route: Route, body: unknown, status = 200): Promise<void> =>
@@ -103,6 +133,12 @@ async function mockApi(page: Page, api: Api): Promise<void> {
       const body = method === 'GET' ? null : (request.postDataJSON() as Record<string, unknown>)
       const row = api.rows.find((candidate) => candidate.id === id)
 
+      // The PLATFORM field specs: the same as the organization route's plus the
+      // platform-only external voice fields (`HeygenExternalVoice…` below).
+      if (method === 'GET' && path === '/admin/avatar-templates/field-specs') {
+        return jsonRoute(route, { data: PLATFORM_FIELD_SPECS })
+      }
+
       if (method === 'GET') return jsonRoute(route, { data: api.rows.map(resource) })
       api.writes.push({ method, path, body })
 
@@ -150,15 +186,11 @@ async function mockApi(page: Page, api: Api): Promise<void> {
       return jsonRoute(route, { data: resource(row) })
     }
   )
+  // The page must NEVER read the organization specs: they leave the platform-only
+  // voice fields out. Any request to that route fails the test through `unexpected`.
   await page.route(
     (url) => url.pathname === '/avatar-templates/field-specs',
-    (route) =>
-      jsonRoute(route, {
-        data: {
-          heygen: [{ key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId' }],
-          tavus: [],
-        },
-      })
+    (route) => jsonRoute(route, { message: 'platform page read the organization specs' }, 500)
   )
   // The form loads the LLM pickers; an empty list is a valid answer.
   await page.route(
@@ -341,6 +373,130 @@ test.describe('Platform templates: management flow (superadmin)', () => {
     await expect(dialog).toHaveCount(0)
     // The copies live in other organizations: the list behind is unchanged.
     await expect(page.getByTestId('platform-template-row-7')).toContainText('Studio voice')
+  })
+})
+
+test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
+  const CARTESIA_VOICES = {
+    status: 'ok',
+    items: [
+      {
+        id: 'ca-it',
+        provider: 'cartesia',
+        label: 'Elena',
+        name: 'Elena',
+        language: 'it',
+        locale: 'it',
+        accent: null,
+        italian: 'native',
+        preview_image_url: null,
+        preview_audio_url: null,
+        preview_video_url: null,
+      },
+    ],
+  }
+
+  async function open(page: Page, api: Api): Promise<void> {
+    await injectSession(page)
+    await mockIdentity(page, 'superadmin')
+    await mockApi(page, api)
+    await page.route(
+      (url) => url.pathname === '/avatar-templates/catalogue',
+      (route) => jsonRoute(route, { data: CARTESIA_VOICES })
+    )
+    await page.goto('/platform-templates')
+  }
+
+  test('picks an engine, then a catalogue voice, and saves them without a native voice id', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await open(page, api)
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Elena su HeyGen')
+
+    // A native HeyGen voice until an engine is chosen; no external voice field yet.
+    await expect(page.getByTestId('template-config-voiceId')).toBeVisible()
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId')).toHaveCount(0)
+
+    await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
+
+    // The vendor voice picker REPLACES the native voice field.
+    await expect(page.getByTestId('template-config-voiceId')).toHaveCount(0)
+    await page.getByTestId('template-config-ttsExternalVoiceId').click()
+    await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-preview')).toBeVisible()
+
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('platform-template-row-100')).toContainText('Elena su HeyGen')
+    const created = api.writes.find((write) => write.method === 'POST')
+    expect(created?.body?.config).toEqual({ ttsEngine: 'cartesia', ttsExternalVoiceId: 'ca-it' })
+  })
+
+  test('clearing the engine clears the voice and brings the native voice field back', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await open(page, api)
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
+    await page.getByTestId('template-config-ttsExternalVoiceId').click()
+    await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
+
+    await page.getByTestId('template-config-ttsEngine').selectOption('')
+
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId')).toHaveCount(0)
+    await expect(page.getByTestId('template-config-voiceId')).toBeVisible()
+  })
+
+  test('an engine with no voice is refused before anything is sent', async ({ page }) => {
+    const api = newApi()
+    await open(page, api)
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Senza voce')
+    await page.getByTestId('template-config-ttsEngine').selectOption('elevenlabs')
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-error')).toBeVisible()
+    expect(api.writes.filter((write) => write.method === 'POST')).toHaveLength(0)
+  })
+
+  test('a bind LiveAvatar refuses shows up on the voice field, in Italian, as a 422 (never a crash)', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await open(page, api)
+    await page.route(
+      (url) => url.pathname === '/admin/avatar-templates',
+      (route) =>
+        route.request().method() === 'POST'
+          ? jsonRoute(
+              route,
+              {
+                message: 'The given data was invalid.',
+                errors: { 'config.ttsExternalVoiceId': ['tts_voice_bind_failed'] },
+              },
+              422
+            )
+          : route.fallback()
+    )
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Bind rifiutato')
+    await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
+    await page.getByTestId('template-config-ttsExternalVoiceId').click()
+    await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-error')).toContainText(
+      'collegare la voce a HeyGen'
+    )
+    // The drawer stays open: the operator's work is not lost.
+    await expect(page.getByTestId('template-field-name')).toHaveValue('Bind rifiutato')
   })
 })
 

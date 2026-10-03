@@ -9,6 +9,7 @@
  * is being offered.
  */
 import type {
+  FieldSpecsResponse,
   PlatformTemplateCreatePayload,
   PlatformTemplateListResponse,
   PlatformTemplateResponse,
@@ -54,6 +55,14 @@ export function usePlatformAvatarTemplates() {
   const list = (): Promise<PlatformTemplateListResponse> =>
     apiFetch<PlatformTemplateListResponse>(BASE)
 
+  /**
+   * The field specs a PLATFORM template accepts, platform-only fields included
+   * (the external HeyGen voice). The organization route serves the same specs
+   * minus those, which is what keeps them off the organization's page.
+   */
+  const fetchFieldSpecs = (): Promise<FieldSpecsResponse> =>
+    apiFetch<FieldSpecsResponse>(`${BASE}/field-specs`)
+
   const get = (id: number | string): Promise<PlatformTemplateResponse> =>
     apiFetch<PlatformTemplateResponse>(`${BASE}/${id}`)
 
@@ -95,5 +104,5 @@ export function usePlatformAvatarTemplates() {
     }
   }
 
-  return { list, get, create, update, activate, deactivate, remove }
+  return { list, get, create, update, activate, deactivate, remove, fetchFieldSpecs }
 }

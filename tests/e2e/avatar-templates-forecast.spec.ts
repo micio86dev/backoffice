@@ -318,7 +318,7 @@ test.describe('Avatar templates — Cartesia catalogue sample is served by the a
     let sampleQuery: Record<string, string> | null = null
     let sampleAuthorization: string | undefined
 
-    await mockApi(page, [templateFixture({ provider: 'tavus' })])
+    await mockApi(page, [templateFixture()])
     await page.route(
       (url) => url.pathname === '/auth/me',
       (route) =>

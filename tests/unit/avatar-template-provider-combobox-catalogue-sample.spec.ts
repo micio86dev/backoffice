@@ -126,6 +126,25 @@ describe('a Cartesia entry whose clip is served by the api', () => {
     wrapper.unmount()
   })
 
+  it('offers no control for an entry that predates the flag (preview_audio_via_api absent)', async () => {
+    const { preview_audio_via_api: _flag, ...legacy } = entry({
+      id: 'c3',
+      label: 'Old',
+      name: 'Old',
+    })
+    fetchCatalogue.mockResolvedValue({ status: 'ok', items: [legacy as CatalogueEntry] })
+    const wrapper = await mountPicker('cartesia', 'c3')
+    await flushPromises()
+
+    expect(wrapper.find(sel(`${P}-catalogue-sample`)).exists()).toBe(false)
+
+    await open(wrapper)
+
+    expect(wrapper.find(sel(`${P}-play-c3`)).exists()).toBe(false)
+    expect(apiFetch).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('fetches the bytes through the typed client and plays a blob url, never a vendor url', async () => {
     fetchCatalogue.mockResolvedValue({ status: 'ok', items: [CARTESIA] })
     const wrapper = await mountPicker('cartesia')

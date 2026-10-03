@@ -133,7 +133,13 @@ export interface CatalogueEntry {
   accent: string | null
   italian: 'native' | 'multilingual' | null
   preview_image_url: string | null
+  /** A PUBLIC audio url the browser may play itself (ElevenLabs). Never a key-gated vendor url. */
   preview_audio_url: string | null
+  /**
+   * `true` when the vendor's clip needs the platform key (Cartesia): the api serves its bytes at
+   * `GET /avatar-templates/catalogue-sample`. Absent on payloads that predate the flag.
+   */
+  preview_audio_via_api?: boolean
   /** Tavus faces only. */
   preview_video_url: string | null
   /**

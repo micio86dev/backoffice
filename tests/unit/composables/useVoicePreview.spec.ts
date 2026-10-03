@@ -287,6 +287,124 @@ describe('useVoicePreview', () => {
     expect(FakeAudio.instances[0]!.pause).toHaveBeenCalled()
   })
 
+  describe('catalogue sample (Cartesia clip served by the api)', () => {
+    it('GETs the bytes through the api as a blob and plays the object URL, never a remote url', async () => {
+      const { useVoicePreview, catalogueSampleKey } = await load()
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggleCatalogueSample('c-1')
+
+      expect(apiFetch).toHaveBeenCalledTimes(1)
+      expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/catalogue-sample', {
+        method: 'GET',
+        query: { provider: 'cartesia', voice_id: 'c-1' },
+        responseType: 'blob',
+      })
+      expect(FakeAudio.instances[0]!.src).toBe('blob:sample-1')
+      expect(FakeAudio.instances[0]!.src).not.toContain('cartesia.ai')
+      expect(preview.stateFor(catalogueSampleKey('c-1'))).toBe('playing')
+      scope.stop()
+    })
+
+    it('goes loading then playing, stops on a second click and replays from memory', async () => {
+      const { useVoicePreview, catalogueSampleKey } = await load()
+      let resolve!: (b: Blob) => void
+      apiFetch.mockReturnValueOnce(new Promise<Blob>((r) => (resolve = r)))
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+      const key = catalogueSampleKey('c-1')
+
+      const pending = preview.toggleCatalogueSample('c-1')
+      expect(preview.stateFor(key)).toBe('loading')
+      resolve(new Blob(['x']))
+      await pending
+      expect(preview.stateFor(key)).toBe('playing')
+
+      await preview.toggleCatalogueSample('c-1') // stop
+      expect(preview.stateFor(key)).toBe('idle')
+      await preview.toggleCatalogueSample('c-1') // replay
+
+      expect(apiFetch).toHaveBeenCalledTimes(1)
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+      scope.stop()
+    })
+
+    it('never shares a key or a cache entry with the synthesised sample of the same voice', async () => {
+      const { useVoicePreview, catalogueSampleKey, voicePreviewKey } = await load()
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      expect(catalogueSampleKey('v-1')).not.toBe(voicePreviewKey(cartesia))
+
+      await preview.toggle(cartesia)
+      await preview.toggleCatalogueSample('v-1')
+
+      expect(apiFetch).toHaveBeenCalledTimes(2)
+      expect(preview.stateFor(voicePreviewKey(cartesia))).toBe('idle')
+      expect(preview.stateFor(catalogueSampleKey('v-1'))).toBe('playing')
+      scope.stop()
+    })
+
+    it('silences the combobox own player when it starts', async () => {
+      const { useVoicePreview } = await load()
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+      const stopCatalogue = vi.fn()
+
+      preview.claimPlayback(stopCatalogue)
+      await preview.toggleCatalogueSample('c-1')
+
+      expect(stopCatalogue).toHaveBeenCalledTimes(1)
+      scope.stop()
+    })
+
+    it.each([
+      [422, 'voice_preview_unavailable', 'unavailable'],
+      [503, 'voice_preview_provider_not_configured', 'provider_not_configured'],
+      [404, 'voice_preview_voice_not_found', 'voice_not_found'],
+      [502, 'voice_preview_provider_error', 'provider_error'],
+    ])('maps %i %s to %s and asks again on the next click', async (status, message, expected) => {
+      const { useVoicePreview, catalogueSampleKey } = await load()
+      apiFetch.mockRejectedValueOnce(serverError(status, message))
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+      const key = catalogueSampleKey('c-1')
+
+      await preview.toggleCatalogueSample('c-1')
+      expect(preview.stateFor(key)).toBe('error')
+      expect(preview.errorFor(key)).toBe(expected)
+
+      await preview.toggleCatalogueSample('c-1')
+      expect(apiFetch).toHaveBeenCalledTimes(2)
+      expect(preview.stateFor(key)).toBe('playing')
+      scope.stop()
+    })
+
+    it('maps a throttled request to rate_limited', async () => {
+      const { useVoicePreview, catalogueSampleKey } = await load()
+      apiFetch.mockRejectedValueOnce({ status: 429, data: { message: 'Too Many Attempts.' } })
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggleCatalogueSample('c-1')
+
+      expect(preview.errorFor(catalogueSampleKey('c-1'))).toBe('rate_limited')
+      scope.stop()
+    })
+
+    it('revokes its object URL when the last consumer unmounts', async () => {
+      const { useVoicePreview } = await load()
+      const scope = effectScope()
+      const preview = scope.run(() => useVoicePreview())!
+
+      await preview.toggleCatalogueSample('c-1')
+      scope.stop()
+
+      expect(revoke).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('persona variant (pal_id)', () => {
     const pal = { provider: 'tavus', pal_id: 'p-1' } as const
 

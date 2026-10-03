@@ -1110,7 +1110,8 @@
         },
         "preview": {
           "play": "Play catalogue sample",
-          "pause": "Pause catalogue sample"
+          "pause": "Pause catalogue sample",
+          "loading": "Loading the catalogue sample…"
         }
       }
     },

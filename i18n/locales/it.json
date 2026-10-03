@@ -1110,7 +1110,8 @@
         },
         "preview": {
           "play": "Riproduci campione del catalogo",
-          "pause": "Metti in pausa il campione del catalogo"
+          "pause": "Metti in pausa il campione del catalogo",
+          "loading": "Caricamento del campione del catalogo…"
         }
       }
     },

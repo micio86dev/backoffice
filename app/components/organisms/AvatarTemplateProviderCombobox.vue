@@ -230,19 +230,25 @@
           -->
           <div v-if="resource === 'voice'" class="flex items-center gap-2 pl-2">
             <button
-              v-if="candidate.preview_audio_url !== null"
+              v-if="hasCatalogueSample(candidate)"
               type="button"
               :data-testid="`${testIdPrefix}-play-${candidate.id}`"
-              :aria-label="
-                playingId === candidate.id
-                  ? t('avatar_templates.form.catalogue.preview.pause')
-                  : t('avatar_templates.form.catalogue.preview.play')
+              :aria-label="sampleLabel(candidate)"
+              :aria-busy="sampleState(candidate) === 'loading' ? 'true' : undefined"
+              :aria-describedby="
+                sampleError(candidate) !== null
+                  ? `${testIdPrefix}-play-error-${candidate.id}`
+                  : undefined
               "
               :title="t('avatar_templates.form.voicePreview.caption.catalogue')"
               class="rounded p-1 text-muted-foreground hover:bg-primary/10"
               @click="togglePreview(candidate)"
             >
-              <PauseIcon v-if="playingId === candidate.id" class="size-4" />
+              <LoaderCircleIcon
+                v-if="sampleState(candidate) === 'loading'"
+                class="size-4 motion-safe:animate-spin"
+              />
+              <PauseIcon v-else-if="sampleState(candidate) === 'playing'" class="size-4" />
               <PlayIcon v-else class="size-4" />
             </button>
             <VoicePreviewButton
@@ -254,6 +260,15 @@
               :test-id="`${testIdPrefix}-italian-preview-${candidate.id}`"
             />
           </div>
+          <p
+            v-if="resource === 'voice' && sampleError(candidate) !== null"
+            :id="`${testIdPrefix}-play-error-${candidate.id}`"
+            role="alert"
+            :data-testid="`${testIdPrefix}-play-error-${candidate.id}`"
+            class="pl-2 text-xs text-destructive"
+          >
+            {{ sampleErrorText(candidate) }}
+          </p>
         </li>
       </ul>
     </div>
@@ -301,17 +316,39 @@
           :test-id="`${testIdPrefix}-preview`"
         />
         <button
-          v-if="resource === 'voice' && selected?.preview_audio_url"
+          v-if="resource === 'voice' && selected !== null && hasCatalogueSample(selected)"
           type="button"
           :data-testid="`${testIdPrefix}-catalogue-sample`"
-          :aria-pressed="playingId === selected.id ? 'true' : 'false'"
+          :aria-pressed="sampleState(selected) === 'playing' ? 'true' : 'false'"
+          :aria-busy="sampleState(selected) === 'loading' ? 'true' : undefined"
+          :aria-describedby="
+            sampleError(selected) !== null ? `${testIdPrefix}-catalogue-sample-error` : undefined
+          "
           class="inline-flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium hover:bg-primary/10 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           @click="togglePreview(selected)"
         >
-          <PauseIcon v-if="playingId === selected.id" class="size-4" aria-hidden="true" />
+          <LoaderCircleIcon
+            v-if="sampleState(selected) === 'loading'"
+            class="size-4 motion-safe:animate-spin"
+            aria-hidden="true"
+          />
+          <PauseIcon
+            v-else-if="sampleState(selected) === 'playing'"
+            class="size-4"
+            aria-hidden="true"
+          />
           <PlayIcon v-else class="size-4" aria-hidden="true" />
           {{ t('avatar_templates.form.voicePreview.caption.catalogue') }}
         </button>
+        <p
+          v-if="resource === 'voice' && selected !== null && sampleError(selected) !== null"
+          :id="`${testIdPrefix}-catalogue-sample-error`"
+          role="alert"
+          :data-testid="`${testIdPrefix}-catalogue-sample-error`"
+          class="basis-full text-xs text-destructive"
+        >
+          {{ sampleErrorText(selected) }}
+        </p>
       </div>
     </div>
 
@@ -383,7 +420,12 @@ import { formControlClass, formSelectClass } from '@/components/ui/form-control'
 import { cn } from '@/lib/utils'
 import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import { useExclusivePopover } from '@/composables/useExclusivePopover'
-import { useVoicePreview } from '@/composables/useVoicePreview'
+import {
+  catalogueSampleKey,
+  useVoicePreview,
+  type VoicePreviewState,
+} from '@/composables/useVoicePreview'
+import { translateServerCode } from '@/utils/server-message'
 import type {
   CatalogueEntry,
   CatalogueErrorCode,
@@ -415,9 +457,9 @@ const emit = defineEmits<{
   (e: 'loaded', ids: string[] | null): void
 }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { fetchCatalogue } = useAvatarTemplates()
-const { claimPlayback } = useVoicePreview()
+const { claimPlayback, stateFor, errorFor, toggleCatalogueSample } = useVoicePreview()
 const attrs = useAttrs()
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -556,7 +598,57 @@ function stopCatalogueSample(): void {
   playingId.value = null
 }
 
+/**
+ * A catalogue clip exists in one of two forms: a PUBLIC url the browser plays
+ * itself (ElevenLabs), or a clip the api serves because its host needs the
+ * platform key (Cartesia, `preview_audio_via_api`). The second is NEVER played
+ * from a vendor url: the bytes come through the typed client.
+ */
+function hasCatalogueSample(candidate: CatalogueEntry): boolean {
+  return candidate.preview_audio_url !== null || candidate.preview_audio_via_api === true
+}
+
+function isServedByApi(candidate: CatalogueEntry): boolean {
+  return candidate.preview_audio_url === null && candidate.preview_audio_via_api === true
+}
+
+function sampleState(candidate: CatalogueEntry): VoicePreviewState {
+  if (isServedByApi(candidate)) return stateFor(catalogueSampleKey(candidate.id))
+
+  return playingId.value === candidate.id ? 'playing' : 'idle'
+}
+
+function sampleError(candidate: CatalogueEntry): string | null {
+  return isServedByApi(candidate) ? errorFor(catalogueSampleKey(candidate.id)) : null
+}
+
+function sampleErrorText(candidate: CatalogueEntry): string {
+  const code = sampleError(candidate)
+
+  return code === null
+    ? ''
+    : translateServerCode({ t, te }, 'avatar_templates.form.voicePreview.error', code)
+}
+
+function sampleLabel(candidate: CatalogueEntry): string {
+  const state = sampleState(candidate)
+
+  return t(
+    state === 'loading'
+      ? 'avatar_templates.form.catalogue.preview.loading'
+      : state === 'playing'
+        ? 'avatar_templates.form.catalogue.preview.pause'
+        : 'avatar_templates.form.catalogue.preview.play'
+  )
+}
+
 function togglePreview(candidate: CatalogueEntry): void {
+  if (isServedByApi(candidate)) {
+    void toggleCatalogueSample(candidate.id)
+
+    return
+  }
+
   const audio = audioRef.value
   if (audio === null || candidate.preview_audio_url === null) return
 

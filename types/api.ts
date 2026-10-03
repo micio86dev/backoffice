@@ -4646,17 +4646,85 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The audio clip. */
             200: {
                 headers: {
+                    "Cache-Control"?: string;
+                    "X-Content-Type-Options"?: "nosniff";
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string;
+                    "audio/wav": string;
+                    "audio/ogg": string;
+                    "audio/mpeg": string;
                 };
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
-            422: components["responses"]["ValidationException"];
+            /** @description The provider does not know this voice. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_voice_not_found";
+                    };
+                };
+            };
+            /** @description Either the request failed validation (the standard validation body) or the voice has no catalogue clip (`voice_preview_unavailable`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_unavailable";
+                    } | {
+                        message: string;
+                        errors: {
+                            [key: string]: string[];
+                        };
+                    };
+                };
+            };
+            /** @description Throttled. Retry after the number of seconds in the `Retry-After` header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The provider failed or was unreachable. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_provider_error";
+                    };
+                };
+            };
+            /** @description The provider is not configured on the platform. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_provider_not_configured";
+                    };
+                };
+            };
         };
     };
     "avatarTemplate.options": {
@@ -5094,17 +5162,87 @@ export interface operations {
             };
         };
         responses: {
+            /** @description The audio clip. */
             200: {
                 headers: {
+                    "Cache-Control"?: string;
+                    "X-Content-Type-Options"?: "nosniff";
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string;
+                    "audio/wav": string;
+                    "audio/ogg": string;
+                    "audio/mpeg": string;
                 };
             };
             401: components["responses"]["AuthenticationException"];
             403: components["responses"]["AuthorizationException"];
-            422: components["responses"]["ValidationException"];
+            /** @description The provider does not know this voice. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_voice_not_found";
+                    };
+                };
+            };
+            /** @description Either the request failed validation (the standard validation body) or no voice can be previewed (`voice_preview_unavailable`, with a `reason`: `tavus_stock_voice`, `pal_uses_tavus_voice`, `pal_azure_engine` or `pal_no_voice_configured`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_unavailable";
+                        /** @enum {string} */
+                        reason?: "tavus_stock_voice" | "pal_uses_tavus_voice" | "pal_azure_engine" | "pal_no_voice_configured";
+                    } | {
+                        message: string;
+                        errors: {
+                            [key: string]: string[];
+                        };
+                    };
+                };
+            };
+            /** @description Throttled. Retry after the number of seconds in the `Retry-After` header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        message: string;
+                    };
+                };
+            };
+            /** @description The provider failed or was unreachable. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_provider_error";
+                    };
+                };
+            };
+            /** @description The provider is not configured on the platform. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        message: "voice_preview_provider_not_configured";
+                    };
+                };
+            };
         };
     };
     "barsIndicator.index": {

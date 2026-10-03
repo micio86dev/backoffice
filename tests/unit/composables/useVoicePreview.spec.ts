@@ -405,6 +405,74 @@ describe('useVoicePreview', () => {
     })
   })
 
+  describe('every documented failure of both audio routes', () => {
+    // The openapi.json documents 404/422/429/502/503 for BOTH routes; whichever route failed, the sample must
+    // end in `error` with the translated code, never stay `loading`/`playing`, and leave no object URL behind.
+    const FAILURES = [
+      [404, { message: 'voice_preview_voice_not_found' }, 'voice_not_found'],
+      [422, { message: 'voice_preview_unavailable' }, 'unavailable'],
+      [
+        422,
+        {
+          message: 'The given data was invalid.',
+          errors: { voice_id: ['The voice id field is required.'] },
+        },
+        'invalid_request',
+      ],
+      [429, { message: 'Too Many Attempts.' }, 'rate_limited'],
+      [502, { message: 'voice_preview_provider_error' }, 'provider_error'],
+      [503, { message: 'voice_preview_provider_not_configured' }, 'provider_not_configured'],
+    ] as const
+
+    const ROUTES = [
+      [
+        'synthesised sample',
+        (
+          p: Awaited<ReturnType<typeof load>>['useVoicePreview'] extends () => infer R ? R : never
+        ) => p.toggle(cartesia),
+      ],
+      [
+        'catalogue sample',
+        (
+          p: Awaited<ReturnType<typeof load>>['useVoicePreview'] extends () => infer R ? R : never
+        ) => p.toggleCatalogueSample('v-1'),
+      ],
+    ] as const
+
+    for (const [route, run] of ROUTES) {
+      it.each(FAILURES)(
+        `${route}: %i ends in error, never stuck, nothing to revoke`,
+        async (status, body, expected) => {
+          const { useVoicePreview, voicePreviewKey, catalogueSampleKey } = await load()
+          const key =
+            route === 'catalogue sample' ? catalogueSampleKey('v-1') : voicePreviewKey(cartesia)
+          // 429 carries the documented Retry-After; the blob error body is what `responseType: 'blob'` yields.
+          apiFetch.mockRejectedValueOnce({
+            status,
+            response: { headers: new Headers(status === 429 ? { 'Retry-After': '42' } : {}) },
+            data: new Blob([JSON.stringify(body)], { type: 'application/json' }),
+          })
+          const scope = effectScope()
+          const preview = scope.run(() => useVoicePreview())!
+
+          await run(preview)
+
+          expect(preview.stateFor(key)).toBe('error')
+          expect(preview.errorFor(key)).toBe(expected)
+          expect(URL.createObjectURL).not.toHaveBeenCalled()
+          expect(FakeAudio.instances.every((audio) => audio.src === '')).toBe(true)
+
+          // Recoverable: the next click asks again, and its object URL IS revoked on unmount.
+          await run(preview)
+          expect(preview.stateFor(key)).toBe('playing')
+          expect(preview.errorFor(key)).toBeNull()
+          scope.stop()
+          expect(revoke).toHaveBeenCalledTimes(1)
+        }
+      )
+    }
+  })
+
   describe('persona variant (pal_id)', () => {
     const pal = { provider: 'tavus', pal_id: 'p-1' } as const
 

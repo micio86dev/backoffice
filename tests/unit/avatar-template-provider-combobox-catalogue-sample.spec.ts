@@ -236,6 +236,42 @@ describe('a Cartesia entry whose clip is served by the api', () => {
     wrapper.unmount()
   })
 
+  it.each([
+    [404, 'voice_preview_voice_not_found', 'voice_not_found'],
+    [422, 'voice_preview_unavailable', 'unavailable'],
+    [429, 'Too Many Attempts.', 'rate_limited'],
+    [502, 'voice_preview_provider_error', 'provider_error'],
+    [503, 'voice_preview_provider_not_configured', 'provider_not_configured'],
+  ])(
+    'a %i leaves a translated alert, no stuck busy/playing control and nothing to revoke',
+    async (status, message, code) => {
+      apiFetch.mockRejectedValueOnce({
+        status,
+        response: { headers: new Headers(status === 429 ? { 'Retry-After': '42' } : {}) },
+        data: new Blob([JSON.stringify({ message })]),
+      })
+      fetchCatalogue.mockResolvedValue({ status: 'ok', items: [CARTESIA] })
+      const wrapper = await mountPicker('cartesia')
+      await flushPromises()
+      await open(wrapper)
+
+      await wrapper.get(sel(`${P}-play-c1`)).trigger('click')
+      await flushPromises()
+
+      const control = wrapper.get(sel(`${P}-play-c1`))
+      expect(wrapper.get(sel(`${P}-play-error-c1`)).text()).toBe(
+        `avatar_templates.form.voicePreview.error.${code}`
+      )
+      expect(control.attributes('aria-busy')).toBeUndefined()
+      expect(control.attributes('aria-label')).toBe('avatar_templates.form.catalogue.preview.play')
+      expect(URL.createObjectURL).not.toHaveBeenCalled()
+      expect(FakeAudio.instances.every((audio) => audio.src === '')).toBe(true)
+
+      wrapper.unmount()
+      expect(revoke).not.toHaveBeenCalled()
+    }
+  )
+
   it('playing it does not select the voice', async () => {
     fetchCatalogue.mockResolvedValue({ status: 'ok', items: [CARTESIA] })
     const wrapper = await mountPicker('cartesia')

@@ -237,6 +237,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/avatar-templates/catalogue-sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /api/avatar-templates/catalogue-sample
+         * @description Returns the RAW AUDIO bytes (`audio/wav`, `audio/ogg` or `audio/mpeg`), not JSON. Failures are
+         *     `{message: <code>}` with one of `voice_preview_unavailable` (422, the voice has no catalogue
+         *     clip), `voice_preview_provider_not_configured` (503), `voice_preview_voice_not_found` (404)
+         *     and `voice_preview_provider_error` (502).
+         */
+        get: operations["avatarCatalogueSample"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/avatar-templates/options": {
         parameters: {
             query?: never;
@@ -4609,6 +4632,31 @@ export interface operations {
                 };
             };
             401: components["responses"]["AuthenticationException"];
+        };
+    };
+    avatarCatalogueSample: {
+        parameters: {
+            query: {
+                provider: "cartesia";
+                voice_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                };
+            };
+            401: components["responses"]["AuthenticationException"];
+            403: components["responses"]["AuthorizationException"];
+            422: components["responses"]["ValidationException"];
         };
     };
     "avatarTemplate.options": {

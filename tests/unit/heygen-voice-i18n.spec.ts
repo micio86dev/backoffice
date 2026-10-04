@@ -21,8 +21,9 @@ function lookup(bundle: unknown, key: string): unknown {
 const KEYS = [
   'avatar_templates.hint.heygenTtsEngine',
   'avatar_templates.hint.heygenTtsExternalVoiceId',
+  'avatar_templates.hint.heygenTtsModelName',
   // refusals the API answers on `config.ttsEngine` / `config.ttsExternalVoiceId` / `config.voiceId`
-  'avatar_templates.error.config.platform_only',
+  'avatar_templates.error.config.superadmin_only',
   'avatar_templates.error.config.superseded_by_tts_engine',
   'avatar_templates.error.config.tts_setting_unsupported',
   'avatar_templates.error.config.tts_voice_unverifiable',

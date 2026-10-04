@@ -464,27 +464,15 @@ const isNew = computed(() => props.template.id === undefined)
 const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
 
 /**
- * The fields the form actually renders and validates.
- *
- * Two kinds of field are held back, each because the API would refuse a value
- * for it right now:
- *  - one SUPERSEDED by another field's value — HeyGen's native `voiceId` while
- *    a Cartesia or ElevenLabs engine supplies the voice;
- *  - HeyGen's `ttsExternalVoiceId` while no external engine is chosen: the voice
- *    belongs to an engine's catalogue, so without one there is nothing to pick
- *    and a bare id would be refused (`tts_engine_required`). Tavus keeps its
- *    field always visible (a stock voice needs no id), hence the provider check.
+ * The fields the form actually renders and validates: every spec field except
+ * one SUPERSEDED by another field's value — HeyGen's native `voiceId` while a
+ * Cartesia or ElevenLabs engine supplies the voice, which the API would refuse
+ * beside it. The engine, voice model and voice id fields are always shown for a
+ * HeyGen template the API served them for (a superadmin), exactly as Tavus's
+ * are; they simply are not in the specs anyone else is served.
  */
 const visibleFields = computed(() =>
-  activeFields.value.filter(
-    (field) =>
-      !isSuperseded(field, draft.value.config) &&
-      !(
-        field.key === 'ttsExternalVoiceId' &&
-        draft.value.provider === 'heygen' &&
-        !isCataloguedEngine(draft.value.config.ttsEngine)
-      )
-  )
+  activeFields.value.filter((field) => !isSuperseded(field, draft.value.config))
 )
 
 // A CSS grid, not `Field`'s own `orientation` prop — orientation controls a

@@ -60,7 +60,7 @@ vi.mock('@/composables/useAvatarTemplates', () => ({
 }))
 vi.mock('@/composables/useApi', () => ({ useApi: () => ({ apiFetch }) }))
 
-/** What the PLATFORM field-spec route serves for HeyGen. */
+/** What the field-spec routes serve a SUPERADMIN for HeyGen (either template page). */
 const PLATFORM_SPECS: Record<ProviderName, FieldSpec[]> = {
   heygen: [
     { key: 'avatarId', type: 'text', label_key: 'l.avatarId', catalogue_resource: 'avatar' },
@@ -78,34 +78,57 @@ const PLATFORM_SPECS: Record<ProviderName, FieldSpec[]> = {
       type: 'select',
       label_key: 'l.ttsEngine',
       options: ['none', 'cartesia', 'elevenlabs'],
-      platform_only: true,
+      superadmin_only: true,
+    },
+    {
+      key: 'ttsModelName',
+      type: 'select',
+      label_key: 'l.ttsModelName',
+      options: ['sonic-3.5', 'sonic-3', 'eleven_flash_v2_5', 'eleven_multilingual_v2'],
+      options_depend_on: 'ttsEngine',
+      options_by_value: {
+        cartesia: ['sonic-3.5', 'sonic-3'],
+        elevenlabs: ['eleven_flash_v2_5', 'eleven_multilingual_v2'],
+      },
+      superadmin_only: true,
     },
     {
       key: 'ttsExternalVoiceId',
       type: 'text',
       label_key: 'l.ttsExternalVoiceId',
-      platform_only: true,
+      superadmin_only: true,
     },
     { key: 'voiceSpeed', type: 'number', label_key: 'l.voiceSpeed', min: 0.8, max: 1.2 },
   ],
-  tavus: [],
+  tavus: [
+    { key: 'faceId', type: 'text', label_key: 'l.faceId', catalogue_resource: 'replica' },
+    { key: 'palId', type: 'text', label_key: 'l.palId', catalogue_resource: 'pal' },
+    {
+      key: 'ttsEngine',
+      type: 'select',
+      label_key: 'l.ttsEngine',
+      options: ['tavus-auto', 'cartesia', 'elevenlabs', 'azure'],
+    },
+    { key: 'ttsExternalVoiceId', type: 'text', label_key: 'l.ttsExternalVoiceId' },
+  ],
 }
 
-/** What the ORGANIZATION route serves: no platform-only field. */
+/** What the spec routes serve everyone who is NOT a superadmin: no superadmin-only field. */
 const ORG_SPECS: Record<ProviderName, FieldSpec[]> = {
-  heygen: PLATFORM_SPECS.heygen.filter((field) => field.platform_only !== true),
-  tavus: [],
+  heygen: PLATFORM_SPECS.heygen.filter((field) => field.superadmin_only !== true),
+  tavus: PLATFORM_SPECS.tavus,
 }
 
 const mounted: Array<{ unmount: () => void }> = []
 
 function mountForm(
   config: Record<string, unknown> = {},
-  specs: Record<ProviderName, FieldSpec[]> = PLATFORM_SPECS
+  specs: Record<ProviderName, FieldSpec[]> = PLATFORM_SPECS,
+  template: { id?: number; provider?: ProviderName } = {}
 ) {
   const wrapper = mount(AvatarTemplateForm, {
     props: {
-      template: { name: 'T', provider: 'heygen', config, id: 7 },
+      template: { name: 'T', provider: 'heygen', config, id: 7, ...template },
       fieldSpecs: specs,
       saving: false,
       submitError: null,
@@ -190,16 +213,53 @@ describe('the engine selector and the voice picker', () => {
     ])
   })
 
-  it('shows the native voice picker, and no external voice field, while no external engine is chosen', async () => {
-    const wrapper = mountForm()
+  it('shows engine, voice model and voice id fields on a HeyGen template right away, like Tavus, with no save first', async () => {
+    const wrapper = mountForm({}, PLATFORM_SPECS, { id: undefined })
     await flushPromises()
 
-    expect(wrapper.find(field('voiceId')).exists()).toBe(true)
-    expect(wrapper.find(field('ttsExternalVoiceId')).exists()).toBe(false)
+    for (const key of ['ttsEngine', 'ttsModelName', 'ttsExternalVoiceId', 'voiceId']) {
+      expect(wrapper.find(field(key)).exists(), key).toBe(true)
+    }
+  })
 
-    await chooseEngine(wrapper, 'none')
-    expect(wrapper.find(field('voiceId')).exists()).toBe(true)
-    expect(wrapper.find(field('ttsExternalVoiceId')).exists()).toBe(false)
+  it('offers only the models of the chosen engine, and none until an engine is chosen', async () => {
+    const wrapper = mountForm({}, PLATFORM_SPECS, { id: undefined })
+    await flushPromises()
+
+    const models = () =>
+      wrapper
+        .get(field('ttsModelName'))
+        .findAll('option')
+        .map((option) => option.element.value)
+
+    expect(models()).toEqual([''])
+    expect(wrapper.get(field('ttsModelName')).attributes('disabled')).toBeDefined()
+
+    await chooseEngine(wrapper, 'cartesia')
+    expect(models()).toEqual(['', 'sonic-3.5', 'sonic-3'])
+
+    await chooseEngine(wrapper, 'elevenlabs')
+    expect(models()).toEqual(['', 'eleven_flash_v2_5', 'eleven_multilingual_v2'])
+  })
+
+  it('changing the engine drops a model that engine does not offer', async () => {
+    const wrapper = mountForm({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsModelName: 'sonic-3',
+      ttsExternalVoiceId: 'ca-it',
+    })
+    await flushPromises()
+    await chooseEngine(wrapper, 'elevenlabs')
+    await pickVoice(wrapper, 'el-1')
+    await submit(wrapper)
+
+    const emitted = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
+    expect(emitted.config).toEqual({
+      avatarId: 'av-1',
+      ttsEngine: 'elevenlabs',
+      ttsExternalVoiceId: 'el-1',
+    })
   })
 
   it.each([
@@ -270,7 +330,8 @@ describe('what the engine clears', () => {
     await chooseEngine(wrapper, '')
 
     expect(wrapper.find(field('voiceId')).exists()).toBe(true)
-    expect(wrapper.find(field('ttsExternalVoiceId')).exists()).toBe(false)
+    // the voice that belonged to the cleared engine is gone
+    expect((wrapper.get(field('ttsExternalVoiceId')).element as HTMLInputElement).value).toBe('')
 
     await submit(wrapper)
     // back to a native-voice template, whose voice is required again
@@ -353,5 +414,47 @@ describe('listening to the external voice', () => {
       voice_id: 'el-1',
       language: 'it',
     })
+  })
+})
+
+describe('switching the provider on a new template', () => {
+  async function chooseProvider(wrapper: Form, provider: string): Promise<void> {
+    const select = wrapper.get(sel('template-field-provider'))
+    ;(select.element as HTMLSelectElement).value = provider
+    await select.trigger('change')
+    await flushPromises()
+  }
+
+  it('re-renders the right fields each way, Tavus <-> HeyGen, with the voice fields on HeyGen', async () => {
+    const wrapper = mountForm({}, PLATFORM_SPECS, { id: undefined, provider: 'tavus' })
+    await flushPromises()
+
+    expect(wrapper.find(field('faceId')).exists()).toBe(true)
+    expect(wrapper.find(field('avatarId')).exists()).toBe(false)
+    expect(wrapper.find(field('ttsModelName')).exists()).toBe(false)
+
+    await chooseProvider(wrapper, 'heygen')
+    expect(wrapper.find(field('avatarId')).exists()).toBe(true)
+    expect(wrapper.find(field('faceId')).exists()).toBe(false)
+    for (const key of ['ttsEngine', 'ttsModelName', 'ttsExternalVoiceId']) {
+      expect(wrapper.find(field(key)).exists(), key).toBe(true)
+    }
+
+    await chooseProvider(wrapper, 'tavus')
+    expect(wrapper.find(field('faceId')).exists()).toBe(true)
+    expect(wrapper.find(field('ttsModelName')).exists()).toBe(false)
+    expect(wrapper.find(field('ttsEngine')).exists()).toBe(true)
+  })
+
+  it("does not carry the other provider's engine across the switch", async () => {
+    const wrapper = mountForm({}, PLATFORM_SPECS, { id: undefined, provider: 'heygen' })
+    await flushPromises()
+    await chooseEngine(wrapper, 'cartesia')
+
+    await chooseProvider(wrapper, 'tavus')
+    await chooseProvider(wrapper, 'heygen')
+
+    expect((wrapper.get(field('ttsEngine')).element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.find(field('voiceId')).exists()).toBe(true)
   })
 })

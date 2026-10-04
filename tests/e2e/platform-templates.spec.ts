@@ -41,17 +41,38 @@ const PLATFORM_FIELD_SPECS = {
       label_key: 'avatar_templates.field.ttsEngine',
       hint_key: 'avatar_templates.hint.heygenTtsEngine',
       options: ['none', 'cartesia', 'elevenlabs'],
-      platform_only: true,
+      superadmin_only: true,
+    },
+    {
+      key: 'ttsModelName',
+      type: 'select',
+      label_key: 'avatar_templates.field.ttsModelName',
+      hint_key: 'avatar_templates.hint.heygenTtsModelName',
+      options: ['sonic-3.5', 'sonic-3', 'eleven_flash_v2_5', 'eleven_multilingual_v2'],
+      options_depend_on: 'ttsEngine',
+      options_by_value: {
+        cartesia: ['sonic-3.5', 'sonic-3'],
+        elevenlabs: ['eleven_flash_v2_5', 'eleven_multilingual_v2'],
+      },
+      superadmin_only: true,
     },
     {
       key: 'ttsExternalVoiceId',
       type: 'text',
       label_key: 'avatar_templates.field.ttsExternalVoiceId',
       hint_key: 'avatar_templates.hint.heygenTtsExternalVoiceId',
-      platform_only: true,
+      superadmin_only: true,
     },
   ],
-  tavus: [],
+  tavus: [
+    { key: 'faceId', type: 'text', label_key: 'avatar_templates.field.faceId' },
+    {
+      key: 'ttsEngine',
+      type: 'select',
+      label_key: 'avatar_templates.field.ttsEngine',
+      options: ['tavus-auto', 'cartesia', 'elevenlabs', 'azure'],
+    },
+  ],
 }
 
 const isDataRequest = (route: Route): boolean => route.request().resourceType() !== 'document'
@@ -416,9 +437,8 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
     await page.getByTestId('platform-template-new').click()
     await page.getByTestId('template-field-name').fill('Elena su HeyGen')
 
-    // A native HeyGen voice until an engine is chosen; no external voice field yet.
+    // A native HeyGen voice until an engine is chosen.
     await expect(page.getByTestId('template-config-voiceId')).toBeVisible()
-    await expect(page.getByTestId('template-config-ttsExternalVoiceId')).toHaveCount(0)
 
     await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
 
@@ -435,6 +455,28 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
     expect(created?.body?.config).toEqual({ ttsEngine: 'cartesia', ttsExternalVoiceId: 'ca-it' })
   })
 
+  test('selecting HeyGen on CREATE shows engine, voice model and voice fields at once, and switching provider re-renders', async ({
+    page,
+  }) => {
+    await open(page, newApi())
+
+    await page.getByTestId('platform-template-new').click()
+    // HeyGen is the default provider: the fields are there before anything is saved.
+    for (const key of ['ttsEngine', 'ttsModelName', 'ttsExternalVoiceId', 'voiceId']) {
+      await expect(page.getByTestId(`template-config-${key}`)).toBeVisible()
+    }
+    await expect(page.getByText('Modello vocale', { exact: true })).toBeVisible()
+    await expect(page.getByText('Motore di sintesi vocale', { exact: true })).toBeVisible()
+
+    await page.getByTestId('template-field-provider').selectOption('tavus')
+    await expect(page.getByTestId('template-config-faceId')).toBeVisible()
+    await expect(page.getByTestId('template-config-ttsModelName')).toHaveCount(0)
+
+    await page.getByTestId('template-field-provider').selectOption('heygen')
+    await expect(page.getByTestId('template-config-ttsModelName')).toBeVisible()
+    await expect(page.getByTestId('template-config-avatarId')).toBeVisible()
+  })
+
   test('clearing the engine clears the voice and brings the native voice field back', async ({
     page,
   }) => {
@@ -448,7 +490,7 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
 
     await page.getByTestId('template-config-ttsEngine').selectOption('')
 
-    await expect(page.getByTestId('template-config-ttsExternalVoiceId')).toHaveCount(0)
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId')).toHaveValue('')
     await expect(page.getByTestId('template-config-voiceId')).toBeVisible()
   })
 

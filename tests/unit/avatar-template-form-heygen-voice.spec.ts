@@ -99,6 +99,23 @@ const PLATFORM_SPECS: Record<ProviderName, FieldSpec[]> = {
       superadmin_only: true,
     },
     { key: 'voiceSpeed', type: 'number', label_key: 'l.voiceSpeed', min: 0.8, max: 1.2 },
+    // The knobs a Cartesia settings object lacks: the server declares Cartesia as the engine that replaces them.
+    ...['voiceStability', 'voiceSimilarityBoost', 'voiceStyle'].map((key): FieldSpec => ({
+      key,
+      type: 'number',
+      label_key: `l.${key}`,
+      min: 0,
+      max: 1,
+      superseded_by_key: 'ttsEngine',
+      superseded_by_values: ['cartesia'],
+    })),
+    {
+      key: 'voiceUseSpeakerBoost',
+      type: 'checkbox',
+      label_key: 'l.voiceUseSpeakerBoost',
+      superseded_by_key: 'ttsEngine',
+      superseded_by_values: ['cartesia'],
+    },
   ],
   tavus: [
     { key: 'faceId', type: 'text', label_key: 'l.faceId', catalogue_resource: 'replica' },
@@ -485,6 +502,70 @@ describe('a config that already breaks the superseded invariant when the form op
 
     const emitted = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
     expect(emitted.config).toEqual({ avatarId: 'av-1', voiceId: 'hv-en', ttsEngine: 'none' })
+  })
+})
+
+const CARTESIA_UNSUPPORTED = [
+  'voiceStability',
+  'voiceSimilarityBoost',
+  'voiceStyle',
+  'voiceUseSpeakerBoost',
+] as const
+
+describe('the voice knobs the Cartesia engine does not have', () => {
+  it('shows them with no engine and with ElevenLabs, and never with Cartesia', async () => {
+    const wrapper = mountForm({ avatarId: 'av-1', voiceId: 'hv-en' })
+    await flushPromises()
+    for (const key of CARTESIA_UNSUPPORTED) expect(wrapper.find(field(key)).exists()).toBe(true)
+
+    await chooseEngine(wrapper, 'cartesia')
+    for (const key of CARTESIA_UNSUPPORTED) expect(wrapper.find(field(key)).exists()).toBe(false)
+    // speed IS a Cartesia setting and stays
+    expect(wrapper.find(field('voiceSpeed')).exists()).toBe(true)
+
+    await chooseEngine(wrapper, 'elevenlabs')
+    for (const key of CARTESIA_UNSUPPORTED) expect(wrapper.find(field(key)).exists()).toBe(true)
+  })
+
+  it('drops a value held for them when the engine becomes Cartesia, so it is never submitted', async () => {
+    const wrapper = mountForm({
+      avatarId: 'av-1',
+      ttsEngine: 'elevenlabs',
+      ttsExternalVoiceId: 'el-it',
+      voiceStability: 0.5,
+      voiceUseSpeakerBoost: true,
+      voiceSpeed: 1.1,
+    })
+    await flushPromises()
+    await chooseEngine(wrapper, 'cartesia')
+    await pickVoice(wrapper, 'ca-it')
+    await submit(wrapper)
+
+    const emitted = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
+    expect(emitted.config).toEqual({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+      voiceSpeed: 1.1,
+    })
+  })
+
+  it('does not resubmit them from a stored Cartesia config', async () => {
+    const wrapper = mountForm({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+      voiceStyle: 0.2,
+    })
+    await flushPromises()
+    await submit(wrapper)
+
+    const emitted = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
+    expect(emitted.config).toEqual({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+    })
   })
 })
 

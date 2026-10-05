@@ -103,6 +103,15 @@ describe('reusable link copy', () => {
       }
       expect(lookup(table, 'entryLink.disclosure')).toMatch(table === en ? /single-use/ : /monouso/)
     })
+
+    it('states no fixed link duration in the single-use disclosure', () => {
+      // A link BEAI emails lives 24 h, one only returned to the operator 30 min.
+      // The absolute expiry is rendered from `expires_at` next to it instead.
+      const text = String(lookup(table, 'entryLink.disclosure'))
+
+      expect(text).not.toMatch(/\d/)
+      expect(text).not.toMatch(/minut|hour|\bore\b/i)
+    })
   })
 
   it.each(REUSABLE_KEYS)('%s carries the normative English text', (key) => {

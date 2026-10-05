@@ -223,7 +223,7 @@
     },
     "invite": "Invita candidato",
     "generate": "Genera nuovo link",
-    "disclosure": "Questo link è monouso e scade tra 30 minuti. Aprirlo tu stesso — anche solo per verificarlo — lo consuma; consegnalo direttamente al candidato.",
+    "disclosure": "Questo link è monouso e scade nel momento indicato qui sotto. Aprirlo tu stesso — anche solo per verificarlo — lo consuma; consegnalo direttamente al candidato.",
     "expiresAt": "Scade:",
     "copy": "Copia",
     "copied": "Copiato",

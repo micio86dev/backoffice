@@ -49,3 +49,27 @@ describe('the two locales are translations, not copies', () => {
     expect(lookup(en, key)).not.toBe(lookup(it_, key))
   })
 })
+
+describe('every refusal code the form can be shown has copy in both locales', () => {
+  const CODES = [
+    'superadmin_only',
+    'superseded_by_tts_engine',
+    'tts_setting_unsupported',
+    'tts_voice_unverifiable',
+    'tts_voice_bind_failed',
+    'tts_vendor_key_missing',
+    'tts_provider_unconfigured',
+    'tts_secret_failed',
+    'tts_bind_busy',
+    'tts_engine_unsupported',
+  ]
+
+  it.each(Object.entries(TABLES))('%s carries all ten codes, each non-empty', (_locale, table) => {
+    const config = lookup(table, 'avatar_templates.error.config') as Record<string, unknown>
+
+    for (const code of CODES) {
+      expect(typeof config[code], code).toBe('string')
+      expect((config[code] as string).trim(), code).not.toBe('')
+    }
+  })
+})

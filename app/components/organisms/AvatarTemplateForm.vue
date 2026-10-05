@@ -405,7 +405,11 @@ import {
   fieldsToResetOnChange,
   optionsFor,
 } from '@/utils/dependent-options'
-import { fieldsToDropWhenChanged, isSuperseded } from '@/utils/superseded-fields'
+import {
+  fieldsToDropWhenChanged,
+  isSuperseded,
+  staleSupersededKeys,
+} from '@/utils/superseded-fields'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
@@ -473,6 +477,20 @@ const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? []
  */
 const visibleFields = computed(() =>
   activeFields.value.filter((field) => !isSuperseded(field, draft.value.config))
+)
+
+// A stored config can already hold both a governing value and the field it
+// replaces (written before the invariant existed, or by a path that never went
+// through `onFieldChange`). Reconcile it as the form opens, and whenever the
+// specs arrive or the provider changes, or the stale value would be resubmitted.
+watch(
+  activeFields,
+  (specs) => {
+    for (const key of staleSupersededKeys(specs, draft.value.config)) {
+      draft.value.config = withoutKey(draft.value.config, key)
+    }
+  },
+  { immediate: true }
 )
 
 // A CSS grid, not `Field`'s own `orientation` prop — orientation controls a
@@ -722,8 +740,9 @@ function voicePreviewFor(field: FieldSpec): {
   // sample (which would play a different, English voice).
   const engine = draft.value.config.ttsEngine
 
-  if (field.key === 'ttsExternalVoiceId' && isCataloguedEngine(engine)) {
-    return { provider: engine, voiceId }
+  if (field.key === 'ttsExternalVoiceId') {
+    // No catalogued engine means no vendor to ask: HeyGen's own catalogue does not know this id.
+    return isCataloguedEngine(engine) ? { provider: engine, voiceId } : null
   }
 
   return { provider, voiceId }

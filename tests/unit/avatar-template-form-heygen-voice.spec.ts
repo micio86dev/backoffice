@@ -458,3 +458,81 @@ describe('switching the provider on a new template', () => {
     expect(wrapper.find(field('voiceId')).exists()).toBe(true)
   })
 })
+
+describe('a config that already breaks the superseded invariant when the form opens', () => {
+  it('does not resubmit the native voice id an external engine replaces', async () => {
+    const wrapper = mountForm({
+      avatarId: 'av-1',
+      voiceId: 'hv-en',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+    })
+    await flushPromises()
+    await submit(wrapper)
+
+    const emitted = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
+    expect(emitted.config).toEqual({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+    })
+  })
+
+  it('leaves a consistent config untouched', async () => {
+    const wrapper = mountForm({ avatarId: 'av-1', voiceId: 'hv-en', ttsEngine: 'none' })
+    await flushPromises()
+    await submit(wrapper)
+
+    const emitted = wrapper.emitted('submit')?.[0]?.[0] as { config: Record<string, unknown> }
+    expect(emitted.config).toEqual({ avatarId: 'av-1', voiceId: 'hv-en', ttsEngine: 'none' })
+  })
+})
+
+describe('listening while no catalogued engine is chosen', () => {
+  it.each([
+    ['no engine', {}],
+    ['engine none', { ttsEngine: 'none' }],
+  ])(
+    'offers no sample of a vendor voice id with %s, rather than asking HeyGen for it',
+    async (_label, extra) => {
+      const wrapper = mountForm({ avatarId: 'av-1', ttsExternalVoiceId: 'ca-it', ...extra })
+      await flushPromises()
+
+      expect(wrapper.find(preview('ttsExternalVoiceId')).exists()).toBe(false)
+      expect(previewBodies()).toEqual([])
+    }
+  )
+})
+
+const CONFIG_ERROR_CODES = [
+  'superadmin_only',
+  'superseded_by_tts_engine',
+  'tts_setting_unsupported',
+  'tts_voice_unverifiable',
+  'tts_voice_bind_failed',
+  'tts_vendor_key_missing',
+  'tts_provider_unconfigured',
+  'tts_secret_failed',
+  'tts_bind_busy',
+  'tts_engine_unsupported',
+] as const
+
+describe('every refusal the API answers on the external voice reaches the operator', () => {
+  it.each(CONFIG_ERROR_CODES)('renders %s on the voice field', async (code) => {
+    const wrapper = mountForm({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+    })
+    await flushPromises()
+    await wrapper.setProps({
+      submitError: { status: 422, data: { errors: { 'config.ttsExternalVoiceId': [code] } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get(sel('template-config-ttsExternalVoiceId-error')).text()).toBe(
+      `avatar_templates.error.config.${code}`
+    )
+    expect(wrapper.find(sel('template-form-errors')).exists()).toBe(false)
+  })
+})

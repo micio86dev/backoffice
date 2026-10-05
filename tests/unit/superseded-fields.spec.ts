@@ -6,7 +6,11 @@
  * never offers a control the API would refuse.
  */
 import { describe, expect, it } from 'vitest'
-import { fieldsToDropWhenChanged, isSuperseded } from '../../app/utils/superseded-fields'
+import {
+  fieldsToDropWhenChanged,
+  isSuperseded,
+  staleSupersededKeys,
+} from '../../app/utils/superseded-fields'
 import type { FieldSpec } from '../../app/types/avatar-template'
 
 const voiceId: FieldSpec = {
@@ -46,5 +50,21 @@ describe('fieldsToDropWhenChanged', () => {
     expect(fieldsToDropWhenChanged(specs, 'ttsEngine', {}, 'cartesia')).toEqual([])
     expect(fieldsToDropWhenChanged(specs, 'ttsEngine', { voiceId: 'native' }, 'none')).toEqual([])
     expect(fieldsToDropWhenChanged(specs, 'voiceSpeed', { voiceId: 'native' }, '1.1')).toEqual([])
+  })
+})
+
+describe('staleSupersededKeys', () => {
+  const specs = [voiceId, speed]
+
+  it('lists a held value its governing field already replaces', () => {
+    expect(staleSupersededKeys(specs, { ttsEngine: 'cartesia', voiceId: 'native' })).toEqual([
+      'voiceId',
+    ])
+  })
+
+  it('lists nothing when the governing value does not replace it, or nothing is held', () => {
+    expect(staleSupersededKeys(specs, { ttsEngine: 'none', voiceId: 'native' })).toEqual([])
+    expect(staleSupersededKeys(specs, { ttsEngine: 'cartesia' })).toEqual([])
+    expect(staleSupersededKeys(specs, { ttsEngine: 'cartesia', voiceId: null })).toEqual([])
   })
 })

@@ -40,3 +40,15 @@ export function fieldsToDropWhenChanged(
     .filter((field) => config[field.key] !== undefined && config[field.key] !== null)
     .map((field) => field.key)
 }
+
+/**
+ * Which held values violate the invariant as they stand: fields that hold a
+ * value while their governing field already replaces them. Used when a form
+ * opens on a stored config, which no field change has reconciled.
+ */
+export function staleSupersededKeys(specs: FieldSpec[], config: Config): string[] {
+  return specs
+    .filter((field) => isSuperseded(field, config))
+    .filter((field) => config[field.key] !== undefined && config[field.key] !== null)
+    .map((field) => field.key)
+}

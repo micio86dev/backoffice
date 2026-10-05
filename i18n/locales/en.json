@@ -223,7 +223,7 @@
     },
     "invite": "Invite candidate",
     "generate": "Generate new link",
-    "disclosure": "This link is single-use and expires in 30 minutes. Opening it yourself — even just to check it works — spends it; hand it to the candidate directly.",
+    "disclosure": "This link is single-use and expires at the moment shown below. Opening it yourself — even just to check it works — spends it; hand it to the candidate directly.",
     "expiresAt": "Expires:",
     "copy": "Copy",
     "copied": "Copied",

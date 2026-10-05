@@ -18,7 +18,23 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
+import en from '../../../../i18n/locales/en.json'
+import it_ from '../../../../i18n/locales/it.json'
+
 const tMock = (key: string) => key
+
+/** A `$t` that resolves against a REAL locale table, so the copy is asserted, not the key. */
+function realT(table: unknown) {
+  return (key: string): string => {
+    const value = key.split('.').reduce<unknown>((node, segment) => {
+      if (typeof node !== 'object' || node === null) return undefined
+
+      return (node as Record<string, unknown>)[segment]
+    }, table)
+
+    return typeof value === 'string' ? value : key
+  }
+}
 
 const EntryLinkPanel = (await import('../../../../app/components/organisms/EntryLinkPanel.vue'))
   .default
@@ -80,6 +96,40 @@ describe('EntryLinkPanel — disclosure DOM order (design D4)', () => {
     expect(wrapper.text().toLowerCase()).not.toContain('revoke')
     expect(wrapper.text().toLowerCase()).not.toContain('regenerate')
   })
+})
+
+// admin-backoffice spec, "Link Disclosure Never Hard-Codes A Lifetime": a link
+// BEAI emails lives 24 h and one only returned to the operator lives 30 min, so
+// a fixed duration in static copy is false for one of the two.
+describe('EntryLinkPanel — disclosure never hard-codes a lifetime', () => {
+  const CASES = [
+    { name: 'emailed link, 24 h away', expires_at: '2026-08-18T15:32:00.000000Z' },
+    { name: 'returned-only link, 30 min away', expires_at: '2026-08-17T16:02:00.000000Z' },
+  ]
+  const LOCALES = [
+    { locale: 'en', table: en },
+    { locale: 'it', table: it_ },
+  ]
+
+  for (const { name, expires_at } of CASES) {
+    for (const { locale, table } of LOCALES) {
+      it(`${name}, ${locale}: single-use text carries no fixed duration and the expiry line shows expires_at`, () => {
+        const wrapper = mount(EntryLinkPanel, {
+          props: { link: { ...LINK, expires_at }, locale },
+          global: { mocks: { $t: realT(table) } },
+        })
+
+        const disclosure = wrapper.get('[data-testid="entry-link-disclosure"]').text()
+        expect(disclosure).toMatch(locale === 'en' ? /single-use/ : /monouso/)
+        expect(disclosure).not.toMatch(/\b(30|24|trenta|ventiquattro|thirty)\b/i)
+        expect(disclosure).not.toMatch(/minut|hour|\bore\b|\bora\b/i)
+
+        const expiry = wrapper.get('[data-testid="entry-link-expiry"]').text()
+        expect(expiry).toContain(locale === 'en' ? 'Expires:' : 'Scade:')
+        expect(expiry).toContain(String(new Date(expires_at).getFullYear()))
+      })
+    }
+  }
 })
 
 describe('EntryLinkPanel — clipboard failure is designed out (design D6)', () => {

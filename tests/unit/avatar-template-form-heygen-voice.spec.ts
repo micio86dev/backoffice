@@ -617,3 +617,40 @@ describe('every refusal the API answers on the external voice reaches the operat
     expect(wrapper.find(sel('template-form-errors')).exists()).toBe(false)
   })
 })
+
+describe('a server error for a field the engine hides (R3-001)', () => {
+  it('falls through to the summary, not onto a control that is not rendered', async () => {
+    const wrapper = mountForm({
+      avatarId: 'av-1',
+      ttsEngine: 'cartesia',
+      ttsExternalVoiceId: 'ca-it',
+    })
+    await flushPromises()
+    expect(wrapper.find(field('voiceId')).exists()).toBe(false)
+
+    await wrapper.setProps({
+      submitError: { status: 422, data: { errors: { 'config.voiceId': ['tts_bind_busy'] } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get(sel('template-form-errors')).text()).toContain(
+      'avatar_templates.error.config.tts_bind_busy'
+    )
+    expect(wrapper.find(sel('template-config-voiceId-error')).exists()).toBe(false)
+  })
+
+  it('still claims an error for a field that is visible', async () => {
+    const wrapper = mountForm({ avatarId: 'av-1', voiceId: 'hv-en', ttsEngine: 'none' })
+    await flushPromises()
+
+    await wrapper.setProps({
+      submitError: { status: 422, data: { errors: { 'config.voiceId': ['tts_bind_busy'] } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get(sel('template-config-voiceId-error')).text()).toBe(
+      'avatar_templates.error.config.tts_bind_busy'
+    )
+    expect(wrapper.find(sel('template-form-errors')).exists()).toBe(false)
+  })
+})

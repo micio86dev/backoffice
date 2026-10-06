@@ -1041,7 +1041,10 @@ watch(
       return
     }
 
-    const activeKeys = new Set(activeFields.value.map((field) => field.key))
+    // Only a field the form RENDERS can carry its own error: one hidden by
+    // supersession (HeyGen `voiceId` under an external engine) has no control to
+    // show it on, so its error must fall through to the summary below.
+    const activeKeys = new Set(visibleFields.value.map((field) => field.key))
     const CONFIG_PREFIX = 'config.'
 
     for (const [serverField, messages] of Object.entries(fields)) {
@@ -1080,7 +1083,13 @@ watch(
           const hasTranslation = typeof te === 'function' ? te(translationKey) : true
           configErrors.value[key] = hasTranslation ? t(translationKey) : message
         } else {
-          unmappedErrors.value.push(message)
+          // Same copy as a field would get, raw code when it has none.
+          const translated = translateServerCode(
+            { t, te },
+            'avatar_templates.error.config',
+            message
+          )
+          if (!unmappedErrors.value.includes(translated)) unmappedErrors.value.push(translated)
         }
 
         continue

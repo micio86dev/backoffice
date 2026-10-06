@@ -175,6 +175,33 @@
         unmount this card (and its own success confirmation) before the
         operator ever saw it.
       -->
+      <!--
+        Evaluation retry (scoring-retry-rt-b): the operator's single
+        re-interview of a `pending` evaluation. The panel decides for itself
+        whether anything shows (the action needs `retryAvailable` AND
+        `canRetry`; the read-only progress line is for every role), so this
+        wrapper hides itself while it is empty rather than leaving a bordered
+        box around nothing. `canRetry` reads the abilities contract's
+        `participants.retry` flag, never a role name; the API's 403 is the real
+        gate. The panel keeps the one-time link in its own memory and emits
+        `authorized` WITHOUT it, so the page only refreshes the participant.
+      -->
+      <div
+        class="flex flex-col gap-4 rounded-xl border p-4 empty:hidden"
+        data-testid="participant-retry-card"
+      >
+        <EvaluationRetryPanel
+          :participant-id="participant.id"
+          :status="participant.status"
+          :retry-available="participant.retry_available"
+          :retry-attempt="participant.retry_attempt"
+          :retry-authorized-at="participant.retry_authorized_at"
+          :can-retry="canRetry"
+          :locale="locale"
+          @authorized="onRetryAuthorized"
+        />
+      </div>
+
       <Card
         v-if="canRecover && (participant.status === 'errore' || justRecovered)"
         data-testid="participant-recovery-card"
@@ -405,6 +432,7 @@ import EvaluationAuditPanel from '@/components/organisms/EvaluationAuditPanel.vu
 import TranscriptPanel from '@/components/organisms/TranscriptPanel.vue'
 import EntryLinkPanel, { type EntryLink } from '@/components/organisms/EntryLinkPanel.vue'
 import ParticipantRecoveryPanel from '@/components/organisms/ParticipantRecoveryPanel.vue'
+import EvaluationRetryPanel from '@/components/organisms/EvaluationRetryPanel.vue'
 import { useParticipants, type ParticipantDetailResponse } from '@/composables/useParticipants'
 import type { RecoverParticipantResponse } from '@/composables/useParticipantRecovery'
 import {
@@ -647,6 +675,7 @@ const { generateEntryLink } = useEntryLinks()
 const { can } = useCurrentUser()
 const canInvite = computed(() => can('participants.create'))
 const canRecover = computed(() => can('participants.recover'))
+const canRetry = computed(() => can('participants.retry'))
 const entryLink = ref<EntryLink | null>(null)
 const entryLinkError = ref<string | null>(null)
 const generatingEntryLink = ref(false)
@@ -759,6 +788,21 @@ async function onParticipantRecovered(response: RecoverParticipantResponse): Pro
   if (participant.value) participant.value.status = response.status
   justRecovered.value = true
   await loadSessions(String(route.params['id']))
+}
+
+// scoring-retry-rt-b: the panel emits `authorized` without the one-time link.
+// Re-read the participant so the status badge and the read-only retry state
+// reflect the authorization. Best-effort: the panel already shows its own
+// success state, and a failed refresh must never blank the page.
+async function onRetryAuthorized(): Promise<void> {
+  const id = Array.isArray(route.params['id']) ? route.params['id'][0] : route.params['id']
+  if (id === undefined) return
+
+  try {
+    participant.value = (await fetchParticipant(id)).data
+  } catch {
+    // Keep what is on screen.
+  }
 }
 
 async function loadSessions(id: string): Promise<void> {

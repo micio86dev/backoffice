@@ -75,6 +75,10 @@ test.describe('Entry link mint (operator-interview-link)', () => {
     // assertion order below mirrors the DOM order the component enforces
     // (EntryLinkPanel.spec.ts covers the DOM-order guarantee directly).
     await expect(page.getByText(/monouso/)).toBeVisible()
+    // The lifetime differs per link (24 h emailed, 30 min returned only), so the
+    // disclosure states none; the absolute expiry line carries it.
+    await expect(page.getByTestId('entry-link-disclosure')).not.toContainText(/\d|minut/)
+    await expect(page.getByTestId('entry-link-expiry')).toContainText('Scade:')
     await expect(page.getByText('https://interview.example.com/interview/e2e-token')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Copia' })).toBeVisible()
   })
@@ -96,6 +100,10 @@ test.describe('Entry link re-issue (participant detail)', () => {
     await page.getByRole('button', { name: 'Genera nuovo link' }).click()
 
     await expect(page.getByText(/monouso/)).toBeVisible()
+    // The lifetime differs per link (24 h emailed, 30 min returned only), so the
+    // disclosure states none; the absolute expiry line carries it.
+    await expect(page.getByTestId('entry-link-disclosure')).not.toContainText(/\d|minut/)
+    await expect(page.getByTestId('entry-link-expiry')).toContainText('Scade:')
     await expect(page.getByText('https://interview.example.com/interview/e2e-token')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Copia' })).toBeVisible()
   })

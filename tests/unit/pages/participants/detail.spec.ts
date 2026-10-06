@@ -1331,6 +1331,208 @@ describe('pages/participants/[id].vue', () => {
       expect(alert.classes().join(' ')).not.toContain('destructive')
     })
   })
+
+  // ─────────────────────────────────────────────────────────────────────
+  // scoring-retry-rt-b PR4b: the evaluation-retry panel is mounted by the
+  // page. Visibility of the ACTION comes from the abilities contract
+  // (`can('participants.retry')`), never a role name; the read-only progress
+  // line is for every role.
+  // ─────────────────────────────────────────────────────────────────────
+  describe('Evaluation retry panel wiring', () => {
+    type RetryFields = {
+      retry_available: boolean
+      retry_attempt: boolean
+      retry_authorized_at: string | null
+    }
+
+    const AVAILABLE: RetryFields = {
+      retry_available: true,
+      retry_attempt: false,
+      retry_authorized_at: null,
+    }
+
+    function withRetry(id: number, status: string, retry: RetryFields) {
+      const response = detailResponse(status)
+      return { data: { ...response.data, id, ...retry } }
+    }
+
+    async function mountRetryPage(options: {
+      role?: string
+      status?: string
+      retry?: RetryFields
+      participantResponses?: Array<ReturnType<typeof withRetry>>
+      authorizeRetryMock?: ReturnType<typeof vi.fn>
+      routeId?: { value: string }
+    }) {
+      const {
+        role = 'operator',
+        status = 'completato',
+        retry = AVAILABLE,
+        authorizeRetryMock = vi.fn(),
+      } = options
+      const responses = options.participantResponses ?? [withRetry(42, status, retry)]
+      const fetchParticipantMock = vi.fn()
+      responses.forEach((r, i) =>
+        i === responses.length - 1
+          ? fetchParticipantMock.mockResolvedValue(r)
+          : fetchParticipantMock.mockResolvedValueOnce(r)
+      )
+      const route = { params: { id: '42' } }
+      vi.stubGlobal(
+        'useRoute',
+        vi.fn(() => route)
+      )
+
+      vi.doMock('../../../../app/composables/useParticipants', () => ({
+        useParticipants: () => ({ fetchParticipant: fetchParticipantMock }),
+      }))
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => currentUserStub(role),
+      }))
+      vi.doMock('../../../../app/composables/useEvaluationRetry', () => ({
+        useEvaluationRetry: () => ({ authorizeRetry: authorizeRetryMock }),
+      }))
+      vi.doMock('../../../../app/composables/useEvaluationReport', () => ({
+        useEvaluationReport: () => ({ fetchEvaluation: vi.fn().mockRejectedValue(new Error('x')) }),
+      }))
+      vi.doMock('../../../../app/composables/useDownloads', () => ({
+        useDownloads: () => ({ downloadTranscript: vi.fn(), downloadEvaluation: vi.fn() }),
+      }))
+      vi.doMock('../../../../app/composables/useSessionReview', () => ({
+        useSessionReview: () => ({ listSessions: vi.fn().mockResolvedValue({ data: [] }) }),
+      }))
+
+      const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
+      const wrapper = mount(withTooltipProvider(DetailPage), {
+        global: {
+          mocks: { $t: realT(en) },
+          stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+        },
+      })
+      await flushPromises()
+      await flushPromises()
+
+      return { wrapper, fetchParticipantMock, authorizeRetryMock, route }
+    }
+
+    it.each(['operator', 'admin'])(
+      'offers the authorize action to %s when a retry is available',
+      async (role) => {
+        const { wrapper } = await mountRetryPage({ role })
+
+        expect(wrapper.find('[data-testid="evaluation-retry-open"]').exists()).toBe(true)
+      }
+    )
+
+    it('offers nothing to a viewer when a retry is available (gated by the ability, not a role name)', async () => {
+      const { wrapper } = await mountRetryPage({ role: 'viewer' })
+
+      expect(wrapper.find('[data-testid="evaluation-retry-panel"]').exists()).toBe(false)
+    })
+
+    it('is absent when no retry state exists (completed evaluation without retry)', async () => {
+      const { wrapper } = await mountRetryPage({
+        retry: { retry_available: false, retry_attempt: false, retry_authorized_at: null },
+      })
+
+      expect(wrapper.find('[data-testid="evaluation-retry-panel"]').exists()).toBe(false)
+    })
+
+    it('shows the read-only waiting line to a viewer once a retry was authorized', async () => {
+      const { wrapper } = await mountRetryPage({
+        role: 'viewer',
+        status: 'in_attesa',
+        retry: {
+          retry_available: false,
+          retry_attempt: true,
+          retry_authorized_at: '2026-10-06T09:00:00Z',
+        },
+      })
+
+      const line = wrapper.get('[data-testid="evaluation-retry-state"]')
+      expect(line.attributes('data-state')).toBe('waiting')
+      // Formatted in the page locale (en), not a hard-coded one.
+      expect(line.text()).toContain('Oct 6, 2026')
+      expect(wrapper.find('[data-testid="evaluation-retry-open"]').exists()).toBe(false)
+    })
+
+    it.each([
+      ['in_corso', 'inProgress'],
+      ['in_valutazione', 'scoring'],
+      ['completato', 'finished'],
+    ])('passes the literal status %s through, so the line reads %s', async (status, state) => {
+      const { wrapper } = await mountRetryPage({
+        role: 'viewer',
+        status,
+        retry: {
+          retry_available: false,
+          retry_attempt: true,
+          retry_authorized_at: '2026-10-06T09:00:00Z',
+        },
+      })
+
+      expect(wrapper.get('[data-testid="evaluation-retry-state"]').attributes('data-state')).toBe(
+        state
+      )
+    })
+
+    it('passes the participant id to the panel, and refreshes the participant when authorized', async () => {
+      const authorizeRetryMock = vi.fn().mockResolvedValue({
+        status: 'in_attesa',
+        competencies_reset: ['COL'],
+        entry_url: 'https://frontend.example/enter#token',
+        expires_at: '2026-10-07T09:00:00Z',
+        email_sent: true,
+      })
+      const { wrapper, fetchParticipantMock } = await mountRetryPage({
+        authorizeRetryMock,
+        participantResponses: [
+          withRetry(42, 'completato', AVAILABLE),
+          withRetry(42, 'in_attesa', {
+            retry_available: false,
+            retry_attempt: true,
+            retry_authorized_at: '2026-10-06T09:00:00Z',
+          }),
+        ],
+      })
+
+      expect(wrapper.text()).not.toContain('Waiting')
+      await wrapper.get('[data-testid="evaluation-retry-open"]').trigger('click')
+      await wrapper.get('[data-testid="evaluation-retry-confirm"]').trigger('click')
+      await flushPromises()
+
+      expect(authorizeRetryMock).toHaveBeenCalledWith(42, {})
+      expect(fetchParticipantMock).toHaveBeenCalledTimes(2)
+      // The page refreshed: the status badge now reflects the new status, and
+      // the link stays in the panel (it is never emitted to the page).
+      expect(wrapper.get('[data-testid="participant-retry-card"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Waiting')
+      expect(wrapper.find('[data-testid="evaluation-retry-success"]').exists()).toBe(true)
+    })
+
+    it('does not carry a link to another participant when the route changes', async () => {
+      const authorizeRetryMock = vi.fn().mockResolvedValue({
+        status: 'in_attesa',
+        competencies_reset: ['COL'],
+        entry_url: 'https://frontend.example/enter#secret-token',
+        expires_at: '2026-10-07T09:00:00Z',
+        email_sent: false,
+      })
+      const { wrapper } = await mountRetryPage({ authorizeRetryMock })
+
+      await wrapper.get('[data-testid="evaluation-retry-open"]').trigger('click')
+      await wrapper.get('[data-testid="evaluation-retry-confirm"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.text()).toContain('secret-token')
+
+      await wrapper.unmount()
+      const next = await mountRetryPage({
+        participantResponses: [withRetry(43, 'completato', AVAILABLE)],
+      })
+
+      expect(next.wrapper.text()).not.toContain('secret-token')
+    })
+  })
 })
 
 function flushPromises(): Promise<void> {

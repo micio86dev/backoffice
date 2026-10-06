@@ -341,6 +341,45 @@
       "unknown": "Non è stato possibile riaprire questa valutazione. Riprova."
     }
   },
+  "evaluationRetry": {
+    "description": "Questa valutazione non ha potuto essere validata per intero. Un admin o un operatore può autorizzare un solo nuovo colloquio, limitato alle competenze che non è stato possibile validare.",
+    "action": "Autorizza il nuovo colloquio",
+    "state": {
+      "waiting": "Nuovo colloquio autorizzato il {date}. In attesa che il candidato lo svolga.",
+      "inProgress": "Nuovo colloquio in corso.",
+      "scoring": "Valutazione del nuovo colloquio in corso.",
+      "finished": "Nuovo colloquio completato. La valutazione è ora definitiva."
+    },
+    "confirm": {
+      "title": "Autorizzare il nuovo colloquio?",
+      "consequence": {
+        "reDo": "Il candidato risponderà di nuovo solo alle competenze che non è stato possibile validare. Le risposte già registrate per quelle competenze verranno eliminate definitivamente. Le competenze validate restano invariate.",
+        "unreadable": "La valutazione non sarà leggibile finché il nuovo colloquio non sarà stato valutato.",
+        "once": "Il nuovo colloquio può essere autorizzato una sola volta per partecipante e non può essere ritirato.",
+        "link": "Verrà creato un link monouso. Se il candidato ha un indirizzo email recapitabile, il link gli viene inviato anche via email."
+      },
+      "reasonLabel": "Motivo (facoltativo)",
+      "reasonPlaceholder": "es. il candidato ha perso la connessione durante il colloquio",
+      "submit": "Autorizza il nuovo colloquio",
+      "submitting": "Autorizzazione in corso…",
+      "cancel": "Annulla"
+    },
+    "success": {
+      "title": "Nuovo colloquio autorizzato",
+      "body": "Al candidato verranno poste di nuovo domande su: {count} competenze.",
+      "emailSent": "Email inviata al candidato.",
+      "emailNotSent": "Nessuna email è stata inviata. Consegna tu il link al candidato.",
+      "dismiss": "Fatto"
+    },
+    "refusalReason": {
+      "retry_already_consumed": "Per questo partecipante è già stato autorizzato un nuovo colloquio. Si può usare una sola volta.",
+      "not_completed": "Il partecipante non ha completato il colloquio, quindi non c'è nulla da ripetere.",
+      "test_mode_participant": "Questo partecipante appartiene a un colloquio in modalità test, che non può essere ripetuto.",
+      "evaluation_not_pending": "La valutazione non è in attesa di un nuovo colloquio, quindi non è possibile autorizzarlo.",
+      "project_inaccessible": "Il progetto è chiuso o fuori dal periodo di disponibilità, quindi il candidato non potrebbe aprire un nuovo link. Riapri o estendi prima il progetto.",
+      "unknown": "Non è stato possibile autorizzare il nuovo colloquio. Riprova."
+    }
+  },
   "projects": {
     "title": "Progetti",
     "subtitle": "Ogni progetto definisce cosa misura una valutazione e dove finiscono i risultati.",

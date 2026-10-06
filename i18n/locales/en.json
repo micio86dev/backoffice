@@ -341,6 +341,45 @@
       "unknown": "This assessment could not be re-opened. Please try again."
     }
   },
+  "evaluationRetry": {
+    "description": "This evaluation could not be fully validated. An admin or operator can authorize one single re-interview, limited to the competencies that could not be validated.",
+    "action": "Authorize re-interview",
+    "state": {
+      "waiting": "Re-interview authorized on {date}. Waiting for the candidate to take it.",
+      "inProgress": "Re-interview in progress.",
+      "scoring": "Scoring the re-interview.",
+      "finished": "Retry completed. The evaluation is now definitive."
+    },
+    "confirm": {
+      "title": "Authorize the re-interview?",
+      "consequence": {
+        "reDo": "The candidate will answer again only the competencies that could not be validated. Any answer already recorded for those competencies will be permanently deleted. Validated competencies are kept as they are.",
+        "unreadable": "The evaluation will be unreadable until the re-interview has been scored.",
+        "once": "A retry can be authorized only once per participant and cannot be withdrawn.",
+        "link": "A single-use link will be created. If the candidate has a deliverable email address, it is also emailed to them."
+      },
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "e.g. the candidate lost the connection during the interview",
+      "submit": "Authorize re-interview",
+      "submitting": "Authorizing…",
+      "cancel": "Cancel"
+    },
+    "success": {
+      "title": "Re-interview authorized",
+      "body": "The candidate will be asked again about: {count} competencies.",
+      "emailSent": "Email sent to the candidate.",
+      "emailNotSent": "No email was sent. Give the candidate this link yourself.",
+      "dismiss": "Done"
+    },
+    "refusalReason": {
+      "retry_already_consumed": "A re-interview was already authorized for this participant. It can be used only once.",
+      "not_completed": "The participant has not completed the interview, so there is nothing to retry.",
+      "test_mode_participant": "This participant belongs to a test-mode interview, which cannot be retried.",
+      "evaluation_not_pending": "The evaluation is not waiting for a retry, so a re-interview cannot be authorized.",
+      "project_inaccessible": "The project is closed or outside its availability window, so the candidate could not open a new link. Reopen or extend the project first.",
+      "unknown": "The re-interview could not be authorized. Please try again."
+    }
+  },
   "projects": {
     "title": "Projects",
     "subtitle": "Each project defines what an assessment measures and where its results are delivered.",

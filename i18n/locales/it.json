@@ -366,7 +366,7 @@
     },
     "success": {
       "title": "Nuovo colloquio autorizzato",
-      "body": "Al candidato verranno poste di nuovo domande su: {count} competenze.",
+      "body": "Al candidato verranno poste di nuovo domande su: {competencies}.",
       "emailSent": "Email inviata al candidato.",
       "emailNotSent": "Nessuna email è stata inviata. Consegna tu il link al candidato.",
       "dismiss": "Fatto"

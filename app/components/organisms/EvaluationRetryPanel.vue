@@ -9,7 +9,11 @@
       <Alert variant="success" data-testid="evaluation-retry-success">
         <AlertTitle>{{ $t('evaluationRetry.success.title') }}</AlertTitle>
         <AlertDescription>
-          {{ $t('evaluationRetry.success.body', { count: result.competencies_reset.length }) }}
+          {{
+            $t('evaluationRetry.success.body', {
+              competencies: result.competencies_reset.join(', ') || '–',
+            })
+          }}
         </AlertDescription>
       </Alert>
 
@@ -210,6 +214,20 @@ const actionVisible = computed(() => props.retryAvailable && props.canRetry && !
 
 const visible = computed(
   () => result.value !== null || stateKey.value !== null || actionVisible.value
+)
+
+// The panel may be reused for another participant without a remount. The one-time link, the spent
+// flag, the confirm step and any refusal belong to the participant they were created for.
+watch(
+  () => props.participantId,
+  () => {
+    result.value = null
+    spent.value = false
+    confirming.value = false
+    authorizing.value = false
+    reason.value = ''
+    errorReason.value = null
+  }
 )
 
 function onCancel(): void {

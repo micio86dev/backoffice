@@ -390,3 +390,73 @@ describe('EvaluationRetryPanel — copy exists in it and en', () => {
     expect(text).not.toMatch(/\b(30|24)\b/)
   })
 })
+
+describe('EvaluationRetryPanel — review follow-ups', () => {
+  it('names the competencies to re-ask instead of a bare count, so one never reads "1 competencies"', async () => {
+    authorizeRetryMock.mockResolvedValue(SUCCESS)
+    const wrapper = mountPanel()
+    await openAndConfirm(wrapper)
+
+    expect(wrapper.get('[data-testid="evaluation-retry-success"]').text()).toContain(
+      'evaluationRetry.success.body:{"competencies":"PRS, STG"}'
+    )
+
+    authorizeRetryMock.mockResolvedValue({ ...SUCCESS, competencies_reset: ['PRS'] })
+    const single = mountPanel()
+    await openAndConfirm(single)
+
+    expect(single.get('[data-testid="evaluation-retry-success"]').text()).toContain(
+      'evaluationRetry.success.body:{"competencies":"PRS"}'
+    )
+  })
+
+  it('drops the one-time link, the spent flag and the confirm step when the panel is reused for another participant', async () => {
+    authorizeRetryMock.mockResolvedValue(SUCCESS)
+    const wrapper = mountPanel()
+    await openAndConfirm(wrapper)
+    expect(wrapper.html()).toContain('retry-token-abc')
+
+    await wrapper.setProps({ participantId: 43 })
+
+    expect(wrapper.find('[data-testid="evaluation-retry-success"]').exists()).toBe(false)
+    expect(wrapper.html()).not.toContain('retry-token-abc')
+    // The next participant starts from a clean, available state.
+    expect(wrapper.find('[data-testid="evaluation-retry-open"]').exists()).toBe(true)
+  })
+
+  it('does not carry a half-filled confirm step or a refusal over to another participant', async () => {
+    const wrapper = mountPanel()
+    await wrapper.get('[data-testid="evaluation-retry-open"]').trigger('click')
+    expect(wrapper.find('[data-testid="evaluation-retry-confirm"]').exists()).toBe(true)
+
+    await wrapper.setProps({ participantId: 43 })
+
+    expect(wrapper.find('[data-testid="evaluation-retry-confirm"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="evaluation-retry-open"]').exists()).toBe(true)
+  })
+
+  it('shows a dash, never "Invalid Date", when the authorization time is not known yet', () => {
+    const wrapper = mountPanel({
+      status: 'in_attesa',
+      retryAvailable: false,
+      retryAttempt: true,
+      retryAuthorizedAt: null,
+    })
+
+    const text = wrapper.get('[data-testid="evaluation-retry-state"]').text()
+    expect(text).toContain('evaluationRetry.state.waiting:{"date":"–"}')
+    expect(text).not.toContain('Invalid')
+  })
+
+  it('renders nothing for a status the retry flow does not map (an errored participant)', () => {
+    const wrapper = mountPanel({
+      status: 'errore',
+      retryAvailable: false,
+      retryAttempt: true,
+      retryAuthorizedAt: '2026-10-06T09:30:00.000000Z',
+    })
+
+    expect(wrapper.find('[data-testid="evaluation-retry-state"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
+  })
+})

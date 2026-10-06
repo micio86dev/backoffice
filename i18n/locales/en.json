@@ -366,7 +366,7 @@
     },
     "success": {
       "title": "Re-interview authorized",
-      "body": "The candidate will be asked again about: {count} competencies.",
+      "body": "The candidate will be asked again about: {competencies}.",
       "emailSent": "Email sent to the candidate.",
       "emailNotSent": "No email was sent. Give the candidate this link yourself.",
       "dismiss": "Done"

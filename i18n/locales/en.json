@@ -508,6 +508,7 @@
         "webhook_url_too_long": "The webhook URL is too long."
       },
       "competenciesLoadError": "The competency list could not be loaded. Please try again.",
+      "competenciesPreselectedHint": "Pre-selected from the role; untick the ones you do not want.",
       "templatesLoadError": "The avatar template list could not be loaded. Please try again.",
       "templateGroup": {
         "organization": "Your organization",

@@ -508,6 +508,7 @@
         "webhook_url_too_long": "L'URL del webhook è troppo lungo."
       },
       "competenciesLoadError": "L'elenco delle competenze non è stato caricato. Riprova.",
+      "competenciesPreselectedHint": "Preselezionate dal ruolo: deseleziona quelle che non vuoi.",
       "templatesLoadError": "L'elenco dei template avatar non è stato caricato. Riprova.",
       "templateGroup": {
         "organization": "La tua organizzazione",

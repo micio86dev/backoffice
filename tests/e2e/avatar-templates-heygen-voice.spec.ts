@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -80,6 +81,7 @@ interface Api {
 }
 
 async function mockApi(page: Page, kind: 'superadmin' | 'admin'): Promise<Api> {
+  await answerFirstVisitPrompts(page)
   const superadmin = kind === 'superadmin'
   const api: Api = { writes: [] }
 
@@ -175,9 +177,6 @@ test.describe('Avatar templates page: HeyGen external voice, superadmin only', (
     const api = await mockApi(page, 'superadmin')
     await page.goto('/avatar-templates')
 
-    const tourSkip = page.getByTestId('onboarding-tour-skip')
-    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
-
     await page.getByTestId('template-new').click()
     await page.getByTestId('template-field-name').fill('Elena su HeyGen')
 
@@ -218,9 +217,6 @@ test.describe('Avatar templates page: HeyGen external voice, superadmin only', (
           : route.fallback()
     )
     await page.goto('/avatar-templates')
-
-    const tourSkip = page.getByTestId('onboarding-tour-skip')
-    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
 
     await page.getByTestId('template-new').click()
     await page.getByTestId('template-field-name').fill('Elena su HeyGen')

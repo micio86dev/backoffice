@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -54,6 +55,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   // `/settings` is admin-gated at the route, and the gate reads the ability map
   // `/auth/me` publishes. Without this the page redirects to the dashboard and
   // every assertion below fails on a missing control that was never meant to

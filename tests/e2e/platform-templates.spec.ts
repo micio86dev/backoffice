@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 
@@ -113,6 +114,7 @@ async function injectSession(page: Page): Promise<void> {
 }
 
 async function mockIdentity(page: Page, kind: 'superadmin' | 'admin'): Promise<void> {
+  await answerFirstVisitPrompts(page)
   const superadmin = kind === 'superadmin'
 
   await page.route(
@@ -139,6 +141,26 @@ async function mockIdentity(page: Page, kind: 'superadmin' | 'admin'): Promise<v
     (url) => url.pathname === '/admin/organizations',
     (route) => jsonRoute(route, { data: [], acting_organization_id: null })
   )
+}
+
+async function expectFirstVisitPromptsAnswered(page: Page): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('beai.onboarding.tour-seen.1')))
+    .toBe('seen')
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('beai.consent.analytics')))
+    .toBe('denied')
+}
+
+/**
+ * Opens the engine's voice list once its catalogue has loaded, so the click never
+ * lands while the trigger is still in its busy (loading) state.
+ */
+async function openVoiceList(page: Page): Promise<void> {
+  const trigger = page.getByTestId('template-config-ttsExternalVoiceId')
+
+  await expect(trigger).not.toHaveAttribute('aria-busy', 'true')
+  await trigger.click()
 }
 
 async function mockApi(page: Page, api: Api): Promise<void> {
@@ -460,6 +482,10 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
     const api = newApi()
     await open(page, api)
 
+    // The first-visit prompts are answered before the page loads: a tour or a
+    // consent banner that opened late would take focus and close the voice list.
+    await expectFirstVisitPromptsAnswered(page)
+
     await page.getByTestId('platform-template-new').click()
     await page.getByTestId('template-field-name').fill('Elena su HeyGen')
 
@@ -470,7 +496,7 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
 
     // The vendor voice picker REPLACES the native voice field.
     await expect(page.getByTestId('template-config-voiceId')).toHaveCount(0)
-    await page.getByTestId('template-config-ttsExternalVoiceId').click()
+    await openVoiceList(page)
     await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
     await expect(page.getByTestId('template-config-ttsExternalVoiceId-preview')).toBeVisible()
 
@@ -509,9 +535,17 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
     const api = newApi()
     await open(page, api)
 
+    // The first-visit prompts are answered before the page loads: a tour or a
+    // consent banner that opened late would take focus and close the voice list.
+    await expectFirstVisitPromptsAnswered(page)
+
     await page.getByTestId('platform-template-new').click()
+    // A name first: the drawer focuses it, and pressing anywhere else blurs it and
+    // inserts "name required" above the voice field, shifting the control out from
+    // under the pointer between press and release, so the click is lost.
+    await page.getByTestId('template-field-name').fill('Elena su HeyGen')
     await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
-    await page.getByTestId('template-config-ttsExternalVoiceId').click()
+    await openVoiceList(page)
     await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
 
     await page.getByTestId('template-config-ttsEngine').selectOption('')
@@ -556,7 +590,7 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
     await page.getByTestId('platform-template-new').click()
     await page.getByTestId('template-field-name').fill('Bind rifiutato')
     await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
-    await page.getByTestId('template-config-ttsExternalVoiceId').click()
+    await openVoiceList(page)
     await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
     await page.getByTestId('form-drawer-save').click()
 

@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -61,6 +62,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: Page, options: { photoUrl?: string | null } = {}): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -109,17 +111,6 @@ async function login(page: Page): Promise<void> {
   await expect(page).toHaveURL('/')
 }
 
-/**
- * The analytics consent banner is fixed to the bottom of the viewport and
- * sits over page content, swallowing clicks on anything underneath it —
- * same fixture dismissal as reports-index.spec.ts. Dismissed through the
- * app's own control, not by seeding its storage key.
- */
-async function dismissConsent(page: Page): Promise<void> {
-  await page.getByTestId('analytics-consent-reject').click()
-  await expect(page.getByTestId('analytics-consent')).toBeHidden()
-}
-
 test.describe('Profile page (user-profile-self-service)', () => {
   test('shows the signed-in user, editable account details, and read-only role/organization', async ({
     page,
@@ -131,7 +122,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     await expect(page.getByRole('textbox', { name: 'Nome' })).toHaveValue('Ada Lovelace')
     await expect(page.getByRole('textbox', { name: 'Email', exact: true })).toHaveValue(
@@ -162,7 +152,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     await page.getByRole('textbox', { name: 'Nome' }).fill('Grace Hopper')
     await page.getByRole('combobox', { name: 'Lingua' }).click()
@@ -197,7 +186,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     await page.getByLabel('Password attuale', { exact: true }).fill('wrong-password')
     await page.getByLabel('Nuova password', { exact: true }).fill('a-new-password-123')
@@ -232,7 +220,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     await page.getByLabel('Password attuale', { exact: true }).fill('current-pass')
     await page.getByLabel('Nuova password', { exact: true }).fill('a-new-password-123')
@@ -288,7 +275,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     await expect(page.getByTestId('profile-photo-fallback')).toBeVisible()
 
@@ -339,7 +325,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     // NOT toHaveCount(0): reka-ui's AvatarImage stays mounted in the DOM
     // whenever photoUrl is truthy (v-if is bound to the URL's presence, not
@@ -371,7 +356,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     // NOT toHaveCount(0): reka-ui's AvatarImage stays mounted in the DOM
     // whenever photoUrl is truthy (v-if is bound to the URL's presence, not
@@ -412,7 +396,6 @@ test.describe('Profile page (user-profile-self-service)', () => {
     )
     await login(page)
     await page.goto('/profile')
-    await dismissConsent(page)
 
     await expect(page.getByTestId('profile-photo-preview')).toBeVisible()
 

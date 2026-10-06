@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 
@@ -73,6 +74,7 @@ async function injectSession(page: Page): Promise<void> {
 }
 
 async function mockOrgAdmin(page: Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>

@@ -408,3 +408,24 @@ describe('EntryLinkPanel — the reusable variant', () => {
     expect(window.location.hash).toBe(hashBefore)
   })
 })
+
+describe('EntryLinkPanel — hideGenerate', () => {
+  it('keeps the Generate button by default', () => {
+    const wrapper = mount(EntryLinkPanel, {
+      props: { link: LINK, locale: 'en' },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="entry-link-generate"]').exists()).toBe(true)
+  })
+
+  it('drops the Generate button, and keeps Copy, when the caller opts out', () => {
+    const wrapper = mount(EntryLinkPanel, {
+      props: { link: LINK, locale: 'en', hideGenerate: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.find('[data-testid="entry-link-generate"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="entry-link-copy"]').exists()).toBe(true)
+  })
+})

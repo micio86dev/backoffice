@@ -654,3 +654,35 @@ describe('a server error for a field the engine hides (R3-001)', () => {
     expect(wrapper.find(sel('template-form-errors')).exists()).toBe(false)
   })
 })
+
+describe('the column layout does not depend on the engine (R3-002)', () => {
+  // Exactly TWO_COLUMN_MIN_FIELDS (5) fields, one of which the engine hides:
+  // the layout counts the provider's fields, so switching engine never reflows the form.
+  const FIVE: Record<ProviderName, FieldSpec[]> = {
+    heygen: [
+      { key: 'avatarId', type: 'text', label_key: 'l.avatarId' },
+      { key: 'voiceSpeed', type: 'number', label_key: 'l.voiceSpeed' },
+      { key: 'ttsEngine', type: 'select', label_key: 'l.ttsEngine', options: ['none', 'cartesia'] },
+      { key: 'ttsExternalVoiceId', type: 'text', label_key: 'l.ttsExternalVoiceId' },
+      {
+        key: 'voiceId',
+        type: 'text',
+        label_key: 'l.voiceId',
+        superseded_by_key: 'ttsEngine',
+        superseded_by_values: ['cartesia'],
+      },
+    ],
+    tavus: [],
+  }
+
+  it('keeps two columns when the engine hides a superseded field', async () => {
+    const wrapper = mountForm({ ttsEngine: 'none' }, FIVE)
+    await flushPromises()
+    const container = () => wrapper.get(sel('template-config-fields'))
+    expect(container().classes()).toContain('grid')
+
+    await chooseEngine(wrapper, 'cartesia')
+    expect(wrapper.find(field('voiceId')).exists()).toBe(false)
+    expect(container().classes()).toContain('grid')
+  })
+})

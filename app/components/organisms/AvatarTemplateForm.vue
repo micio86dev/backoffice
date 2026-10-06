@@ -498,8 +498,11 @@ watch(
 // SINGLE field's internal label/control layout (asserted unchanged by
 // `avatar-template-form.spec.ts`'s checkbox-vs-text test) and is orthogonal
 // to how MULTIPLE fields are arranged relative to each other.
+//
+// The count is the provider's fields (`activeFields`), NOT the rendered ones:
+// a field the engine hides must not flip the layout while the operator switches it.
 const configFieldsClass = computed(() =>
-  visibleFields.value.length >= TWO_COLUMN_MIN_FIELDS
+  activeFields.value.length >= TWO_COLUMN_MIN_FIELDS
     ? 'grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'
     : 'flex flex-col gap-3'
 )

@@ -37,6 +37,20 @@ describe('isSuperseded', () => {
   })
 })
 
+describe('isSuperseded — string governing values only (R3-003)', () => {
+  // Every governing field today is a string select. The contract is deliberately
+  // narrow: a boolean or number never supersedes, even when its text form is listed.
+  const flagged: FieldSpec = { ...voiceId, superseded_by_values: ['true', '1'] }
+
+  it.each([true, 1, {}, ['true']])('never supersedes on the non-string value %j', (governing) => {
+    expect(isSuperseded(flagged, { ttsEngine: governing })).toBe(false)
+  })
+
+  it('supersedes on the matching string', () => {
+    expect(isSuperseded(flagged, { ttsEngine: 'true' })).toBe(true)
+  })
+})
+
 describe('fieldsToDropWhenChanged', () => {
   const specs = [voiceId, speed]
 

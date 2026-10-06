@@ -20,6 +20,7 @@ export function isSuperseded(field: FieldSpec, config: Config): boolean {
 
   const governing = config[field.superseded_by_key]
 
+  // String governing values only (every governing field is a string select); a boolean or number never supersedes.
   return typeof governing === 'string' && field.superseded_by_values.includes(governing)
 }
 

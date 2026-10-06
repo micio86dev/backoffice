@@ -253,6 +253,14 @@
           test-id="project-form-competencies-error"
         />
 
+        <!-- Create only: the saved set of an existing project is not pre-selected. -->
+        <FieldDescription
+          v-if="!isEditing && !optionsError && competencyOptions.length > 0"
+          data-testid="project-form-competencies-preselected"
+        >
+          {{ $t('projects.form.competenciesPreselectedHint') }}
+        </FieldDescription>
+
         <Field :data-invalid="Boolean(errors.pauseEveryNCompetencies)">
           <FieldLabel for="project-form-pause-every-n">
             {{ $t('projects.form.pauseEveryNCompetencies') }}
@@ -811,7 +819,14 @@ function onAssessmentTypeChange(value: unknown): void {
   if (value === 'potential') roleCode.value = ''
 }
 
+// Identifies the LATEST load. Two quick changes (role, then version) start two
+// requests that may settle out of order; only the newest may touch the options
+// or the ticked set, or a slow earlier answer would overwrite the newer
+// selection with ids of the wrong role+revision pair.
+let competencyLoadSeq = 0
+
 async function loadCompetencyOptions(): Promise<void> {
+  const seq = ++competencyLoadSeq
   // Cleared BEFORE the guard. Below it, switching from a failed `potential`
   // load back to `standard` returns early — no role is selected yet — and
   // left "the competencies could not be loaded" on screen about a state
@@ -835,6 +850,8 @@ async function loadCompetencyOptions(): Promise<void> {
         ? await fetchPotentialCompetencies(frameworkVersionId.value)
         : await fetchRoleCompetencies(roleCode.value, frameworkVersionId.value)
 
+    if (seq !== competencyLoadSeq) return
+
     competencyOptions.value = response.data.map((competency) => ({
       // Carried through because `StoreProjectRequest.competency_ids` validates
       // integer primary keys. Dropping it made `CompetencyPicker.toggle()`
@@ -856,14 +873,28 @@ async function loadCompetencyOptions(): Promise<void> {
       // already scopes this to the CURRENT role×competency pair.
       barsAvailable: competency.bars_available,
     }))
+
+    // CREATE only: the role's competencies the operator can actually tick
+    // (an explicit `bars_available: false` is never selectable, and on create
+    // nothing is persisted to grandfather it in) come pre-ticked, and the
+    // operator unticks what they do not want. Edit mode keeps the saved set.
+    // Runs only here, after the NEW options exist, so a later re-render never
+    // undoes a manual untick.
+    if (!isEditing.value) {
+      competencyIds.value = competencyOptions.value
+        .filter((option) => option.barsAvailable !== false)
+        .flatMap((option) => (option.id === undefined ? [] : [option.id]))
+    }
   } catch {
+    if (seq !== competencyLoadSeq) return
+
     // NOT an empty list. "No competencies available for this selection" is a
     // claim about the catalogue, and a failed request supports no claim about
     // it — the same D4 discipline the projects page states for its own list.
     competencyOptions.value = []
     optionsError.value = true
   } finally {
-    optionsLoaded.value = true
+    if (seq === competencyLoadSeq) optionsLoaded.value = true
   }
 }
 

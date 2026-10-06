@@ -267,6 +267,8 @@ test.describe('Operator evaluation retry (scoring-retry-rt-b)', () => {
 
     await expect(page.getByRole('heading', { name: 'Mario Rossi' })).toBeVisible()
     await expect(page.getByTestId('evaluation-retry-panel')).toHaveCount(0)
+    // Real CSS: the wrapper collapses (`empty:hidden`) instead of leaving a bordered empty box.
+    await expect(page.getByTestId('participant-retry-card')).not.toBeVisible()
   })
 
   test.describe('as a viewer', () => {

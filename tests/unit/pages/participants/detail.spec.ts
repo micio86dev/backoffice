@@ -1360,7 +1360,7 @@ describe('pages/participants/[id].vue', () => {
       role?: string
       status?: string
       retry?: RetryFields
-      participantResponses?: Array<ReturnType<typeof withRetry>>
+      participantResponses?: Array<ReturnType<typeof withRetry> | Error>
       authorizeRetryMock?: ReturnType<typeof vi.fn>
       routeId?: { value: string }
     }) {
@@ -1372,11 +1372,17 @@ describe('pages/participants/[id].vue', () => {
       } = options
       const responses = options.participantResponses ?? [withRetry(42, status, retry)]
       const fetchParticipantMock = vi.fn()
-      responses.forEach((r, i) =>
-        i === responses.length - 1
-          ? fetchParticipantMock.mockResolvedValue(r)
-          : fetchParticipantMock.mockResolvedValueOnce(r)
-      )
+      responses.forEach((r, i) => {
+        const last = i === responses.length - 1
+        if (r instanceof Error) {
+          if (last) fetchParticipantMock.mockRejectedValue(r)
+          else fetchParticipantMock.mockRejectedValueOnce(r)
+        } else if (last) {
+          fetchParticipantMock.mockResolvedValue(r)
+        } else {
+          fetchParticipantMock.mockResolvedValueOnce(r)
+        }
+      })
       const route = { params: { id: '42' } }
       vi.stubGlobal(
         'useRoute',
@@ -1510,7 +1516,33 @@ describe('pages/participants/[id].vue', () => {
       expect(wrapper.find('[data-testid="evaluation-retry-success"]').exists()).toBe(true)
     })
 
-    it('does not carry a link to another participant when the route changes', async () => {
+    it('keeps the page and the success state when the refresh after the authorization fails', async () => {
+      const authorizeRetryMock = vi.fn().mockResolvedValue({
+        status: 'in_attesa',
+        competencies_reset: ['COL'],
+        entry_url: 'https://frontend.example/enter#token',
+        expires_at: '2026-10-07T09:00:00Z',
+        email_sent: true,
+      })
+      const { wrapper, fetchParticipantMock } = await mountRetryPage({
+        authorizeRetryMock,
+        participantResponses: [withRetry(42, 'completato', AVAILABLE), new Error('network down')],
+      })
+
+      await wrapper.get('[data-testid="evaluation-retry-open"]').trigger('click')
+      await wrapper.get('[data-testid="evaluation-retry-confirm"]').trigger('click')
+      await flushPromises()
+
+      // The refresh was attempted and failed: nothing blanks, the link and the card stay.
+      expect(fetchParticipantMock).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('[data-testid="participant-retry-card"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="evaluation-retry-success"]').exists()).toBe(true)
+    })
+
+    // A fresh page for the next participant, not an in-place navigation: Nuxt keys the page on the
+    // resolved path so a param change remounts it, and the panel resets itself on a participant change
+    // (covered in its own spec). This pins only that no link survives into a new page instance.
+    it('shows no link left by the previous participant on a freshly mounted page', async () => {
       const authorizeRetryMock = vi.fn().mockResolvedValue({
         status: 'in_attesa',
         competencies_reset: ['COL'],

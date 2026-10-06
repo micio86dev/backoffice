@@ -4662,6 +4662,7 @@ export interface operations {
                                 viewAny: boolean;
                                 create: boolean;
                                 recover: boolean;
+                                retry: boolean;
                             };
                             clients: {
                                 viewAny: boolean;

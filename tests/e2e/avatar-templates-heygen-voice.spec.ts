@@ -205,6 +205,32 @@ test.describe('Avatar templates page: HeyGen external voice, superadmin only', (
     expect((api.writes[0]?.body?.config as Record<string, unknown>).voiceId).toBeUndefined()
   })
 
+  test('a HeyGen bind outage (503 with only a message code) reaches the operator in the form', async ({
+    page,
+  }) => {
+    await mockApi(page, 'superadmin')
+    // Registered after mockApi, so it wins for the save only.
+    await page.route(
+      (url) => url.pathname === '/avatar-templates',
+      (route) =>
+        isDataRequest(route) && route.request().method() === 'POST'
+          ? jsonRoute(route, { message: 'tts_bind_busy' }, 503)
+          : route.fallback()
+    )
+    await page.goto('/avatar-templates')
+
+    const tourSkip = page.getByTestId('onboarding-tour-skip')
+    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
+
+    await page.getByTestId('template-new').click()
+    await page.getByTestId('template-field-name').fill('Elena su HeyGen')
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-form-errors')).toContainText(
+      'Questa voce è in fase di collegamento da un altro salvataggio'
+    )
+  })
+
   test('an organization admin never sees those fields: no create control, and the form it would open has none', async ({
     page,
   }) => {

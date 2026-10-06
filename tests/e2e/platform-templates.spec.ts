@@ -272,6 +272,32 @@ test.describe('Platform templates: management flow (superadmin)', () => {
     await expect(page.getByTestId('platform-template-notice')).toHaveAttribute('role', 'status')
   })
 
+  test('a HeyGen bind outage (503 with only a message code) reaches the operator in the form', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await injectSession(page)
+    await mockIdentity(page, 'superadmin')
+    await mockApi(page, api)
+    // Registered after mockApi, so it wins for the create only.
+    await page.route(
+      (url) => url.pathname === '/admin/avatar-templates',
+      (route) =>
+        isDataRequest(route) && route.request().method() === 'POST'
+          ? jsonRoute(route, { message: 'tts_provider_unconfigured' }, 503)
+          : route.fallback()
+    )
+
+    await page.goto('/platform-templates')
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Studio voice')
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-form-errors')).toContainText(
+      'La piattaforma non ha una chiave HeyGen configurata'
+    )
+  })
+
   test('warns with the usage counts before an edit: nothing is sent until confirmed', async ({
     page,
   }) => {

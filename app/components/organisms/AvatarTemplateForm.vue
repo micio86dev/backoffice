@@ -394,7 +394,8 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
-import { getErrorFields } from '@/utils/http-error'
+import { getErrorFields, serverMessageCode } from '@/utils/http-error'
+import { translateServerCode } from '@/utils/server-message'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
@@ -1026,7 +1027,19 @@ watch(
     llmCredentialError.value = undefined
 
     const fields = getErrorFields(submitError)
-    if (fields === null) return
+    if (fields === null) {
+      // A refusal no field can carry: a HeyGen bind outage answers 502/503
+      // `{message: <code>}` with no `errors` object, so without this the
+      // operator would see nothing at all. The code goes in the summary,
+      // through the same copy the per-knob branch uses, raw code as fallback.
+      const code = serverMessageCode(submitError)
+      if (code !== null) {
+        unmappedErrors.value.push(
+          translateServerCode({ t, te }, 'avatar_templates.error.config', code)
+        )
+      }
+      return
+    }
 
     const activeKeys = new Set(activeFields.value.map((field) => field.key))
     const CONFIG_PREFIX = 'config.'

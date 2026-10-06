@@ -242,6 +242,11 @@ export function participantDetail(
         url: `/participants/${row.id}/evaluation`,
       },
     },
+    // No retry state by default: the evaluation-retry panel stays unmounted
+    // unless a spec opts in through `overrides`.
+    retry_attempt: false,
+    retry_authorized_at: null,
+    retry_available: false,
     ...overrides,
   }
 }

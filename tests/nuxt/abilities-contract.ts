@@ -76,6 +76,7 @@ export const stubAcceptsOnlyRealAbilityKeys: boolean = [
   currentUserStub({ roles: [], isSuperadmin: true }).can('avatarTemplates.create'),
   currentUserStub('operator').can('projects.update'),
   currentUserStub('operator').can('participants.recover'),
+  currentUserStub('operator').can('participants.retry'),
   currentUserStub('viewer').can('projects.viewAny'),
 ].every((answer) => typeof answer === 'boolean')
 

@@ -32,6 +32,13 @@ describe('tests/unit/support/abilities — the mirror answers VALUES, not just b
     expect(admin).toEqual({ viewAny: false, create: false, update: false, delete: false })
   })
 
+  it('lets admin and operator retry an evaluation and keeps it from a viewer', () => {
+    // `ParticipantPolicy::retry` — admin and operator only, viewer denied.
+    expect(abilitiesForRole('admin').participants.retry).toBe(true)
+    expect(abilitiesForRole('operator').participants.retry).toBe(true)
+    expect(abilitiesForRole('viewer').participants.retry).toBe(false)
+  })
+
   it('gives a superadmin every LLM-credential ability', () => {
     const platform = abilitiesForRole({ roles: [], isSuperadmin: true }).llmCredentials
 

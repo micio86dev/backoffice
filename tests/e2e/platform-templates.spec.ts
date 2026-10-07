@@ -540,12 +540,26 @@ test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
     await expectFirstVisitPromptsAnswered(page)
 
     await page.getByTestId('platform-template-new').click()
-    // A name first: the drawer focuses it, and pressing anywhere else blurs it and
-    // inserts "name required" above the voice field, shifting the control out from
-    // under the pointer between press and release, so the click is lost.
-    await page.getByTestId('template-field-name').fill('Elena su HeyGen')
+    // The operator has the name field focused and types nothing: pressing another
+    // control blurs it. The blur check is deferred while the pointer is down, so
+    // the single click that opens the voice list is kept.
+    await page.getByTestId('template-field-name').focus()
     await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
-    await openVoiceList(page)
+    await page.getByTestId('template-field-name').focus()
+    const trigger = page.getByTestId('template-config-ttsExternalVoiceId')
+    await expect(trigger).not.toHaveAttribute('aria-busy', 'true')
+    await trigger.scrollIntoViewIfNeeded()
+    const box = await trigger.boundingBox()
+    if (!box) throw new Error('voice trigger has no box')
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    // Between press and release nothing may be inserted above the control.
+    await expect(page.getByTestId('template-name-error')).toHaveCount(0)
+    expect((await trigger.boundingBox())?.y).toBe(box.y)
+    await page.mouse.up()
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it')).toBeVisible()
+    // The deferred check runs once the press is over.
+    await expect(page.getByTestId('template-name-error')).toBeVisible()
     await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
 
     await page.getByTestId('template-config-ttsEngine').selectOption('')

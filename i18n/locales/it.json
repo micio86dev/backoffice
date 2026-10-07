@@ -410,7 +410,7 @@
       "archived": "Archiviato"
     },
     "assessmentType": {
-      "standard": "Standard",
+      "standard": "Prontezza",
       "potential": "Potenziale"
     },
     "roleCode": {
@@ -432,7 +432,7 @@
       "language": "Lingua",
       "assessmentType": "Tipo di valutazione",
       "roleCode": "Ruolo",
-      "roleCodeRequiredForStandard": "Obbligatorio per una valutazione standard. Questa scelta non sarà più modificabile quando il progetto uscirà dallo stato bozza.",
+      "roleCodeRequiredForStandard": "Obbligatorio per una valutazione di Prontezza. Questa scelta non sarà più modificabile quando il progetto uscirà dallo stato bozza.",
       "frameworkVersion": "Versione del framework",
       "frameworkVersionImmutable": "La versione del framework è fissata alla creazione e non può più cambiare, così ogni risultato valutato resta confrontabile con lo stesso catalogo.",
       "immutableWhenLive": "Questo campo è bloccato quando il progetto è attivo o archiviato, così una valutazione live resta sempre confrontabile con se stessa.",
@@ -456,7 +456,7 @@
         "name": "Il nome che i candidati vedono nell'email di invito e all'inizio del colloquio.",
         "slug": "Compare nell'indirizzo del progetto. Solo lettere minuscole, numeri e trattini.",
         "language": "La lingua in cui si svolge il colloquio con il candidato. Non cambia la lingua di questo pannello.",
-        "assessmentTypeFreezes": "Scegli con attenzione: non sarà più modificabile quando il progetto sarà attivo. Standard valuta il candidato rispetto a un ruolo specifico; Potenziale valuta il potenziale generale, senza un ruolo di riferimento.",
+        "assessmentTypeFreezes": "Scegli con attenzione: non sarà più modificabile quando il progetto sarà attivo. Prontezza valuta il candidato rispetto a un ruolo specifico; Potenziale valuta il potenziale generale, senza un ruolo di riferimento.",
         "pauseEveryN": "Concede al candidato una breve pausa ogni tot competenze. Lascia vuoto per non inserire pause.",
         "nudgeMinChars": "Se una risposta è più breve di questo numero di caratteri, al candidato viene chiesto di approfondire.",
         "exitRedirectUrl": "Dove viene indirizzato il candidato al termine del colloquio. Lascia vuoto per mostrare la pagina di chiusura standard.",
@@ -844,8 +844,8 @@
     },
     "platform": {
       "maxQuestions": {
-        "standard": "Domande massime per competenza — standard",
-        "standardHelp": "Quante domande un operatore può predefinire per una competenza in una valutazione standard. Il colloquio resta adattivo: queste vengono poste per prime, il resto lo approfondisce l'intervistatore.",
+        "standard": "Domande massime per competenza — Prontezza",
+        "standardHelp": "Quante domande un operatore può predefinire per una competenza in una valutazione di Prontezza. Il colloquio resta adattivo: queste vengono poste per prime, il resto lo approfondisce l'intervistatore.",
         "potential": "Domande massime per competenza — potenziale",
         "potentialHelp": "Lo stesso limite per le valutazioni di potenziale, che per costruzione si basano su domande fisse.",
         "range": "Inserisci un numero intero tra 1 e 10."
@@ -1371,8 +1371,8 @@
         "title": "Progetti",
         "summary": "Un progetto è una configurazione di valutazione: cosa misura, in che lingua e dove vengono recapitati i risultati.",
         "steps": {
-          "0": "Crea il progetto e scegli il tipo di valutazione. Standard misura le competenze di un ruolo; Potenziale misura solo MTG e LAT. La scelta è definitiva una volta che il progetto è attivo.",
-          "1": "Per un progetto Standard scegli il ruolo: decide quali competenze copre il colloquio.",
+          "0": "Crea il progetto e scegli il tipo di valutazione. Prontezza misura le competenze di un ruolo; Potenziale misura solo MTG e LAT. La scelta è definitiva una volta che il progetto è attivo.",
+          "1": "Per un progetto Prontezza scegli il ruolo: decide quali competenze copre il colloquio.",
           "2": "Imposta l'URL webhook se il sistema chiamante deve ricevere avanzamento e risultati, e l'URL di uscita per dove mandare il candidato alla fine.",
           "3": "Attiva il progetto. Da quel momento il sistema chiamante può generare link di accesso; tipo di valutazione e ruolo non si possono più cambiare."
         }
@@ -1438,7 +1438,7 @@
       },
       "assessmentType": {
         "term": "Tipo di valutazione",
-        "definition": "Standard valuta le competenze di un ruolo. Potenziale valuta solo MTG e LAT, con quattro domande fisse. Definitivo una volta attivo."
+        "definition": "Prontezza valuta le competenze di un ruolo. Potenziale valuta solo MTG e LAT, con quattro domande fisse. Definitivo una volta attivo."
       },
       "roleCode": {
         "term": "Ruolo",
@@ -1709,9 +1709,9 @@
     "intro": "Il catalogo del framework da cui attinge ogni progetto: competenze, ruoli, indicatori BARS e domande predefinite. La revisione pubblicata è mostrata in sola lettura; crea una bozza per modificarla, poi pubblica la bozza.",
     "sections": {
       "competencies": "Competenze",
-      "competenciesDescription": "Le competenze valutate, standard e di potenziale.",
+      "competenciesDescription": "Le competenze valutate, di Prontezza e di Potenziale.",
       "roles": "Ruoli",
-      "rolesDescription": "I cinque ruoli di valutazione standard.",
+      "rolesDescription": "I cinque ruoli di valutazione di Prontezza.",
       "indicators": "Indicatori",
       "indicatorsDescription": "Gli indicatori BARS di ciascuna competenza.",
       "defaultQuestions": "Domande predefinite",
@@ -1735,7 +1735,7 @@
         "potential_competency_not_in_pivot": "Competenza di potenziale assegnata a un ruolo",
         "potential_indicator_must_be_role_less": "Indicatore di potenziale con un ruolo",
         "indicator_pair_not_declared": "Indicatori presenti per una coppia non dichiarata",
-        "standard_indicator_must_have_role": "Indicatore standard senza ruolo",
+        "standard_indicator_must_have_role": "Indicatore di Prontezza senza ruolo",
         "cross_role_duplicate_anchor_new_to_revision": "Testo dell'ancora duplicato tra ruoli",
         "revision_already_published": "Già pubblicata"
       },
@@ -1797,10 +1797,10 @@
       "position_required": "È richiesta una posizione.",
       "competency_ids_required": "L'elenco delle competenze è obbligatorio.",
       "competency_id_duplicated": "Una competenza non può essere selezionata due volte.",
-      "competency_not_found_or_not_standard": "Quella competenza non è una competenza standard della bozza aperta."
+      "competency_not_found_or_not_standard": "Quella competenza non è una competenza di Prontezza della bozza aperta."
     },
     "competencies": {
-      "description": "Le competenze valutate di questa revisione, standard e di potenziale.",
+      "description": "Le competenze valutate di questa revisione, di Prontezza e di Potenziale.",
       "new": "Nuova competenza",
       "edit": "Modifica",
       "delete": "Elimina",
@@ -1810,7 +1810,7 @@
       "code": "Codice",
       "type": "Tipo",
       "typeOption": {
-        "standard": "Standard",
+        "standard": "Prontezza",
         "potential": "Potenziale"
       },
       "table": {
@@ -1823,7 +1823,7 @@
       }
     },
     "roles": {
-      "description": "I cinque ruoli di valutazione standard di questa revisione.",
+      "description": "I cinque ruoli di valutazione di Prontezza di questa revisione.",
       "new": "Nuovo ruolo",
       "edit": "Modifica",
       "delete": "Elimina",
@@ -1851,7 +1851,7 @@
         "remove": "Rimuovi",
         "addLabel": "Aggiungi una competenza",
         "add": "Aggiungi",
-        "noneAvailable": "Ogni competenza standard di questa bozza è già assegnata.",
+        "noneAvailable": "Ogni competenza di Prontezza di questa bozza è già assegnata.",
         "potentialNote": "Le competenze di potenziale (MTG e LAT) non appartengono a nessun ruolo. Vengono valutate nei progetti di tipo Potenziale e si scelgono lì, non qui.",
         "confirmDetachTitle": "Rimuovere queste competenze?",
         "confirmDetachBody": "Il salvataggio rimuove ogni competenza tolta dall'elenco sottostante. Una competenza la cui coppia ruolo/competenza ha ancora indicatori BARS in questa bozza non può essere rimossa — il salvataggio viene rifiutato, indicandola, finché quegli indicatori non vengono rimossi prima.",

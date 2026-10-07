@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 
@@ -22,6 +23,57 @@ interface Row {
   provider: 'heygen' | 'tavus'
   is_active: boolean
   usage: { organization_count: number; project_count: number }
+}
+
+/** What `GET /admin/avatar-templates/field-specs` serves for the two providers. */
+const PLATFORM_FIELD_SPECS = {
+  heygen: [
+    { key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId' },
+    {
+      key: 'voiceId',
+      type: 'text',
+      label_key: 'avatar_templates.field.voiceId',
+      superseded_by_key: 'ttsEngine',
+      superseded_by_values: ['cartesia', 'elevenlabs'],
+    },
+    {
+      key: 'ttsEngine',
+      type: 'select',
+      label_key: 'avatar_templates.field.ttsEngine',
+      hint_key: 'avatar_templates.hint.heygenTtsEngine',
+      options: ['none', 'cartesia', 'elevenlabs'],
+      superadmin_only: true,
+    },
+    {
+      key: 'ttsModelName',
+      type: 'select',
+      label_key: 'avatar_templates.field.ttsModelName',
+      hint_key: 'avatar_templates.hint.heygenTtsModelName',
+      options: ['sonic-3.5', 'sonic-3', 'eleven_flash_v2_5', 'eleven_multilingual_v2'],
+      options_depend_on: 'ttsEngine',
+      options_by_value: {
+        cartesia: ['sonic-3.5', 'sonic-3'],
+        elevenlabs: ['eleven_flash_v2_5', 'eleven_multilingual_v2'],
+      },
+      superadmin_only: true,
+    },
+    {
+      key: 'ttsExternalVoiceId',
+      type: 'text',
+      label_key: 'avatar_templates.field.ttsExternalVoiceId',
+      hint_key: 'avatar_templates.hint.heygenTtsExternalVoiceId',
+      superadmin_only: true,
+    },
+  ],
+  tavus: [
+    { key: 'faceId', type: 'text', label_key: 'avatar_templates.field.faceId' },
+    {
+      key: 'ttsEngine',
+      type: 'select',
+      label_key: 'avatar_templates.field.ttsEngine',
+      options: ['tavus-auto', 'cartesia', 'elevenlabs', 'azure'],
+    },
+  ],
 }
 
 const isDataRequest = (route: Route): boolean => route.request().resourceType() !== 'document'
@@ -62,6 +114,7 @@ async function injectSession(page: Page): Promise<void> {
 }
 
 async function mockIdentity(page: Page, kind: 'superadmin' | 'admin'): Promise<void> {
+  await answerFirstVisitPrompts(page)
   const superadmin = kind === 'superadmin'
 
   await page.route(
@@ -90,6 +143,26 @@ async function mockIdentity(page: Page, kind: 'superadmin' | 'admin'): Promise<v
   )
 }
 
+async function expectFirstVisitPromptsAnswered(page: Page): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('beai.onboarding.tour-seen.1')))
+    .toBe('seen')
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('beai.consent.analytics')))
+    .toBe('denied')
+}
+
+/**
+ * Opens the engine's voice list once its catalogue has loaded, so the click never
+ * lands while the trigger is still in its busy (loading) state.
+ */
+async function openVoiceList(page: Page): Promise<void> {
+  const trigger = page.getByTestId('template-config-ttsExternalVoiceId')
+
+  await expect(trigger).not.toHaveAttribute('aria-busy', 'true')
+  await trigger.click()
+}
+
 async function mockApi(page: Page, api: Api): Promise<void> {
   await page.route(
     (url) => url.pathname.startsWith('/admin/avatar-templates'),
@@ -102,6 +175,12 @@ async function mockApi(page: Page, api: Api): Promise<void> {
       const id = Number(path.split('/')[3])
       const body = method === 'GET' ? null : (request.postDataJSON() as Record<string, unknown>)
       const row = api.rows.find((candidate) => candidate.id === id)
+
+      // The PLATFORM field specs: the same as the organization route's plus the
+      // platform-only external voice fields (`HeygenExternalVoice…` below).
+      if (method === 'GET' && path === '/admin/avatar-templates/field-specs') {
+        return jsonRoute(route, { data: PLATFORM_FIELD_SPECS })
+      }
 
       if (method === 'GET') return jsonRoute(route, { data: api.rows.map(resource) })
       api.writes.push({ method, path, body })
@@ -150,15 +229,11 @@ async function mockApi(page: Page, api: Api): Promise<void> {
       return jsonRoute(route, { data: resource(row) })
     }
   )
+  // The page must NEVER read the organization specs: they leave the platform-only
+  // voice fields out. Any request to that route fails the test through `unexpected`.
   await page.route(
     (url) => url.pathname === '/avatar-templates/field-specs',
-    (route) =>
-      jsonRoute(route, {
-        data: {
-          heygen: [{ key: 'avatarId', type: 'text', label_key: 'avatar_templates.field.avatarId' }],
-          tavus: [],
-        },
-      })
+    (route) => jsonRoute(route, { message: 'platform page read the organization specs' }, 500)
   )
   // The form loads the LLM pickers; an empty list is a valid answer.
   await page.route(
@@ -217,6 +292,32 @@ test.describe('Platform templates: management flow (superadmin)', () => {
 
     await expect(page.getByTestId('platform-template-state-100')).toHaveText('Offerto')
     await expect(page.getByTestId('platform-template-notice')).toHaveAttribute('role', 'status')
+  })
+
+  test('a HeyGen bind outage (503 with only a message code) reaches the operator in the form', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await injectSession(page)
+    await mockIdentity(page, 'superadmin')
+    await mockApi(page, api)
+    // Registered after mockApi, so it wins for the create only.
+    await page.route(
+      (url) => url.pathname === '/admin/avatar-templates',
+      (route) =>
+        isDataRequest(route) && route.request().method() === 'POST'
+          ? jsonRoute(route, { message: 'tts_provider_unconfigured' }, 503)
+          : route.fallback()
+    )
+
+    await page.goto('/platform-templates')
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Studio voice')
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-form-errors')).toContainText(
+      'La piattaforma non ha una chiave HeyGen configurata'
+    )
   })
 
   test('warns with the usage counts before an edit: nothing is sent until confirmed', async ({
@@ -341,6 +442,163 @@ test.describe('Platform templates: management flow (superadmin)', () => {
     await expect(dialog).toHaveCount(0)
     // The copies live in other organizations: the list behind is unchanged.
     await expect(page.getByTestId('platform-template-row-7')).toContainText('Studio voice')
+  })
+})
+
+test.describe('Platform templates: HeyGen external voice (superadmin)', () => {
+  const CARTESIA_VOICES = {
+    status: 'ok',
+    items: [
+      {
+        id: 'ca-it',
+        provider: 'cartesia',
+        label: 'Elena',
+        name: 'Elena',
+        language: 'it',
+        locale: 'it',
+        accent: null,
+        italian: 'native',
+        preview_image_url: null,
+        preview_audio_url: null,
+        preview_video_url: null,
+      },
+    ],
+  }
+
+  async function open(page: Page, api: Api): Promise<void> {
+    await injectSession(page)
+    await mockIdentity(page, 'superadmin')
+    await mockApi(page, api)
+    await page.route(
+      (url) => url.pathname === '/avatar-templates/catalogue',
+      (route) => jsonRoute(route, { data: CARTESIA_VOICES })
+    )
+    await page.goto('/platform-templates')
+  }
+
+  test('picks an engine, then a catalogue voice, and saves them without a native voice id', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await open(page, api)
+
+    // The first-visit prompts are answered before the page loads: a tour or a
+    // consent banner that opened late would take focus and close the voice list.
+    await expectFirstVisitPromptsAnswered(page)
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Elena su HeyGen')
+
+    // A native HeyGen voice until an engine is chosen.
+    await expect(page.getByTestId('template-config-voiceId')).toBeVisible()
+
+    await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
+
+    // The vendor voice picker REPLACES the native voice field.
+    await expect(page.getByTestId('template-config-voiceId')).toHaveCount(0)
+    await openVoiceList(page)
+    await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-preview')).toBeVisible()
+
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('platform-template-row-100')).toContainText('Elena su HeyGen')
+    const created = api.writes.find((write) => write.method === 'POST')
+    expect(created?.body?.config).toEqual({ ttsEngine: 'cartesia', ttsExternalVoiceId: 'ca-it' })
+  })
+
+  test('selecting HeyGen on CREATE shows engine, voice model and voice fields at once, and switching provider re-renders', async ({
+    page,
+  }) => {
+    await open(page, newApi())
+
+    await page.getByTestId('platform-template-new').click()
+    // HeyGen is the default provider: the fields are there before anything is saved.
+    for (const key of ['ttsEngine', 'ttsModelName', 'ttsExternalVoiceId', 'voiceId']) {
+      await expect(page.getByTestId(`template-config-${key}`)).toBeVisible()
+    }
+    await expect(page.getByText('Modello vocale', { exact: true })).toBeVisible()
+    await expect(page.getByText('Motore di sintesi vocale', { exact: true })).toBeVisible()
+
+    await page.getByTestId('template-field-provider').selectOption('tavus')
+    await expect(page.getByTestId('template-config-faceId')).toBeVisible()
+    await expect(page.getByTestId('template-config-ttsModelName')).toHaveCount(0)
+
+    await page.getByTestId('template-field-provider').selectOption('heygen')
+    await expect(page.getByTestId('template-config-ttsModelName')).toBeVisible()
+    await expect(page.getByTestId('template-config-avatarId')).toBeVisible()
+  })
+
+  test('clearing the engine clears the voice and brings the native voice field back', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await open(page, api)
+
+    // The first-visit prompts are answered before the page loads: a tour or a
+    // consent banner that opened late would take focus and close the voice list.
+    await expectFirstVisitPromptsAnswered(page)
+
+    await page.getByTestId('platform-template-new').click()
+    // A name first: the drawer focuses it, and pressing anywhere else blurs it and
+    // inserts "name required" above the voice field, shifting the control out from
+    // under the pointer between press and release, so the click is lost.
+    await page.getByTestId('template-field-name').fill('Elena su HeyGen')
+    await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
+    await openVoiceList(page)
+    await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
+
+    await page.getByTestId('template-config-ttsEngine').selectOption('')
+
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId')).toHaveValue('')
+    await expect(page.getByTestId('template-config-voiceId')).toBeVisible()
+  })
+
+  test('an engine with no voice is refused before anything is sent', async ({ page }) => {
+    const api = newApi()
+    await open(page, api)
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Senza voce')
+    await page.getByTestId('template-config-ttsEngine').selectOption('elevenlabs')
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-error')).toBeVisible()
+    expect(api.writes.filter((write) => write.method === 'POST')).toHaveLength(0)
+  })
+
+  test('a bind LiveAvatar refuses shows up on the voice field, in Italian, as a 422 (never a crash)', async ({
+    page,
+  }) => {
+    const api = newApi()
+    await open(page, api)
+    await page.route(
+      (url) => url.pathname === '/admin/avatar-templates',
+      (route) =>
+        route.request().method() === 'POST'
+          ? jsonRoute(
+              route,
+              {
+                message: 'The given data was invalid.',
+                errors: { 'config.ttsExternalVoiceId': ['tts_voice_bind_failed'] },
+              },
+              422
+            )
+          : route.fallback()
+    )
+
+    await page.getByTestId('platform-template-new').click()
+    await page.getByTestId('template-field-name').fill('Bind rifiutato')
+    await page.getByTestId('template-config-ttsEngine').selectOption('cartesia')
+    await openVoiceList(page)
+    await page.getByTestId('template-config-ttsExternalVoiceId-item-ca-it').click()
+    await page.getByTestId('form-drawer-save').click()
+
+    await expect(page.getByTestId('template-config-ttsExternalVoiceId-error')).toContainText(
+      'collegare la voce a HeyGen'
+    )
+    // The drawer stays open: the operator's work is not lost.
+    await expect(page.getByTestId('template-field-name')).toHaveValue('Bind rifiutato')
   })
 })
 

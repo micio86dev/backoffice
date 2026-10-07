@@ -36,6 +36,12 @@ describe('usePlatformAvatarTemplates', () => {
     ])
   })
 
+  it('reads the field specs from the platform route, which lists the superadmin-only voice fields', async () => {
+    await usePlatformAvatarTemplates().fetchFieldSpecs()
+
+    expect(apiFetch).toHaveBeenCalledWith('/admin/avatar-templates/field-specs')
+  })
+
   it('creates with POST and updates with PATCH, forwarding the body as given', async () => {
     await usePlatformAvatarTemplates().create({
       name: 'Global A',

@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 import { checkA11y } from './fixtures/a11y'
 
@@ -75,6 +76,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: import('@playwright/test').Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   // The project form needs the picker list — `projects.avatar_template_id` is
   // NOT NULL, so a form with an empty select correctly refuses its own submit.
   // Unmocked, that reads as "the page is broken" when it is the form doing its

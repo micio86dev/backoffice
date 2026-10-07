@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -46,6 +47,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockBaselineApi(page: import('@playwright/test').Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   const jsonData = (data: unknown = []) => ({
     status: 200,
     contentType: 'application/json',

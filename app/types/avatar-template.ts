@@ -106,6 +106,20 @@ export interface FieldSpec {
    */
   options_depend_on?: string
   options_by_value?: Record<string, string[]>
+  /**
+   * Present (and true) only on a field a SUPERADMIN alone may set (the external
+   * HeyGen voice, which binds a paid vendor voice). Both field-spec routes serve
+   * it to a superadmin and to nobody else, so a form never renders it for anyone
+   * the API would refuse.
+   */
+  superadmin_only?: boolean
+  /**
+   * This field is REPLACED by another's value: while `superseded_by_key` holds
+   * one of `superseded_by_values` it is not required and must be absent (the
+   * HeyGen native `voiceId` beside an external speech engine).
+   */
+  superseded_by_key?: string
+  superseded_by_values?: string[]
 }
 
 /**

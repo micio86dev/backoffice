@@ -103,10 +103,13 @@ const USER_ID = 1
  * - `beai.onboarding.tour-seen.<userId>` is what `onboarding-storage.ts` reads;
  *   "seen" is its only positive value.
  *
+ * `userId` is the id the spec's own `/auth/me` mock reports, for the specs that
+ * sign in without the fixture: the tour flag is keyed on it.
+ *
  * The write sits in a try/catch because the init script also runs in documents
  * with an opaque origin (`about:blank`), where storage throws.
  */
-async function answerFirstVisitPrompts(page: Page): Promise<void> {
+export async function answerFirstVisitPrompts(page: Page, userId: number = USER_ID): Promise<void> {
   await page.addInitScript((userId) => {
     try {
       window.localStorage.setItem('beai.consent.analytics', 'denied')
@@ -114,7 +117,7 @@ async function answerFirstVisitPrompts(page: Page): Promise<void> {
     } catch {
       // No storage in this document: nothing to answer.
     }
-  }, USER_ID)
+  }, userId)
 }
 
 async function signIn(page: Page, role: Role, abilities: Abilities | undefined): Promise<void> {

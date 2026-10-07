@@ -138,7 +138,7 @@
         orientation carries `*:w-full`, which would stretch a 16px box to the
         grid cell, and the molecule owns its own layout.
       -->
-          <template v-for="field in activeFields" :key="field.key">
+          <template v-for="field in visibleFields" :key="field.key">
             <CheckboxField
               v-if="field.type === 'checkbox'"
               :id="`template-config-${field.key}`"
@@ -394,7 +394,8 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
-import { getErrorFields } from '@/utils/http-error'
+import { getErrorFields, serverMessageCode } from '@/utils/http-error'
+import { translateServerCode } from '@/utils/server-message'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
@@ -405,9 +406,15 @@ import {
   fieldsToResetOnChange,
   optionsFor,
 } from '@/utils/dependent-options'
+import {
+  fieldsToDropWhenChanged,
+  isSuperseded,
+  staleSupersededKeys,
+} from '@/utils/superseded-fields'
 import LlmModelPicker from '@/components/molecules/LlmModelPicker.vue'
 import LlmModeExplainer from '@/components/molecules/LlmModeExplainer.vue'
 import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplateProviderCombobox.vue'
+import type { VoicePreviewRequest } from '@/composables/useVoicePreview'
 import {
   CATALOGUED_TTS_ENGINES,
   type AvatarTemplate,
@@ -461,10 +468,39 @@ const draft = ref({
 const isNew = computed(() => props.template.id === undefined)
 const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
 
+/**
+ * The fields the form actually renders and validates: every spec field except
+ * one SUPERSEDED by another field's value — HeyGen's native `voiceId` while a
+ * Cartesia or ElevenLabs engine supplies the voice, which the API would refuse
+ * beside it. The engine, voice model and voice id fields are always shown for a
+ * HeyGen template the API served them for (a superadmin), exactly as Tavus's
+ * are; they simply are not in the specs anyone else is served.
+ */
+const visibleFields = computed(() =>
+  activeFields.value.filter((field) => !isSuperseded(field, draft.value.config))
+)
+
+// A stored config can already hold both a governing value and the field it
+// replaces (written before the invariant existed, or by a path that never went
+// through `onFieldChange`). Reconcile it as the form opens, and whenever the
+// specs arrive or the provider changes, or the stale value would be resubmitted.
+watch(
+  activeFields,
+  (specs) => {
+    for (const key of staleSupersededKeys(specs, draft.value.config)) {
+      draft.value.config = withoutKey(draft.value.config, key)
+    }
+  },
+  { immediate: true }
+)
+
 // A CSS grid, not `Field`'s own `orientation` prop — orientation controls a
 // SINGLE field's internal label/control layout (asserted unchanged by
 // `avatar-template-form.spec.ts`'s checkbox-vs-text test) and is orthogonal
 // to how MULTIPLE fields are arranged relative to each other.
+//
+// The count is the provider's fields (`activeFields`), NOT the rendered ones:
+// a field the engine hides must not flip the layout while the operator switches it.
 const configFieldsClass = computed(() =>
   activeFields.value.length >= TWO_COLUMN_MIN_FIELDS
     ? 'grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'
@@ -687,9 +723,11 @@ function catalogueFor(field: FieldSpec): { field: FieldSpec; provider: Catalogue
  * `avatarTemplates.*` abilities the preview endpoint's policy uses), so no
  * further role check is repeated here.
  */
-function voicePreviewFor(
-  field: FieldSpec
-): { provider: 'heygen' | 'tavus'; voiceId: string; ttsEngine?: string | null } | null {
+function voicePreviewFor(field: FieldSpec): {
+  provider: VoicePreviewRequest['provider']
+  voiceId: string
+  ttsEngine?: string | null
+} | null {
   if (field.catalogue_resource !== 'voice' && field.key !== 'ttsExternalVoiceId') return null
 
   const provider = draft.value.provider
@@ -699,6 +737,16 @@ function voicePreviewFor(
     const engine = draft.value.config.ttsEngine
 
     return { provider, voiceId, ttsEngine: typeof engine === 'string' ? engine : null }
+  }
+
+  // A HeyGen external voice is a Cartesia/ElevenLabs voice bound on LiveAvatar:
+  // it is sampled through that vendor, like Tavus's, never as a generic HeyGen
+  // sample (which would play a different, English voice).
+  const engine = draft.value.config.ttsEngine
+
+  if (field.key === 'ttsExternalVoiceId') {
+    // No catalogued engine means no vendor to ask: HeyGen's own catalogue does not know this id.
+    return isCataloguedEngine(engine) ? { provider: engine, voiceId } : null
   }
 
   return { provider, voiceId }
@@ -743,6 +791,17 @@ function onFieldChange(field: FieldSpec, raw: string | boolean): void {
   // change stores an id the new engine has never heard of.
   if (field.key === 'ttsEngine' && raw !== draft.value.config.ttsEngine) {
     draft.value.config = withoutKey(draft.value.config, 'ttsExternalVoiceId')
+  }
+
+  // Superseded fields: a value the new choice REPLACES (HeyGen's native voice id
+  // beside an external engine) is dropped with it, or the API refuses the save.
+  for (const key of fieldsToDropWhenChanged(
+    activeFields.value,
+    field.key,
+    draft.value.config,
+    raw
+  )) {
+    draft.value.config = withoutKey(draft.value.config, key)
   }
 
   // Dependent selects (`options_depend_on`): a value the new parent value no
@@ -928,7 +987,7 @@ function validateReferences(): boolean {
 function validateAllConfigFields(): boolean {
   let ok = true
 
-  for (const field of activeFields.value) {
+  for (const field of visibleFields.value) {
     if (!validateConfigField(field)) ok = false
   }
 
@@ -971,9 +1030,24 @@ watch(
     llmCredentialError.value = undefined
 
     const fields = getErrorFields(submitError)
-    if (fields === null) return
+    if (fields === null) {
+      // A refusal no field can carry: a HeyGen bind outage answers 502/503
+      // `{message: <code>}` with no `errors` object, so without this the
+      // operator would see nothing at all. The code goes in the summary,
+      // through the same copy the per-knob branch uses, raw code as fallback.
+      const code = serverMessageCode(submitError)
+      if (code !== null) {
+        unmappedErrors.value.push(
+          translateServerCode({ t, te }, 'avatar_templates.error.config', code)
+        )
+      }
+      return
+    }
 
-    const activeKeys = new Set(activeFields.value.map((field) => field.key))
+    // Only a field the form RENDERS can carry its own error: one hidden by
+    // supersession (HeyGen `voiceId` under an external engine) has no control to
+    // show it on, so its error must fall through to the summary below.
+    const activeKeys = new Set(visibleFields.value.map((field) => field.key))
     const CONFIG_PREFIX = 'config.'
 
     for (const [serverField, messages] of Object.entries(fields)) {
@@ -1012,7 +1086,13 @@ watch(
           const hasTranslation = typeof te === 'function' ? te(translationKey) : true
           configErrors.value[key] = hasTranslation ? t(translationKey) : message
         } else {
-          unmappedErrors.value.push(message)
+          // Same copy as a field would get, raw code when it has none.
+          const translated = translateServerCode(
+            { t, te },
+            'avatar_templates.error.config',
+            message
+          )
+          if (!unmappedErrors.value.includes(translated)) unmappedErrors.value.push(translated)
         }
 
         continue

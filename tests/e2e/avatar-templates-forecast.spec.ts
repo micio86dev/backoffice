@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 
@@ -61,6 +62,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockApi(page: Page, templates: unknown[]): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -244,12 +246,6 @@ test.describe('Avatar templates — provider catalogue picker (avatar-template-c
     await login(page)
     await page.goto('/avatar-templates')
 
-    // The role-aware first-login guided tour opens over a fresh session
-    // (feature/role-aware-onboarding-tour) and would otherwise sit on top of
-    // the row actions this test needs to click.
-    const tourSkip = page.getByTestId('onboarding-tour-skip')
-    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
-
     await page.getByTestId('template-edit-1').click()
     await expect(page.getByTestId('template-form')).toBeVisible()
 
@@ -380,8 +376,6 @@ test.describe('Avatar templates — Cartesia catalogue sample is served by the a
 
     await login(page)
     await page.goto('/avatar-templates')
-    const tourSkip = page.getByTestId('onboarding-tour-skip')
-    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
 
     await page.getByTestId('template-edit-1').click()
     await expect(page.getByTestId('template-form')).toBeVisible()

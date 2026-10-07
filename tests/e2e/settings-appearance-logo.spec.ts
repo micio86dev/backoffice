@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 
@@ -48,6 +49,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: Page, organization = ORGANIZATION): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>
@@ -103,10 +105,6 @@ async function login(page: Page): Promise<void> {
 
 async function openAppearance(page: Page): Promise<void> {
   await page.goto('/settings')
-  // The consent banner overlays the bottom of the page and intercepts pointer
-  // events on the submit button — dismiss it, exactly as the other specs do.
-  await page.getByTestId('analytics-consent-reject').click()
-  await expect(page.getByTestId('analytics-consent')).toBeHidden()
   await page.getByRole('tab', { name: 'Aspetto' }).click()
   await expect(page.getByTestId('branding-form')).toBeVisible()
 }

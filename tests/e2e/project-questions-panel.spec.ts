@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -34,16 +35,6 @@ async function injectSession(page: Page): Promise<void> {
   )
 }
 
-/**
- * The analytics consent banner is fixed to the bottom of the viewport and
- * intercepts clicks on anything underneath it — same fixture dismissal as
- * `profile.spec.ts`/`reports-index.spec.ts`.
- */
-async function dismissConsent(page: Page): Promise<void> {
-  await page.getByTestId('analytics-consent-reject').click()
-  await expect(page.getByTestId('analytics-consent')).toBeHidden()
-}
-
 const PROJECT = {
   id: 1,
   organization_id: 1,
@@ -69,6 +60,7 @@ const PROJECT = {
 }
 
 async function mockBaseline(page: Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>
@@ -172,7 +164,6 @@ test.describe('Project edit drawer — predefined questions panel after the Ques
     )
 
     await page.goto('/projects')
-    await dismissConsent(page)
 
     await page
       .getByRole('row', { name: /Draft Project/ })

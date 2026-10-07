@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -178,6 +179,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: import('@playwright/test').Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>

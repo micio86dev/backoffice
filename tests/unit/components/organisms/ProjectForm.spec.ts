@@ -2015,8 +2015,260 @@ describe('ProjectForm — competency options are scoped to the selected framewor
     expect(wrapper.findComponent(CompetencyPicker).props('options')).toEqual([
       { id: 2, code: 'COL', name: 'Collaboration v2', barsAvailable: true },
     ])
-    expect(wrapper.findComponent(CompetencyPicker).props('modelValue')).toEqual([])
+    // Pre-ticked from the NEW revision's options; the id ticked under the old
+    // version (1) is not carried across.
+    expect(wrapper.findComponent(CompetencyPicker).props('modelValue')).toEqual([2])
 
+    wrapper.unmount()
+  })
+})
+
+describe('ProjectForm — a role pre-ticks its selectable competencies on create', () => {
+  const catalogue = {
+    data: [
+      { id: 11, code: 'COL', name: 'Collaboration', bars_available: true },
+      { id: 12, code: 'STG', name: 'Strategy', bars_available: false },
+      { id: 13, code: 'INN', name: 'Innovation', bars_available: true },
+    ],
+  }
+
+  async function pickRole(wrapper: ReturnType<typeof mountCreate>, code: string): Promise<void> {
+    const roleSelect = wrapper.get('[data-testid="project-form-role-code"]')
+    roleSelect.element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    await waitFor(
+      () => (document.body.textContent ?? '').includes(`projects.roleCode.${code}`),
+      'the role select popup to render its options'
+    )
+    const option = Array.from(document.body.querySelectorAll('[role="option"]')).find((el) =>
+      (el.textContent ?? '').includes(`projects.roleCode.${code}`)
+    )
+    if (!option) throw new Error(`${code} role option not found in the open Select popup`)
+    option.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }))
+    await flushPromises()
+  }
+
+  function mountCreate() {
+    return mount(ProjectForm, {
+      props: { project: null },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+  }
+
+  function ticked(wrapper: ReturnType<typeof mountCreate>): number[] {
+    return wrapper.findComponent(CompetencyPicker).props('modelValue') as number[]
+  }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void
+    const promise = new Promise<T>((r) => {
+      resolve = r
+    })
+    return { promise, resolve }
+  }
+
+  it('ticks the selectable competencies of the chosen role and never the uncovered one', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue(catalogue)
+    const wrapper = mountCreate()
+    await flushPromises()
+
+    await pickRole(wrapper, 'ICO')
+
+    expect(ticked(wrapper)).toEqual([11, 13])
+    wrapper.unmount()
+  })
+
+  it('publishes the pre-ticked set through update:competencies', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue(catalogue)
+    const wrapper = mountCreate()
+    await flushPromises()
+
+    await pickRole(wrapper, 'ICO')
+
+    const emitted = wrapper.emitted('update:competencies') ?? []
+    expect(emitted.at(-1)).toEqual([
+      [
+        { id: 11, code: 'COL' },
+        { id: 13, code: 'INN' },
+      ],
+    ])
+    wrapper.unmount()
+  })
+
+  it('ticks the tickable potential competencies (MTG and LAT)', async () => {
+    fetchPotentialCompetenciesMock.mockResolvedValue({
+      data: [
+        { id: 91, code: 'MTG', name: 'Motivation', bars_available: true },
+        { id: 92, code: 'LAT', name: 'Learning agility', bars_available: null },
+      ],
+    })
+    const wrapper = mountCreate()
+    await flushPromises()
+
+    await wrapper
+      .get('[data-testid="project-form-assessment-type"] button:last-child')
+      .trigger('click')
+    await flushPromises()
+
+    expect(ticked(wrapper)).toEqual([91, 92])
+    wrapper.unmount()
+  })
+
+  it('ticks nothing when the catalogue fails to load', async () => {
+    // The first role loads fine and ticks; the second one fails, and the
+    // earlier role's ids must not survive it.
+    fetchRoleCompetenciesMock
+      .mockResolvedValueOnce(catalogue)
+      .mockRejectedValue(new Error('network down'))
+    const wrapper = mountCreate()
+    await flushPromises()
+
+    await pickRole(wrapper, 'ICO')
+    expect(ticked(wrapper)).toEqual([11, 13])
+    await pickRole(wrapper, 'FLL')
+
+    expect(wrapper.find('[data-testid="project-form-competencies-error"]').exists()).toBe(true)
+    expect(ticked(wrapper)).toEqual([])
+    wrapper.unmount()
+  })
+
+  it('keeps a manual untick all the way to the create payload (the server still refuses an empty set)', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue(catalogue)
+    const wrapper = mountCreate()
+    await flushPromises()
+    await pickRole(wrapper, 'ICO')
+
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [13])
+    await flushPromises()
+    expect(ticked(wrapper)).toEqual([13])
+
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [])
+    await flushPromises()
+    expect(ticked(wrapper)).toEqual([])
+
+    await wrapper.get('[data-testid="project-form-name"]').setValue('Demo')
+    await wrapper.get('[data-testid="project-form-slug"]').setValue('demo')
+    await wrapper.findComponent(CompetencyPicker).vm.$emit('update:modelValue', [13])
+    await wrapper.get('[data-testid="project-form"]').trigger('submit')
+    await flushPromises()
+
+    // The form has no client-side minimum: an empty set is the server's 422
+    // to give, so the point here is that the untick is what gets submitted.
+    const [payload] = createProjectMock.mock.calls.at(-1) as [Record<string, unknown>]
+    expect(payload.competency_ids).toEqual([13])
+    wrapper.unmount()
+  })
+
+  it('re-ticks the new role set when the framework version changes, never carrying old ids', async () => {
+    fetchRoleCompetenciesMock.mockImplementation((_role: string, versionId: number) =>
+      Promise.resolve({
+        data: [{ id: versionId * 100, code: 'COL', name: 'Collaboration', bars_available: true }],
+      })
+    )
+    listVersionsMock.mockResolvedValue({
+      data: [1, 2].map((id) => ({
+        id,
+        organization_id: 1,
+        version: `v${id}.0`,
+        label: 'x',
+        is_locked: false,
+        created_at: null,
+        updated_at: null,
+      })),
+    })
+    const wrapper = mountCreate()
+    await flushPromises()
+    await pickRole(wrapper, 'ICO')
+    expect(ticked(wrapper)).toEqual([100])
+
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('2')
+    await flushPromises()
+
+    expect(ticked(wrapper)).toEqual([200])
+    wrapper.unmount()
+  })
+
+  it('ignores a stale response: a slow earlier load never ticks its ids over the newer selection', async () => {
+    const slow = deferred<typeof catalogue>()
+    fetchRoleCompetenciesMock.mockImplementation((_role: string, versionId: number) =>
+      versionId === 1
+        ? slow.promise
+        : Promise.resolve({
+            data: [{ id: 200, code: 'COL', name: 'Collaboration', bars_available: true }],
+          })
+    )
+    listVersionsMock.mockResolvedValue({
+      data: [1, 2].map((id) => ({
+        id,
+        organization_id: 1,
+        version: `v${id}.0`,
+        label: 'x',
+        is_locked: false,
+        created_at: null,
+        updated_at: null,
+      })),
+    })
+    const wrapper = mountCreate()
+    await flushPromises()
+    await pickRole(wrapper, 'ICO')
+    await wrapper.get('[data-testid="project-form-framework-version"]').setValue('2')
+    await flushPromises()
+    expect(ticked(wrapper)).toEqual([200])
+
+    slow.resolve(catalogue)
+    await flushPromises()
+
+    expect(ticked(wrapper)).toEqual([200])
+    expect(wrapper.findComponent(CompetencyPicker).props('options')).toEqual([
+      { id: 200, code: 'COL', name: 'Collaboration', barsAvailable: true },
+    ])
+    wrapper.unmount()
+  })
+
+  it('explains the pre-selection on create once options exist, and never on edit', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue(catalogue)
+    const create = mountCreate()
+    await flushPromises()
+    expect(create.find('[data-testid="project-form-competencies-preselected"]').exists()).toBe(
+      false
+    )
+    await pickRole(create, 'ICO')
+    expect(create.get('[data-testid="project-form-competencies-preselected"]').text()).toBe(
+      'projects.form.competenciesPreselectedHint'
+    )
+    create.unmount()
+
+    const edit = mount(ProjectForm, {
+      props: {
+        project: activeProject({ status: 'draft', role_code: 'ICO', competencies: [] }),
+      },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(edit.find('[data-testid="project-form-competencies-preselected"]').exists()).toBe(false)
+    edit.unmount()
+  })
+
+  it('leaves the saved set exactly as it is when editing, and pre-ticks nothing after a role change', async () => {
+    fetchRoleCompetenciesMock.mockResolvedValue(catalogue)
+    const wrapper = mount(ProjectForm, {
+      props: {
+        project: activeProject({
+          status: 'draft',
+          role_code: 'ICO',
+          competencies: [{ id: 11, code: 'COL', type: 'standard', position: 0 }],
+        }),
+      },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(ticked(wrapper)).toEqual([11])
+
+    await pickRole(wrapper, 'FLL')
+
+    expect(ticked(wrapper)).toEqual([])
     wrapper.unmount()
   })
 })

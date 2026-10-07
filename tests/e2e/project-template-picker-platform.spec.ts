@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -82,6 +83,7 @@ async function jsonRoute(route: Route, body: unknown, status = 200): Promise<voi
 const isDataRequest = (route: Route): boolean => route.request().resourceType() !== 'document'
 
 async function mockApi(page: Page, options: unknown[], projects: unknown[] = []): Promise<void> {
+  await answerFirstVisitPrompts(page)
   const answer = (path: string | RegExp, body: unknown) =>
     page.route(
       (url) => (typeof path === 'string' ? url.pathname === path : path.test(url.pathname)),

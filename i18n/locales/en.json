@@ -223,7 +223,7 @@
     },
     "invite": "Invite candidate",
     "generate": "Generate new link",
-    "disclosure": "This link is single-use and expires in 30 minutes. Opening it yourself — even just to check it works — spends it; hand it to the candidate directly.",
+    "disclosure": "This link is single-use and expires at the moment shown below. Opening it yourself — even just to check it works — spends it; hand it to the candidate directly.",
     "expiresAt": "Expires:",
     "copy": "Copy",
     "copied": "Copied",
@@ -339,6 +339,45 @@
       "nothing_to_recover": "There is nothing to recover for this participant.",
       "not_failed": "This participant is not in a failed state.",
       "unknown": "This assessment could not be re-opened. Please try again."
+    }
+  },
+  "evaluationRetry": {
+    "description": "This evaluation could not be fully validated. An admin or operator can authorize one single re-interview, limited to the competencies that could not be validated.",
+    "action": "Authorize re-interview",
+    "state": {
+      "waiting": "Re-interview authorized on {date}. Waiting for the candidate to take it.",
+      "inProgress": "Re-interview in progress.",
+      "scoring": "Scoring the re-interview.",
+      "finished": "Retry completed. The evaluation is now definitive."
+    },
+    "confirm": {
+      "title": "Authorize the re-interview?",
+      "consequence": {
+        "reDo": "The candidate will answer again only the competencies that could not be validated. Any answer already recorded for those competencies will be permanently deleted. Validated competencies are kept as they are.",
+        "unreadable": "The evaluation will be unreadable until the re-interview has been scored.",
+        "once": "A retry can be authorized only once per participant and cannot be withdrawn.",
+        "link": "A single-use link will be created. If the candidate has a deliverable email address, it is also emailed to them."
+      },
+      "reasonLabel": "Reason (optional)",
+      "reasonPlaceholder": "e.g. the candidate lost the connection during the interview",
+      "submit": "Authorize re-interview",
+      "submitting": "Authorizing…",
+      "cancel": "Cancel"
+    },
+    "success": {
+      "title": "Re-interview authorized",
+      "body": "The candidate will be asked again about: {competencies}.",
+      "emailSent": "Email sent to the candidate.",
+      "emailNotSent": "No email was sent. Give the candidate this link yourself.",
+      "dismiss": "Done"
+    },
+    "refusalReason": {
+      "retry_already_consumed": "A re-interview was already authorized for this participant. It can be used only once.",
+      "not_completed": "The participant has not completed the interview, so there is nothing to retry.",
+      "test_mode_participant": "This participant belongs to a test-mode interview, which cannot be retried.",
+      "evaluation_not_pending": "The evaluation is not waiting for a retry, so a re-interview cannot be authorized.",
+      "project_inaccessible": "The project is closed or outside its availability window, so the candidate could not open a new link. Reopen or extend the project first.",
+      "unknown": "The re-interview could not be authorized. Please try again."
     }
   },
   "projects": {
@@ -469,6 +508,7 @@
         "webhook_url_too_long": "The webhook URL is too long."
       },
       "competenciesLoadError": "The competency list could not be loaded. Please try again.",
+      "competenciesPreselectedHint": "Pre-selected from the role; untick the ones you do not want.",
       "templatesLoadError": "The avatar template list could not be loaded. Please try again.",
       "templateGroup": {
         "organization": "Your organization",
@@ -1110,7 +1150,8 @@
         },
         "preview": {
           "play": "Play catalogue sample",
-          "pause": "Pause catalogue sample"
+          "pause": "Pause catalogue sample",
+          "loading": "Loading the catalogue sample…"
         }
       }
     },
@@ -1150,6 +1191,16 @@
         "tts_engine_required": "Choose an external speech engine, or clear the external voice ID.",
         "tts_voice_required": "Choose a voice for the selected speech engine.",
         "tts_voice_not_found": "This voice does not exist for the selected speech engine. Choose one from the list.",
+        "superadmin_only": "Only a superadmin can set an external speech voice.",
+        "superseded_by_tts_engine": "A HeyGen voice cannot be set together with an external speech engine. Clear it, or set the engine to none.",
+        "tts_setting_unsupported": "This engine has no such setting. Clear it, or choose another engine.",
+        "tts_voice_unverifiable": "The voice list for this engine could not be read, so the voice cannot be checked. Try again in a moment.",
+        "tts_voice_bind_failed": "The voice could not be linked to HeyGen. Nothing was saved. Try again; if it keeps failing, the HeyGen service may be unavailable.",
+        "tts_vendor_key_missing": "The platform has no API key configured for this speech engine, so its voices cannot be used yet.",
+        "tts_provider_unconfigured": "The platform has no HeyGen key configured, so the voice cannot be linked.",
+        "tts_secret_failed": "HeyGen did not accept the platform key for this speech engine. Nothing was saved.",
+        "tts_bind_busy": "This voice is being linked by another save right now. Try again in a few seconds.",
+        "tts_engine_unsupported": "This speech engine cannot be used with HeyGen.",
         "tts_model_engine_mismatch": "This model does not belong to the selected speech engine. Choose one from the list."
       },
       "llm": {
@@ -1234,6 +1285,9 @@
       "enableClosedCaptions": "Show live captions of what is being said.",
       "enableRecording": "If on, Tavus records the conversation. Turn it on only if you need the recording.",
       "faceId": "The Tavus avatar’s face/appearance (the “replica”). In the Tavus dashboard go to Replicas, open the one you want and copy its ID.",
+      "heygenTtsEngine": "Use a Cartesia or ElevenLabs voice instead of a HeyGen voice (platform templates only). The voice is linked to HeyGen when you save; the language spoken still follows each project. Leave on “none” to keep a HeyGen voice.",
+      "heygenTtsModelName": "The speech model of the chosen engine. Only models that speak Italian are offered; leave the default if unsure.",
+      "heygenTtsExternalVoiceId": "Choose a voice from the selected engine's list. Saving links it to HeyGen once; saving again reuses it.",
       "idleEngagement": "What the avatar does during silence: “off” waits; “patient” nudges occasionally; “eager” chimes in often.",
       "interactivityType": "How you talk: “CONVERSATIONAL” = speak freely; “PUSH_TO_TALK” = hold to talk.",
       "interruptibility": "How easy it is to interrupt the avatar while it speaks. High = it stops as soon as you talk.",

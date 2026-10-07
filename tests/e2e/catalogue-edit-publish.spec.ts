@@ -1,4 +1,5 @@
 import { test, expect, type Route, type Page } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 
 /**
@@ -39,18 +40,6 @@ function jsonRoute(route: Route, body: unknown, status = 200): Promise<void> {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
 
-/**
- * The analytics consent banner is fixed to the bottom of the viewport and
- * intercepts clicks on anything underneath it — same fixture dismissal as
- * `profile.spec.ts`/`reports-index.spec.ts`. Every test below interacts with
- * controls at the bottom of the section rail, so this is called
- * unconditionally after every `page.goto('/catalogue')`.
- */
-async function dismissConsent(page: Page): Promise<void> {
-  await page.getByTestId('analytics-consent-reject').click()
-  await expect(page.getByTestId('analytics-consent')).toBeHidden()
-}
-
 async function injectSession(page: Page): Promise<void> {
   await page.route(
     (url) => url.pathname === '/auth/refresh',
@@ -59,6 +48,7 @@ async function injectSession(page: Page): Promise<void> {
 }
 
 async function mockSuperadmin(page: Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>
@@ -81,6 +71,7 @@ async function mockSuperadmin(page: Page): Promise<void> {
 }
 
 async function mockOrgAdmin(page: Page): Promise<void> {
+  await answerFirstVisitPrompts(page, 2)
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>
@@ -172,7 +163,6 @@ test.describe('Catalogue — reachability and the security half', () => {
     await mockDefaultQuestions(page)
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
 
     const nav = page.getByRole('navigation', { name: 'Navigazione principale' })
     await expect(nav.getByRole('link', { name: 'Catalogo' })).toBeVisible()
@@ -196,7 +186,6 @@ test.describe('Catalogue — reachability and the security half', () => {
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
 
     await expect(page).toHaveURL('/')
     const nav = page.getByRole('navigation', { name: 'Navigazione principale' })
@@ -268,7 +257,6 @@ test.describe('Catalogue — the published revision is read-only until a draft i
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
 
     await expect(page.getByTestId('catalogue-revision-state')).toContainText('Pubblicata')
     await expect(page.getByTestId('catalogue-read-only-notice')).toBeVisible()
@@ -353,7 +341,6 @@ test.describe('Catalogue — competency CRUD, behind ConfirmDialog for delete', 
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
     await page.getByRole('tab', { name: /^Competenze/ }).click()
 
     await expect(page.getByTestId('competency-edit-11')).toBeVisible()
@@ -425,7 +412,6 @@ test.describe('Catalogue — role competency assignment, detach behind ConfirmDi
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
     await page.getByRole('tab', { name: /^Ruoli/ }).click()
 
     await page.getByTestId('role-competencies-1').click()
@@ -492,7 +478,6 @@ test.describe('Catalogue — BARS indicator create', () => {
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
     await page.getByRole('tab', { name: /^Indicatori/ }).click()
 
     await page.getByTestId('indicators-new').click()
@@ -571,7 +556,6 @@ test.describe('Catalogue — publish', () => {
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
     await page.getByRole('tab', { name: /^Indicatori/ }).click()
 
     // Edit succeeds while the revision is still a draft.
@@ -630,7 +614,6 @@ test.describe('Catalogue — publish', () => {
     )
 
     await page.goto('/catalogue')
-    await dismissConsent(page)
 
     await page.getByTestId('catalogue-publish').click()
     await expect(page.getByRole('alertdialog')).toBeVisible()

@@ -66,7 +66,12 @@
       <Button :disabled="copyDisabled" data-testid="entry-link-copy" @click="onCopy">
         {{ copied ? $t('entryLink.copied') : $t('entryLink.copy') }}
       </Button>
-      <Button variant="outline" data-testid="entry-link-generate" @click="$emit('generate')">
+      <Button
+        v-if="!hideGenerate"
+        variant="outline"
+        data-testid="entry-link-generate"
+        @click="$emit('generate')"
+      >
         {{ $t('entryLink.generate') }}
       </Button>
     </div>
@@ -103,9 +108,14 @@ export interface ReusableEntryLink {
  * only one that existed before reusable links) takes an `EntryLink`, the
  * reusable one a `ReusableEntryLink`.
  */
-export type EntryLinkPanelProps = { locale: string } & (
-  { kind?: 'single-use'; link: EntryLink } | { kind: 'reusable'; link: ReusableEntryLink }
-)
+export type EntryLinkPanelProps = {
+  locale: string
+  /**
+   * Single-use only. `true` removes the Generate button for a caller that has
+   * no re-issue action of its own (the evaluation retry panel).
+   */
+  hideGenerate?: boolean
+} & ({ kind?: 'single-use'; link: EntryLink } | { kind: 'reusable'; link: ReusableEntryLink })
 
 const props = defineProps<EntryLinkPanelProps>()
 

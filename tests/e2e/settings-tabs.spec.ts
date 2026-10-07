@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 import type { TenantRole } from '../unit/support/abilities'
@@ -250,6 +251,7 @@ async function mockIdentity(
   roles: readonly TenantRole[],
   isSuperadmin = false
 ): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>

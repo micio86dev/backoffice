@@ -1,4 +1,5 @@
 import { test, expect, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { abilitiesFor } from './fixtures/abilities'
 import { checkA11y } from './fixtures/a11y'
 
@@ -75,6 +76,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockAdminApi(page: import('@playwright/test').Page): Promise<void> {
+  await answerFirstVisitPrompts(page)
   // The project form needs the picker list — `projects.avatar_template_id` is
   // NOT NULL, so a form with an empty select correctly refuses its own submit.
   // Unmocked, that reads as "the page is broken" when it is the form doing its
@@ -238,6 +240,51 @@ test.describe('Projects CRUD (Unit 2b)', () => {
     await page.getByRole('button', { name: 'Salva' }).click()
 
     await expect(page.getByText('New E2E Project')).toBeVisible()
+  })
+
+  // Owner decision 2026-10-06: on CREATE a role's selectable competencies come
+  // pre-ticked and the operator unticks what they do not want. The uncovered
+  // one (Judgement, no BARS anchors) is never pre-ticked.
+  test('choosing a role on create pre-ticks its competencies, and the request carries only the ones left ticked', async ({
+    page,
+  }) => {
+    await mockAdminApi(page)
+
+    let createBody: { competency_ids?: number[] } | null = null
+    // Registered AFTER mockAdminApi — the last matching route wins.
+    await page.route(
+      (url) => url.pathname === '/projects',
+      (route) => {
+        if (!isDataRequest(route)) return route.continue()
+        if (route.request().method() === 'POST') {
+          createBody = route.request().postDataJSON() as { competency_ids?: number[] }
+
+          return jsonRoute(route, { data: { ...DRAFT_PROJECT, id: 9, name: 'Preticked' } }, 201)
+        }
+
+        return jsonRoute(route, { data: [DRAFT_PROJECT] })
+      }
+    )
+
+    await login(page)
+    await page.getByRole('link', { name: 'Progetti' }).click()
+    await expect(page).toHaveURL('/projects')
+
+    await page.getByRole('button', { name: 'Nuovo progetto' }).click()
+    await page.getByLabel('Nome').fill('Preticked')
+    await page.getByLabel('Slug').fill('preticked')
+    await page.getByRole('combobox', { name: 'Ruolo' }).click()
+    await page.getByRole('option', { name: 'Contributore individuale' }).click()
+
+    await expect(page.getByLabel('Problem Solving')).toBeChecked()
+    await expect(page.getByLabel('Communication')).toBeChecked()
+    await expect(page.getByLabel('Judgement')).not.toBeChecked()
+    await expect(page.getByLabel('Judgement')).toBeDisabled()
+
+    await page.getByLabel('Communication').uncheck()
+    await page.getByRole('button', { name: 'Salva' }).click()
+
+    await expect.poll(() => createBody?.competency_ids).toEqual([1])
   })
 
   // project-competency-revision-scope fix: competency ids are validated by

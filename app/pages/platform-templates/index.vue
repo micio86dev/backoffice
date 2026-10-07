@@ -222,7 +222,6 @@ import AvatarTemplateForm from '@/components/organisms/AvatarTemplateForm.vue'
 import CopyTemplateDialog from '@/components/organisms/CopyTemplateDialog.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { useAvatarTemplates } from '@/composables/useAvatarTemplates'
 import {
   PlatformTemplateActiveError,
   PlatformTemplateInUseError,
@@ -251,8 +250,8 @@ useHead({
 const buttonClass =
   'rounded-md border border-border px-3 py-1.5 text-sm hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none'
 
-const { list, create, update, activate, deactivate, remove } = usePlatformAvatarTemplates()
-const { fetchFieldSpecs } = useAvatarTemplates()
+const { list, create, update, activate, deactivate, remove, fetchFieldSpecs } =
+  usePlatformAvatarTemplates()
 
 const templates = ref<PlatformTemplate[]>([])
 const fieldSpecs = ref<Record<ProviderName, FieldSpec[]>>({ heygen: [], tavus: [] })

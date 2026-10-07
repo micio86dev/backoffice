@@ -1,8 +1,9 @@
 /**
  * useVoicePreview — listen to a voice before a template is activated.
  *
- * `POST /avatar-templates/voice-preview` answers RAW AUDIO BYTES, not JSON, so
- * it is read as a Blob and played from an object URL. Everything else is about
+ * `POST /avatar-templates/voice-preview` (and `GET /avatar-templates/catalogue-sample`,
+ * Cartesia's own clip) answer RAW AUDIO BYTES, not JSON, so
+ * they are read as a Blob and played from an object URL. Everything else is about
  * keeping that cheap and unsurprising:
  *
  *  - ONE sample plays at a time, app-wide. The state below is module-scoped on
@@ -66,6 +67,14 @@ export function voicePreviewKey(request: VoicePreviewRequest): string {
     request.provider === 'tavus' ? (request.tts_engine ?? '') : '',
     request.language ?? 'it',
   ].join('|')
+}
+
+/**
+ * Cache / ownership key of a vendor CATALOGUE clip (`GET /avatar-templates/catalogue-sample`).
+ * The leading `catalogue` is never a provider, so it cannot collide with `voicePreviewKey`.
+ */
+export function catalogueSampleKey(voiceId: string): string {
+  return ['catalogue', 'cartesia', voiceId].join('|')
 }
 
 // --- module-scoped, shared by every consumer ---------------------------------
@@ -226,10 +235,12 @@ export function useVoicePreview() {
     externalStop = stopOther
   }
 
-  /** Play the sample, or stop it when it is the one currently playing. */
-  async function toggle(request: VoicePreviewRequest): Promise<void> {
-    const key = voicePreviewKey(request)
-
+  /**
+   * Play the sample under `key`, or stop it when it is the one currently
+   * playing. `fetchSample` is the only thing that differs between the
+   * synthesised sample and a catalogue clip: where the bytes come from.
+   */
+  async function toggleKey(key: string, fetchSample: () => Promise<Blob>): Promise<void> {
     if (activeKey.value === key && activeState.value === 'playing') {
       stop()
 
@@ -253,11 +264,7 @@ export function useVoicePreview() {
     activeState.value = 'loading'
 
     try {
-      const blob = await apiFetch<Blob>('/avatar-templates/voice-preview', {
-        method: 'POST',
-        body: { ...request, language: request.language ?? 'it' },
-        responseType: 'blob',
-      })
+      const blob = await fetchSample()
       const url = URL.createObjectURL(blob)
       cache.set(key, url)
 
@@ -274,11 +281,38 @@ export function useVoicePreview() {
     }
   }
 
+  /** Play the synthesised sample, or stop it when it is the one currently playing. */
+  function toggle(request: VoicePreviewRequest): Promise<void> {
+    return toggleKey(voicePreviewKey(request), () =>
+      apiFetch<Blob>('/avatar-templates/voice-preview', {
+        method: 'POST',
+        body: { ...request, language: request.language ?? 'it' },
+        responseType: 'blob',
+      })
+    )
+  }
+
+  /**
+   * Play Cartesia's own catalogue clip of a voice. The file host needs the
+   * platform key, so the api downloads it and we receive the BYTES: the
+   * browser never calls the vendor and never holds a key or a vendor url.
+   */
+  function toggleCatalogueSample(voiceId: string): Promise<void> {
+    return toggleKey(catalogueSampleKey(voiceId), () =>
+      apiFetch<Blob>('/avatar-templates/catalogue-sample', {
+        method: 'GET',
+        query: { provider: 'cartesia', voice_id: voiceId },
+        responseType: 'blob',
+      })
+    )
+  }
+
   return {
     activeKey: readonly(activeKey),
     stateFor,
     errorFor,
     toggle,
+    toggleCatalogueSample,
     stop,
     claimPlayback,
   }

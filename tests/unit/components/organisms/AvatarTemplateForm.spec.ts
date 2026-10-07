@@ -565,3 +565,100 @@ describe('AvatarTemplateForm — 422 mapping (non-negotiable #4)', () => {
     expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
   })
 })
+
+// A HeyGen third-party-voice bind that fails for a reason no field can fix
+// answers 503/502 with `{message: <code>}` and NO `errors` object
+// (api 0ab739b). The watcher used to read only field errors, so the operator
+// saw nothing at all.
+describe('AvatarTemplateForm — message-only 502/503 submit errors (H8)', () => {
+  const outageCases = [
+    [503, 'tts_provider_unconfigured'],
+    [503, 'tts_vendor_key_missing'],
+    [503, 'tts_bind_busy'],
+    [502, 'tts_secret_failed'],
+  ] as const
+
+  it.each(outageCases)('shows the %i code %s in the summary, translated', async (status, code) => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: { ...baseProps(), submitError: { status, data: { message: code } } },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    const summary = wrapper.get('[data-testid="template-form-errors"]')
+    expect(summary.text()).toContain(`avatar_templates.error.config.${code}`)
+  })
+
+  it('shows the raw code when no copy exists for it', async () => {
+    const original = (globalThis as { useI18n?: unknown }).useI18n
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: (key: string) => key, te: () => false, locale: ref('it') }))
+    )
+    try {
+      const wrapper = mount(AvatarTemplateForm, {
+        props: {
+          ...baseProps(),
+          submitError: { status: 503, data: { message: 'tts_new_outage' } },
+        },
+        global: { mocks: { $t: (key: string) => key } },
+      })
+      await flushPromises()
+
+      const summary = wrapper.get('[data-testid="template-form-errors"]')
+      expect(summary.text()).toContain('tts_new_outage')
+      expect(summary.text()).not.toContain('avatar_templates.error')
+    } finally {
+      vi.stubGlobal('useI18n', original)
+    }
+  })
+
+  it('ignores a framework prose message (not a bare code)', async () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        ...baseProps(),
+        submitError: { status: 503, data: { message: 'Service Unavailable.' } },
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
+  })
+
+  it('clears the message when the next submit error is null', async () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        ...baseProps(),
+        submitError: { status: 503, data: { message: 'tts_bind_busy' } },
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(true)
+
+    await wrapper.setProps({ submitError: null })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
+  })
+
+  it('keeps a real 422 field error exactly as before', async () => {
+    const wrapper = mount(AvatarTemplateForm, {
+      props: {
+        ...baseProps(),
+        submitError: {
+          status: 422,
+          data: { message: 'invalid_request', errors: { llm_model_id: ['model_unavailable'] } },
+        },
+      },
+      global: { mocks: { $t: (key: string) => key } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="template-llm-model-error"]').text()).toContain(
+      'avatar_templates.error.llm.model_unavailable'
+    )
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
+  })
+})

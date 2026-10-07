@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Route } from '@playwright/test'
+import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
 
@@ -61,6 +62,7 @@ function isDataRequest(route: Route): boolean {
 }
 
 async function mockApi(page: Page, templates: unknown[]): Promise<void> {
+  await answerFirstVisitPrompts(page)
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -244,12 +246,6 @@ test.describe('Avatar templates — provider catalogue picker (avatar-template-c
     await login(page)
     await page.goto('/avatar-templates')
 
-    // The role-aware first-login guided tour opens over a fresh session
-    // (feature/role-aware-onboarding-tour) and would otherwise sit on top of
-    // the row actions this test needs to click.
-    const tourSkip = page.getByTestId('onboarding-tour-skip')
-    if (await tourSkip.isVisible().catch(() => false)) await tourSkip.click()
-
     await page.getByTestId('template-edit-1').click()
     await expect(page.getByTestId('template-form')).toBeVisible()
 
@@ -279,5 +275,128 @@ test.describe('Avatar templates — provider catalogue picker (avatar-template-c
       voiceId: 'voice-e2e-1',
       avatarId: 'manual-avatar-id',
     })
+  })
+})
+
+// cartesia-catalogue-sample-proxy: Cartesia's own catalogue clip lives on a host that answers 401
+// without the platform key, which the browser must never hold. The picker therefore asks the api for
+// the clip's BYTES (typed client, Bearer auth) and plays a blob url; it never requests the vendor host.
+test.describe('Avatar templates — Cartesia catalogue sample is served by the api', () => {
+  // 0.1 s of 8 kHz mono silence: a real, decodable WAV, so a playback failure would be ours.
+  function silentWav(): Buffer {
+    const samples = 800
+    const header = Buffer.alloc(44)
+    header.write('RIFF', 0)
+    header.writeUInt32LE(36 + samples * 2, 4)
+    header.write('WAVEfmt ', 8)
+    header.writeUInt32LE(16, 16)
+    header.writeUInt16LE(1, 20)
+    header.writeUInt16LE(1, 22)
+    header.writeUInt32LE(8000, 24)
+    header.writeUInt32LE(16000, 28)
+    header.writeUInt16LE(2, 32)
+    header.writeUInt16LE(16, 34)
+    header.write('data', 36)
+    header.writeUInt32LE(samples * 2, 40)
+
+    return Buffer.concat([header, Buffer.alloc(samples * 2)])
+  }
+
+  test('fetches the clip through the api with the session token and never calls the vendor host', async ({
+    page,
+  }) => {
+    const vendorRequests: string[] = []
+    page.on('request', (request) => {
+      if (new URL(request.url()).hostname.endsWith('cartesia.ai')) {
+        vendorRequests.push(request.url())
+      }
+    })
+    let sampleQuery: Record<string, string> | null = null
+    let sampleAuthorization: string | undefined
+
+    await mockApi(page, [templateFixture()])
+    await page.route(
+      (url) => url.pathname === '/auth/me',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              user: {
+                id: 1,
+                name: 'Ada Lovelace',
+                email: 'ada@example.com',
+                locale: 'it',
+                photo_url: null,
+              },
+              organization: { id: 1, name: 'Acme' },
+              roles: ['admin'],
+              abilities: abilitiesFor({ roles: ['admin'], isSuperadmin: true }),
+            })
+          : route.continue()
+    )
+    await page.route(
+      (url) => url.pathname === '/avatar-templates/catalogue',
+      (route) =>
+        isDataRequest(route)
+          ? jsonRoute(route, {
+              data: {
+                status: 'ok',
+                items: [
+                  {
+                    id: 'cartesia-voice-1',
+                    provider: 'cartesia',
+                    label: 'Giulia',
+                    name: 'Giulia',
+                    language: 'it',
+                    locale: 'it',
+                    accent: null,
+                    italian: 'native',
+                    preview_image_url: null,
+                    preview_audio_url: null,
+                    preview_audio_via_api: true,
+                    preview_video_url: null,
+                  },
+                ],
+              },
+            })
+          : route.continue()
+    )
+    await page.route(
+      (url) => url.pathname === '/avatar-templates/catalogue-sample',
+      async (route) => {
+        const request = route.request()
+        sampleQuery = Object.fromEntries(new URL(request.url()).searchParams)
+        sampleAuthorization = request.headers()['authorization']
+        await route.fulfill({ status: 200, contentType: 'audio/wav', body: silentWav() })
+      }
+    )
+    await page.route(
+      (url) => url.pathname === '/llm-models' || url.pathname === '/llm-credentials',
+      (route) => (isDataRequest(route) ? jsonRoute(route, { data: [] }) : route.continue())
+    )
+
+    await login(page)
+    await page.goto('/avatar-templates')
+
+    await page.getByTestId('template-edit-1').click()
+    await expect(page.getByTestId('template-form')).toBeVisible()
+
+    await page.getByTestId('template-config-voiceId').click()
+    const play = page.getByTestId('template-config-voiceId-play-cartesia-voice-1')
+    await expect(play).toBeVisible()
+    await play.click()
+
+    await expect
+      .poll(() => sampleQuery)
+      .toEqual({
+        provider: 'cartesia',
+        voice_id: 'cartesia-voice-1',
+      })
+    expect(sampleAuthorization).toMatch(/^Bearer \S+/)
+    // The clip decoded and played (or finished): nothing went wrong and nothing is left busy.
+    await expect(
+      page.getByTestId('template-config-voiceId-play-error-cartesia-voice-1')
+    ).toHaveCount(0)
+    await expect(play).not.toHaveAttribute('aria-busy', 'true')
+    expect(vendorRequests).toEqual([])
   })
 })

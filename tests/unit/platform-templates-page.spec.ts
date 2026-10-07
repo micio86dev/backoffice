@@ -49,6 +49,8 @@ const SPECS = {
   tavus: [],
 }
 
+const orgFieldSpecs = vi.fn().mockResolvedValue({ data: { heygen: [], tavus: [] } })
+
 type Errors = typeof import('../../app/composables/usePlatformAvatarTemplates')
 
 async function mountPage(
@@ -64,6 +66,7 @@ async function mountPage(
   const errors = await import('../../app/composables/usePlatformAvatarTemplates')
   api = {
     list: vi.fn().mockResolvedValue({ data: rows }),
+    fetchFieldSpecs: vi.fn().mockResolvedValue({ data: SPECS }),
     get: vi.fn(),
     create: vi.fn().mockResolvedValue({ data: template() }),
     update: vi.fn().mockResolvedValue({ data: template() }),
@@ -81,7 +84,8 @@ async function mountPage(
   }))
   vi.doMock('../../app/composables/useAvatarTemplates', () => ({
     useAvatarTemplates: () => ({
-      fetchFieldSpecs: vi.fn().mockResolvedValue({ data: SPECS }),
+      // The ORGANIZATION route, which must NOT be what this page loads its form from.
+      fetchFieldSpecs: orgFieldSpecs,
       duplicateTemplate: vi.fn().mockResolvedValue({ data: [] }),
     }),
   }))
@@ -123,6 +127,16 @@ describe('PlatformTemplatesPage', () => {
 
   afterEach(() => {
     document.body.innerHTML = ''
+  })
+
+  describe('field specs', () => {
+    it('loads the form from the PLATFORM route (which lists the external voice fields), never the organization one', async () => {
+      orgFieldSpecs.mockClear()
+      const { api } = await mountPage()
+
+      expect(api.fetchFieldSpecs).toHaveBeenCalledTimes(1)
+      expect(orgFieldSpecs).not.toHaveBeenCalled()
+    })
   })
 
   describe('list', () => {

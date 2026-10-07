@@ -410,7 +410,7 @@
       "archived": "Archived"
     },
     "assessmentType": {
-      "standard": "Standard",
+      "standard": "Readiness",
       "potential": "Potential"
     },
     "roleCode": {
@@ -432,7 +432,7 @@
       "language": "Language",
       "assessmentType": "Assessment type",
       "roleCode": "Role",
-      "roleCodeRequiredForStandard": "Required for a standard assessment. This choice becomes permanent once the project leaves draft.",
+      "roleCodeRequiredForStandard": "Required for a Readiness assessment. This choice becomes permanent once the project leaves draft.",
       "frameworkVersion": "Framework version",
       "frameworkVersionImmutable": "The framework version is fixed at creation and can never change afterwards, so every scored result stays comparable against the same catalogue.",
       "immutableWhenLive": "This field is locked once the project is active or archived, so a live assessment always stays comparable to itself.",
@@ -456,7 +456,7 @@
         "name": "The name candidates see in the invitation email and at the start of the interview.",
         "slug": "Used in the project's address. Lowercase letters, numbers and hyphens only.",
         "language": "The language the interview is conducted in with the candidate. It does not change the language of this panel.",
-        "assessmentTypeFreezes": "Choose carefully: this can no longer be changed once the project goes live. Standard evaluates a candidate against a specific role; Potential evaluates general potential, with no target role.",
+        "assessmentTypeFreezes": "Choose carefully: this can no longer be changed once the project goes live. Readiness evaluates a candidate against a specific role; Potential evaluates general potential, with no target role.",
         "pauseEveryN": "Gives the candidate a short break after this many competencies. Leave empty for no breaks.",
         "nudgeMinChars": "If an answer is shorter than this many characters, the candidate is asked to expand on it.",
         "exitRedirectUrl": "Where the candidate is sent after finishing the interview. Leave empty to show the standard closing page.",
@@ -844,8 +844,8 @@
     },
     "platform": {
       "maxQuestions": {
-        "standard": "Max questions per competency — standard",
-        "standardHelp": "How many questions an operator may predefine for one competency in a standard assessment. The interview stays adaptive: these are asked first, the rest is followed up by the interviewer.",
+        "standard": "Max questions per competency — Readiness",
+        "standardHelp": "How many questions an operator may predefine for one competency in a Readiness assessment. The interview stays adaptive: these are asked first, the rest is followed up by the interviewer.",
         "potential": "Max questions per competency — potential",
         "potentialHelp": "The same cap for potential assessments, which are built around fixed questions by design.",
         "range": "Enter a whole number between 1 and 10."
@@ -1371,8 +1371,8 @@
         "title": "Projects",
         "summary": "A project is one assessment configuration: what it measures, in which language, and where results are delivered.",
         "steps": {
-          "0": "Create the project and pick its assessment type. Standard measures the competencies of a role; Potential measures only MTG and LAT. This choice is permanent once the project goes live.",
-          "1": "For a Standard project, choose the role. That decides which competencies the interview covers.",
+          "0": "Create the project and pick its assessment type. Readiness measures the competencies of a role; Potential measures only MTG and LAT. This choice is permanent once the project goes live.",
+          "1": "For a Readiness project, choose the role. That decides which competencies the interview covers.",
           "2": "Set the webhook URL if the calling system should be notified of progress and results, and the exit URL for where the candidate is sent afterwards.",
           "3": "Activate the project. From then on the calling system can mint entry links for it; assessment type and role can no longer change."
         }
@@ -1438,7 +1438,7 @@
       },
       "assessmentType": {
         "term": "Assessment type",
-        "definition": "Standard scores the competencies of a role. Potential scores only MTG and LAT, from four fixed questions. Permanent once live."
+        "definition": "Readiness scores the competencies of a role. Potential scores only MTG and LAT, from four fixed questions. Permanent once live."
       },
       "roleCode": {
         "term": "Role",
@@ -1709,9 +1709,9 @@
     "intro": "The framework catalogue every project draws from: competencies, roles, BARS indicators and default questions. The published revision is shown read-only; create a draft to edit it, then publish the draft.",
     "sections": {
       "competencies": "Competencies",
-      "competenciesDescription": "The scored competencies, standard and potential.",
+      "competenciesDescription": "The scored competencies, Readiness and Potential.",
       "roles": "Roles",
-      "rolesDescription": "The five standard assessment roles.",
+      "rolesDescription": "The five Readiness assessment roles.",
       "indicators": "Indicators",
       "indicatorsDescription": "The BARS indicators behind each competency.",
       "defaultQuestions": "Default questions",
@@ -1735,7 +1735,7 @@
         "potential_competency_not_in_pivot": "Potential competency assigned to a role",
         "potential_indicator_must_be_role_less": "Potential indicator carries a role",
         "indicator_pair_not_declared": "Indicators exist for an undeclared pair",
-        "standard_indicator_must_have_role": "Standard indicator missing a role",
+        "standard_indicator_must_have_role": "Readiness indicator missing a role",
         "cross_role_duplicate_anchor_new_to_revision": "Duplicate anchor text across roles",
         "revision_already_published": "Already published"
       },
@@ -1797,10 +1797,10 @@
       "position_required": "A position is required.",
       "competency_ids_required": "The competency list is required.",
       "competency_id_duplicated": "A competency cannot be selected twice.",
-      "competency_not_found_or_not_standard": "That competency is not a standard competency in the open draft."
+      "competency_not_found_or_not_standard": "That competency is not a Readiness competency in the open draft."
     },
     "competencies": {
-      "description": "The scored competencies of this revision, standard and potential.",
+      "description": "The scored competencies of this revision, Readiness and Potential.",
       "new": "New competency",
       "edit": "Edit",
       "delete": "Delete",
@@ -1810,7 +1810,7 @@
       "code": "Code",
       "type": "Type",
       "typeOption": {
-        "standard": "Standard",
+        "standard": "Readiness",
         "potential": "Potential"
       },
       "table": {
@@ -1823,7 +1823,7 @@
       }
     },
     "roles": {
-      "description": "The five standard assessment roles of this revision.",
+      "description": "The five Readiness assessment roles of this revision.",
       "new": "New role",
       "edit": "Edit",
       "delete": "Delete",
@@ -1851,7 +1851,7 @@
         "remove": "Remove",
         "addLabel": "Add a competency",
         "add": "Add",
-        "noneAvailable": "Every standard competency in this draft is already assigned.",
+        "noneAvailable": "Every Readiness competency in this draft is already assigned.",
         "potentialNote": "Potential competencies (MTG and LAT) belong to no role. They are scored on Potential projects and are chosen there, not here.",
         "confirmDetachTitle": "Detach these competencies?",
         "confirmDetachBody": "Saving detaches every competency removed from the list below. A competency whose role/competency pair still carries BARS indicators in this draft cannot be detached — the save is refused, naming it, until those indicators are removed first.",

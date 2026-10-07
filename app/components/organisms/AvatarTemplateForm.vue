@@ -46,7 +46,7 @@
           :aria-invalid="Boolean(nameError)"
           :aria-describedby="nameDescribedBy"
           :class="formControlClass"
-          @blur="validateName"
+          @blur="guardBlur(validateName)"
         />
         <FieldDescription id="template-name-help">
           {{ $t('avatar_templates.form.help.name') }}
@@ -69,7 +69,7 @@
           :aria-invalid="Boolean(descriptionError)"
           :aria-describedby="descriptionError ? 'template-description-error' : undefined"
           :class="formControlClass"
-          @blur="validateDescription"
+          @blur="guardBlur(validateDescription)"
         />
         <FieldError
           v-if="descriptionError"
@@ -250,7 +250,7 @@
                 :aria-describedby="describedBy(field)"
                 :class="formControlClass"
                 @input="onFieldChange(field, ($event.target as HTMLInputElement).value)"
-                @blur="validateConfigField(field)"
+                @blur="guardBlur(() => validateConfigField(field))"
               />
               <!--
           Listen to the voice this field holds (DESIGN.md §16.14). A field with
@@ -398,6 +398,7 @@ import { getErrorFields, serverMessageCode } from '@/utils/http-error'
 import { translateServerCode } from '@/utils/server-message'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
+import { usePointerPressGuard } from '@/composables/usePointerPressGuard'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import VoicePreviewButton from '@/components/molecules/VoicePreviewButton.vue'
 import PalSyncStatus from '@/components/molecules/PalSyncStatus.vue'
@@ -506,6 +507,10 @@ const configFieldsClass = computed(() =>
     ? 'grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2'
     : 'flex flex-col gap-3'
 )
+
+// A blur check never runs while the pointer is down: the error it inserts would
+// move the control being pressed and the click would be lost.
+const { guardBlur } = usePointerPressGuard()
 
 const nameError = ref<string | undefined>(undefined)
 const descriptionError = ref<string | undefined>(undefined)

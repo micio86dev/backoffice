@@ -662,3 +662,66 @@ describe('AvatarTemplateForm — message-only 502/503 submit errors (H8)', () =>
     expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
   })
 })
+
+// A blur caused by pressing another control must not insert an error above it
+// between pointerdown and pointerup (the click would be lost). Keyboard blur
+// still validates at once, and the deferred check runs after the press.
+describe('AvatarTemplateForm — blur validation never swallows a click', () => {
+  const NAME = '[data-testid="template-field-name"]'
+  const NAME_ERROR = '[data-testid="template-name-error"]'
+
+  function mountForm() {
+    return mount(AvatarTemplateForm, {
+      props: baseProps({ name: '' }),
+      attachTo: document.body,
+      global: { mocks: { $t: (key: string) => key } },
+    })
+  }
+
+  const afterPress = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+  it('does not insert the name error while the pointer is down on another control', async () => {
+    const wrapper = mountForm()
+    await flushPromises()
+
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await wrapper.get(NAME).trigger('blur')
+
+    expect(wrapper.find(NAME_ERROR).exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('shows the name error right after the press is released', async () => {
+    const wrapper = mountForm()
+    await flushPromises()
+
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await wrapper.get(NAME).trigger('blur')
+    document.body.dispatchEvent(new Event('pointerup', { bubbles: true }))
+    await afterPress()
+    await flushPromises()
+
+    expect(wrapper.find(NAME_ERROR).exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('still validates at once on a keyboard blur (no pointer press)', async () => {
+    const wrapper = mountForm()
+    await flushPromises()
+
+    await wrapper.get(NAME).trigger('blur')
+
+    expect(wrapper.find(NAME_ERROR).exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('still refuses an empty name on submit', async () => {
+    const wrapper = mountForm()
+    await flushPromises()
+
+    await submitForm(wrapper)
+
+    expect(wrapper.find(NAME_ERROR).exists()).toBe(true)
+    wrapper.unmount()
+  })
+})

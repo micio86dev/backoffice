@@ -338,7 +338,7 @@ test.describe('Projects CRUD (Unit 2b)', () => {
       .click()
 
     await expect(page.getByLabel('Versione del framework')).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Standard' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Prontezza' })).toBeDisabled()
   })
 
   // dates-and-destructive-actions, design.md D7 — archive no longer fires on

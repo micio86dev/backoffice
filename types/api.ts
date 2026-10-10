@@ -7288,7 +7288,13 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    live_conversation_id?: string;
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -7309,6 +7315,12 @@ export interface operations {
                             prompt_version: string | null;
                             competency_ordinal: number | null;
                             total_competencies: number | null;
+                        };
+                        conversation_id?: string;
+                        conversation_ttl_seconds?: number;
+                        continuation?: {
+                            conversation_id: string;
+                            competency_code: string;
                         };
                     };
                 };
@@ -10765,11 +10777,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Utterance persisted. `boundary_due` is true once the competency has met its turn budget. */
             202: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        boundary_due: boolean;
+                    };
+                };
             };
             401: components["responses"]["AuthenticationException"];
             404: components["responses"]["ModelNotFoundException"];

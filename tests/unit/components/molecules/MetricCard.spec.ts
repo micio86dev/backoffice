@@ -139,4 +139,32 @@ describe('MetricCard', () => {
     expect(page.get(`#${firstId}`).text()).toBe('Uno')
     expect(page.get(`#${secondId}`).text()).toBe('Due')
   })
+
+  // organization-currencies: a converted amount carries `≈`, which is not
+  // reliably announced, and a note stating where it came from.
+  it('gives the value a spoken label only when one is passed', () => {
+    const plain = mount(MetricCard, { props: { label: 'Cost', value: '$12.00' } })
+    expect(plain.find('[aria-label]').exists()).toBe(false)
+
+    const spoken = mount(MetricCard, {
+      props: { label: 'Cost', value: '≈ €11.04', valueLabel: 'approximately €11.04' },
+    })
+    const value = spoken.get('[aria-label]')
+    expect(value.attributes('aria-label')).toBe('approximately €11.04')
+    expect(value.attributes('role')).toBe('img')
+    expect(value.text()).toBe('≈ €11.04')
+  })
+
+  it('renders the note as visible text, only when there is one', () => {
+    expect(
+      mount(MetricCard, { props: { label: 'Cost', value: '$12.00', testId: 'c' } })
+        .find('[data-testid="c-note"]')
+        .exists()
+    ).toBe(false)
+
+    const withNote = mount(MetricCard, {
+      props: { label: 'Cost', value: '≈ €11.04', note: 'Converted from $12.00', testId: 'c' },
+    })
+    expect(withNote.get('[data-testid="c-note"]').text()).toBe('Converted from $12.00')
+  })
 })

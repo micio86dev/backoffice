@@ -11,7 +11,6 @@ import {
   formatPercent,
   formatCompetencyMean,
   formatDuration,
-  formatUsdAmount,
   formatMoney,
 } from '../../../app/utils/format'
 
@@ -86,53 +85,6 @@ describe('formatDuration', () => {
   })
 })
 
-describe('formatUsdAmount', () => {
-  // The `$` sign lives in the `review.costValue` copy key; this returns the
-  // NUMBER only, so both cost lines on a review render through one formatter
-  // and cannot drift apart.
-  it('renders a dollars-and-cents figure with two fraction digits', () => {
-    expect(formatUsdAmount(2, 'en')).toBe('2.00')
-    expect(formatUsdAmount(2.5, 'en')).toBe('2.50')
-  })
-
-  it('is locale-aware, never a hand-built string', () => {
-    expect(formatUsdAmount(1234.5, 'it')).toBe(
-      new Intl.NumberFormat('it', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(1234.5)
-    )
-  })
-
-  // One interview's conversation-LLM spend is routinely under a cent. Two
-  // fraction digits would round a real charge down to 0.00, which reads as
-  // free — a price, and the wrong one.
-  it('keeps a sub-cent charge visible instead of rounding it to zero', () => {
-    expect(formatUsdAmount(0.0087, 'en')).toBe('0.0087')
-    expect(formatUsdAmount(0.0002, 'en')).toBe('0.0002')
-  })
-
-  // Significant digits, not a fixed decimal count: a fixed count only moves
-  // the boundary at which a real charge starts rendering as zero.
-  it('stays non-zero however small the charge is', () => {
-    expect(formatUsdAmount(0.000012, 'en')).toBe('0.000012')
-  })
-
-  // The widened precision applies ONLY below a cent: a $2.34567 estimate must
-  // not start rendering four decimals of noise.
-  it('does not widen precision for figures at or above a cent', () => {
-    expect(formatUsdAmount(2.34567, 'en')).toBe('2.35')
-    expect(formatUsdAmount(0.0187, 'en')).toBe('0.02')
-    expect(formatUsdAmount(0.01, 'en')).toBe('0.01')
-  })
-
-  // A real zero is a price the API states deliberately; it is NOT the
-  // "we did not run this" case, which arrives as null and never reaches here.
-  it('renders an explicit zero as zero', () => {
-    expect(formatUsdAmount(0, 'en')).toBe('0.00')
-  })
-})
-
 describe('formatMoney', () => {
   const usd = { code: 'USD', decimals: 2, rate_per_usd: 1 }
   const eur = { code: 'EUR', decimals: 2, rate_per_usd: 0.92 }
@@ -179,10 +131,14 @@ describe('formatMoney', () => {
     )
     expect(formatMoney(0.0034, eur, 'it')).toContain('0,0031')
     expect(formatMoney(0.0087, usd, 'en')).toBe('$0.0087')
+    // Significant digits, not a fixed count: it stays non-zero however small.
+    expect(formatMoney(0.000012, usd, 'en')).toBe('$0.000012')
+    expect(formatMoney(0, usd, 'en')).toBe('$0.00')
   })
 
   it('does not widen precision at or above one minor unit', () => {
     expect(formatMoney(0.01, usd, 'en')).toBe('$0.01')
+    expect(formatMoney(0.0187, usd, 'en')).toBe('$0.02')
     expect(formatMoney(2.34567, usd, 'en')).toBe('$2.35')
   })
 

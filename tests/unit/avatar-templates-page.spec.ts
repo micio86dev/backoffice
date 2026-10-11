@@ -13,6 +13,11 @@ import { confirmDialog } from './support/confirm'
 import { realI18n } from './support/i18n'
 import { withTooltipProvider } from './support/tooltip-host'
 import { waitFor, waitForTestId } from './support/wait-for'
+import { currenciesDouble, organizationDouble, resetMoney, useEur } from './support/money'
+
+// `useMoney` reads the organization currency and the catalogue: USD unless a
+// test calls `useEur()`. Reset here so no state leaks between tests.
+beforeEach(() => resetMoney())
 
 /**
  * The rendered text of the currently-open ConfirmDialog ONLY — never
@@ -112,6 +117,8 @@ async function mountPage(
   handlers: Handlers = {},
   avatarTemplates: Record<string, boolean> = abilities()
 ) {
+  vi.doMock('../../app/composables/useOrganization', organizationDouble)
+  vi.doMock('../../app/composables/useCurrencies', currenciesDouble)
   vi.doMock('../../app/composables/useCurrentUser', () => ({
     useCurrentUser: () => ({
       can: (key: string) => avatarTemplates[key.split('.')[1] ?? ''] === true,
@@ -370,6 +377,31 @@ describe('AvatarTemplatesPage', () => {
     expect(wrapper.find('[data-testid="templates-empty"]').exists()).toBe(false)
   })
 
+  it('renders a 409 load failure as "not ready yet", not as a refusal', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('HTTP 409'), { status: 409 })),
+    })
+
+    const alert = wrapper.get('[data-testid="templates-error"]')
+    expect(alert.text()).toContain('errors.states.notReady.message')
+    expect(alert.text()).not.toContain('avatar_templates.error.load_body')
+    expect(alert.classes().join(' ')).not.toContain('destructive')
+  })
+
+  it('keeps the refusal copy and style for any other load failure', async () => {
+    const { wrapper } = await mountPage({
+      listTemplates: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('HTTP 403'), { status: 403 })),
+    })
+
+    const alert = wrapper.get('[data-testid="templates-error"]')
+    expect(alert.text()).toContain('avatar_templates.error.load_body')
+    expect(alert.classes().join(' ')).toContain('destructive')
+  })
+
   it('opens an empty form for a new template', async () => {
     const { wrapper } = await mountPage()
 
@@ -569,10 +601,31 @@ describe('AvatarTemplatesPage — conversation-LLM forecast', () => {
     const line = wrapper.get('[data-testid="template-llm-forecast-1"]')
     expect(line.text()).toContain('avatar_templates.llmForecast')
     // The shape travels with the number: a total is only interpretable
-    // alongside the interview it is a total FOR.
-    expect(line.text()).toContain('0,30')
+    // alongside the interview it is a total FOR. The amount is the `Intl`
+    // rendering of the organization currency; no symbol lives in the copy.
+    expect(line.text()).toContain(
+      JSON.stringify(
+        new Intl.NumberFormat('it', { style: 'currency', currency: 'USD' }).format(0.3)
+      ).slice(1, -1)
+    )
+    expect(wrapper.find('[data-testid="template-llm-forecast-note-1"]').exists()).toBe(false)
     expect(line.text()).toContain('15')
     expect(line.text()).toContain('60')
+  })
+
+  it('forecasts in the organization currency, approximate, with the converted-from note', async () => {
+    useEur()
+    const { wrapper } = await mountPage()
+
+    // 0.30 USD at 0.92 = 0.276 EUR, which rounds to 0,28: converted exactly once
+    // (twice would read 0,25) and marked approximate.
+    const eur = new Intl.NumberFormat('it', { style: 'currency', currency: 'EUR' }).format(0.28)
+    const line = wrapper.get('[data-testid="template-llm-forecast-1"]').text()
+    expect(line).toContain('money.approximate')
+    expect(line).toContain(eur)
+    const note = wrapper.get('[data-testid="template-llm-forecast-note-1"]').text()
+    expect(note).toContain('money.convertedNote')
+    expect(note).toContain('"code":"EUR"')
   })
 
   it('never states a per-minute LLM rate', async () => {
@@ -795,6 +848,10 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(true)
+    // A refusal wears the destructive style.
+    expect(wrapper.get('[data-testid="template-write-error"]').classes().join(' ')).toContain(
+      'destructive'
+    )
     // And NOT the load message, which says the listing failed — it did not.
     expect(wrapper.find('[data-testid="templates-error"]').exists()).toBe(false)
   })
@@ -823,6 +880,10 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="template-write-error"]').exists()).toBe(true)
+    // A code-less 409 is "not ready yet": temporary, so not the red of a refusal.
+    expect(wrapper.get('[data-testid="template-write-error"]').classes().join(' ')).not.toContain(
+      'destructive'
+    )
   })
 
   it('tells the operator WHY a 409 happened, not that it will resolve itself', async () => {
@@ -853,6 +914,8 @@ describe('AvatarTemplatesPage — a write that the API refuses', () => {
 
     expect(alert.text()).toContain('avatar_templates.serverError.template_in_use')
     expect(alert.text()).not.toContain('notReady')
+    // A coded 409 is a real conflict, so it keeps the destructive style.
+    expect(alert.classes().join(' ')).toContain('destructive')
     // The count reaches the operator rather than being thrown away.
     expect(wrapper.find('[data-testid="template-write-error-count"]').text()).toContain('7')
   })

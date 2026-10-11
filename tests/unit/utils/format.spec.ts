@@ -150,6 +150,30 @@ describe('formatMoney', () => {
     expect(formatMoney(2.5, { code: 'EUR', decimals: 2, rate_per_usd: 0 }, 'en')).toBe(want)
   })
 
+  it.each(['', 'eu', 'eur', 'EU1', 'EURO', 'XXX1'])(
+    'falls back to USD, never throws, on an unusable code %j',
+    (code) => {
+      const row = { code, decimals: 2, rate_per_usd: 0.92 }
+      expect(formatMoney(2.5, row, 'en')).toBe(intl('en', 'USD', 2, 2.5))
+    }
+  )
+
+  it.each([99, -1, 2.5, Number.NaN])(
+    'falls back to USD, never throws, on unusable decimals %j',
+    (decimals) => {
+      const row = { code: 'EUR', decimals, rate_per_usd: 0.92 }
+      expect(formatMoney(2.5, row, 'en')).toBe(intl('en', 'USD', 2, 2.5))
+    }
+  )
+
+  it.each([Number.NaN, Infinity, -Infinity])(
+    'renders a non-finite amount %j as the en dash used for absent amounts, never NaN',
+    (amount) => {
+      expect(formatMoney(amount, eur, 'en')).toBe('–')
+      expect(formatMoney(amount, null, 'en')).toBe('–')
+    }
+  )
+
   it('does not crash on a negative amount', () => {
     expect(formatMoney(-1, eur, 'en')).toBe(intl('en', 'EUR', 2, -0.92))
   })

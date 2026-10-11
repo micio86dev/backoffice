@@ -17,6 +17,8 @@ export type CurrencyRecord = CurrenciesResponse['data'][number]
 
 const list = ref<CurrencyRecord[] | null>(null)
 let inFlight: Promise<CurrencyRecord[]> | null = null
+// Bumped by `invalidate` so a fetch already in flight cannot write pre-edit data back.
+let generation = 0
 
 export function useCurrencies() {
   const { apiFetch } = useApi()
@@ -25,14 +27,27 @@ export function useCurrencies() {
   async function ensureLoaded(): Promise<CurrencyRecord[]> {
     if (list.value !== null) return list.value
 
+    const started = generation
     inFlight ??= apiFetch<CurrenciesResponse>('/currencies')
-      .then((response) => (list.value = response.data))
+      .then((response) => {
+        // A write landed mid-flight: this payload is stale, so hand back the fresh load.
+        if (started !== generation) return ensureLoaded()
+        list.value = response.data
+        return response.data
+      })
       .finally(() => {
-        inFlight = null
+        if (started === generation) inFlight = null
       })
 
     return inFlight
   }
 
-  return { currencies: readonly(list), ensureLoaded }
+  /** Drops the cache so the next `ensureLoaded` refetches (after a catalogue write). */
+  function invalidate(): void {
+    generation += 1
+    inFlight = null
+    list.value = null
+  }
+
+  return { currencies: readonly(list), ensureLoaded, invalidate }
 }

@@ -238,11 +238,13 @@ test.describe('Dashboard — KPI tiles and recent activity', () => {
     // `useDashboardMetrics` typed `costs.currency` and its docblock said it was
     // "carried rather than assumed" — on a figure an operator may reconcile
     // against an invoice. Reading it from the same place the page does is what
-    // makes this assertion able to catch that assumption coming back.
+    // makes this assertion able to catch that assumption coming back. The amount
+    // renders through `Intl` (`useMoney`), so the Italian locale puts the code
+    // AFTER the number.
     const currency = METRICS_FIXTURE.data.costs.currency
-    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${currency} ${total}`)
-    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${currency} ${scoring}`)
-    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${currency} ${conversation}`)
+    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${total} ${currency}`)
+    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${scoring} ${currency}`)
+    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${conversation} ${currency}`)
   })
 
   test('the recent-activity feed renders its rows', async ({ page }) => {

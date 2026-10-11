@@ -2,6 +2,7 @@ import { test, expect, type Page, type Route } from '@playwright/test'
 import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
+import { expectedMoney, mockCurrencyContext } from './fixtures/currency'
 
 /**
  * Per-session cost on the interview session review
@@ -94,6 +95,7 @@ function isDataRequest(route: Route): boolean {
 
 async function mockApi(page: Page, cost: unknown): Promise<void> {
   await answerFirstVisitPrompts(page)
+  await mockCurrencyContext(page, { organizationCurrency: 'USD' })
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -158,13 +160,18 @@ test.describe('Session review — conversation-LLM cost', () => {
     await expect(section).toBeVisible()
 
     // Each meter, on its own line, with its own figure.
-    await expect(page.getByTestId('cost-avatar')).toContainText('2,00')
-    await expect(page.getByTestId('cost-llm-estimated')).toContainText('0,50')
+    // The figure AND its currency code: a bare `2,00` also passes for EUR.
+    await expect(page.getByTestId('cost-avatar')).toContainText(await expectedMoney(page, 2))
+    await expect(page.getByTestId('cost-llm-estimated')).toContainText(
+      await expectedMoney(page, 0.5)
+    )
 
-    // Rule 1 — the sum has no owner, so it is never rendered.
+    // Rule 1 — the sum has no owner, so it is never rendered, in any currency.
     await expect(section).not.toContainText('2,50')
     // Rule 2 — 0.50 over 600 s would be 0,05 per minute.
     await expect(section).not.toContainText('0,05')
+    // USD is the stored figure, not a conversion.
+    await expect(section).not.toContainText('≈')
   })
 
   // Rule 3.
@@ -188,7 +195,7 @@ test.describe('Session review — conversation-LLM cost', () => {
 
     const llm = page.getByTestId('cost-llm-absent')
     await expect(llm).toBeVisible()
-    await expect(llm).not.toContainText('0,00')
+    await expect(llm).not.toContainText(await expectedMoney(page, 0))
     await expect(page.getByTestId('cost-llm-estimated')).toHaveCount(0)
   })
 

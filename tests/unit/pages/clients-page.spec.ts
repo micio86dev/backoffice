@@ -237,7 +237,7 @@ describe('pages/clients/index.vue', () => {
       )
       await flushPromises()
 
-      expect(createClient).toHaveBeenCalledWith({ name: 'Globex' })
+      expect(createClient).toHaveBeenCalledWith({ name: 'Globex', currency_code: 'USD' })
       expect(fetchClientOverviewMock).toHaveBeenCalledTimes(2)
       expect(body('client-form')).toBeNull()
     })

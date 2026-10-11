@@ -702,6 +702,16 @@
         "name_too_long": "Il nome dell'organizzazione è troppo lungo."
       }
     },
+    "currency": {
+      "label": "Valuta di visualizzazione",
+      "help": "I costi sono memorizzati in dollari USA e qui mostrati convertiti al cambio della piattaforma. Cambia solo la visualizzazione.",
+      "saved": "La valuta di visualizzazione è stata salvata.",
+      "saveError": "Non è stato possibile salvare la valuta di visualizzazione. Riprova.",
+      "loadError": "Non è stato possibile caricare l'elenco delle valute. Ricarica la pagina per riprovare.",
+      "serverError": {
+        "currency_unavailable": "Questa valuta non è disponibile. Scegline una dall'elenco."
+      }
+    },
     "webhooks": {
       "url": "URL webhook predefinito",
       "secret": "Segreto webhook predefinito",
@@ -1680,7 +1690,8 @@
         "name_required": "Inserisci un nome.",
         "slug_taken": "Questo identificativo è già usato da un altro cliente.",
         "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
-        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB."
+        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB.",
+        "currency_unavailable": "Questa valuta non è disponibile. Scegline una dall'elenco."
       },
       "saveError": "Impossibile salvare il cliente. Riprova."
     }

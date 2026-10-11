@@ -12,6 +12,7 @@ import {
   formatCompetencyMean,
   formatDuration,
   formatUsdAmount,
+  formatMoney,
 } from '../../../app/utils/format'
 
 describe('formatDate', () => {
@@ -129,5 +130,71 @@ describe('formatUsdAmount', () => {
   // "we did not run this" case, which arrives as null and never reaches here.
   it('renders an explicit zero as zero', () => {
     expect(formatUsdAmount(0, 'en')).toBe('0.00')
+  })
+})
+
+describe('formatMoney', () => {
+  const usd = { code: 'USD', decimals: 2, rate_per_usd: 1 }
+  const eur = { code: 'EUR', decimals: 2, rate_per_usd: 0.92 }
+  const jpy = { code: 'JPY', decimals: 0, rate_per_usd: 150 }
+  const intl = (locale: string, code: string, d: number, v: number) =>
+    new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: d,
+      maximumFractionDigits: d,
+    }).format(v)
+
+  it('renders USD and EUR exactly as Intl does, in both locales', () => {
+    for (const locale of ['it', 'en']) {
+      expect(formatMoney(2.34, usd, locale)).toBe(intl(locale, 'USD', 2, 2.34))
+      expect(formatMoney(2.5, eur, locale)).toBe(intl(locale, 'EUR', 2, 2.3))
+    }
+  })
+
+  it('applies the rate exactly once and rounds to the currency decimals', () => {
+    expect(formatMoney(1.2345, eur, 'en')).toBe(intl('en', 'EUR', 2, 1.14))
+  })
+
+  it('honours the catalogue decimals, not the ISO default of the code', () => {
+    const eur3 = { code: 'EUR', decimals: 3, rate_per_usd: 0.92 }
+    expect(formatMoney(2.5, eur3, 'en')).toBe(intl('en', 'EUR', 3, 2.3))
+  })
+
+  it('renders zero as a plain zero amount', () => {
+    expect(formatMoney(0, eur, 'en')).toBe(intl('en', 'EUR', 2, 0))
+  })
+
+  it('handles a zero-decimal currency', () => {
+    expect(formatMoney(2.34, jpy, 'en')).toBe(intl('en', 'JPY', 0, 351))
+  })
+
+  it('keeps a sub-minor-unit amount visible with 2 significant digits, never zero', () => {
+    expect(formatMoney(0.0034, eur, 'en')).toBe(
+      new Intl.NumberFormat('en', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumSignificantDigits: 2,
+      }).format(0.0031)
+    )
+    expect(formatMoney(0.0034, eur, 'it')).toContain('0,0031')
+    expect(formatMoney(0.0087, usd, 'en')).toBe('$0.0087')
+  })
+
+  it('does not widen precision at or above one minor unit', () => {
+    expect(formatMoney(0.01, usd, 'en')).toBe('$0.01')
+    expect(formatMoney(2.34567, usd, 'en')).toBe('$2.35')
+  })
+
+  it('falls back to USD, never zero, without a usable currency or rate', () => {
+    const want = intl('en', 'USD', 2, 2.5)
+    expect(formatMoney(2.5, null, 'en')).toBe(want)
+    expect(formatMoney(2.5, undefined, 'en')).toBe(want)
+    expect(formatMoney(2.5, { code: 'EUR', decimals: 2, rate_per_usd: null }, 'en')).toBe(want)
+    expect(formatMoney(2.5, { code: 'EUR', decimals: 2, rate_per_usd: 0 }, 'en')).toBe(want)
+  })
+
+  it('does not crash on a negative amount', () => {
+    expect(formatMoney(-1, eur, 'en')).toBe(intl('en', 'EUR', 2, -0.92))
   })
 })

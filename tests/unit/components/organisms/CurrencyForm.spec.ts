@@ -68,6 +68,66 @@ describe('CurrencyForm', () => {
     expect((wrapper.get(SELECT).element as HTMLSelectElement).value).toBe('EUR')
   })
 
+  it('keeps a deactivated current currency selectable, listed first', async () => {
+    const wrapper = mountForm('GBP')
+    await flushPromises()
+
+    const select = wrapper.get(SELECT)
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['GBP', 'USD ($)', 'EUR (€)'])
+    expect((select.element as HTMLSelectElement).value).toBe('GBP')
+  })
+
+  it('does not duplicate a current currency that is still active', async () => {
+    const wrapper = mountForm('EUR')
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get(SELECT)
+        .findAll('option')
+        .map((o) => o.text())
+    ).toEqual(['USD ($)', 'EUR (€)'])
+  })
+
+  it('follows the organization prop when it changes (select)', async () => {
+    const wrapper = mountForm('USD')
+    await flushPromises()
+
+    await wrapper.setProps({ organization: { currency_code: 'EUR' } as never })
+
+    expect((wrapper.get(SELECT).element as HTMLSelectElement).value).toBe('EUR')
+  })
+
+  it('follows the organization prop when it changes (read-only)', async () => {
+    role.current = 'viewer'
+    const wrapper = mountForm('USD')
+    await flushPromises()
+
+    await wrapper.setProps({ organization: { currency_code: 'EUR' } as never })
+
+    expect(wrapper.get('[data-testid="currency-value"]').text()).toBe('EUR (€)')
+  })
+
+  it('does not clobber an unsaved selection when the prop is refreshed unchanged', async () => {
+    const wrapper = mountForm('USD')
+    await flushPromises()
+    await wrapper.get(SELECT).setValue('EUR')
+
+    await wrapper.setProps({ organization: { currency_code: 'USD' } as never })
+
+    expect((wrapper.get(SELECT).element as HTMLSelectElement).value).toBe('EUR')
+  })
+
+  it('does not clobber an unsaved selection when the prop changes underneath it', async () => {
+    const wrapper = mountForm('USD')
+    await flushPromises()
+    await wrapper.get(SELECT).setValue('EUR')
+
+    await wrapper.setProps({ organization: { currency_code: 'GBP' } as never })
+
+    expect((wrapper.get(SELECT).element as HTMLSelectElement).value).toBe('EUR')
+  })
+
   it('saves the selected code', async () => {
     const wrapper = mountForm('USD')
     await flushPromises()

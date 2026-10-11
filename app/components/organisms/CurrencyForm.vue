@@ -62,7 +62,7 @@
  * Options are the ACTIVE catalogue rows, labelled `code (symbol)` — the
  * catalogue carries no names and none are invented here.
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
@@ -91,6 +91,16 @@ const { t, te } = useI18n()
 const canUpdate = computed(() => can('organization.update'))
 
 const selected = ref(props.organization.currency_code)
+
+// Resync rule: follow the record when it changes AND the form is clean (the
+// selection still equals the value it was last synced to). An admin's unsaved
+// pick is never overwritten; after a save the new prop equals the pick anyway.
+watch(
+  () => props.organization.currency_code,
+  (next, previous) => {
+    if (selected.value === previous) selected.value = next
+  }
+)
 const error = ref<string | undefined>(undefined)
 const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
 const saving = ref(false)

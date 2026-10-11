@@ -103,6 +103,29 @@ describe('currency', () => {
       expect.objectContaining({ currency_code: 'USD' })
     )
   })
+
+  it('keeps a deactivated current currency selectable, listed first', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, currency_code: 'GBP' } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    const select = wrapper.get(sel('client-currency'))
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['GBP', 'USD ($)', 'EUR (€)'])
+    expect((select.element as HTMLSelectElement).value).toBe('GBP')
+  })
+
+  it('does not duplicate a current currency that is still active', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, currency_code: 'EUR' } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get(sel('client-currency'))
+        .findAll('option')
+        .map((o) => o.text())
+    ).toEqual(['USD ($)', 'EUR (€)'])
+  })
 })
 
 describe('create', () => {

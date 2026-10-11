@@ -72,6 +72,56 @@ export function formatUsdAmount(usd: number, locale: string): string {
   }).format(usd)
 }
 
+/** The slice of a catalogue currency `formatMoney` needs. */
+export interface MoneyCurrency {
+  code: string
+  decimals: number
+  rate_per_usd: number | null
+}
+
+/**
+ * A cost amount in the organization's display currency; `usd` is always the
+ * stored figure. One formatter, so every cost line renders the same shape and
+ * the symbol, its placement and spacing belong to `Intl`, never to copy keys.
+ *
+ * No usable currency (null, or a missing/non-positive rate) falls back to USD:
+ * never a guess, never zero. The conversion is `usd * rate_per_usd`, applied
+ * once, and the result rounds to the currency's `decimals`.
+ *
+ * Precision widens BELOW one minor unit and only there. One interview's
+ * conversation-LLM spend is routinely a fraction of a cent, and rounding it to
+ * the currency's decimals would show a real charge as zero, which reads as
+ * free. Zero is a price; "we did not run this model" is not, and that case
+ * arrives as `null` from the API and is rendered as absent by the caller.
+ * Below one minor unit it uses SIGNIFICANT digits, not a wider fixed count: a
+ * fixed count only moves the boundary at which a real charge reads as zero.
+ */
+export function formatMoney(
+  usd: number,
+  currency: MoneyCurrency | null | undefined,
+  locale: string
+): string {
+  const usable = currency && currency.rate_per_usd && currency.rate_per_usd > 0
+  const code = usable ? currency.code : 'USD'
+  const decimals = usable ? currency.decimals : 2
+  const amount = usable ? usd * currency.rate_per_usd! : usd
+
+  if (amount !== 0 && Math.abs(amount) < 10 ** -decimals) {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: code,
+      maximumSignificantDigits: 2,
+    }).format(amount)
+  }
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: code,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(amount)
+}
+
 /**
  * Competency mean (DESIGN.md §8.3): always at least 1 decimal (so a
  * whole-number mean like `4` renders `4.0`, never truncated-looking `4`),

@@ -123,6 +123,7 @@ const ADMIN_ONLY = new Set(['organization.update', 'users.viewAny', 'apiClients.
 const PLATFORM_ONLY = new Set([
   'llmCredentials.viewAny',
   'platformSettings.viewAny',
+  'currencies.manage',
   'clients.viewAny',
 ])
 
@@ -427,6 +428,28 @@ describe('pages/settings/index.vue', () => {
 
     expect(wrapper.text()).toContain('settings.tabs.platform')
     expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
+  })
+
+  // organization-currencies OC-07b.2: the catalogue section names its OWN
+  // ability. Granting only the other two platform abilities must not reveal
+  // it, and granting only `currencies.manage` must.
+  it('shows the currencies section only with currencies.manage', async () => {
+    mockOrganizationNotFound()
+    const grant = (granted: string[]) =>
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => ({
+          ensureLoaded: vi.fn().mockResolvedValue({ roles: [] }),
+          can: (ability: string) => ability === 'clients.viewAny' || granted.includes(ability),
+          user: ref({ is_superadmin: true }),
+        }),
+      }))
+
+    grant(['platformSettings.viewAny', 'llmCredentials.viewAny'])
+    expect((await mountSettings()).text()).not.toContain('settings.tabs.currencies')
+
+    vi.resetModules()
+    grant(['currencies.manage'])
+    expect((await mountSettings()).text()).toContain('settings.tabs.currencies')
   })
 
   it("and the other way round, so neither section can borrow the other's gate", async () => {

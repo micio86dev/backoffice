@@ -667,6 +667,77 @@
       }
     }
   },
+  "currencies": {
+    "title": "Catalogo valute",
+    "note": "I costi sono memorizzati in dollari USA. Ogni tasso è inserito qui a mano (non esiste un feed esterno) e le organizzazioni vedono importi convertiti solo come approssimazione.",
+    "new": "Aggiungi valuta",
+    "newTitle": "Aggiungi una valuta",
+    "editTitle": "Modifica {code}",
+    "create": "Aggiungi",
+    "empty": "Nessuna valuta.",
+    "table": {
+      "code": "Codice",
+      "symbol": "Simbolo",
+      "decimals": "Decimali",
+      "rate": "Tasso per 1 USD",
+      "asOf": "Data del tasso",
+      "status": "Stato",
+      "actions": "Azioni"
+    },
+    "field": {
+      "code": "Codice (tre lettere maiuscole)",
+      "symbol": "Simbolo",
+      "decimals": "Decimali (da 0 a 4)",
+      "rate": "Tasso per 1 USD (fino a sei decimali)",
+      "asOf": "Data del tasso"
+    },
+    "status": {
+      "active": "Attiva",
+      "inactive": "Non attiva",
+      "noRate": "Nessun tasso"
+    },
+    "edit": "Modifica",
+    "activate": "Attiva",
+    "deactivate": "Disattiva",
+    "delete": "Elimina",
+    "activationRequiresRate": "Imposta un tasso prima di attivare questa valuta.",
+    "usdFixed": "USD è la valuta di base: si può modificare solo il simbolo.",
+    "confirmDeactivateTitle": "Disattivare {code}?",
+    "confirmDeactivateDescription": "Le organizzazioni non potranno più scegliere questa valuta.",
+    "confirmDeleteTitle": "Eliminare {code}?",
+    "confirmDeleteDescription": "La valuta viene rimossa dal catalogo. L'operazione non si può annullare.",
+    "validation": {
+      "code": "Inserisci tre lettere maiuscole.",
+      "symbol": "Inserisci un simbolo di al massimo otto caratteri.",
+      "decimals": "Inserisci un numero intero da 0 a 4.",
+      "rate": "Inserisci un decimale positivo con al massimo sei decimali, usando il punto.",
+      "asOf": "Inserisci la data del tasso.",
+      "rateAndDate": "Il tasso e la sua data vanno insieme."
+    },
+    "saveError": "Non è stato possibile salvare la valuta. Riprova.",
+    "actionError": "Non è stato possibile applicare la modifica. Riprova.",
+    "error": {
+      "forbidden": "Non hai il permesso di gestire le valute.",
+      "notFound": "Questa valuta non esiste più. Ricarica l'elenco.",
+      "notReady": "Il catalogo è in uno stato in conflitto. Ricarica l'elenco e riprova."
+    },
+    "loadError": "Non è stato possibile caricare il catalogo valute.",
+    "conflict": {
+      "currency_in_use": "Un'organizzazione usa ancora questa valuta, quindi non può essere disattivata né eliminata.",
+      "currency_usd_immutable": "USD è la valuta di base: non può essere disattivata, eliminata né avere un altro tasso."
+    },
+    "serverError": {
+      "currency_code_invalid": "Il codice deve essere di tre lettere maiuscole.",
+      "currency_code_taken": "Questo codice è già nel catalogo.",
+      "currency_code_immutable": "Il codice non può essere modificato.",
+      "currency_symbol_invalid": "Il simbolo deve avere da 1 a 8 caratteri.",
+      "currency_decimals_invalid": "I decimali devono essere un numero intero da 0 a 4.",
+      "currency_rate_invalid": "Il tasso deve essere un decimale positivo con al massimo sei decimali.",
+      "currency_rate_as_of_invalid": "La data del tasso deve essere valida e non futura.",
+      "currency_active_invalid": "Il valore di attivazione non è valido.",
+      "currency_activation_requires_rate": "Imposta un tasso prima di attivare questa valuta."
+    }
+  },
   "settings": {
     "title": "Impostazioni",
     "subtitle": "Dati dell'organizzazione, credenziali di integrazione e accessi del team.",
@@ -677,7 +748,8 @@
       "users": "Utenti e ruoli",
       "llmCredentials": "Credenziali LLM di conversazione",
       "branding": "Aspetto",
-      "platform": "Piattaforma"
+      "platform": "Piattaforma",
+      "currencies": "Valute"
     },
     "sectionDescription": {
       "organization": "Nome e identificatore del tenant",
@@ -686,7 +758,8 @@
       "users": "Chi può accedere e cosa può fare",
       "llmCredentials": "La chiave API del fornitore su cui gira il modello dell'intervista",
       "branding": "Logo e colore del cliente, applicati a questo pannello e all'app del candidato.",
-      "platform": "Impostazioni valide per tutto BEAI. Visibili solo agli amministratori di piattaforma."
+      "platform": "Impostazioni valide per tutto BEAI. Visibili solo agli amministratori di piattaforma.",
+      "currencies": "Il catalogo delle valute e i loro tassi in USD. Visibile solo agli amministratori di piattaforma."
     },
     "organization": {
       "name": "Nome",

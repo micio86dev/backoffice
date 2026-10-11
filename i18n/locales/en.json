@@ -667,6 +667,77 @@
       }
     }
   },
+  "currencies": {
+    "title": "Currency catalogue",
+    "note": "Costs are stored in US dollars. Each rate is entered here by hand (there is no external feed) and organizations see converted amounts as approximate.",
+    "new": "Add currency",
+    "newTitle": "Add a currency",
+    "editTitle": "Edit {code}",
+    "create": "Add",
+    "empty": "No currencies yet.",
+    "table": {
+      "code": "Code",
+      "symbol": "Symbol",
+      "decimals": "Decimals",
+      "rate": "Rate per 1 USD",
+      "asOf": "Rate date",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "field": {
+      "code": "Code (three capital letters)",
+      "symbol": "Symbol",
+      "decimals": "Decimals (0 to 4)",
+      "rate": "Rate per 1 USD (up to six decimals)",
+      "asOf": "Rate date"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "noRate": "No rate"
+    },
+    "edit": "Edit",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "activationRequiresRate": "Set a rate before activating this currency.",
+    "usdFixed": "USD is the base currency: only its symbol can be changed.",
+    "confirmDeactivateTitle": "Deactivate {code}?",
+    "confirmDeactivateDescription": "Organizations can no longer choose this currency.",
+    "confirmDeleteTitle": "Delete {code}?",
+    "confirmDeleteDescription": "The currency is removed from the catalogue. This cannot be undone.",
+    "validation": {
+      "code": "Enter three capital letters.",
+      "symbol": "Enter a symbol of up to eight characters.",
+      "decimals": "Enter a whole number from 0 to 4.",
+      "rate": "Enter a positive decimal with up to six decimals, using a dot.",
+      "asOf": "Enter the date of the rate.",
+      "rateAndDate": "A rate and its date go together."
+    },
+    "saveError": "The currency could not be saved. Please try again.",
+    "actionError": "The change could not be applied. Please try again.",
+    "error": {
+      "forbidden": "You do not have permission to manage currencies.",
+      "notFound": "This currency no longer exists. Reload the list.",
+      "notReady": "The catalogue is in a conflicting state. Reload the list and try again."
+    },
+    "loadError": "The currency catalogue could not be loaded.",
+    "conflict": {
+      "currency_in_use": "An organization still uses this currency, so it cannot be deactivated or deleted.",
+      "currency_usd_immutable": "USD is the base currency and cannot be deactivated, deleted or given another rate."
+    },
+    "serverError": {
+      "currency_code_invalid": "The code must be three capital letters.",
+      "currency_code_taken": "This code is already in the catalogue.",
+      "currency_code_immutable": "The code cannot be changed.",
+      "currency_symbol_invalid": "The symbol must be 1 to 8 characters.",
+      "currency_decimals_invalid": "Decimals must be a whole number from 0 to 4.",
+      "currency_rate_invalid": "The rate must be a positive decimal with up to six decimals.",
+      "currency_rate_as_of_invalid": "The rate date must be a valid date, not in the future.",
+      "currency_active_invalid": "The active flag is not valid.",
+      "currency_activation_requires_rate": "Set a rate before activating this currency."
+    }
+  },
   "settings": {
     "title": "Settings",
     "subtitle": "Organization details, integration credentials and team access.",
@@ -677,7 +748,8 @@
       "users": "Users & roles",
       "llmCredentials": "Conversation LLM credentials",
       "branding": "Appearance",
-      "platform": "Platform"
+      "platform": "Platform",
+      "currencies": "Currencies"
     },
     "sectionDescription": {
       "organization": "Name and tenancy identifier",
@@ -686,7 +758,8 @@
       "users": "Who can sign in, and what they are allowed to do",
       "llmCredentials": "The vendor API key the interview model runs on",
       "branding": "The client's logo and colour, applied to this panel and to the candidate app.",
-      "platform": "BEAI-wide settings. Visible to platform administrators only."
+      "platform": "BEAI-wide settings. Visible to platform administrators only.",
+      "currencies": "The currency catalogue and its USD rates. Visible to platform administrators only."
     },
     "organization": {
       "name": "Name",

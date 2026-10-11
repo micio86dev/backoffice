@@ -117,6 +117,10 @@ export function abilitiesForRole(input: MirroredIdentityInput | TenantRole): Abi
     // four abilities the API refuses — the exact permissive drift this file's
     // own docblock describes for `avatarTemplates.create`, one group over.
     llmCredentials: { viewAny: platform, create: platform, update: platform, delete: platform },
+    // The currency catalogue is platform data: only the superadmin manages it
+    // (`manageCurrencies` Gate, `currencies.manage`); organization admins merely
+    // pick an active currency for their own organization.
+    currencies: { manage: platform },
     avatarTemplates: {
       viewAny: admin,
       create: platform,

@@ -97,6 +97,34 @@
           </FieldError>
         </Field>
 
+        <Field :data-invalid="Boolean(currencyError)">
+          <FieldLabel for="client-currency">{{ $t('settings.currency.label') }}</FieldLabel>
+          <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+          <select
+            id="client-currency"
+            v-model="currencyCode"
+            data-testid="client-currency"
+            autocomplete="off"
+            :class="formSelectClass"
+            :aria-invalid="Boolean(currencyError)"
+            :aria-describedby="describedBy('client-currency', Boolean(currencyError))"
+          >
+            <option v-for="code in currencyCodes" :key="code" :value="code">
+              {{ currencyLabel(code) }}
+            </option>
+          </select>
+          <FieldDescription id="client-currency-help">
+            {{ $t('settings.currency.help') }}
+          </FieldDescription>
+          <FieldError
+            v-if="currencyError"
+            id="client-currency-error"
+            data-testid="client-currency-error"
+          >
+            {{ currencyError }}
+          </FieldError>
+        </Field>
+
         <FormMessage
           v-if="formMessage"
           kind="error"
@@ -130,8 +158,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
+import { formSelectClass } from '@/components/ui/form-control'
 import FormMessage from '@/components/molecules/FormMessage.vue'
 import { useSuperadmin } from '@/composables/useSuperadmin'
+import { useCurrencies } from '@/composables/useCurrencies'
 import { BRAND_PRIMARY, HEX } from '@/utils/brand'
 import { applyServerFieldErrors } from '@/utils/http-error'
 import { translateServerCodes } from '@/utils/server-message'
@@ -160,19 +190,44 @@ const isEdit = computed(() => props.clientId !== undefined)
 const name = ref('')
 const slug = ref('')
 const color = ref('')
+// USD is the platform anchor and the column default (organization-currencies).
+const currencyCode = ref('USD')
 
 const nameError = ref<string | undefined>(undefined)
 const slugError = ref<string | undefined>(undefined)
 const colorError = ref<string | undefined>(undefined)
+const currencyError = ref<string | undefined>(undefined)
 const formMessage = ref<string | null>(null)
 
 const loading = ref(isEdit.value)
 const loadFailed = ref(false)
 const saving = ref(false)
 
+const { currencies, ensureLoaded: loadCurrencies } = useCurrencies()
+
+// A currency deactivated after being chosen is no longer listed; keep the
+// current value selectable so the control never shows a blank.
+const currencyCodes = computed(() => {
+  const active = (currencies.value ?? []).map((c) => c.code)
+
+  return active.includes(currencyCode.value) ? active : [currencyCode.value, ...active]
+})
+
+function currencyLabel(code: string): string {
+  const symbol = currencies.value?.find((c) => c.code === code)?.symbol
+
+  return symbol === undefined ? code : `${code} (${symbol})`
+}
+
 watch(saving, (value) => emit('update:pending', value), { immediate: true })
 
 onMounted(async () => {
+  // A failed catalogue fetch leaves only USD selectable (which the API always
+  // accepts), and says so rather than looking like a confident short list.
+  void loadCurrencies().catch(() => {
+    formMessage.value = t('settings.currency.loadError')
+  })
+
   if (props.clientId === undefined) return
 
   try {
@@ -180,6 +235,7 @@ onMounted(async () => {
     name.value = data.name
     slug.value = data.slug
     color.value = data.primary_color ?? ''
+    currencyCode.value = data.currency_code ?? 'USD'
   } catch {
     // Never a form the operator could save blind: a name and colour that were
     // never loaded would overwrite the real ones with blanks.
@@ -235,18 +291,22 @@ function onColorPicked(event: Event): void {
 function showServerError(error: unknown): void {
   const unmapped = applyServerFieldErrors(
     error,
-    { name: 'name', slug: 'slug', primary_color: 'color' } as const,
+    { name: 'name', slug: 'slug', primary_color: 'color', currency_code: 'currency' } as const,
     (key, message) => {
       const translated = translateServerCodes({ t, te }, 'clients.form.serverError', [message])[0]
 
       if (key === 'name') nameError.value = translated
       else if (key === 'slug') slugError.value = translated
-      else colorError.value = translated
+      else if (key === 'color') colorError.value = translated
+      else currencyError.value = translated
     }
   )
 
   const mapped =
-    nameError.value !== undefined || slugError.value !== undefined || colorError.value !== undefined
+    nameError.value !== undefined ||
+    slugError.value !== undefined ||
+    colorError.value !== undefined ||
+    currencyError.value !== undefined
 
   if (unmapped !== null && unmapped.length > 0) {
     formMessage.value = translateServerCodes({ t, te }, 'clients.form.serverError', unmapped).join(
@@ -259,6 +319,7 @@ function showServerError(error: unknown): void {
 
 async function onSubmit(): Promise<void> {
   formMessage.value = null
+  currencyError.value = undefined
 
   // Every validator runs, so an operator with two problems sees both.
   const nameOk = validateName()
@@ -273,6 +334,7 @@ async function onSubmit(): Promise<void> {
       const created = await createClient({
         name: name.value.trim(),
         ...(slug.value === '' ? {} : { slug: slug.value }),
+        currency_code: currencyCode.value,
       })
       targetId.value = created.data.id
 
@@ -281,6 +343,7 @@ async function onSubmit(): Promise<void> {
       await updateClient(targetId.value, {
         name: name.value.trim(),
         primary_color: color.value === '' ? null : color.value,
+        currency_code: currencyCode.value,
       })
     }
 

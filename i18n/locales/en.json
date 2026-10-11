@@ -702,6 +702,16 @@
         "name_too_long": "The organization name is too long."
       }
     },
+    "currency": {
+      "label": "Display currency",
+      "help": "Costs are stored in US dollars and shown here converted at the platform rate. This changes the display only.",
+      "saved": "The display currency was saved.",
+      "saveError": "The display currency could not be saved. Please try again.",
+      "loadError": "The list of currencies could not be loaded. Reload the page to try again.",
+      "serverError": {
+        "currency_unavailable": "This currency is not available. Choose one from the list."
+      }
+    },
     "webhooks": {
       "url": "Default webhook URL",
       "secret": "Default webhook secret",
@@ -1680,7 +1690,8 @@
         "name_required": "Enter a name.",
         "slug_taken": "This identifier is already used by another client.",
         "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
-        "primary_color_invalid": "Enter a colour as #RRGGBB."
+        "primary_color_invalid": "Enter a colour as #RRGGBB.",
+        "currency_unavailable": "This currency is not available. Choose one from the list."
       },
       "saveError": "Could not save the client. Please try again."
     }

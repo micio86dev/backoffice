@@ -137,6 +137,8 @@ async function expectConverted(
   noteScope: ReturnType<Page['getByTestId']>,
   usd: number
 ): Promise<void> {
+  // Plain float product: exact for every fixture amount used here (12, 8, 4, 2, 0.5 at
+  // 0.9); a new amount sitting on a half-cent boundary would need the app's own rounding.
   const eur = await expectedMoney(page, usd * 0.9, 'EUR')
 
   // The figure itself is `≈ <euro>` and spoken as "circa <euro>"; the original

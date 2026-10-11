@@ -12,6 +12,25 @@ import { ref } from 'vue'
 import SessionReviewPanel from '../../../../app/components/organisms/SessionReviewPanel.vue'
 import { withTooltipProvider } from '../../support/tooltip-host'
 
+// `useMoney` reads the organization currency and the catalogue; both are
+// driven from here so no spec reaches the network. USD (no row) by default.
+const currencyCode = ref<string | null | undefined>('USD')
+const catalogue = ref<unknown[] | null>([])
+vi.mock('../../../../app/composables/useOrganization', () => ({
+  useOrganization: () => ({ currencyCode }),
+}))
+vi.mock('../../../../app/composables/useCurrencies', () => ({
+  useCurrencies: () => ({ currencies: catalogue, ensureLoaded: () => Promise.resolve([]) }),
+}))
+
+const intl = (code: string, value: number, digits = 2) =>
+  new Intl.NumberFormat('it', {
+    style: 'currency',
+    currency: code,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value)
+
 // Interpolates, so a cost figure can be asserted on. Keys that take no params
 // still render as the bare key, which is what the existing assertions below
 // match on. `setup.ts`'s global `useI18n` drops params by design; a spec that
@@ -20,6 +39,8 @@ const tMock = (key: string, params?: Record<string, unknown>) =>
   params === undefined ? key : `${key}:${JSON.stringify(params)}`
 
 beforeEach(() => {
+  currencyCode.value = 'USD'
+  catalogue.value = []
   vi.stubGlobal(
     'useI18n',
     vi.fn(() => ({ t: tMock, te: () => true, locale: ref('it') }))
@@ -231,6 +252,15 @@ describe('SessionReviewPanel — coverage honesty', () => {
     expect(wrapper.find('[data-testid="integrity-coverage-warning"]').exists()).toBe(false)
   })
 
+  it('renders when coverage is incomplete but the layer list is missing', async () => {
+    const integrity = { ...review().integrity, band: null, coverage_complete: false }
+    delete (integrity as Record<string, unknown>)['unavailable_layers']
+
+    const wrapper = await mountPanel({ ...review(), integrity })
+
+    expect(wrapper.find('[data-testid="integrity-coverage-warning"]').exists()).toBe(true)
+  })
+
   it('does not warn against an API that predates the coverage fields', async () => {
     // `undefined` means "this server has no opinion about coverage", not
     // "coverage was incomplete". Warning on every session during a version skew
@@ -278,9 +308,9 @@ describe('SessionReviewPanel — conversation-LLM cost', () => {
     // provider, the LLM line names the conversation model.
     expect(avatar.text()).toContain('review.cost.avatarMeter')
     expect(avatar.text()).toContain('heygen')
-    expect(avatar.text()).toContain('2,00')
+    expect(avatar.text()).toContain(intl('USD', 2))
     expect(llm.text()).toContain('review.cost.llmEstimated')
-    expect(llm.text()).toContain('0,50')
+    expect(llm.text()).toContain(intl('USD', 0.5))
   })
 
   // Rule 1.
@@ -324,7 +354,7 @@ describe('SessionReviewPanel — conversation-LLM cost', () => {
 
     const actual = wrapper.get('[data-testid="cost-llm-actual"]')
     expect(actual.text()).toContain('review.cost.llmActual')
-    expect(actual.text()).toContain('0,42')
+    expect(actual.text()).toContain(intl('USD', 0.42))
   })
 
   // Rule 4.
@@ -357,5 +387,75 @@ describe('SessionReviewPanel — conversation-LLM cost', () => {
       'review.cost.llmEstimated'
     )
     expect(wrapper.text()).toContain('help.glossary.llmCost.definition')
+  })
+})
+
+/**
+ * organization-currencies (OC-06): a EUR organization sees euros, marked
+ * approximate, with a visible note an operator can reconcile against a USD
+ * invoice. The conversion is applied exactly once per line.
+ */
+describe('SessionReviewPanel — organization currency', () => {
+  const eurRow = {
+    code: 'EUR',
+    symbol: '€',
+    decimals: 2,
+    rate_per_usd: '0.920000',
+    rate_as_of: '2026-10-01',
+    is_active: true,
+  }
+
+  it('renders each line in EUR with the approximation marker and its visible note', () => {
+    currencyCode.value = 'EUR'
+    catalogue.value = [eurRow]
+
+    const wrapper = mountPanel(
+      review({
+        cost: {
+          avatar: { provider: 'heygen', minutes: 10, usd: 2 },
+          llm: { estimated_usd: 0.5, actual_usd: 0.42 },
+          is_estimate: true as const,
+        },
+      })
+    )
+
+    const approx = (usd: number) =>
+      `money.approximate:${JSON.stringify({ amount: intl('EUR', usd * 0.92) })}`
+    expect(wrapper.get('[data-testid="cost-avatar"]').text()).toContain(approx(2))
+    expect(wrapper.get('[data-testid="cost-llm-estimated"]').text()).toContain(approx(0.5))
+    expect(wrapper.get('[data-testid="cost-llm-actual"]').text()).toContain(approx(0.42))
+
+    // Every converted line states its own original USD figure, the rate and the date.
+    for (const [id, usd] of [
+      ['cost-avatar-note', 2],
+      ['cost-llm-estimated-note', 0.5],
+      ['cost-llm-actual-note', 0.42],
+    ] as const) {
+      const note = wrapper.get(`[data-testid="${id}"]`).text()
+      expect(note).toContain('money.convertedNote')
+      expect(note).toContain(JSON.stringify(intl('USD', usd)).slice(1, -1))
+      expect(note).toContain('"code":"EUR"')
+      expect(note).toContain('"rate":"0,92"')
+      expect(note).toContain('1 ott 2026')
+    }
+  })
+
+  it('gives the converted amount an accessible spoken label', () => {
+    currencyCode.value = 'EUR'
+    catalogue.value = [eurRow]
+
+    const label = mountPanel(review())
+      .get('[data-testid="cost-avatar"] [aria-label]')
+      .attributes('aria-label')
+
+    expect(label).toBe(`money.approximateLabel:${JSON.stringify({ amount: intl('EUR', 1.84) })}`)
+  })
+
+  it('shows no approximation, label or note for a USD organization', () => {
+    const wrapper = mountPanel(review())
+
+    expect(wrapper.text()).not.toContain('money.approximate')
+    expect(wrapper.find('[data-testid="cost-avatar-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="cost-avatar"] [aria-label]').exists()).toBe(false)
   })
 })

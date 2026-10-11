@@ -4,7 +4,7 @@
       Facts first: an operator opening a review wants to know what ran, for how
       long, and roughly what it cost, before being shown anything interpretive.
     -->
-    <section class="grid gap-4 md:grid-cols-3" aria-label="">
+    <section class="grid gap-4 md:grid-cols-3">
       <MetricCard :label="$t('review.duration')" :value="durationLabel" />
       <MetricCard :label="$t('review.provider')" :value="review.provider" />
       <MetricCard :label="$t('review.status')" :value="review.status" />
@@ -39,7 +39,19 @@
           <dt class="text-sm text-muted-foreground">
             {{ $t('review.cost.avatarMeter', { provider: review.provider }) }}
           </dt>
-          <dd class="text-sm font-medium text-foreground">{{ avatarCostLabel }}</dd>
+          <dd class="text-sm font-medium text-foreground">
+            <span
+              :role="avatarSpoken ? 'img' : undefined"
+              :aria-label="avatarSpoken ?? undefined"
+              >{{ avatarCostLabel }}</span
+            >
+            <span
+              v-if="avatarNote"
+              class="block text-xs font-normal text-muted-foreground"
+              data-testid="cost-avatar-note"
+              >{{ avatarNote }}</span
+            >
+          </dd>
         </div>
 
         <!--
@@ -70,7 +82,19 @@
           data-testid="cost-llm-estimated"
         >
           <dt class="text-sm text-muted-foreground">{{ $t('review.cost.llmEstimated') }}</dt>
-          <dd class="text-sm font-medium text-foreground">{{ llmEstimatedLabel }}</dd>
+          <dd class="text-sm font-medium text-foreground">
+            <span
+              :role="llmEstimatedSpoken ? 'img' : undefined"
+              :aria-label="llmEstimatedSpoken ?? undefined"
+              >{{ llmEstimatedLabel }}</span
+            >
+            <span
+              v-if="llmEstimatedNote"
+              class="block text-xs font-normal text-muted-foreground"
+              data-testid="cost-llm-estimated-note"
+              >{{ llmEstimatedNote }}</span
+            >
+          </dd>
         </div>
 
         <!--
@@ -86,7 +110,19 @@
           data-testid="cost-llm-actual"
         >
           <dt class="text-sm text-muted-foreground">{{ $t('review.cost.llmActual') }}</dt>
-          <dd class="text-sm font-medium text-foreground">{{ llmActualLabel }}</dd>
+          <dd class="text-sm font-medium text-foreground">
+            <span
+              :role="llmActualSpoken ? 'img' : undefined"
+              :aria-label="llmActualSpoken ?? undefined"
+              >{{ llmActualLabel }}</span
+            >
+            <span
+              v-if="llmActualNote"
+              class="block text-xs font-normal text-muted-foreground"
+              data-testid="cost-llm-actual-note"
+              >{{ llmActualNote }}</span
+            >
+          </dd>
         </div>
       </dl>
     </section>
@@ -134,7 +170,7 @@
         data-testid="integrity-coverage-warning"
       >
         {{ $t('review.integrity.coverageIncomplete') }}
-        <span v-if="review.integrity.unavailable_layers.length > 0">
+        <span v-if="(review.integrity.unavailable_layers?.length ?? 0) > 0">
           {{ $t('review.integrity.unavailableLayers', { layers: unavailableLayerLabels }) }}
         </span>
       </p>
@@ -217,7 +253,8 @@ import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import HelpTip from '@/components/atoms/HelpTip.vue'
 import MetricCard from '@/components/molecules/MetricCard.vue'
-import { formatDate, formatDuration, formatUsdAmount } from '@/utils/format'
+import { formatDate, formatDuration } from '@/utils/format'
+import { useMoney } from '@/composables/useMoney'
 import type { IntegrityEventRow, SessionReview } from '@/composables/useSessionReview'
 
 const props = defineProps<{
@@ -254,6 +291,8 @@ const unavailableLayerLabels = computed(() =>
 
 const durationLabel = computed(() => formatDuration(props.review.duration_seconds, t))
 
+const { money, moneyLabel, moneyNote } = useMoney()
+
 // Always the word "estimate": no provider exposes a per-session billed amount,
 // and an operator who reads this as an invoice line will reconcile it against a
 // real bill and find a discrepancy that was never a defect.
@@ -261,18 +300,19 @@ const durationLabel = computed(() => formatDuration(props.review.duration_second
 // One formatter for every cost figure on this panel. Two meters rendered by
 // two different code paths drift into two different shapes, and a reader
 // comparing them then has to work out whether the difference is in the money
-// or in the formatting.
-function costLabel(usd: number): string {
-  return t('review.costValue', { usd: formatUsdAmount(usd, props.locale) })
-}
+// or in the formatting. A missing figure is a dash, never 0: an unpriceable
+// session is not a free one. Each converted line carries its own visible note
+// (the original USD figure), so any line can be reconciled against an invoice.
+type Usd = number | null | undefined
 
-const avatarCostLabel = computed(() => {
-  const avatar = props.review.cost.avatar
-  // A dash, never 0 — an unpriceable session is not a free one.
-  if (avatar === null) return '–'
+const costLabel = (usd: Usd) => (usd == null ? '–' : money(usd))
+const costSpoken = (usd: Usd) => (usd == null ? null : moneyLabel(usd))
+const costNote = (usd: Usd) => (usd == null ? null : moneyNote(usd))
 
-  return costLabel(avatar.usd)
-})
+const avatarUsd = computed(() => props.review.cost.avatar?.usd)
+const avatarCostLabel = computed(() => costLabel(avatarUsd.value))
+const avatarSpoken = computed(() => costSpoken(avatarUsd.value))
+const avatarNote = computed(() => costNote(avatarUsd.value))
 
 /**
  * The session's conversation-LLM spend, as a TOTAL for the session.
@@ -283,20 +323,16 @@ const avatarCostLabel = computed(() => {
  * arithmetically meaningless, and worse, an operator would multiply it by a
  * session length and get a confidently wrong answer.
  */
-const llmEstimatedLabel = computed(() => {
-  const usd = props.review.cost.llm?.estimated_usd
-  if (usd === null || usd === undefined) return '–'
-
-  return costLabel(usd)
-})
+const llmEstimatedUsd = computed(() => props.review.cost.llm?.estimated_usd)
+const llmEstimatedLabel = computed(() => costLabel(llmEstimatedUsd.value))
+const llmEstimatedSpoken = computed(() => costSpoken(llmEstimatedUsd.value))
+const llmEstimatedNote = computed(() => costNote(llmEstimatedUsd.value))
 
 /** Present only in a future non-managed mode; see the template comment. */
-const llmActualLabel = computed(() => {
-  const usd = props.review.cost.llm?.actual_usd
-  if (usd === null || usd === undefined) return '–'
-
-  return formatUsdAmount(usd, props.locale)
-})
+const llmActualUsd = computed(() => props.review.cost.llm?.actual_usd)
+const llmActualLabel = computed(() => costLabel(llmActualUsd.value))
+const llmActualSpoken = computed(() => costSpoken(llmActualUsd.value))
+const llmActualNote = computed(() => costNote(llmActualUsd.value))
 
 function durationOf(event: IntegrityEventRow): number | null {
   const ms = event.payload?.durationMs

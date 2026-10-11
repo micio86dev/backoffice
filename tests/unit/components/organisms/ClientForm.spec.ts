@@ -8,6 +8,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import ClientForm from '../../../../app/components/organisms/ClientForm.vue'
 
 const createClientMock = vi.fn()
@@ -19,6 +20,18 @@ vi.mock('@/composables/useSuperadmin', () => ({
     createClient: createClientMock,
     fetchClient: fetchClientMock,
     updateClient: updateClientMock,
+  }),
+}))
+
+const ensureLoadedMock = vi.fn()
+
+vi.mock('@/composables/useCurrencies', () => ({
+  useCurrencies: () => ({
+    currencies: ref([
+      { code: 'USD', symbol: '$', decimals: 2, rate_per_usd: '1', rate_as_of: '2026-10-01' },
+      { code: 'EUR', symbol: '€', decimals: 2, rate_per_usd: '0.89', rate_as_of: '2026-10-01' },
+    ]),
+    ensureLoaded: ensureLoadedMock,
   }),
 }))
 
@@ -40,9 +53,79 @@ const EXISTING = {
 }
 
 beforeEach(() => {
+  ensureLoadedMock.mockReset().mockResolvedValue([])
   createClientMock.mockReset().mockResolvedValue({ data: { id: 9 } })
   fetchClientMock.mockReset().mockResolvedValue(EXISTING)
   updateClientMock.mockReset().mockResolvedValue(EXISTING)
+})
+
+describe('currency', () => {
+  it('offers the active currencies on create, defaulting to USD, and sends the choice', async () => {
+    const wrapper = mountForm()
+    await flushPromises()
+
+    const select = wrapper.get(sel('client-currency'))
+    expect((select.element as HTMLSelectElement).value).toBe('USD')
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['USD ($)', 'EUR (€)'])
+
+    await wrapper.get(sel('client-name')).setValue('Acme Spa')
+    await select.setValue('EUR')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(createClientMock).toHaveBeenCalledWith({ name: 'Acme Spa', currency_code: 'EUR' })
+  })
+
+  it('says so when the catalogue cannot be loaded', async () => {
+    ensureLoadedMock.mockRejectedValue(new Error('500'))
+    const wrapper = mountForm()
+    await flushPromises()
+
+    expect(wrapper.get(sel('client-form-banner')).text()).toContain('settings.currency.loadError')
+  })
+
+  it('preselects the loaded currency on edit and sends the change', async () => {
+    fetchClientMock.mockResolvedValue({
+      data: { ...EXISTING.data, currency_code: 'EUR' },
+    })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    const select = wrapper.get(sel('client-currency'))
+    expect((select.element as HTMLSelectElement).value).toBe('EUR')
+
+    await select.setValue('USD')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateClientMock).toHaveBeenCalledWith(
+      4,
+      expect.objectContaining({ currency_code: 'USD' })
+    )
+  })
+
+  it('keeps a deactivated current currency selectable, listed first', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, currency_code: 'GBP' } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    const select = wrapper.get(sel('client-currency'))
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['GBP', 'USD ($)', 'EUR (€)'])
+    expect((select.element as HTMLSelectElement).value).toBe('GBP')
+  })
+
+  it('does not duplicate a current currency that is still active', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, currency_code: 'EUR' } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get(sel('client-currency'))
+        .findAll('option')
+        .map((o) => o.text())
+    ).toEqual(['USD ($)', 'EUR (€)'])
+  })
 })
 
 describe('create', () => {
@@ -63,7 +146,11 @@ describe('create', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(createClientMock).toHaveBeenCalledWith({ name: 'Acme Spa', slug: 'acme' })
+    expect(createClientMock).toHaveBeenCalledWith({
+      name: 'Acme Spa',
+      slug: 'acme',
+      currency_code: 'USD',
+    })
     expect(wrapper.emitted('saved')).toHaveLength(1)
   })
 
@@ -74,7 +161,7 @@ describe('create', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(createClientMock).toHaveBeenCalledWith({ name: 'Acme Spa' })
+    expect(createClientMock).toHaveBeenCalledWith({ name: 'Acme Spa', currency_code: 'USD' })
   })
 
   it('sets the colour after creating, because the create endpoint takes none', async () => {
@@ -85,7 +172,7 @@ describe('create', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(createClientMock).toHaveBeenCalledWith({ name: 'Acme Spa' })
+    expect(createClientMock).toHaveBeenCalledWith({ name: 'Acme Spa', currency_code: 'USD' })
     expect(updateClientMock).toHaveBeenCalledWith(9, { primary_color: '#AABBCC' })
     expect(wrapper.emitted('saved')).toHaveLength(1)
   })
@@ -201,6 +288,7 @@ describe('edit', () => {
     expect(updateClientMock).toHaveBeenCalledWith(4, {
       name: 'Quint Group',
       primary_color: '#445566',
+      currency_code: 'USD',
     })
     expect(createClientMock).not.toHaveBeenCalled()
     expect(wrapper.emitted('saved')).toHaveLength(1)
@@ -214,7 +302,11 @@ describe('edit', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(updateClientMock).toHaveBeenCalledWith(4, { name: 'Quint', primary_color: null })
+    expect(updateClientMock).toHaveBeenCalledWith(4, {
+      name: 'Quint',
+      primary_color: null,
+      currency_code: 'USD',
+    })
   })
 
   it('shows a server colour refusal under the colour field', async () => {

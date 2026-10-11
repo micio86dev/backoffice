@@ -1,8 +1,9 @@
 <template>
-  <form data-testid="organization-profile-form" novalidate @submit.prevent="onSubmit">
-    <FormFieldset :disabled="saving">
-      <FieldGroup>
-        <!--
+  <div class="flex flex-col gap-8">
+    <form data-testid="organization-profile-form" novalidate @submit.prevent="onSubmit">
+      <FormFieldset :disabled="saving">
+        <FieldGroup>
+          <!--
           Read-only values are a DESCRIPTION LIST, not a mislabelled control.
 
           Both fields here state a fact rather than accept input, and both used
@@ -16,17 +17,17 @@
           exactly this — term and value, associated by structure, announced as
           a pair with no ARIA and no `for` to get wrong.
         -->
-        <Field>
-          <dl class="flex flex-col gap-1">
-            <dt class="text-sm font-medium">{{ $t('settings.organization.slug') }}</dt>
-            <dd class="text-muted-foreground text-sm" data-testid="organization-profile-slug">
-              {{ organization.slug }}
-            </dd>
-          </dl>
-          <FieldDescription>{{ $t('settings.organization.slugReadOnly') }}</FieldDescription>
-        </Field>
+          <Field>
+            <dl class="flex flex-col gap-1">
+              <dt class="text-sm font-medium">{{ $t('settings.organization.slug') }}</dt>
+              <dd class="text-muted-foreground text-sm" data-testid="organization-profile-slug">
+                {{ organization.slug }}
+              </dd>
+            </dl>
+            <FieldDescription>{{ $t('settings.organization.slugReadOnly') }}</FieldDescription>
+          </Field>
 
-        <!--
+          <!--
           Editable for an admin, a stated FACT for everyone else — the same
           shape the slug above has always had.
 
@@ -37,58 +38,61 @@
           whole section would have been the wrong correction: the
           organization's own name is worth reading, and it is not privileged.
         -->
-        <Field v-if="!canUpdate">
-          <dl class="flex flex-col gap-1">
-            <dt class="text-sm font-medium">{{ $t('settings.organization.name') }}</dt>
-            <dd class="text-muted-foreground text-sm" data-testid="organization-profile-name">
-              {{ organization.name }}
-            </dd>
-          </dl>
-        </Field>
+          <Field v-if="!canUpdate">
+            <dl class="flex flex-col gap-1">
+              <dt class="text-sm font-medium">{{ $t('settings.organization.name') }}</dt>
+              <dd class="text-muted-foreground text-sm" data-testid="organization-profile-name">
+                {{ organization.name }}
+              </dd>
+            </dl>
+          </Field>
 
-        <Field v-else :data-invalid="Boolean(error)">
-          <FieldLabel for="organization-profile-name">{{
-            $t('settings.organization.name')
-          }}</FieldLabel>
-          <Input
-            id="organization-profile-name"
-            v-model="name"
-            autocomplete="off"
-            :aria-invalid="Boolean(error)"
-            :aria-describedby="describedBy"
-            data-testid="organization-profile-name"
-            @blur="validateName"
+          <Field v-else :data-invalid="Boolean(error)">
+            <FieldLabel for="organization-profile-name">{{
+              $t('settings.organization.name')
+            }}</FieldLabel>
+            <Input
+              id="organization-profile-name"
+              v-model="name"
+              autocomplete="off"
+              :aria-invalid="Boolean(error)"
+              :aria-describedby="describedBy"
+              data-testid="organization-profile-name"
+              @blur="validateName"
+            />
+            <FieldDescription id="organization-profile-name-help">
+              {{ $t('settings.organization.help.name') }}
+            </FieldDescription>
+            <FieldError
+              v-if="error"
+              id="organization-profile-name-error"
+              data-testid="organization-profile-name-error"
+            >
+              {{ error }}
+            </FieldError>
+          </Field>
+
+          <FormMessage
+            v-if="formMessage"
+            :kind="formMessage.kind"
+            :text="formMessage.text"
+            test-id="organization-profile-banner"
           />
-          <FieldDescription id="organization-profile-name-help">
-            {{ $t('settings.organization.help.name') }}
-          </FieldDescription>
-          <FieldError
-            v-if="error"
-            id="organization-profile-name-error"
-            data-testid="organization-profile-name-error"
+
+          <Button
+            v-if="canUpdate"
+            type="submit"
+            :loading="saving"
+            data-testid="organization-profile-submit"
           >
-            {{ error }}
-          </FieldError>
-        </Field>
+            {{ $t('projects.action.save') }}
+          </Button>
+        </FieldGroup>
+      </FormFieldset>
+    </form>
 
-        <FormMessage
-          v-if="formMessage"
-          :kind="formMessage.kind"
-          :text="formMessage.text"
-          test-id="organization-profile-banner"
-        />
-
-        <Button
-          v-if="canUpdate"
-          type="submit"
-          :loading="saving"
-          data-testid="organization-profile-submit"
-        >
-          {{ $t('projects.action.save') }}
-        </Button>
-      </FieldGroup>
-    </FormFieldset>
-  </form>
+    <CurrencyForm :organization="organization" @saved="emit('saved')" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -101,6 +105,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
+import CurrencyForm from '@/components/organisms/CurrencyForm.vue'
 import { useOrganization, type OrganizationRecord } from '@/composables/useOrganization'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { applyServerFieldErrors } from '@/utils/http-error'

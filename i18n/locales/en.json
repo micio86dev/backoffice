@@ -129,8 +129,7 @@
       "latency": "AI latency (p50 / p95)",
       "latencyValue": "{p50} / {p95}",
       "cost": "AI & avatar spend",
-      "costValue": "{currency} {usd}",
-      "costBreakdown": "Scoring {currency} {scoring} · Interview {currency} {conversation}",
+      "costBreakdown": "Scoring {scoring} · Interview {conversation}",
       "noData": "No data yet",
       "notMeasured": "not measured",
       "latencyMs": "{value} ms"
@@ -179,7 +178,7 @@
     },
     "detail": {
       "backToList": "Back to candidates",
-      "language": "Language",
+      "identity": "{ref} · {role} · Language: {language}",
       "reusableLink": "Started from reusable link: {label}",
       "reusableLinkUnlabelled": "Started from reusable link",
       "timeline": {
@@ -198,6 +197,7 @@
       "interview": {
         "title": "Interview",
         "progress": "Progress",
+        "progressValue": "{done} / {total}",
         "elapsed": "Elapsed time",
         "elapsedCoverage": "{counted} of {total} sessions counted",
         "costCoverage": "{estimated} of {total} sessions estimated"
@@ -667,6 +667,78 @@
       }
     }
   },
+  "currencies": {
+    "title": "Currency catalogue",
+    "note": "Costs are stored in US dollars. Each rate is entered here by hand (there is no external feed) and organizations see converted amounts as approximate.",
+    "new": "Add currency",
+    "newTitle": "Add a currency",
+    "editTitle": "Edit {code}",
+    "create": "Add",
+    "empty": "No currencies yet.",
+    "table": {
+      "code": "Code",
+      "symbol": "Symbol",
+      "decimals": "Decimals",
+      "rate": "Rate per 1 USD",
+      "asOf": "Rate date",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "field": {
+      "code": "Code (three capital letters)",
+      "symbol": "Symbol",
+      "decimals": "Decimals (0 to 4)",
+      "rate": "Rate per 1 USD (up to six decimals)",
+      "asOf": "Rate date"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "noRate": "No rate"
+    },
+    "edit": "Edit",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "activationRequiresRate": "Set a rate before activating this currency.",
+    "usdFixed": "USD is the base currency: only its symbol can be changed.",
+    "confirmDeactivateTitle": "Deactivate {code}?",
+    "confirmDeactivateDescription": "Organizations can no longer choose this currency.",
+    "confirmDeleteTitle": "Delete {code}?",
+    "confirmDeleteDescription": "The currency is removed from the catalogue. This cannot be undone.",
+    "validation": {
+      "code": "Enter three capital letters.",
+      "symbol": "Enter a symbol of up to eight characters.",
+      "decimals": "Enter a whole number from 0 to 4.",
+      "rate": "Enter a positive decimal with up to six decimals, using a dot.",
+      "asOf": "Enter the date of the rate.",
+      "rateAndDate": "A rate and its date go together.",
+      "rateStored": "A rate and its date are required once a rate is set."
+    },
+    "saveError": "The currency could not be saved. Please try again.",
+    "actionError": "The change could not be applied. Please try again.",
+    "error": {
+      "forbidden": "You do not have permission to manage currencies.",
+      "notFound": "This currency no longer exists. Reload the list.",
+      "notReady": "The catalogue is in a conflicting state. Reload the list and try again."
+    },
+    "loadError": "The currency catalogue could not be loaded.",
+    "conflict": {
+      "currency_in_use": "An organization still uses this currency, so it cannot be deactivated or deleted.",
+      "currency_usd_immutable": "USD is the base currency and cannot be deactivated, deleted or given another rate."
+    },
+    "serverError": {
+      "currency_code_invalid": "The code must be three capital letters.",
+      "currency_code_taken": "This code is already in the catalogue.",
+      "currency_code_immutable": "The code cannot be changed.",
+      "currency_symbol_invalid": "The symbol must be 1 to 8 characters.",
+      "currency_decimals_invalid": "Decimals must be a whole number from 0 to 4.",
+      "currency_rate_invalid": "The rate must be a positive decimal with up to six decimals.",
+      "currency_rate_as_of_invalid": "The rate date must be a valid date, not in the future.",
+      "currency_active_invalid": "The active flag is not valid.",
+      "currency_activation_requires_rate": "Set a rate before activating this currency."
+    }
+  },
   "settings": {
     "title": "Settings",
     "subtitle": "Organization details, integration credentials and team access.",
@@ -677,7 +749,8 @@
       "users": "Users & roles",
       "llmCredentials": "Conversation LLM credentials",
       "branding": "Appearance",
-      "platform": "Platform"
+      "platform": "Platform",
+      "currencies": "Currencies"
     },
     "sectionDescription": {
       "organization": "Name and tenancy identifier",
@@ -686,7 +759,8 @@
       "users": "Who can sign in, and what they are allowed to do",
       "llmCredentials": "The vendor API key the interview model runs on",
       "branding": "The client's logo and colour, applied to this panel and to the candidate app.",
-      "platform": "BEAI-wide settings. Visible to platform administrators only."
+      "platform": "BEAI-wide settings. Visible to platform administrators only.",
+      "currencies": "The currency catalogue and its USD rates. Visible to platform administrators only."
     },
     "organization": {
       "name": "Name",
@@ -700,6 +774,16 @@
       "serverError": {
         "name_invalid": "The organization name is not valid.",
         "name_too_long": "The organization name is too long."
+      }
+    },
+    "currency": {
+      "label": "Display currency",
+      "help": "Costs are stored in US dollars and shown here converted at the platform rate. This changes the display only.",
+      "saved": "The display currency was saved.",
+      "saveError": "The display currency could not be saved. Please try again.",
+      "loadError": "The list of currencies could not be loaded. Reload the page to try again.",
+      "serverError": {
+        "currency_unavailable": "This currency is not available. Choose one from the list."
       }
     },
     "webhooks": {
@@ -1313,7 +1397,7 @@
       "voiceUseSpeakerBoost": "Makes the voice clearer and more present, closer to the original. Costs a little extra latency. Usually worth keeping on."
     },
     "llmForecastIntro": "Each template below carries an estimate of what one typical interview costs in conversation-LLM tokens. Avatar minutes are billed by a different vendor on a different meter and are not included here.",
-    "llmForecast": "≈ $ {amount} in LLM tokens for a typical {minutes}-minute, {turns}-turn interview. An estimate, and a total for that whole interview — not a rate per minute.",
+    "llmForecast": "{amount} in LLM tokens for a typical {minutes}-minute, {turns}-turn interview. An estimate, and a total for that whole interview — not a rate per minute.",
     "llmForecastUnavailable": "No conversation model is bound to this template, so its LLM cost cannot be forecast.",
     "serverError": {
       "template_in_use": "This template cannot be deleted while projects still use it.",
@@ -1519,6 +1603,11 @@
       "description": "Avatar templates that BEAI offers to every organization. Editing one reaches every project that uses it."
     }
   },
+  "money": {
+    "approximate": "≈ {amount}",
+    "approximateLabel": "approximately {amount}",
+    "convertedNote": "Converted from {usd} at 1 USD = {rate} {code}, rate of {date}"
+  },
   "review": {
     "title": "Session review",
     "subtitle": "What happened during this interview: timing, integrity checks and snapshots.",
@@ -1528,7 +1617,6 @@
     "provider": "Service",
     "status": "Status",
     "costEstimate": "Estimated cost",
-    "costValue": "≈ $ {usd}",
     "integrity": {
       "title": "Integrity checks",
       "score": "Score {score}",
@@ -1680,7 +1768,8 @@
         "name_required": "Enter a name.",
         "slug_taken": "This identifier is already used by another client.",
         "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
-        "primary_color_invalid": "Enter a colour as #RRGGBB."
+        "primary_color_invalid": "Enter a colour as #RRGGBB.",
+        "currency_unavailable": "This currency is not available. Choose one from the list."
       },
       "saveError": "Could not save the client. Please try again."
     }

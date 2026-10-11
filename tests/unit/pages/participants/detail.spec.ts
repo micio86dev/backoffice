@@ -18,6 +18,7 @@ import { withTooltipProvider } from '../../support/tooltip-host'
 import { currentUserStub } from '../../support/abilities'
 import en from '../../../../i18n/locales/en.json'
 import it_ from '../../../../i18n/locales/it.json'
+import { currenciesDouble, organizationDouble, resetMoney, useEur } from '../../support/money'
 
 const tMock = (key: string) => key
 
@@ -110,6 +111,11 @@ function detailResponse(
 describe('pages/participants/[id].vue', () => {
   beforeEach(() => {
     vi.resetModules()
+    // `useMoney` reads the organization currency and the catalogue: USD here,
+    // EUR where a test calls `useEur()`. No spec reaches the network.
+    resetMoney()
+    vi.doMock('../../../../app/composables/useOrganization', organizationDouble)
+    vi.doMock('../../../../app/composables/useCurrencies', currenciesDouble)
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
     vi.stubGlobal(
@@ -665,6 +671,13 @@ describe('pages/participants/[id].vue', () => {
         expect(
           wrapper.get('[data-testid="participant-entry-link-disabled-reason"]').text()
         ).toContain(`entryLink.disabledReason.${expectedReasonKey}`)
+        // The reason is the button's accessible description, not just nearby text.
+        const reason = wrapper.get('[data-testid="participant-entry-link-disabled-reason"]')
+        expect(
+          wrapper
+            .get('[data-testid="participant-generate-entry-link"]')
+            .attributes('aria-describedby')
+        ).toBe(reason.attributes('id'))
       }
     )
 
@@ -780,6 +793,24 @@ describe('pages/participants/[id].vue', () => {
       // The single-use panel, with its Generate control and expiry.
       expect(wrapper.find('[data-testid="entry-link-never-expires"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="entry-link-generate"]').exists()).toBe(true)
+    })
+
+    it('does not collapse a 409 into the generic mint error', async () => {
+      const generateEntryLinkMock = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('HTTP 409'), { status: 409 }))
+      const wrapper = await mountEntryLinkCard({ role: 'operator', generateEntryLinkMock })
+
+      await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+      await flushPromises()
+
+      const error = wrapper.get('[data-testid="participant-entry-link-error"]').text()
+      expect(error).toContain('errors.states.notReady.message')
+      expect(error).not.toContain('entryLink.mintError')
+      // "Not ready yet" is temporary: it must not wear the red of a refusal.
+      expect(
+        wrapper.get('[data-testid="participant-entry-link-error"]').classes().join(' ')
+      ).not.toContain('destructive')
     })
 
     it('shows an inline error and keeps the button available to retry when the mint rejects', async () => {
@@ -936,8 +967,12 @@ describe('pages/participants/[id].vue', () => {
 
       const header = wrapper.get('h1').element.parentElement!
       const text = header.textContent ?? ''
-      expect(text.indexOf('ref-042')).toBeGreaterThan(-1)
-      expect(text.indexOf('ref-042')).toBeLessThan(text.indexOf('externalReference.externalId'))
+      // The identity line is one translated sentence (params are not rendered
+      // by the identity `$t`), so the ordering is checked against its key.
+      expect(text.indexOf('participants.detail.identity')).toBeGreaterThan(-1)
+      expect(text.indexOf('participants.detail.identity')).toBeLessThan(
+        text.indexOf('externalReference.externalId')
+      )
     })
 
     it.each([
@@ -1089,6 +1124,11 @@ describe('pages/participants/[id].vue', () => {
     })
 
     it('renders progress as done / total, not the bare session_count', async () => {
+      // The progress string is translated copy now, so read it through the real table.
+      vi.stubGlobal(
+        'useI18n',
+        vi.fn(() => ({ t: realT(en), locale: ref('en') }))
+      )
       const { wrapper } = await mountDetailPage({
         status: 'in_corso',
         interview: { progress: { done: 6, total: 15 } },
@@ -1098,6 +1138,11 @@ describe('pages/participants/[id].vue', () => {
     })
 
     it('renders a DIFFERENT done/total for a different fixture (proves real data, not a fixed string)', async () => {
+      // The progress string is translated copy now, so read it through the real table.
+      vi.stubGlobal(
+        'useI18n',
+        vi.fn(() => ({ t: realT(en), locale: ref('en') }))
+      )
       const { wrapper } = await mountDetailPage({
         status: 'in_corso',
         interview: { progress: { done: 2, total: 18 } },
@@ -1122,6 +1167,47 @@ describe('pages/participants/[id].vue', () => {
       })
 
       expect(wrapper.text()).toContain('review.costEstimate')
+      // The figure itself is the `Intl` USD rendering: no symbol in the copy.
+      expect(wrapper.get('[data-testid="interview-cost"]').text()).toContain('$4.50')
+      expect(wrapper.find('[data-testid="interview-cost-note"]').exists()).toBe(false)
+    })
+
+    it('shows the cost in the organization currency, approximate, with its note', async () => {
+      useEur()
+      vi.stubGlobal(
+        'useI18n',
+        vi.fn(() => ({
+          t: (key: string, params?: Record<string, unknown>) =>
+            params === undefined ? key : `${key}:${JSON.stringify(params)}`,
+          locale: ref('en'),
+        }))
+      )
+
+      const { wrapper } = await mountDetailPage({
+        status: 'in_corso',
+        interview: {
+          cost: {
+            amount: 4.5,
+            currency: 'USD',
+            is_estimate: true,
+            sessions_estimated: 3,
+            sessions_total: 3,
+          },
+        },
+      })
+
+      const eur = new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' }).format(4.14)
+      const card = wrapper.get('[data-testid="interview-cost"]')
+      // 4.50 USD at 0.92 = 4.14 EUR, converted exactly once.
+      expect(card.text()).toContain(`money.approximate:${JSON.stringify({ amount: eur })}`)
+      expect(card.get('[aria-label]').attributes('aria-label')).toBe(
+        `money.approximateLabel:${JSON.stringify({ amount: eur })}`
+      )
+      const note = wrapper.get('[data-testid="interview-cost-note"]').text()
+      expect(note).toContain('money.convertedNote')
+      expect(note).toContain('$4.50')
+      expect(note).toContain('"code":"EUR"')
+      expect(note).toContain('Oct 1, 2026')
     })
 
     it('states how many sessions contributed when the cost total is partial', async () => {
@@ -1138,12 +1224,9 @@ describe('pages/participants/[id].vue', () => {
         },
       })
 
-      expect(
-        wrapper
-          .get('[data-testid="interview-cost"]')
-          .get('[data-testid="metric-card-detail"]')
-          .text()
-      ).toBe('participants.detail.interview.costCoverage')
+      expect(wrapper.get('[data-testid="interview-cost-detail"]').text()).toBe(
+        'participants.detail.interview.costCoverage'
+      )
     })
 
     it('states nothing about coverage when the cost total is complete (full coverage)', async () => {
@@ -1160,12 +1243,7 @@ describe('pages/participants/[id].vue', () => {
         },
       })
 
-      expect(
-        wrapper
-          .get('[data-testid="interview-cost"]')
-          .find('[data-testid="metric-card-detail"]')
-          .exists()
-      ).toBe(false)
+      expect(wrapper.find('[data-testid="interview-cost-detail"]').exists()).toBe(false)
     })
 
     it('renders a dash rather than 0 when no session yields a cost estimate', async () => {
@@ -1201,15 +1279,17 @@ describe('pages/participants/[id].vue', () => {
         interview: { elapsed: { seconds: 780, sessions_counted: 2, sessions_total: 3 } },
       })
 
-      expect(
-        wrapper
-          .get('[data-testid="interview-elapsed"]')
-          .get('[data-testid="metric-card-detail"]')
-          .text()
-      ).toBe('participants.detail.interview.elapsedCoverage')
+      expect(wrapper.get('[data-testid="interview-elapsed-detail"]').text()).toBe(
+        'participants.detail.interview.elapsedCoverage'
+      )
     })
 
     it('a viewer sees every interview-summary field — no restriction beyond RBAC', async () => {
+      // The progress string is translated copy now, so read it through the real table.
+      vi.stubGlobal(
+        'useI18n',
+        vi.fn(() => ({ t: realT(en), locale: ref('en') }))
+      )
       vi.doMock('../../../../app/composables/useCurrentUser', () => ({
         useCurrentUser: () => currentUserStub('viewer'),
       }))

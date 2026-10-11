@@ -2,6 +2,7 @@ import { test, expect, type Route, type Page } from '@playwright/test'
 import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
+import { expectedMoney, mockCurrencyContext } from './fixtures/currency'
 
 /*
  * LOCATOR POLICY, stated because this spec used to break it everywhere.
@@ -75,6 +76,8 @@ async function injectSession(page: Page): Promise<void> {
 
 async function mockOrgAdmin(page: Page): Promise<void> {
   await answerFirstVisitPrompts(page)
+  // The cost tile reads the organization currency and the catalogue; state them.
+  await mockCurrencyContext(page, { organizationCurrency: 'USD' })
   await page.route(
     (url) => url.pathname === '/auth/me',
     (route) =>
@@ -100,7 +103,7 @@ async function mockOrgAdmin(page: Page): Promise<void> {
  * Chosen deliberately small and round: below 1000 for the latency figures so
  * no engine's digit-grouping threshold is even in play, and a 5-digit token
  * total so grouping unambiguously applies. The exact rendered string is never
- * hardcoded here (see `expectedNumber`/`expectedPercent`/`expectedUsd`) — it
+ * hardcoded here (see `expectedNumber`/`expectedPercent`/`expectedMoney`) — it
  * is computed by the SAME browser running the assertion, so the test cannot
  * drift from whatever ICU/CLDR version that engine ships.
  */
@@ -199,14 +202,6 @@ async function expectedPercent(page: Page, ratio: number): Promise<string> {
   )
 }
 
-async function expectedUsd(page: Page, usd: number): Promise<string> {
-  return page.evaluate(
-    (v) =>
-      new Intl.NumberFormat('it', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v),
-    usd
-  )
-}
-
 test.describe('Dashboard — KPI tiles and recent activity', () => {
   test('the five KPI tiles render their values', async ({ page }) => {
     await injectSession(page)
@@ -221,9 +216,9 @@ test.describe('Dashboard — KPI tiles and recent activity', () => {
     const tokensUsed = await expectedNumber(page, 50000)
     const p50 = await expectedNumber(page, 500)
     const p95 = await expectedNumber(page, 900)
-    const scoring = await expectedUsd(page, 8)
-    const conversation = await expectedUsd(page, 4)
-    const total = await expectedUsd(page, 12)
+    const scoring = await expectedMoney(page, 8)
+    const conversation = await expectedMoney(page, 4)
+    const total = await expectedMoney(page, 12)
 
     await expect(tile(page, 'Candidati totali')).toContainText(totalParticipants)
     await expect(tile(page, 'Tasso di completamento')).toContainText(completionRate)
@@ -233,16 +228,14 @@ test.describe('Dashboard — KPI tiles and recent activity', () => {
     // a percentile was null — the unit has to travel with a number or not at
     // all, so both halves carry it.
     await expect(tile(page, 'Latenza AI (p50 / p95)')).toContainText(`${p50} ms / ${p95} ms`)
-    // The currency comes from the FIXTURE, not from a symbol assumed here. The
-    // page used to bake `$` into the i18n string in both locales while
-    // `useDashboardMetrics` typed `costs.currency` and its docblock said it was
-    // "carried rather than assumed" — on a figure an operator may reconcile
-    // against an invoice. Reading it from the same place the page does is what
-    // makes this assertion able to catch that assumption coming back.
-    const currency = METRICS_FIXTURE.data.costs.currency
-    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${currency} ${total}`)
-    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${currency} ${scoring}`)
-    await expect(tile(page, 'Spesa AI e avatar')).toContainText(`${currency} ${conversation}`)
+    // Every amount carries its currency CODE (`12,00 USD`): the organization's
+    // currency is stated by the shared mock, and a bare `12,00` would also pass
+    // for a wrong one. The amount renders through `Intl` (`useMoney`), so the
+    // Italian locale puts the code AFTER the number. USD is never approximate.
+    await expect(tile(page, 'Spesa AI e avatar')).toContainText(total)
+    await expect(tile(page, 'Spesa AI e avatar')).toContainText(scoring)
+    await expect(tile(page, 'Spesa AI e avatar')).toContainText(conversation)
+    await expect(tile(page, 'Spesa AI e avatar')).not.toContainText('≈')
   })
 
   test('the recent-activity feed renders its rows', async ({ page }) => {

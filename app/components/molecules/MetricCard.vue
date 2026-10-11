@@ -2,7 +2,9 @@
   <Card :data-testid="testId" role="group" :aria-labelledby="labelId">
     <CardHeader>
       <CardDescription :id="labelId">{{ label }}</CardDescription>
-      <CardTitle class="text-2xl">{{ value }}</CardTitle>
+      <CardTitle class="text-2xl">
+        <span :role="valueLabel ? 'img' : undefined" :aria-label="valueLabel">{{ value }}</span>
+      </CardTitle>
       <!--
         A second line for the figures that are a sum of parts. The headline
         answers "how much", and without the breakdown the next question — "on
@@ -20,6 +22,10 @@
         :data-testid="testId ? `${testId}-detail` : 'metric-card-detail'"
       >
         {{ detail }}
+      </CardDescription>
+      <!-- A converted amount's source, as visible text (not a tooltip). -->
+      <CardDescription v-if="note" :data-testid="testId ? `${testId}-note` : 'metric-card-note'">
+        {{ note }}
       </CardDescription>
     </CardHeader>
   </Card>
@@ -67,6 +73,10 @@ defineProps<{
   value: string
   /** Optional second line, for a headline figure that is a sum of parts. */
   detail?: string
+  /** Where a converted figure came from, shown as visible text under the detail. */
+  note?: string
+  /** Spoken form of `value` when the symbols in it are not announced reliably. */
+  valueLabel?: string
   /**
    * Test hook, named by the caller after the METRIC it renders, not its
    * position in the grid — reordering the KPI row must not silently repoint a

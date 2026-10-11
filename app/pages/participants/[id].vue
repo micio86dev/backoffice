@@ -18,8 +18,13 @@
       <div>
         <h1 class="text-2xl font-semibold text-foreground">{{ participant.display_name }}</h1>
         <p class="text-muted-foreground text-sm">
-          {{ participant.candidate_ref }} · {{ participant.role_code }} ·
-          {{ $t('participants.detail.language') }}: {{ participant.language }}
+          {{
+            $t('participants.detail.identity', {
+              ref: participant.candidate_ref,
+              role: participant.role_code,
+              language: participant.language,
+            })
+          }}
         </p>
         <!--
           candidate-external-reference: the calling system's own reference, one
@@ -109,20 +114,20 @@
             explanation outside the thing it explains, and duplicated styling a
             molecule already owns (DESIGN.md §5).
           -->
-          <div data-testid="interview-elapsed">
-            <MetricCard
-              :label="$t('participants.detail.interview.elapsed')"
-              :value="elapsedLabel"
-              :detail="elapsedCoverageLabel || undefined"
-            />
-          </div>
-          <div data-testid="interview-cost">
-            <MetricCard
-              :label="$t('review.costEstimate')"
-              :value="costLabel"
-              :detail="costCoverageLabel || undefined"
-            />
-          </div>
+          <MetricCard
+            :label="$t('participants.detail.interview.elapsed')"
+            :value="elapsedLabel"
+            :detail="elapsedCoverageLabel || undefined"
+            test-id="interview-elapsed"
+          />
+          <MetricCard
+            :label="$t('review.costEstimate')"
+            :value="costLabel"
+            :value-label="costSpoken"
+            :detail="costCoverageLabel || undefined"
+            :note="costNote"
+            test-id="interview-cost"
+          />
         </CardContent>
       </Card>
 
@@ -140,6 +145,11 @@
           <template v-else>
             <Button
               :disabled="!entryLinkAccessibility.eligible || generatingEntryLink"
+              :aria-describedby="
+                entryLinkAccessibility.eligible
+                  ? undefined
+                  : 'participant-entry-link-disabled-reason'
+              "
               data-testid="participant-generate-entry-link"
               @click="onGenerateEntryLink"
             >
@@ -147,6 +157,7 @@
             </Button>
             <p
               v-if="!entryLinkAccessibility.eligible"
+              id="participant-entry-link-disabled-reason"
               class="text-muted-foreground text-sm"
               data-testid="participant-entry-link-disabled-reason"
             >
@@ -154,7 +165,7 @@
             </p>
             <Alert
               v-if="entryLinkError"
-              variant="destructive"
+              :variant="entryLinkState === 'not-ready' ? 'default' : 'destructive'"
               data-testid="participant-entry-link-error"
             >
               <AlertDescription>{{ entryLinkError }}</AlertDescription>
@@ -447,7 +458,8 @@ import { useSessionReview, type SessionSummary } from '@/composables/useSessionR
 import { useEntryLinks } from '@/composables/useEntryLinks'
 import { useCurrentUser } from '@/composables/useCurrentUser'
 import { isParticipantResourceReady } from '@/utils/participant-lifecycle'
-import { formatDate, formatDuration, formatUsdAmount } from '@/utils/format'
+import { formatDate, formatDuration } from '@/utils/format'
+import { useMoney } from '@/composables/useMoney'
 import {
   projectAccessibility,
   type ProjectAccessibilityReason,
@@ -523,7 +535,7 @@ const evaluationReady = computed(() =>
 const progressLabel = computed(() => {
   if (!participant.value) return '–'
   const { done, total } = participant.value.progress
-  return `${done} / ${total}`
+  return t('participants.detail.interview.progressValue', { done, total })
 })
 
 const elapsedLabel = computed(() =>
@@ -544,14 +556,20 @@ const elapsedCoverageLabel = computed(() => {
 // no provider exposes a per-session billed amount, and an operator who
 // reads this as an invoice line will reconcile it against a real bill and
 // find a discrepancy that was never a defect.
-const costLabel = computed(() => {
-  if (!participant.value || participant.value.cost.amount === null) return '–'
-  // Same formatter as SessionReviewPanel's cost lines: one copy key must
-  // not render through two different number formatters.
-  return t('review.costValue', {
-    usd: formatUsdAmount(participant.value.cost.amount, locale.value),
-  })
-})
+//
+// The amount is the API's USD figure shown in the organization's currency
+// (`useMoney`, the same entry point as SessionReviewPanel's cost lines, so one
+// figure never renders through two formatters). Converted, it is `≈` with a
+// visible note for reconciling against a USD invoice.
+const { money, moneyLabel, moneyNote } = useMoney()
+const costUsd = computed(() => participant.value?.cost.amount ?? null)
+const costLabel = computed(() => (costUsd.value === null ? '–' : money(costUsd.value)))
+const costSpoken = computed(() =>
+  costUsd.value === null ? undefined : (moneyLabel(costUsd.value) ?? undefined)
+)
+const costNote = computed(() =>
+  costUsd.value === null ? undefined : (moneyNote(costUsd.value) ?? undefined)
+)
 
 const costCoverageLabel = computed(() => {
   if (!participant.value) return null
@@ -678,6 +696,8 @@ const canRecover = computed(() => can('participants.recover'))
 const canRetry = computed(() => can('participants.retry'))
 const entryLink = ref<EntryLink | null>(null)
 const entryLinkError = ref<string | null>(null)
+// Only set for a failure with no server code: a coded 409 is a real conflict.
+const entryLinkState = ref<ResourceErrorState | null>(null)
 const generatingEntryLink = ref(false)
 
 /**
@@ -725,6 +745,7 @@ function externalReferencePayload(detail: { external_id: number | null; source: 
 async function onGenerateEntryLink(): Promise<void> {
   if (!participant.value) return
   entryLinkError.value = null
+  entryLinkState.value = null
   generatingEntryLink.value = true
   try {
     const response = await generateEntryLink({
@@ -765,10 +786,18 @@ async function onGenerateEntryLink(): Promise<void> {
     // code at all, such as the network being down.
     const code = serverMessageCode(error)
 
+    // No code means no server-worded reason, but the STATUS still says what
+    // kind of failure it was: a 409 ("not ready, try again") must not read as
+    // a 403 (no permission). Only a failure with neither falls back to the
+    // generic copy.
+    const state = resolveResourceErrorState(error)
+    entryLinkState.value = code === null ? state : null
     entryLinkError.value =
-      code === null
-        ? t('entryLink.mintError')
-        : translateServerCode({ t, te }, 'entryLink.serverError', code)
+      code !== null
+        ? translateServerCode({ t, te }, 'entryLink.serverError', code)
+        : state === 'error'
+          ? t('entryLink.mintError')
+          : t(resourceErrorKey(state, 'message'))
   } finally {
     generatingEntryLink.value = false
   }

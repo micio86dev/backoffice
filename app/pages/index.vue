@@ -63,7 +63,9 @@
       <MetricCard
         :label="$t('dashboard.kpi.cost')"
         :value="costLabel"
+        :value-label="costSpoken"
         :detail="costBreakdown"
+        :note="costNote"
         test-id="dashboard-cost"
       />
     </div>
@@ -94,7 +96,8 @@ import {
   type DashboardMetrics,
   type DashboardActivityRow,
 } from '@/composables/useDashboardMetrics'
-import { formatNumber, formatPercent, formatUsdAmount } from '@/utils/format'
+import { formatNumber, formatPercent } from '@/utils/format'
+import { useMoney } from '@/composables/useMoney'
 import {
   resolveResourceErrorState,
   resourceErrorKey,
@@ -188,33 +191,35 @@ const latencyLabel = computed(() => {
 })
 
 /**
- * What the organization has spent, in USD.
+ * What the organization has spent, in ITS currency.
  *
- * The currency comes from the API. `useDashboardMetrics` types
- * `costs.currency` and its docblock says it is "carried rather than assumed —
- * a bare number on a dashboard is read in whatever currency the reader happens
- * to think in". The page then assumed anyway: `$` was baked into the i18n
- * string in BOTH locales, which is the one place nobody looks for a business
- * rule, on a figure an operator may reconcile against an invoice. The symbol is
- * now a parameter and the contract's value is what renders.
+ * The API's `*_usd` figures are the stored truth and `costs.currency` is a
+ * machine value ("the unit of those numbers"), so neither is shown or changed:
+ * `useMoney` converts at display time (`usd * rate`), marks a converted figure
+ * `≈` and gives the note an operator needs to reconcile it against a USD
+ * invoice. USD, or any currency without a usable active rate, renders as plain
+ * USD. `Intl` owns the symbol, so no copy key carries one.
  *
- * Nothing CONVERTS it, and that is deliberate: putting a conversion in front of
- * a figure an operator may reconcile against an invoice would mean choosing an
- * exchange rate on their behalf.
- *
- * `formatUsdAmount` widens precision below a cent. One interview's
- * conversation spend is routinely a fraction of one, and two fixed decimals
- * would round a real charge to `0.00` — which reads as free.
+ * Precision widens below one minor unit (`formatMoney`). One interview's
+ * conversation spend is routinely a fraction of one, and fixed decimals would
+ * round a real charge to zero, which reads as free.
  */
+const { money, moneyLabel, moneyNote } = useMoney()
+
 const costLabel = computed(() => {
   // Unreachable for the same reason as `latencyLabel` above.
   if (!metrics.value) return t('dashboard.kpi.notMeasured')
 
-  return t('dashboard.kpi.costValue', {
-    currency: metrics.value.costs.currency,
-    usd: formatUsdAmount(metrics.value.costs.total_usd, locale.value),
-  })
+  return money(metrics.value.costs.total_usd)
 })
+
+const costSpoken = computed(() =>
+  metrics.value ? (moneyLabel(metrics.value.costs.total_usd) ?? undefined) : undefined
+)
+
+const costNote = computed(() =>
+  metrics.value ? (moneyNote(metrics.value.costs.total_usd) ?? undefined) : undefined
+)
 
 /**
  * The headline answers "how much"; without this line the next question — "on
@@ -226,9 +231,8 @@ const costBreakdown = computed(() => {
   if (!metrics.value) return undefined
 
   return t('dashboard.kpi.costBreakdown', {
-    currency: metrics.value.costs.currency,
-    scoring: formatUsdAmount(metrics.value.costs.scoring_usd, locale.value),
-    conversation: formatUsdAmount(metrics.value.costs.conversation_usd, locale.value),
+    scoring: money(metrics.value.costs.scoring_usd),
+    conversation: money(metrics.value.costs.conversation_usd),
   })
 })
 

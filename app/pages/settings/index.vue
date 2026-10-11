@@ -117,6 +117,7 @@ import {
   CpuChipIcon,
   SwatchIcon,
   AdjustmentsHorizontalIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/vue/24/outline'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
@@ -141,6 +142,9 @@ const LlmCredentialsPanel = defineAsyncComponent(
   () => import('@/components/organisms/LlmCredentialsPanel.vue')
 )
 const BrandingForm = defineAsyncComponent(() => import('@/components/organisms/BrandingForm.vue'))
+const CurrencyCatalogPanel = defineAsyncComponent(
+  () => import('@/components/organisms/CurrencyCatalogPanel.vue')
+)
 const PlatformSettingsPanel = defineAsyncComponent(
   () => import('@/components/organisms/PlatformSettingsPanel.vue')
 )
@@ -288,6 +292,18 @@ const SECTIONS: readonly SettingsSection[] = [
     component: PlatformSettingsPanel,
     needsOrganization: false,
     requires: 'platformSettings.viewAny',
+  },
+  {
+    // PLATFORM: the catalogue and its USD rates belong to BEAI. Gated on its
+    // OWN published ability (`currencies.manage`), never borrowed from the
+    // neighbouring platform sections, so the three can diverge server-side.
+    value: 'currencies',
+    labelKey: 'settings.tabs.currencies',
+    descriptionKey: 'settings.sectionDescription.currencies',
+    icon: CurrencyDollarIcon,
+    component: CurrencyCatalogPanel,
+    needsOrganization: false,
+    requires: 'currencies.manage',
   },
 ]
 

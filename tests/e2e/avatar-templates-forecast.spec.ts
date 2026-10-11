@@ -2,6 +2,7 @@ import { test, expect, type Page, type Route } from '@playwright/test'
 import { answerFirstVisitPrompts } from './fixtures/admin-session'
 import { checkA11y } from './fixtures/a11y'
 import { abilitiesFor } from './fixtures/abilities'
+import { expectedMoney, mockCurrencyContext } from './fixtures/currency'
 
 /**
  * Per-template conversation-LLM forecast (pluggable-conversation-llm P9,
@@ -63,6 +64,7 @@ function isDataRequest(route: Route): boolean {
 
 async function mockApi(page: Page, templates: unknown[]): Promise<void> {
   await answerFirstVisitPrompts(page)
+  await mockCurrencyContext(page, { organizationCurrency: 'USD' })
   await page.route(
     (url) => url.pathname === '/auth/login',
     (route) =>
@@ -123,7 +125,7 @@ test.describe('Avatar templates — conversation-LLM forecast', () => {
     const forecast = page.getByTestId('template-llm-forecast-1')
     await expect(forecast).toBeVisible()
     // The number and the interview it is a total FOR travel together.
-    await expect(forecast).toContainText('0,30')
+    await expect(forecast).toContainText(await expectedMoney(page, 0.3))
     await expect(forecast).toContainText('15')
     await expect(forecast).toContainText('60')
     // 0.30 over the 15-minute reference interview would be 0,02 per minute.
@@ -140,7 +142,7 @@ test.describe('Avatar templates — conversation-LLM forecast', () => {
     const forecast = page.getByTestId('template-llm-forecast-1')
     await expect(forecast).toBeVisible()
     // Zero is a price. An unbound template has no price at all.
-    await expect(forecast).not.toContainText('0,00')
+    await expect(forecast).not.toContainText(await expectedMoney(page, 0))
   })
 
   test('the templates page is WCAG 2.1 AA clean with the forecast rendered', async ({ page }) => {

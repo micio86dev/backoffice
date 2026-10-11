@@ -55,8 +55,10 @@ export interface MoneyCurrency {
  * stored figure. One formatter, so every cost line renders the same shape and
  * the symbol, its placement and spacing belong to `Intl`, never to copy keys.
  *
- * No usable currency (null, or a missing/non-positive rate) falls back to USD:
- * never a guess, never zero. The conversion is `usd * rate_per_usd`, applied
+ * No usable currency (null, a missing/non-positive rate, a code that is not
+ * three capital letters, or decimals outside the integers 0..20) falls back to
+ * USD: never a guess, never zero, never a thrown `RangeError`. A non-finite
+ * amount renders `–`, like every other absent amount in the app, never `NaN`. The conversion is `usd * rate_per_usd`, applied
  * once, and the result rounds to the currency's `decimals`.
  *
  * Precision widens BELOW one minor unit and only there. One interview's
@@ -72,7 +74,16 @@ export function formatMoney(
   currency: MoneyCurrency | null | undefined,
   locale: string
 ): string {
-  const usable = currency && currency.rate_per_usd && currency.rate_per_usd > 0
+  if (!Number.isFinite(usd)) return '–'
+
+  const usable =
+    currency &&
+    currency.rate_per_usd &&
+    currency.rate_per_usd > 0 &&
+    /^[A-Z]{3}$/.test(currency.code) &&
+    Number.isInteger(currency.decimals) &&
+    currency.decimals >= 0 &&
+    currency.decimals <= 20
   const code = usable ? currency.code : 'USD'
   const decimals = usable ? currency.decimals : 2
   const amount = usable ? usd * currency.rate_per_usd! : usd

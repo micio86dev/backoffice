@@ -3,6 +3,7 @@
  * `/api/organization` resource (D2/D3). No id ever appears in the path.
  * Thin wiring over `useApi().apiFetch`, mirroring `useParticipants.ts:16-30`.
  */
+import { ref, readonly } from 'vue'
 import type { paths } from '../../types/api'
 import { useApi } from './useApi'
 
@@ -37,20 +38,32 @@ type UpdateOrganizationResponse =
 type OrganizationLogoResponse =
   paths['/organization/logo']['post']['responses']['200']['content']['application/json']
 
+/**
+ * The acting organization's display currency, shared so `useMoney` follows the
+ * one read the layout already makes (and a Settings save) instead of fetching
+ * the organization again on every cost page. `undefined` = not read yet (or
+ * the read failed); `null` = no acting organization. Both display USD.
+ */
+const currencyCode = ref<string | null | undefined>(undefined)
+
 export function useOrganization() {
   const { apiFetch } = useApi()
 
   async function fetchOrganization(): Promise<OrganizationResponse> {
-    return apiFetch<OrganizationResponse>('/organization')
+    const response = await apiFetch<OrganizationResponse>('/organization')
+    currencyCode.value = response.data?.currency_code ?? null
+    return response
   }
 
   async function updateOrganization(
     payload: UpdateOrganizationPayload
   ): Promise<UpdateOrganizationResponse> {
-    return apiFetch<UpdateOrganizationResponse>('/organization', {
+    const response = await apiFetch<UpdateOrganizationResponse>('/organization', {
       method: 'PATCH',
       body: payload,
     })
+    currencyCode.value = response.data?.currency_code ?? currencyCode.value
+    return response
   }
 
   /**
@@ -77,5 +90,11 @@ export function useOrganization() {
     return apiFetch<OrganizationLogoResponse>('/organization/logo', { method: 'DELETE' })
   }
 
-  return { fetchOrganization, updateOrganization, uploadLogo, removeLogo }
+  return {
+    fetchOrganization,
+    updateOrganization,
+    uploadLogo,
+    removeLogo,
+    currencyCode: readonly(currencyCode),
+  }
 }

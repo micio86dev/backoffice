@@ -129,8 +129,7 @@
       "latency": "Latenza AI (p50 / p95)",
       "latencyValue": "{p50} / {p95}",
       "cost": "Spesa AI e avatar",
-      "costValue": "{currency} {usd}",
-      "costBreakdown": "Valutazione {currency} {scoring} · Colloquio {currency} {conversation}",
+      "costBreakdown": "Valutazione {scoring} · Colloquio {conversation}",
       "noData": "Nessun dato disponibile",
       "notMeasured": "non misurato",
       "latencyMs": "{value} ms"
@@ -179,7 +178,7 @@
     },
     "detail": {
       "backToList": "Torna ai candidati",
-      "language": "Lingua",
+      "identity": "{ref} · {role} · Lingua: {language}",
       "reusableLink": "Avviato da link riutilizzabile: {label}",
       "reusableLinkUnlabelled": "Avviato da link riutilizzabile",
       "timeline": {
@@ -198,6 +197,7 @@
       "interview": {
         "title": "Colloquio",
         "progress": "Avanzamento",
+        "progressValue": "{done} / {total}",
         "elapsed": "Tempo trascorso",
         "elapsedCoverage": "{counted} di {total} sessioni conteggiate",
         "costCoverage": "{estimated} di {total} sessioni stimate"
@@ -1397,7 +1397,7 @@
       "voiceUseSpeakerBoost": "Rende la voce più chiara e presente, più simile all'originale. Costa un filo di latenza in più. Di solito conviene tenerlo attivo."
     },
     "llmForecastIntro": "Ogni template qui sotto riporta una stima di quanto costa in token dell'LLM di conversazione una singola intervista tipica. I minuti dell'avatar sono fatturati da un fornitore diverso su un contatore diverso e non sono inclusi.",
-    "llmForecast": "≈ $ {amount} in token LLM per un'intervista tipica di {minutes} minuti e {turns} turni. È una stima, ed è il totale di quell'intera intervista — non una tariffa al minuto.",
+    "llmForecast": "{amount} in token LLM per un'intervista tipica di {minutes} minuti e {turns} turni. È una stima, ed è il totale di quell'intera intervista — non una tariffa al minuto.",
     "llmForecastUnavailable": "A questo template non è associato alcun modello di conversazione, quindi il suo costo LLM non può essere stimato.",
     "serverError": {
       "template_in_use": "Questo template non può essere eliminato finché dei progetti lo usano.",
@@ -1603,6 +1603,11 @@
       "description": "I template avatar che BEAI offre a ogni organizzazione. Modificarne uno raggiunge ogni progetto che lo usa."
     }
   },
+  "money": {
+    "approximate": "≈ {amount}",
+    "approximateLabel": "circa {amount}",
+    "convertedNote": "Convertito da {usd} a 1 USD = {rate} {code}, tasso del {date}"
+  },
   "review": {
     "title": "Resoconto sessione",
     "subtitle": "Cosa è successo durante questo colloquio: tempi, controlli di integrità e fotogrammi.",
@@ -1612,7 +1617,6 @@
     "provider": "Servizio",
     "status": "Stato",
     "costEstimate": "Costo stimato",
-    "costValue": "≈ $ {usd}",
     "integrity": {
       "title": "Controlli di integrità",
       "score": "Punteggio {score}",

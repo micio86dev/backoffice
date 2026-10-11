@@ -6,6 +6,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
+import {
+  currenciesDouble,
+  moneyState,
+  organizationDouble,
+  resetMoney,
+  useEur,
+} from './support/money'
 
 const tMock = vi.fn((key: string) => (key === 'dashboard.title' ? 'Dashboard' : key))
 
@@ -379,14 +386,21 @@ function flushPromises(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+// Echoes params so an amount (and the `≈` wrapper around it) can be asserted on.
+const echoT = (key: string, params?: Record<string, unknown>) =>
+  params === undefined ? key : `${key}:${JSON.stringify(params)}`
+
 describe('IndexPage — cost KPI', () => {
   beforeEach(() => {
     vi.resetModules()
+    resetMoney()
+    vi.doMock('../../app/composables/useOrganization', organizationDouble)
+    vi.doMock('../../app/composables/useCurrencies', currenciesDouble)
     vi.stubGlobal('definePageMeta', vi.fn())
     vi.stubGlobal('useHead', vi.fn())
     vi.stubGlobal(
       'useI18n',
-      vi.fn(() => ({ t: tMock, locale: ref('en') }))
+      vi.fn(() => ({ t: echoT, locale: ref('en') }))
     )
   })
 
@@ -408,19 +422,43 @@ describe('IndexPage — cost KPI', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('dashboard.kpi.cost')
-    // `currency` comes from the API rather than a symbol baked into the i18n
-    // string. `useDashboardMetrics` types `costs.currency` and its docblock
-    // says it is "carried rather than assumed"; the page assumed anyway, in
-    // both locales, on a figure an operator may reconcile against an invoice.
-    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', {
-      currency: 'USD',
-      usd: '1.75',
-    })
-    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costBreakdown', {
-      currency: 'USD',
-      scoring: '1.25',
-      conversation: '0.50',
-    })
+    // The unit is the organization's currency, formatted by `Intl`: no symbol
+    // lives in the copy and the API's `costs.currency` is a machine value.
+    expect(wrapper.get('[data-testid="dashboard-cost"]').text()).toContain('$1.75')
+    expect(wrapper.get('[data-testid="dashboard-cost-detail"]').text()).toBe(
+      `dashboard.kpi.costBreakdown:${JSON.stringify({ scoring: '$1.25', conversation: '$0.50' })}`
+    )
+    // A USD organization sees no approximation and no converted-from note.
+    expect(wrapper.text()).not.toContain('money.')
+    expect(wrapper.find('[data-testid="dashboard-cost-note"]').exists()).toBe(false)
+  })
+
+  it('shows the organization currency, approximate, with the converted-from note', async () => {
+    useEur()
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({
+        fetchMetrics: vi.fn().mockResolvedValue(metricsResponse()),
+        fetchActivity: vi.fn().mockResolvedValue({ data: [] }),
+      }),
+    }))
+
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    const eur = (n: number) =>
+      new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' }).format(n)
+    const card = wrapper.get('[data-testid="dashboard-cost"]')
+    // 1.75 USD at 0.92 = 1.61 EUR, converted exactly once.
+    expect(card.text()).toContain(`money.approximate:${JSON.stringify({ amount: eur(1.61) })}`)
+    expect(card.get('[aria-label]').attributes('aria-label')).toBe(
+      `money.approximateLabel:${JSON.stringify({ amount: eur(1.61) })}`
+    )
+    expect(wrapper.get('[data-testid="dashboard-cost-note"]').text()).toContain(
+      'money.convertedNote'
+    )
+    expect(wrapper.get('[data-testid="dashboard-cost-note"]').text()).toContain('$1.75')
+    expect(moneyState.currencyCode.value).toBe('EUR')
   })
 
   it('reports zero as a number, never as a blank', async () => {
@@ -447,13 +485,10 @@ describe('IndexPage — cost KPI', () => {
     }))
 
     const IndexPage = (await import('../../app/pages/index.vue')).default
-    mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
     await flushPromises()
 
-    expect(tMock).toHaveBeenCalledWith('dashboard.kpi.costValue', {
-      currency: 'USD',
-      usd: '0.00',
-    })
+    expect(wrapper.get('[data-testid="dashboard-cost"]').text()).toContain('$0.00')
   })
 
   it('drops a stale load, so the numbers never describe a period the filter is not showing', async () => {

@@ -401,3 +401,44 @@ describe('scoring-audit-jev — audit review copy, locale key parity', () => {
     }
   })
 })
+
+/**
+ * organization-currencies (OC-06, design D13): the symbol, its placement and
+ * its spacing belong to `Intl`, so no cost copy may carry a currency symbol or
+ * a `{currency}` parameter, and the keys that used to hardcode one are gone.
+ */
+describe('cost copy carries no currency symbol (organization-currencies)', () => {
+  const COST_KEYS = [
+    'dashboard.kpi.costBreakdown',
+    'avatar_templates.llmForecast',
+    'money.approximate',
+    'money.approximateLabel',
+    'money.convertedNote',
+  ] as const
+  const REMOVED_KEYS = ['review.costValue', 'dashboard.kpi.costValue'] as const
+
+  it.each(COST_KEYS)('%s exists in it and en and holds no $, € or {currency}', (path) => {
+    for (const [name, table] of [
+      ['it', IT],
+      ['en', EN],
+    ] as const) {
+      const value = get(table, path)
+      expect(typeof value, `${name}.json is missing "${path}"`).toBe('string')
+      expect(value).not.toMatch(/[$€]|\{currency\}/)
+    }
+  })
+
+  it.each(REMOVED_KEYS)('%s is deleted from both locales', (path) => {
+    expect(get(IT, path)).toBeUndefined()
+    expect(get(EN, path)).toBeUndefined()
+  })
+
+  it('the converted note names the original USD amount, the rate, the code and the date', () => {
+    for (const table of [IT, EN]) {
+      const note = String(get(table, 'money.convertedNote'))
+      for (const placeholder of ['{usd}', '{rate}', '{code}', '{date}']) {
+        expect(note).toContain(placeholder)
+      }
+    }
+  })
+})

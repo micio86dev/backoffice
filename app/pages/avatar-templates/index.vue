@@ -44,9 +44,18 @@
     -->
     <ActingClientNotice v-if="canCreate && actingClientRequired" />
 
-    <Alert v-if="loadError" variant="destructive" data-testid="templates-error">
+    <Alert
+      v-if="loadError"
+      :variant="loadErrorState === 'not-ready' ? 'default' : 'destructive'"
+      data-testid="templates-error"
+    >
       <AlertTitle>{{ $t('avatar_templates.error.load_title') }}</AlertTitle>
-      <AlertDescription>{{ $t('avatar_templates.error.load_body') }}</AlertDescription>
+      <!-- A 409 is "not ready yet", not a refusal: it says so instead of blaming the role. -->
+      <AlertDescription>{{
+        loadErrorState === 'not-ready'
+          ? $t(resourceErrorKey('not-ready', 'message'))
+          : $t('avatar_templates.error.load_body')
+      }}</AlertDescription>
     </Alert>
 
     <!--
@@ -57,7 +66,7 @@
     -->
     <Alert
       v-if="writeError || writeErrorCode"
-      variant="destructive"
+      :variant="writeError === 'not-ready' ? 'default' : 'destructive'"
       data-testid="template-write-error"
     >
       <AlertTitle>{{ $t('avatar_templates.error.write_title') }}</AlertTitle>
@@ -126,6 +135,14 @@
             :data-testid="`template-llm-forecast-${template.id}`"
           >
             {{ forecastLabel(template) }}
+          </p>
+          <!-- A converted forecast's source, as visible text. -->
+          <p
+            v-if="forecastNote(template)"
+            class="text-sm text-muted-foreground"
+            :data-testid="`template-llm-forecast-note-${template.id}`"
+          >
+            {{ forecastNote(template) }}
           </p>
           <!--
             Whether Tavus accepted the persona-level settings (voice, model,
@@ -323,12 +340,13 @@ import {
 } from '@/utils/error-state'
 import { serverMessageCode } from '@/utils/http-error'
 import { translateServerCode } from '@/utils/server-message'
-import { formatUsdAmount } from '@/utils/format'
+import { useMoney } from '@/composables/useMoney'
 import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
 
 definePageMeta({ name: 'avatar-templates' })
 
-const { t, te, locale } = useI18n()
+const { t, te } = useI18n()
+const { money, moneyNote } = useMoney()
 
 /**
  * What one typical interview on this template costs in conversation-LLM
@@ -344,10 +362,17 @@ function forecastLabel(template: AvatarTemplate): string {
   if (!forecast) return t('avatar_templates.llmForecastUnavailable')
 
   return t('avatar_templates.llmForecast', {
-    amount: formatUsdAmount(forecast.usd, locale.value),
+    amount: money(forecast.usd),
     minutes: forecast.minutes,
     turns: forecast.turns,
   })
+}
+
+/** The original USD forecast and the rate behind a converted one; `null` for USD. */
+function forecastNote(template: AvatarTemplate): string | null {
+  const forecast = template.llm?.estimated_cost_usd_per_interview
+
+  return forecast ? moneyNote(forecast.usd) : null
 }
 
 useHead({
@@ -368,6 +393,7 @@ const {
 const templates = ref<AvatarTemplate[]>([])
 const fieldSpecs = ref<Record<ProviderName, FieldSpec[]>>({ heygen: [], tavus: [] })
 const loadError = ref(false)
+const loadErrorState = ref<ResourceErrorState | null>(null)
 
 /**
  * A failed WRITE, kept separate from a failed read.
@@ -469,8 +495,10 @@ async function load(): Promise<void> {
     templates.value = list.data
     fieldSpecs.value = specs.data
     loadError.value = false
-  } catch {
+    loadErrorState.value = null
+  } catch (error) {
     loadError.value = true
+    loadErrorState.value = resolveResourceErrorState(error)
   }
 }
 

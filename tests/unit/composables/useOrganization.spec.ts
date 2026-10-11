@@ -33,4 +33,29 @@ describe('useOrganization', () => {
       body: { name: 'New Name' },
     })
   })
+
+  // OC-06: `useMoney` reads the display currency from here, so the layout's
+  // one read (and a Settings save) is what every cost surface follows.
+  describe('currencyCode', () => {
+    it('follows a read, and reads null for no acting organization', async () => {
+      const api = useOrganization()
+
+      apiFetch.mockResolvedValueOnce({ data: { currency_code: 'EUR' } })
+      await api.fetchOrganization()
+      expect(api.currencyCode.value).toBe('EUR')
+
+      apiFetch.mockResolvedValueOnce({ data: null })
+      await api.fetchOrganization()
+      expect(api.currencyCode.value).toBeNull()
+    })
+
+    it('follows a successful save', async () => {
+      apiFetch.mockResolvedValueOnce({ data: { currency_code: 'USD' } })
+      const api = useOrganization()
+
+      await api.updateOrganization({ currency_code: 'USD' })
+
+      expect(api.currencyCode.value).toBe('USD')
+    })
+  })
 })

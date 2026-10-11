@@ -438,7 +438,8 @@ function validate(): boolean {
   const asOf = form.asOf.trim()
 
   if (creating && !/^[A-Z]{3}$/.test(form.code)) next.code = t('currencies.validation.code')
-  if (form.symbol.trim() === '' || form.symbol.length > 8) {
+  const symbol = form.symbol.trim()
+  if (symbol === '' || symbol.length > 8) {
     next.symbol = t('currencies.validation.symbol')
   }
   if (!isBase.value) {
@@ -451,6 +452,11 @@ function validate(): boolean {
       next.rate = t('currencies.validation.rateAndDate')
     }
     if (rate !== '' && asOf === '') next.asOf = t('currencies.validation.asOf')
+    // The api never clears a stored rate, so blanking either field would silently save nothing.
+    if (editing.value?.rate_per_usd != null && (rate === '' || asOf === '')) {
+      if (rate === '') next.rate = t('currencies.validation.rateStored')
+      else next.asOf = t('currencies.validation.rateStored')
+    }
   }
   errors.value = next
   return Object.keys(next).length === 0

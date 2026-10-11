@@ -30,7 +30,9 @@ export function useCurrencies() {
     const started = generation
     inFlight ??= apiFetch<CurrenciesResponse>('/currencies')
       .then((response) => {
-        if (started === generation) list.value = response.data
+        // A write landed mid-flight: this payload is stale, so hand back the fresh load.
+        if (started !== generation) return ensureLoaded()
+        list.value = response.data
         return response.data
       })
       .finally(() => {

@@ -78,10 +78,30 @@ describe('useCurrencyCatalogue', () => {
     const pending = active.ensureLoaded()
     apiFetch.mockResolvedValueOnce(null)
 
+    apiFetch.mockResolvedValueOnce({ data: [] })
+
     await useCurrencyCatalogue().updateCurrency('USD', { symbol: '$' })
     release({ data: [usd] })
     await pending
 
-    expect(active.currencies.value).toBeNull()
+    // The stale payload never lands in the cache; only the post-write refetch does.
+    expect(active.currencies.value).toEqual([])
+  })
+
+  it('hands a caller that started loading before a write the post-write list, not the stale one', async () => {
+    const fresh = { ...usd, symbol: 'US$' }
+    let release: (value: unknown) => void = () => undefined
+    apiFetch.mockReset()
+    apiFetch.mockReturnValueOnce(new Promise((resolve) => (release = resolve)))
+    const active = useCurrencies()
+    active.invalidate()
+    const pending = active.ensureLoaded()
+
+    active.invalidate()
+    apiFetch.mockResolvedValueOnce({ data: [fresh] })
+    release({ data: [usd] })
+
+    await expect(pending).resolves.toEqual([fresh])
+    expect(apiFetch).toHaveBeenCalledTimes(2)
   })
 })

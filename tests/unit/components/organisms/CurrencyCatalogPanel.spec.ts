@@ -55,11 +55,14 @@ const gbp = {
 const rejection = (status: number, data: object) =>
   Object.assign(new Error(String(status)), { status, data })
 
+const mounted: Array<{ unmount: () => void }> = []
+
 async function mountPanel() {
   const wrapper = mount(CurrencyCatalogPanel, {
     global: { mocks: { $t: tMock } },
     attachTo: document.body,
   })
+  mounted.push(wrapper)
   await flushPromises()
   return wrapper
 }
@@ -94,7 +97,11 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  document.body.innerHTML = ''
+  try {
+    for (const wrapper of mounted.splice(0)) wrapper.unmount()
+  } finally {
+    document.body.innerHTML = ''
+  }
 })
 
 describe('CurrencyCatalogPanel — listing', () => {
@@ -109,7 +116,6 @@ describe('CurrencyCatalogPanel — listing', () => {
       'currencies.status.noRate'
     )
     expect(wrapper.find('[data-testid="currency-no-rate-GBP"]').exists()).toBe(false)
-    wrapper.unmount()
   })
 })
 
@@ -120,7 +126,6 @@ describe('CurrencyCatalogPanel — failed load', () => {
 
     expect(wrapper.get('[data-testid="currency-conflict"]').text()).toBe('currencies.loadError')
     expect(wrapper.text()).not.toContain('currencies.empty')
-    wrapper.unmount()
   })
 })
 
@@ -131,7 +136,6 @@ describe('CurrencyCatalogPanel — accessible names', () => {
     for (const id of ['edit', 'toggle', 'delete']) {
       expect(wrapper.get(`[data-testid="currency-${id}-GBP"]`).text()).toContain('GBP')
     }
-    wrapper.unmount()
   })
 })
 
@@ -155,7 +159,6 @@ describe('CurrencyCatalogPanel — create', () => {
       rate_per_usd: '0.912345',
       rate_as_of: '2026-10-09',
     })
-    wrapper.unmount()
   })
 
   it('omits the rate and date when neither is typed, and refuses a malformed rate without calling the API', async () => {
@@ -177,7 +180,6 @@ describe('CurrencyCatalogPanel — create', () => {
     await submit('currency-form')
 
     expect(createCurrency).toHaveBeenCalledWith({ code: 'SEK', symbol: 'kr', decimals: 2 })
-    wrapper.unmount()
   })
 
   it('renders a 422 slug as localized copy, never the raw code', async () => {
@@ -195,7 +197,6 @@ describe('CurrencyCatalogPanel — create', () => {
     const text = document.body.textContent ?? ''
     expect(text).toContain('currencies.serverError.currency_code_taken')
     expect(text).not.toMatch(/(?<!\.)currency_code_taken/)
-    wrapper.unmount()
   })
 })
 
@@ -219,7 +220,45 @@ describe('CurrencyCatalogPanel — edit', () => {
       rate_per_usd: '0.81',
       rate_as_of: '2026-10-10',
     })
-    wrapper.unmount()
+  })
+
+  it('refuses to blank the rate and date of a row that already has a rate', async () => {
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="currency-edit-GBP"]').trigger('click')
+    await waitForTestId('currency-edit-form')
+    setValue('currency-edit-form-rate', '')
+    setValue('currency-edit-form-as-of', '')
+    await submit('currency-edit-form')
+
+    expect(updateCurrency).not.toHaveBeenCalled()
+    expect(
+      document.body.querySelector('[data-testid="currency-edit-form-rate-error"]')?.textContent
+    ).toContain('currencies.validation.rateStored')
+  })
+
+  it('still saves a symbol-only edit on a row with no stored rate', async () => {
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="currency-edit-EUR"]').trigger('click')
+    await waitForTestId('currency-edit-form')
+    setValue('currency-edit-form-symbol', 'EUR')
+    await submit('currency-edit-form')
+
+    expect(updateCurrency).toHaveBeenCalledWith('EUR', { symbol: 'EUR', decimals: 2 })
+  })
+
+  it('validates the symbol length on the trimmed value', async () => {
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="currency-edit-GBP"]').trigger('click')
+    await waitForTestId('currency-edit-form')
+    setValue('currency-edit-form-symbol', '  £       ')
+    await submit('currency-edit-form')
+
+    expect(updateCurrency).toHaveBeenCalledWith('GBP', {
+      symbol: '£',
+      decimals: 2,
+      rate_per_usd: '0.8',
+      rate_as_of: '2026-10-01',
+    })
   })
 
   it('USD edits the symbol only: no rate, date or decimals fields, nothing but the symbol sent', async () => {
@@ -233,7 +272,6 @@ describe('CurrencyCatalogPanel — edit', () => {
     await submit('currency-edit-form')
 
     expect(updateCurrency).toHaveBeenCalledWith('USD', { symbol: 'US$' })
-    wrapper.unmount()
   })
 })
 
@@ -244,7 +282,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
     await wrapper.get('[data-testid="currency-toggle-GBP"]').trigger('click')
     await confirmDialog()
     expect(updateCurrency).toHaveBeenCalledWith('GBP', { is_active: false })
-    wrapper.unmount()
   })
 
   it('activation is disabled, with an explanation, while there is no rate', async () => {
@@ -258,7 +295,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
     expect(wrapper.get('[data-testid="currency-activation-hint-EUR"]').text()).toContain(
       'currencies.activationRequiresRate'
     )
-    wrapper.unmount()
   })
 
   it('deletes only after confirmation', async () => {
@@ -269,7 +305,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
     await confirmDialog()
 
     expect(removeCurrency).toHaveBeenCalledWith('GBP')
-    wrapper.unmount()
   })
 
   it.each(['currency_in_use', 'currency_usd_immutable'])(
@@ -283,7 +318,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
 
       const banner = wrapper.get('[data-testid="currency-conflict"]').text()
       expect(banner).toBe(`currencies.conflict.${slug}`)
-      wrapper.unmount()
     }
   )
 
@@ -297,7 +331,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
     expect(wrapper.get('[data-testid="currency-conflict"]').text()).toBe(
       'currencies.conflict.currency_in_use'
     )
-    wrapper.unmount()
   })
 
   it.each([
@@ -314,7 +347,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
       await confirmDialog()
 
       expect(wrapper.get('[data-testid="currency-conflict"]').text()).toBe(copy)
-      wrapper.unmount()
     }
   )
 
@@ -326,7 +358,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
     await confirmDialog()
 
     expect(wrapper.get('[data-testid="currency-conflict"]').text()).toBe('currencies.actionError')
-    wrapper.unmount()
   })
 
   it('USD row shows no delete and no deactivate control', async () => {
@@ -335,7 +366,6 @@ describe('CurrencyCatalogPanel — activate, deactivate, delete', () => {
     expect(wrapper.find('[data-testid="currency-delete-USD"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="currency-toggle-USD"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="currency-edit-USD"]').exists()).toBe(true)
-    wrapper.unmount()
   })
 })
 

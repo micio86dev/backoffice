@@ -712,7 +712,8 @@
       "decimals": "Enter a whole number from 0 to 4.",
       "rate": "Enter a positive decimal with up to six decimals, using a dot.",
       "asOf": "Enter the date of the rate.",
-      "rateAndDate": "A rate and its date go together."
+      "rateAndDate": "A rate and its date go together.",
+      "rateStored": "A rate and its date are required once a rate is set."
     },
     "saveError": "The currency could not be saved. Please try again.",
     "actionError": "The change could not be applied. Please try again.",

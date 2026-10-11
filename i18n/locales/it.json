@@ -712,7 +712,8 @@
       "decimals": "Inserisci un numero intero da 0 a 4.",
       "rate": "Inserisci un decimale positivo con al massimo sei decimali, usando il punto.",
       "asOf": "Inserisci la data del tasso.",
-      "rateAndDate": "Il tasso e la sua data vanno insieme."
+      "rateAndDate": "Il tasso e la sua data vanno insieme.",
+      "rateStored": "Una volta impostato un tasso, il tasso e la sua data sono obbligatori."
     },
     "saveError": "Non è stato possibile salvare la valuta. Riprova.",
     "actionError": "Non è stato possibile applicare la modifica. Riprova.",

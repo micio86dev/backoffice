@@ -46,6 +46,7 @@ await Promise.all([
   import('../../../../app/components/organisms/LlmCredentialsPanel.vue'),
   import('../../../../app/components/organisms/BrandingForm.vue'),
   import('../../../../app/components/organisms/PlatformSettingsPanel.vue'),
+  import('../../../../app/components/organisms/CurrencyCatalogPanel.vue'),
 ])
 
 const tMock = (key: string) => key
@@ -286,8 +287,7 @@ describe('pages/settings/index.vue', () => {
     mockOrganization()
     mockCurrentUser('admin')
 
-    const SettingsPage = (await import('../../../../app/pages/settings/index.vue')).default
-    const wrapper = mount(SettingsPage, { global: { mocks: { $t: tMock } } })
+    const wrapper = await mountSettings()
     await waitFor(
       () => wrapper.find('[data-testid="organization-profile-form"]').exists(),
       'the organization profile panel to mount'
@@ -302,8 +302,7 @@ describe('pages/settings/index.vue', () => {
     mockOrganization()
     mockCurrentUser('admin')
 
-    const SettingsPage = (await import('../../../../app/pages/settings/index.vue')).default
-    mount(SettingsPage, { global: { mocks: { $t: tMock } } })
+    await mountSettings()
 
     const head = useHeadMock.mock.calls[0]?.[0] as { title?: () => string }
     expect(typeof head?.title).toBe('function')
@@ -447,6 +446,10 @@ describe('pages/settings/index.vue', () => {
     grant(['platformSettings.viewAny', 'llmCredentials.viewAny'])
     expect((await mountSettings()).text()).not.toContain('settings.tabs.currencies')
 
+    // Unmount first: a panel chunk still resolving would otherwise run against
+    // the registry this reset discards.
+    while (mounted.length > 0) mounted.pop()!.unmount()
+    await flushPromises()
     vi.resetModules()
     grant(['currencies.manage'])
     expect((await mountSettings()).text()).toContain('settings.tabs.currencies')

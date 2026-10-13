@@ -15,9 +15,14 @@ const tMock = (key: string) => key
 
 const fetchPlatformSettings = vi.fn()
 const updatePlatformSettings = vi.fn()
+const updateInterviewIntroPhrase = vi.fn()
 
 vi.mock('../../../../app/composables/usePlatformSettings', () => ({
-  usePlatformSettings: () => ({ fetchPlatformSettings, updatePlatformSettings }),
+  usePlatformSettings: () => ({
+    fetchPlatformSettings,
+    updatePlatformSettings,
+    updateInterviewIntroPhrase,
+  }),
 }))
 
 async function mountPanel() {
@@ -131,6 +136,92 @@ describe('PlatformSettingsPanel', () => {
     expect(wrapper.get('[data-testid="platform-standard-error"]').text()).toContain(
       'Serve un intero fra 1 e 10.'
     )
+  })
+
+  it('does not pile the generic banner on top of a mapped field error', async () => {
+    updatePlatformSettings.mockRejectedValue(
+      Object.assign(new Error('HTTP 422'), {
+        status: 422,
+        data: { errors: { 'max_questions_per_competency.standard': ['Serve un intero.'] } },
+      })
+    )
+
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="platform-max-questions-standard"]').setValue('3')
+    await wrapper.get('[data-testid="platform-settings-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="platform-settings-banner"]').exists()).toBe(false)
+  })
+
+  it('shows unmapped server messages in the banner', async () => {
+    updatePlatformSettings.mockRejectedValue(
+      Object.assign(new Error('HTTP 422'), {
+        status: 422,
+        data: { errors: { something_else: ['Unexpected refusal.'] } },
+      })
+    )
+
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="platform-max-questions-standard"]').setValue('3')
+    await wrapper.get('[data-testid="platform-settings-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="platform-settings-banner"]').text()).toContain(
+      'Unexpected refusal.'
+    )
+  })
+
+  describe('interview intro phrase', () => {
+    it('seeds the intro form from the same read as the caps', async () => {
+      fetchPlatformSettings.mockResolvedValue({
+        data: {
+          max_questions_per_competency: { standard: 2, potential: 4 },
+          interview_intro_phrase: { en: 'Hello', it: 'Ciao' },
+        },
+      })
+
+      const wrapper = await mountPanel()
+
+      expect(
+        (wrapper.get('[data-testid="intro-phrase-en"]').element as HTMLTextAreaElement).value
+      ).toBe('Hello')
+      expect(
+        (wrapper.get('[data-testid="intro-phrase-it"]').element as HTMLTextAreaElement).value
+      ).toBe('Ciao')
+    })
+
+    it('saves the intro without resending the caps, and the caps without the intro', async () => {
+      updateInterviewIntroPhrase.mockResolvedValue({
+        data: { interview_intro_phrase: { en: 'Hello' } },
+      })
+      const wrapper = await mountPanel()
+
+      await wrapper.get('[data-testid="intro-phrase-en"]').setValue('Hello')
+      await wrapper.get('[data-testid="intro-phrase-form"]').trigger('submit')
+      await flushPromises()
+
+      expect(updateInterviewIntroPhrase).toHaveBeenCalledWith({ en: 'Hello' })
+      expect(updatePlatformSettings).not.toHaveBeenCalled()
+
+      await wrapper.get('[data-testid="platform-settings-form"]').trigger('submit')
+      await flushPromises()
+
+      expect(updatePlatformSettings).toHaveBeenCalledWith({ standard: 2, potential: 4 })
+      expect(updateInterviewIntroPhrase).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the intro form closed when the read failed', async () => {
+      fetchPlatformSettings.mockRejectedValue(new Error('offline'))
+
+      const wrapper = await mountPanel()
+
+      expect(
+        wrapper.get('[data-testid="intro-phrase-submit"]').attributes('disabled')
+      ).toBeDefined()
+    })
   })
 
   describe('when the current values could not be read', () => {

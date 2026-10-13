@@ -43,9 +43,12 @@ export default defineConfig({
       // dimensions uniformly rather than only on lines. A future regression
       // below 85% on any of them now fails CI instead of shipping silently.
       thresholds: {
-        lines: 85,
-        branches: 85,
-        functions: 85,
+        // Floors sit just under the measured run (lines 99.45, branches 95.48,
+        // functions 96.37 after the coverage push): a real regression fails CI,
+        // ordinary fluctuation does not.
+        lines: 99,
+        branches: 95,
+        functions: 96,
       },
     },
   },

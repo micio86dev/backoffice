@@ -87,6 +87,7 @@ describe('pages/reports/index.vue', () => {
 
     expect(indexMock).toHaveBeenCalledWith({})
     expect(summaryMock).toHaveBeenCalledWith({})
+    expect(wrapper.text()).toContain('Mario Rossi')
     expect(wrapper.text()).toContain('Demo Project')
   })
 

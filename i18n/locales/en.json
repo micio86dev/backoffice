@@ -831,6 +831,14 @@
       "expiresAt": "Expires at",
       "create": "Create key",
       "createError": "This key could not be created. Please review the highlighted fields.",
+      "loadError": "The API keys could not be loaded. Please try again.",
+      "revokeError": "This key could not be revoked. Please try again.",
+      "retry": "Retry",
+      "statusError": {
+        "403": "You do not have permission to do this.",
+        "404": "This key no longer exists. Reload the list.",
+        "409": "The system is not ready for this yet. Please try again shortly."
+      },
       "rawKeyTitle": "Copy this key now",
       "rawKeyWarning": "This is the only time the raw key is shown. It cannot be retrieved again after you close this dialog.",
       "copy": "Copy",

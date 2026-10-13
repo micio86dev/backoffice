@@ -1,6 +1,6 @@
 {
   "name": "backoffice",
-  "version": "0.51.9",
+  "version": "0.51.10",
   "type": "module",
   "private": true,
   "scripts": {

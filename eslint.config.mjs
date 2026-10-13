@@ -58,6 +58,10 @@ export default createConfigForNuxt({
       'vuejs-accessibility/form-control-has-label': 'off',
       'vuejs-accessibility/click-events-have-key-events': 'off',
       'vuejs-accessibility/no-static-element-interactions': 'off',
+      // Optional props of the vendored primitives resolve to `undefined` by Vue's own
+      // default; the rule asks for an explicit one, which `shadcn-vue add` would drop
+      // again on the next install.
+      'vue/require-default-prop': 'off',
     },
   })
   // GENERATED FILES ARE NOT SOURCE.

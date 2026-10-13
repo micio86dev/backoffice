@@ -42,4 +42,10 @@ describe('useApiClients', () => {
 
     expect(apiFetch).toHaveBeenCalledWith('/m2m/clients/4', { method: 'DELETE' })
   })
+
+  it('reads the grantable abilities from the server, never a local copy', async () => {
+    await useApiClients().listAbilities()
+
+    expect(apiFetch).toHaveBeenCalledWith('/m2m/abilities')
+  })
 })

@@ -164,6 +164,72 @@ describe('QuestionList', () => {
   })
 })
 
+describe('QuestionList — display text and drag edge cases', () => {
+  function mountWith(questions: unknown[], locale = 'it') {
+    return mount(QuestionList, {
+      props: { questions: questions as never, locale },
+      global: {
+        mocks: { $t: tMock },
+        stubs: { Button: { template: '<button><slot /></button>' } },
+      },
+    })
+  }
+
+  it('falls back to English when the project-language text is blank', () => {
+    const q = { ...question(1, 'english text', 0), text: { en: 'english text', it: '' } }
+
+    expect(mountWith([q]).get('[data-testid="question-row-1"] p').text()).toBe('english text')
+  })
+
+  it('renders an empty line rather than throwing when no language has text', () => {
+    const q = { ...question(1, 'x', 0), text: { it: null } }
+
+    expect(mountWith([q]).get('[data-testid="question-row-1"] p').text()).toBe('')
+  })
+
+  it('renders an empty line rather than throwing when the text map is missing', () => {
+    const q = { ...question(1, 'x', 0), text: null }
+
+    expect(mountWith([q]).get('[data-testid="question-row-1"] p').text()).toBe('')
+  })
+
+  it('emits the whole new order when a row is dragged upwards', () => {
+    const wrapper = mountWith([question(1, 'a', 0), question(2, 'b', 1), question(3, 'c', 2)])
+
+    wrapper.get('[data-testid="question-grip-3"]').trigger('dragstart')
+    wrapper.get('[data-testid="question-grip-1"]').trigger('drop')
+
+    expect(wrapper.emitted('reorder')?.[0]?.[0]).toEqual([3, 1, 2])
+  })
+
+  it('ignores a drop that has no drag in progress', () => {
+    const wrapper = mountWith([question(1, 'a', 0), question(2, 'b', 1)])
+
+    wrapper.get('[data-testid="question-grip-2"]').trigger('drop')
+
+    expect(wrapper.emitted('reorder')).toBeUndefined()
+  })
+
+  it('ignores a drop onto the row that was picked up', () => {
+    const wrapper = mountWith([question(1, 'a', 0), question(2, 'b', 1)])
+
+    wrapper.get('[data-testid="question-grip-1"]').trigger('dragstart')
+    wrapper.get('[data-testid="question-grip-1"]').trigger('drop')
+
+    expect(wrapper.emitted('reorder')).toBeUndefined()
+  })
+
+  it('forgets the dragged row once dropped, so a second stray drop does nothing', () => {
+    const wrapper = mountWith([question(1, 'a', 0), question(2, 'b', 1)])
+
+    wrapper.get('[data-testid="question-grip-1"]').trigger('dragstart')
+    wrapper.get('[data-testid="question-grip-2"]').trigger('drop')
+    wrapper.get('[data-testid="question-grip-2"]').trigger('drop')
+
+    expect(wrapper.emitted('reorder')).toHaveLength(1)
+  })
+})
+
 describe('QuestionList — read-only', () => {
   it('renders the rows with no grip, move, edit or remove control', () => {
     const wrapper = mount(QuestionList, {

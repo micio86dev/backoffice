@@ -216,4 +216,114 @@ describe('NavBar', () => {
 
     expect(wrapper.findComponent(ClientSwitcher).props('clients')).toHaveLength(2)
   })
+
+  /**
+   * The organization name an ORDINARY operator sees where a superadmin gets the
+   * switcher. It is context, never an error: every failure shape below renders
+   * nothing rather than a topbar that shouts.
+   */
+  function mockOrdinaryOperator(fetchOrganization: () => Promise<unknown>) {
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockResolvedValue({ user: { name: 'Ada', photo_url: null } }),
+        can: () => false,
+      }),
+    }))
+    vi.doMock('../../../../app/composables/useOrganization', () => ({
+      useOrganization: () => ({ fetchOrganization }),
+    }))
+  }
+
+  it('shows the organization name to an ordinary operator instead of the switcher', async () => {
+    mockOrdinaryOperator(vi.fn().mockResolvedValue({ data: { name: 'Acme Corp' } }))
+
+    const wrapper = await mountFresh()
+
+    expect(wrapper.find('[data-testid="navbar-organization"]').text()).toBe('Acme Corp')
+    expect(wrapper.find('[data-testid="client-switcher"]').exists()).toBe(false)
+  })
+
+  it('renders no organization name when the API answers data: null', async () => {
+    mockOrdinaryOperator(vi.fn().mockResolvedValue({ data: null }))
+
+    expect((await mountFresh()).find('[data-testid="navbar-organization"]').exists()).toBe(false)
+  })
+
+  it('renders no organization name, and no error, when the organization read fails', async () => {
+    mockOrdinaryOperator(vi.fn().mockRejectedValue(new Error('boom')))
+
+    const wrapper = await mountFresh()
+
+    expect(wrapper.find('[data-testid="navbar-organization"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="logout-button"]').exists()).toBe(true)
+  })
+
+  it('still falls back to the organization lookup when the identity read fails', async () => {
+    vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+      useCurrentUser: () => ({
+        ensureLoaded: vi.fn().mockRejectedValue(new Error('identity down')),
+        can: () => false,
+      }),
+    }))
+    vi.doMock('../../../../app/composables/useOrganization', () => ({
+      useOrganization: () => ({
+        fetchOrganization: vi.fn().mockResolvedValue({ data: { name: 'Acme Corp' } }),
+      }),
+    }))
+
+    const wrapper = await mountFresh()
+
+    expect(wrapper.find('[data-testid="navbar-organization"]').text()).toBe('Acme Corp')
+  })
+
+  describe('clients revision watcher', () => {
+    function mockSwitcher(canSwitch: boolean, fetchClients: ReturnType<typeof vi.fn>) {
+      const revision = ref(0)
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => ({
+          ensureLoaded: vi.fn().mockResolvedValue({ user: { name: 'Ada', photo_url: null } }),
+          can: () => canSwitch,
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useOrganization', () => ({
+        useOrganization: () => ({
+          fetchOrganization: vi.fn().mockResolvedValue({ data: { name: 'Acme Corp' } }),
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useSuperadmin', () => ({
+        clientsRevision: revision,
+        useSuperadmin: () => ({ fetchClients, setActingClient: vi.fn() }),
+      }))
+      return revision
+    }
+
+    it('does not re-read the client list for a viewer who may not switch clients', async () => {
+      const fetchClients = vi.fn()
+      const revision = mockSwitcher(false, fetchClients)
+      await mountFresh()
+
+      revision.value += 1
+      await flushPromises()
+
+      expect(fetchClients).not.toHaveBeenCalled()
+    })
+
+    it('keeps the last known list when the refresh after a revision bump fails', async () => {
+      const fetchClients = vi
+        .fn()
+        .mockResolvedValueOnce({ data: [{ id: 1, name: 'Acme' }], acting_organization_id: 1 })
+        .mockRejectedValueOnce(new Error('transient'))
+      const revision = mockSwitcher(true, fetchClients)
+      const wrapper = await mountFresh()
+      const ClientSwitcher = (
+        await import('../../../../app/components/organisms/ClientSwitcher.vue')
+      ).default
+
+      revision.value += 1
+      await flushPromises()
+
+      expect(fetchClients).toHaveBeenCalledTimes(2)
+      expect(wrapper.findComponent(ClientSwitcher).props('clients')).toHaveLength(1)
+    })
+  })
 })

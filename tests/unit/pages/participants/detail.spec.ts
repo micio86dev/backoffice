@@ -1650,6 +1650,404 @@ describe('pages/participants/[id].vue', () => {
       expect(next.wrapper.text()).not.toContain('secret-token')
     })
   })
+  describe('Action wiring (recovery, audit refresh, entry-link failures, route id shapes)', () => {
+    type Overrides = Record<string, unknown>
+
+    async function mountWiring(
+      options: {
+        role?: 'admin' | 'operator' | 'viewer'
+        status?: string
+        participant?: Overrides
+        routeParams?: Record<string, unknown>
+        fetchEvaluationMock?: ReturnType<typeof vi.fn>
+        listSessionsMock?: ReturnType<typeof vi.fn>
+        generateEntryLinkMock?: ReturnType<typeof vi.fn>
+        downloadTranscriptMock?: ReturnType<typeof vi.fn>
+        downloadEvaluationMock?: ReturnType<typeof vi.fn>
+        i18n?: 'keys' | 'real'
+      } = {}
+    ) {
+      const {
+        role = 'operator',
+        status = 'completato',
+        participant = {},
+        routeParams = { id: '42' },
+        fetchEvaluationMock = vi.fn().mockResolvedValue(EVALUATION_FIXTURE),
+        listSessionsMock = vi.fn().mockResolvedValue({ data: [] }),
+        generateEntryLinkMock = vi.fn(),
+        downloadTranscriptMock = vi.fn().mockResolvedValue(undefined),
+        downloadEvaluationMock = vi.fn().mockResolvedValue(undefined),
+        i18n = 'keys',
+      } = options
+
+      const base = detailResponse(status)
+      const fetchParticipantMock = vi
+        .fn()
+        .mockResolvedValue({ data: { ...base.data, ...participant } })
+      const route = { params: routeParams }
+      vi.stubGlobal(
+        'useRoute',
+        vi.fn(() => route)
+      )
+      if (i18n === 'real') {
+        const t = realT(en)
+        vi.stubGlobal(
+          'useI18n',
+          vi.fn(() => ({
+            t,
+            te: (key: string) => t(key) !== key,
+            locale: ref('en'),
+          }))
+        )
+      }
+
+      vi.doMock('../../../../app/composables/useParticipants', () => ({
+        useParticipants: () => ({ fetchParticipant: fetchParticipantMock }),
+      }))
+      vi.doMock('../../../../app/composables/useCurrentUser', () => ({
+        useCurrentUser: () => currentUserStub(role),
+      }))
+      vi.doMock('../../../../app/composables/useEvaluationReport', () => ({
+        useEvaluationReport: () => ({ fetchEvaluation: fetchEvaluationMock }),
+      }))
+      vi.doMock('../../../../app/composables/useTranscript', () => ({
+        useTranscript: () => ({ fetchTranscript: vi.fn().mockResolvedValue(TRANSCRIPT_FIXTURE) }),
+      }))
+      vi.doMock('../../../../app/composables/useDownloads', () => ({
+        useDownloads: () => ({
+          downloadTranscript: downloadTranscriptMock,
+          downloadEvaluation: downloadEvaluationMock,
+        }),
+      }))
+      vi.doMock('../../../../app/composables/useSessionReview', () => ({
+        useSessionReview: () => ({ listSessions: listSessionsMock }),
+      }))
+      vi.doMock('../../../../app/composables/useEntryLinks', () => ({
+        useEntryLinks: () => ({ generateEntryLink: generateEntryLinkMock }),
+      }))
+
+      const DetailPage = (await import('../../../../app/pages/participants/[id].vue')).default
+      const wrapper = mount(withTooltipProvider(DetailPage), {
+        global: {
+          mocks: { $t: i18n === 'real' ? realT(en) : tMock },
+          stubs: { NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+        },
+      })
+      await flushPromises()
+      await flushPromises()
+
+      return {
+        wrapper,
+        route,
+        fetchParticipantMock,
+        fetchEvaluationMock,
+        listSessionsMock,
+        generateEntryLinkMock,
+        downloadTranscriptMock,
+        downloadEvaluationMock,
+      }
+    }
+
+    describe('participant recovery', () => {
+      it('flips the status at once, keeps the card to show its confirmation, and re-reads sessions', async () => {
+        const listSessionsMock = vi
+          .fn()
+          .mockResolvedValueOnce({ data: [{ id: 1, status: 'error' }] })
+          .mockResolvedValueOnce({ data: [{ id: 1, status: 'pending' }] })
+        const { wrapper } = await mountWiring({ status: 'errore', listSessionsMock })
+        const Panel = (
+          await import('../../../../app/components/organisms/ParticipantRecoveryPanel.vue')
+        ).default
+        const StatusBadge = (await import('../../../../app/components/atoms/StatusBadge.vue'))
+          .default
+        const SessionList = (await import('../../../../app/components/organisms/SessionList.vue'))
+          .default
+        expect(wrapper.findComponent(StatusBadge).props('status')).toBe('errore')
+
+        wrapper.findComponent(Panel).vm.$emit('recovered', { status: 'in_attesa' })
+        await flushPromises()
+
+        expect(wrapper.findComponent(StatusBadge).props('status')).toBe('in_attesa')
+        // Gating on status alone would have unmounted the card (and the
+        // panel's own confirmation) the instant the badge changed.
+        expect(wrapper.find('[data-testid="participant-recovery-card"]').exists()).toBe(true)
+        expect(listSessionsMock).toHaveBeenCalledTimes(2)
+        expect(wrapper.findComponent(SessionList).props('sessions')).toEqual([
+          { id: 1, status: 'pending' },
+        ])
+      })
+
+      it('empties the session list rather than blanking the page when the re-read fails', async () => {
+        const listSessionsMock = vi
+          .fn()
+          .mockResolvedValueOnce({ data: [{ id: 1, status: 'error' }] })
+          .mockRejectedValueOnce(new Error('sessions down'))
+        const { wrapper } = await mountWiring({ status: 'errore', listSessionsMock })
+        const Panel = (
+          await import('../../../../app/components/organisms/ParticipantRecoveryPanel.vue')
+        ).default
+        const SessionList = (await import('../../../../app/components/organisms/SessionList.vue'))
+          .default
+
+        wrapper.findComponent(Panel).vm.$emit('recovered', { status: 'in_attesa' })
+        await flushPromises()
+
+        expect(wrapper.find('h1').text()).toBe('Jane Doe')
+        expect(wrapper.findComponent(SessionList).props('sessions')).toEqual([])
+      })
+
+      it('does not offer recovery to a viewer, even for an errored participant', async () => {
+        const { wrapper } = await mountWiring({ status: 'errore', role: 'viewer' })
+
+        expect(wrapper.find('[data-testid="participant-recovery-card"]').exists()).toBe(false)
+      })
+    })
+
+    describe('evaluation audit refresh', () => {
+      const AUDIT_META = {
+        run_id: 9,
+        status: 'completed' as const,
+        judge_model_version: 'judge-1',
+        audit_prompt_version: '1.0.0',
+        created_at: '2026-10-01T10:00:00Z',
+        indicators_total: 3,
+        indicators_judged: 3,
+        indicators_skipped: 0,
+        indicators_unavailable: 0,
+        indicators_malformed: 0,
+      }
+      const REFRESHED_DATA = {
+        SLF: {
+          ...EVALUATION_DATA_FIXTURE.SLF,
+          score: 2,
+        },
+      }
+
+      async function auditPanel(wrapper: Awaited<ReturnType<typeof mountWiring>>['wrapper']) {
+        const Panel = (
+          await import('../../../../app/components/organisms/EvaluationAuditPanel.vue')
+        ).default
+        return wrapper.findComponent(Panel)
+      }
+
+      it('replaces BOTH the report data and the audit provenance after a trigger', async () => {
+        const fetchEvaluationMock = vi
+          .fn()
+          .mockResolvedValueOnce(EVALUATION_FIXTURE)
+          .mockResolvedValueOnce({
+            data: REFRESHED_DATA,
+            meta: EVALUATION_META_FIXTURE,
+            auditMeta: AUDIT_META,
+          })
+        const { wrapper } = await mountWiring({ fetchEvaluationMock })
+        const Report = (await import('../../../../app/components/organisms/EvaluationReport.vue'))
+          .default
+        expect((await auditPanel(wrapper)).props('auditMeta')).toBeNull()
+
+        ;(await auditPanel(wrapper)).vm.$emit('triggered', 42)
+        await flushPromises()
+
+        expect(fetchEvaluationMock).toHaveBeenLastCalledWith('42')
+        expect((await auditPanel(wrapper)).props('auditMeta')).toEqual(AUDIT_META)
+        // Updating only the meta left every per-indicator flag showing its
+        // pre-trigger verdict.
+        expect(wrapper.findComponent(Report).props('evaluation')).toEqual(REFRESHED_DATA)
+      })
+
+      it('keeps what is on screen when the refresh fails', async () => {
+        const fetchEvaluationMock = vi
+          .fn()
+          .mockResolvedValueOnce(EVALUATION_FIXTURE)
+          .mockRejectedValueOnce(new Error('network down'))
+        const { wrapper } = await mountWiring({ fetchEvaluationMock })
+        const Report = (await import('../../../../app/components/organisms/EvaluationReport.vue'))
+          .default
+
+        ;(await auditPanel(wrapper)).vm.$emit('triggered', 42)
+        await flushPromises()
+
+        expect(fetchEvaluationMock).toHaveBeenCalledTimes(2)
+        expect(wrapper.findComponent(Report).props('evaluation')).toEqual(EVALUATION_DATA_FIXTURE)
+        expect(wrapper.find('[data-testid="report-error"]').exists()).toBe(false)
+      })
+
+      it('refreshes with the first segment when the id param is an array', async () => {
+        const { wrapper, fetchEvaluationMock } = await mountWiring({
+          routeParams: { id: ['42', '43'] },
+        })
+
+        ;(await auditPanel(wrapper)).vm.$emit('triggered', 42)
+        await flushPromises()
+
+        expect(fetchEvaluationMock).toHaveBeenCalledTimes(2)
+        expect(fetchEvaluationMock).toHaveBeenLastCalledWith('42')
+      })
+
+      it('does nothing when the route carries no id', async () => {
+        const { wrapper, route, fetchEvaluationMock } = await mountWiring()
+        delete (route.params as Record<string, unknown>)['id']
+
+        ;(await auditPanel(wrapper)).vm.$emit('triggered', 42)
+        await flushPromises()
+
+        expect(fetchEvaluationMock).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('route id shapes', () => {
+      it('uses the first segment when the id param is an array', async () => {
+        const { fetchParticipantMock, fetchEvaluationMock } = await mountWiring({
+          routeParams: { id: ['42', '43'] },
+        })
+
+        expect(fetchParticipantMock).toHaveBeenCalledWith('42')
+        expect(fetchEvaluationMock).toHaveBeenCalledWith('42')
+      })
+
+      it('re-reads the participant with the first array segment after a retry authorization', async () => {
+        const { wrapper, fetchParticipantMock } = await mountWiring({
+          routeParams: { id: ['42', '43'] },
+        })
+        const Panel = (
+          await import('../../../../app/components/organisms/EvaluationRetryPanel.vue')
+        ).default
+
+        wrapper.findComponent(Panel).vm.$emit('authorized')
+        await flushPromises()
+
+        expect(fetchParticipantMock).toHaveBeenCalledTimes(2)
+        expect(fetchParticipantMock).toHaveBeenLastCalledWith('42')
+      })
+
+      it('does not re-read the participant after a retry authorization when the route has no id', async () => {
+        const { wrapper, route, fetchParticipantMock } = await mountWiring()
+        const Panel = (
+          await import('../../../../app/components/organisms/EvaluationRetryPanel.vue')
+        ).default
+        delete (route.params as Record<string, unknown>)['id']
+
+        wrapper.findComponent(Panel).vm.$emit('authorized')
+        await flushPromises()
+
+        expect(fetchParticipantMock).toHaveBeenCalledTimes(1)
+      })
+    })
+
+    describe('entry-link re-issue failures', () => {
+      async function clickGenerate(wrapper: Awaited<ReturnType<typeof mountWiring>>['wrapper']) {
+        await wrapper.get('[data-testid="participant-generate-entry-link"]').trigger('click')
+        await flushPromises()
+      }
+
+      it('shows the server-coded reason in the operator language, in the destructive style', async () => {
+        const generateEntryLinkMock = vi.fn().mockRejectedValue(
+          Object.assign(new Error('HTTP 409'), {
+            status: 409,
+            data: { message: 'entry_link_participant_completed' },
+          })
+        )
+        const { wrapper } = await mountWiring({
+          status: 'in_attesa',
+          i18n: 'real',
+          generateEntryLinkMock,
+        })
+
+        await clickGenerate(wrapper)
+
+        const alert = wrapper.get('[data-testid="participant-entry-link-error"]')
+        expect(alert.text()).toContain('This candidate has already completed the assessment.')
+        // A coded 409 is a real conflict, not "not ready yet".
+        expect(alert.classes().join(' ')).toContain('destructive')
+      })
+
+      it('clears the previous error when the next attempt starts', async () => {
+        const generateEntryLinkMock = vi
+          .fn()
+          .mockRejectedValueOnce(new Error('boom'))
+          .mockResolvedValueOnce({
+            entry_url: 'https://interview.example.com/interview/tok',
+            expires_at: '2026-08-17T15:32:00.000000Z',
+          })
+        const { wrapper } = await mountWiring({ status: 'in_attesa', generateEntryLinkMock })
+
+        await clickGenerate(wrapper)
+        expect(wrapper.find('[data-testid="participant-entry-link-error"]').exists()).toBe(true)
+
+        await clickGenerate(wrapper)
+
+        expect(wrapper.find('[data-testid="participant-entry-link-error"]').exists()).toBe(false)
+        expect(wrapper.get('[data-testid="entry-link-url"]').text()).toBe(
+          'https://interview.example.com/interview/tok'
+        )
+      })
+
+      it('never renders a panel with an undefined URL when the response carries no entry_url', async () => {
+        const generateEntryLinkMock = vi.fn().mockResolvedValue({
+          id: 42,
+          display_name: 'Jane Doe',
+          scheduled_at: '2026-10-01T12:00:00.000000Z',
+        })
+        const { wrapper } = await mountWiring({ status: 'in_attesa', generateEntryLinkMock })
+
+        await clickGenerate(wrapper)
+
+        expect(wrapper.find('[data-testid="entry-link-url"]').exists()).toBe(false)
+        expect(wrapper.find('[data-testid="participant-generate-entry-link"]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid="participant-entry-link-error"]').exists()).toBe(false)
+      })
+    })
+
+    describe('interview summary coverage and download names', () => {
+      it('states nothing extra when every session contributed to the elapsed time', async () => {
+        const { wrapper } = await mountWiring({
+          participant: { elapsed: { seconds: 780, sessions_counted: 3, sessions_total: 3 } },
+        })
+
+        expect(wrapper.find('[data-testid="interview-elapsed-detail"]').exists()).toBe(false)
+      })
+
+      it('falls back to a generic file name when the candidate reference has no usable characters', async () => {
+        const { wrapper, downloadTranscriptMock } = await mountWiring({
+          participant: { candidate_ref: '###' },
+        })
+
+        await wrapper.get('[data-testid="download-transcript"]').trigger('click')
+        await flushPromises()
+
+        expect(downloadTranscriptMock).toHaveBeenCalledWith(42, 'beai-transcript-candidate.txt')
+      })
+
+      it.each([
+        [409, 'not-ready'],
+        [403, 'forbidden'],
+      ])('shows a %i evaluation download rejection as the %s state', async (status, state) => {
+        const downloadEvaluationMock = vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error(`HTTP ${status}`), { status }))
+        const { wrapper } = await mountWiring({ downloadEvaluationMock })
+
+        await wrapper.get('[data-testid="download-evaluation"]').trigger('click')
+        await flushPromises()
+
+        expect(wrapper.get('[data-testid="download-error"]').attributes('data-state')).toBe(state)
+        // The button is usable again: a failed download must not strand the operator.
+        expect(
+          wrapper.get('[data-testid="download-evaluation"]').attributes('disabled')
+        ).toBeUndefined()
+      })
+
+      it('slugifies a messy candidate reference into a safe file name', async () => {
+        const { wrapper, downloadTranscriptMock } = await mountWiring({
+          participant: { candidate_ref: '  ref 042/é!  ' },
+        })
+
+        await wrapper.get('[data-testid="download-transcript"]').trigger('click')
+        await flushPromises()
+
+        expect(downloadTranscriptMock).toHaveBeenCalledWith(42, 'beai-transcript-ref-042.txt')
+      })
+    })
+  })
 })
 
 function flushPromises(): Promise<void> {

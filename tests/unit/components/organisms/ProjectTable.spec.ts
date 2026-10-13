@@ -698,3 +698,104 @@ describe('ProjectTable — a project with no competencies', () => {
     expect(ownCell.text()).not.toContain('projects.table.platformBadge')
   })
 })
+
+describe('ProjectTable — invite drawer lifecycle and BARS coverage', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  const MINTED = {
+    entry_url: 'https://interview.example.com/interview/tok',
+    expires_at: '2026-08-17T15:32:00.000000Z',
+  }
+
+  async function openInvite() {
+    const wrapper = mount(ProjectTable, {
+      props: { projects: [project({ id: 1, status: 'active' })], canInvite: true, locale: 'en' },
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
+    return wrapper
+  }
+
+  const inBody = (testId: string) => document.body.querySelector(`[data-testid="${testId}"]`)
+
+  it('returns from the minted link to the form when "generate new link" is chosen', async () => {
+    const wrapper = await openInvite()
+    wrapper.findComponent(EntryLinkForm).vm.$emit('success', MINTED)
+    await wrapper.vm.$nextTick()
+    expect(inBody('entry-link-url')).not.toBeNull()
+
+    ;(inBody('entry-link-generate') as HTMLButtonElement).click()
+    await wrapper.vm.$nextTick()
+
+    // The old URL is gone and the project-scoped form is back, so the operator
+    // re-confirms who is being invited rather than silently re-minting.
+    expect(inBody('entry-link-url')).toBeNull()
+    expect(inBody('entry-link-form')).not.toBeNull()
+    expect(inBody('form-drawer-save')).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('discards the minted link when the drawer is dismissed, and ignores an "open" signal', async () => {
+    const wrapper = await openInvite()
+    wrapper.findComponent(EntryLinkForm).vm.$emit('success', MINTED)
+    await wrapper.vm.$nextTick()
+    const drawer = wrapper.findComponent({ name: 'FormDrawer' })
+
+    drawer.vm.$emit('update:open', true)
+    await wrapper.vm.$nextTick()
+    expect(inBody('entry-link-url')).not.toBeNull()
+
+    drawer.vm.$emit('update:open', false)
+    await wrapper.vm.$nextTick()
+    expect(inBody('entry-link-url')).toBeNull()
+    expect((wrapper.vm as unknown as { inviteTarget: unknown }).inviteTarget).toBeNull()
+
+    wrapper.unmount()
+  })
+
+  describe('uncovered-competency count', () => {
+    const competencies = [
+      { id: 1, code: 'COL', name: { en: 'Collaboration' } },
+      { id: 2, code: 'PRS', name: { en: 'Presence' } },
+      { id: 3, code: 'STG', name: { en: 'Strategy' } },
+    ]
+
+    function row(projectOverrides: Record<string, unknown>, coverage: Record<string, number[]>) {
+      return mount(ProjectTable, {
+        props: { projects: [project({ id: 1, competencies, ...projectOverrides })], coverage },
+        global: { mocks: { $t: tMock } },
+      })
+    }
+
+    it("counts only THIS project's competencies that the role leaves uncovered", () => {
+      // Role FLL leaves 2, 3 and 99 uncovered; this project holds 1, 2, 3.
+      const wrapper = row({}, { FLL: [2, 3, 99] })
+
+      expect(wrapper.get('[data-testid="project-row-uncovered-1"]').text()).toContain(
+        'projects.table.uncoveredCompetencies'
+      )
+    })
+
+    it.each([
+      ['the role is missing from the coverage map', {}],
+      ['the role has nothing uncovered', { FLL: [] }],
+      ['no uncovered id belongs to the project', { FLL: [98, 99] }],
+    ])('shows nothing when %s', (_label, coverage) => {
+      expect(
+        row({}, coverage as Record<string, number[]>)
+          .find('[data-testid="project-row-uncovered-1"]')
+          .exists()
+      ).toBe(false)
+    })
+
+    it('shows nothing for a project with no role code', () => {
+      const wrapper = row({ role_code: null }, { FLL: [2, 3] })
+
+      expect(wrapper.find('[data-testid="project-row-uncovered-1"]').exists()).toBe(false)
+    })
+  })
+})

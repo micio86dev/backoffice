@@ -143,4 +143,56 @@ describe('pages/profile.vue', () => {
       expect(wrapper.get('[data-testid="profile-role-badge"]').text()).toContain('users.role.admin')
     })
   })
+
+  describe('when the profile cannot be read', () => {
+    function httpError(status: number): Error & { status: number } {
+      return Object.assign(new Error(`HTTP ${status}`), { status })
+    }
+
+    it.each([
+      [409, 'not-ready'],
+      [403, 'forbidden'],
+      [404, 'not-found'],
+      [500, 'error'],
+    ])('states a %i as %s and renders none of the forms', async (status, state) => {
+      fetchProfileMock.mockRejectedValue(httpError(status))
+
+      const wrapper = await mountPage()
+
+      expect(wrapper.get('[data-testid="profile-error"]').attributes('data-state')).toBe(state)
+      expect(wrapper.find('[data-testid="profile-details-form"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="profile-password-form"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="profile-name"]').exists()).toBe(false)
+    })
+  })
+
+  it('omits the organization line for a user with no organization', async () => {
+    fetchProfileMock.mockResolvedValue(profileResponse({ organization: null }))
+
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('[data-testid="profile-organization"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="profile-name"]').text()).toBe('Ada Lovelace')
+  })
+
+  it('shows the organization name read-only when there is one', async () => {
+    const wrapper = await mountPage()
+
+    expect(wrapper.get('[data-testid="profile-organization"]').text()).toBe('Acme')
+    expect(wrapper.get('[data-testid="profile-email"]').text()).toBe('ada@example.test')
+  })
+
+  it('titles the document from the head.title.profile key, resolved lazily', async () => {
+    const useHeadMock = vi.fn()
+    vi.stubGlobal('useHead', useHeadMock)
+
+    await mountPage()
+
+    const options = useHeadMock.mock.calls[0]![0] as {
+      title: () => string
+      meta: Array<{ name: string; content: string }>
+    }
+    expect(options.title()).toBe(realI18n().t('head.title.profile'))
+    expect(options.meta).toContainEqual({ name: 'robots', content: 'noindex, nofollow' })
+  })
 })

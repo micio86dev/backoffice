@@ -944,7 +944,29 @@
       },
       "saved": "Impostazioni di piattaforma salvate.",
       "saveFailed": "Non è stato possibile salvare le impostazioni di piattaforma.",
-      "loadFailed": "Non è stato possibile caricare le impostazioni di piattaforma. I valori mostrati sono quelli predefiniti."
+      "loadFailed": "Non è stato possibile caricare le impostazioni di piattaforma. I valori mostrati sono quelli predefiniti.",
+      "introPhrase": {
+        "title": "Frase introduttiva del colloquio",
+        "description": "Pronunciata dall'avatar prima della prima domanda di ogni colloquio. Conta nel tempo limite del colloquio, quindi mantienila breve ed evita le frasi di chiusura. Lascia vuoti entrambi i campi per non avere alcuna introduzione.",
+        "label": {
+          "en": "Frase introduttiva — inglese (obbligatoria)",
+          "it": "Frase introduttiva — italiano (facoltativa)"
+        },
+        "help": {
+          "en": "Usata per i colloqui in inglese e come alternativa per le lingue senza un testo proprio.",
+          "it": "Usata per i colloqui in italiano. Se vuota, viene pronunciato il testo inglese."
+        },
+        "counter": "{count} / {max} caratteri · ≈ {seconds} s di parlato",
+        "overBy": "Oltre il limite di {over}: accorcia il testo.",
+        "tooLong": "Usa al massimo {max} caratteri.",
+        "enRequired": "Aggiungi il testo inglese: è obbligatorio quando è impostata un'introduzione.",
+        "saved": "Introduzione del colloquio salvata.",
+        "cleared": "Introduzione del colloquio rimossa.",
+        "saveFailed": "Impossibile salvare l'introduzione del colloquio.",
+        "clear": "Rimuovi introduzione",
+        "clearConfirmTitle": "Rimuovere l'introduzione del colloquio?",
+        "clearConfirmDescription": "I colloqui inizieranno direttamente con la prima domanda."
+      }
     }
   },
   "users": {

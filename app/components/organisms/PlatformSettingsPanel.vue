@@ -1,86 +1,89 @@
 <template>
-  <form data-testid="platform-settings-form" novalidate @submit.prevent="onSubmit">
-    <FormFieldset :disabled="saving">
-      <FieldGroup>
-        <Field :data-invalid="Boolean(errors.standard)">
-          <FieldLabel for="platform-max-questions-standard">
-            {{ $t('settings.platform.maxQuestions.standard') }}
-          </FieldLabel>
-          <Input
-            id="platform-max-questions-standard"
-            v-model="standard"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            max="10"
-            autocomplete="off"
-            :aria-invalid="Boolean(errors.standard)"
-            :aria-describedby="describedBy('standard')"
-            data-testid="platform-max-questions-standard"
+  <div class="space-y-8">
+    <form data-testid="platform-settings-form" novalidate @submit.prevent="onSubmit">
+      <FormFieldset :disabled="saving">
+        <FieldGroup>
+          <Field :data-invalid="Boolean(errors.standard)">
+            <FieldLabel for="platform-max-questions-standard">
+              {{ $t('settings.platform.maxQuestions.standard') }}
+            </FieldLabel>
+            <Input
+              id="platform-max-questions-standard"
+              v-model="standard"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="10"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.standard)"
+              :aria-describedby="describedBy('standard')"
+              data-testid="platform-max-questions-standard"
+            />
+            <FieldDescription id="platform-max-questions-standard-help">
+              {{ $t('settings.platform.maxQuestions.standardHelp') }}
+            </FieldDescription>
+            <FieldError
+              v-if="errors.standard"
+              id="platform-max-questions-standard-error"
+              data-testid="platform-standard-error"
+            >
+              {{ errors.standard }}
+            </FieldError>
+          </Field>
+
+          <Field :data-invalid="Boolean(errors.potential)">
+            <FieldLabel for="platform-max-questions-potential">
+              {{ $t('settings.platform.maxQuestions.potential') }}
+            </FieldLabel>
+            <Input
+              id="platform-max-questions-potential"
+              v-model="potential"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="10"
+              autocomplete="off"
+              :aria-invalid="Boolean(errors.potential)"
+              :aria-describedby="describedBy('potential')"
+              data-testid="platform-max-questions-potential"
+            />
+            <FieldDescription id="platform-max-questions-potential-help">
+              {{ $t('settings.platform.maxQuestions.potentialHelp') }}
+            </FieldDescription>
+            <FieldError
+              v-if="errors.potential"
+              id="platform-max-questions-potential-error"
+              data-testid="platform-potential-error"
+            >
+              {{ errors.potential }}
+            </FieldError>
+          </Field>
+
+          <FormMessage
+            v-if="formMessage"
+            :kind="formMessage.kind"
+            :text="formMessage.text"
+            test-id="platform-settings-banner"
           />
-          <FieldDescription id="platform-max-questions-standard-help">
-            {{ $t('settings.platform.maxQuestions.standardHelp') }}
-          </FieldDescription>
-          <FieldError
-            v-if="errors.standard"
-            id="platform-max-questions-standard-error"
-            data-testid="platform-standard-error"
+
+          <!--
+            Disabled rather than hidden until the current values have been read.
+            A control that vanishes reads as "you may not do this"; this one is
+            "not yet", and the banner above says why.
+          -->
+          <Button
+            type="submit"
+            :loading="saving"
+            :disabled="!loaded"
+            data-testid="platform-settings-submit"
           >
-            {{ errors.standard }}
-          </FieldError>
-        </Field>
-
-        <Field :data-invalid="Boolean(errors.potential)">
-          <FieldLabel for="platform-max-questions-potential">
-            {{ $t('settings.platform.maxQuestions.potential') }}
-          </FieldLabel>
-          <Input
-            id="platform-max-questions-potential"
-            v-model="potential"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            max="10"
-            autocomplete="off"
-            :aria-invalid="Boolean(errors.potential)"
-            :aria-describedby="describedBy('potential')"
-            data-testid="platform-max-questions-potential"
-          />
-          <FieldDescription id="platform-max-questions-potential-help">
-            {{ $t('settings.platform.maxQuestions.potentialHelp') }}
-          </FieldDescription>
-          <FieldError
-            v-if="errors.potential"
-            id="platform-max-questions-potential-error"
-            data-testid="platform-potential-error"
-          >
-            {{ errors.potential }}
-          </FieldError>
-        </Field>
-
-        <FormMessage
-          v-if="formMessage"
-          :kind="formMessage.kind"
-          :text="formMessage.text"
-          test-id="platform-settings-banner"
-        />
-
-        <!--
-          Disabled rather than hidden until the current values have been read.
-          A control that vanishes reads as "you may not do this"; this one is
-          "not yet", and the banner above says why.
-        -->
-        <Button
-          type="submit"
-          :loading="saving"
-          :disabled="!loaded"
-          data-testid="platform-settings-submit"
-        >
-          {{ $t('projects.action.save') }}
-        </Button>
-      </FieldGroup>
-    </FormFieldset>
-  </form>
+            {{ $t('projects.action.save') }}
+          </Button>
+        </FieldGroup>
+      </FormFieldset>
+    </form>
+    <InterviewIntroPhraseForm :initial="intro" :loaded="loaded" @saved="emit('saved')" />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -106,7 +109,12 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
-import { usePlatformSettings, type PlatformSettingsCaps } from '@/composables/usePlatformSettings'
+import InterviewIntroPhraseForm from '@/components/organisms/InterviewIntroPhraseForm.vue'
+import {
+  usePlatformSettings,
+  type StoredInterviewIntroPhrase,
+  type PlatformSettingsCaps,
+} from '@/composables/usePlatformSettings'
 import { applyServerFieldErrors } from '@/utils/http-error'
 
 const emit = defineEmits<{ (e: 'saved'): void }>()
@@ -120,6 +128,8 @@ const { t } = useI18n()
 const standard = ref('1')
 const potential = ref('4')
 const saving = ref(false)
+// Owned by the intro form once seeded; the read happens here, once, for both.
+const intro = ref<StoredInterviewIntroPhrase | undefined>(undefined)
 
 /**
  * Has the current stored value actually been READ?
@@ -223,10 +233,12 @@ async function onSubmit(): Promise<void> {
     // server field name and both `…standard` and `…potential` share it. That is
     // the right granularity here anyway: the root IS the setting, and the two
     // inputs sit under one shared error line.
+    let mapped = false
     const unmapped = applyServerFieldErrors(
       submitError,
       SERVER_FIELD_TO_ERROR_KEY,
       (_key, message) => {
+        mapped = true
         // The server roots both sub-keys onto one name, so a 422 about either
         // cap lands on both fields rather than on a guess.
         errors.value = { standard: message, potential: message }
@@ -236,12 +248,15 @@ async function onSubmit(): Promise<void> {
     // A field this form renders no control for still has to reach the
     // operator, so anything unmapped goes to the banner rather than being
     // swallowed. `null` means the rejection carried no field errors at all.
-    formMessage.value = {
-      kind: 'error',
-      text:
-        unmapped !== null && unmapped.length > 0
-          ? unmapped.join(' ')
-          : t('settings.platform.saveFailed'),
+    // When every key landed on a control the banner would only repeat it.
+    if (unmapped === null || unmapped.length > 0 || !mapped) {
+      formMessage.value = {
+        kind: 'error',
+        text:
+          unmapped !== null && unmapped.length > 0
+            ? unmapped.join(' ')
+            : t('settings.platform.saveFailed'),
+      }
     }
   } finally {
     saving.value = false
@@ -260,6 +275,7 @@ onMounted(async () => {
   try {
     const response = await fetchPlatformSettings()
     apply(response.data.max_questions_per_competency)
+    intro.value = response.data.interview_intro_phrase
     loaded.value = true
   } catch {
     // The numbers stay on screen — they are the product's real defaults, and

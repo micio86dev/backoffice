@@ -21,7 +21,15 @@ export type UpdatePlatformSettingsPayload = NonNullable<
 >['content']['application/json']
 
 /** The caps map itself, as the generated payload declares it. */
-export type PlatformSettingsCaps = UpdatePlatformSettingsPayload['max_questions_per_competency']
+export type PlatformSettingsCaps = NonNullable<
+  UpdatePlatformSettingsPayload['max_questions_per_competency']
+>
+
+/** The spoken intro as the API stores it: `en` always, `it` optionally, or none. */
+export type InterviewIntroPhrase = UpdatePlatformSettingsPayload['interview_intro_phrase']
+
+/** The same map as READ: the response schema types every locale optional. */
+export type StoredInterviewIntroPhrase = PlatformSettingsResponse['data']['interview_intro_phrase']
 
 export function usePlatformSettings() {
   const { apiFetch } = useApi()
@@ -50,5 +58,19 @@ export function usePlatformSettings() {
     })
   }
 
-  return { fetchPlatformSettings, updatePlatformSettings }
+  /**
+   * Intro only: the caps are deliberately NOT in this body, so saving a phrase
+   * can never overwrite a cap the operator did not touch. A map REPLACES the
+   * stored one; `null` clears it.
+   */
+  async function updateInterviewIntroPhrase(
+    phrase: InterviewIntroPhrase
+  ): Promise<PlatformSettingsResponse> {
+    return apiFetch<PlatformSettingsResponse>('/admin/settings', {
+      method: 'PATCH',
+      body: { interview_intro_phrase: phrase },
+    })
+  }
+
+  return { fetchPlatformSettings, updatePlatformSettings, updateInterviewIntroPhrase }
 }

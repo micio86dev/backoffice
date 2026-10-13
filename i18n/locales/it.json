@@ -1077,6 +1077,7 @@
     }
   },
   "reports": {
+    "retry": "Riprova",
     "title": "Report",
     "subtitle": "Tutte le valutazioni completate, filtrate per progetto, ruolo e periodo.",
     "filters": {

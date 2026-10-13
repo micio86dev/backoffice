@@ -1077,6 +1077,7 @@
     }
   },
   "reports": {
+    "retry": "Try again",
     "title": "Reports",
     "subtitle": "Every completed evaluation, filtered by project, role and period.",
     "filters": {

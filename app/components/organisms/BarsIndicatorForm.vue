@@ -17,11 +17,7 @@
           <p id="bars-indicator-form-competency-static-label" class="text-sm font-medium">
             {{ $t('catalogue.indicators.competencyLabel') }}
           </p>
-          <p
-            aria-labelledby="bars-indicator-form-competency-static-label"
-            class="text-sm"
-            data-testid="bars-indicator-form-competency-static"
-          >
+          <p class="text-sm" data-testid="bars-indicator-form-competency-static">
             {{ competencyLabel(props.indicator!.competency_id) }}
           </p>
         </Field>
@@ -29,11 +25,7 @@
           <p id="bars-indicator-form-role-static-label" class="text-sm font-medium">
             {{ $t('catalogue.indicators.roleLabel') }}
           </p>
-          <p
-            aria-labelledby="bars-indicator-form-role-static-label"
-            class="text-sm"
-            data-testid="bars-indicator-form-role-static"
-          >
+          <p class="text-sm" data-testid="bars-indicator-form-role-static">
             {{ roleLabel(props.indicator!.role_id) }}
           </p>
         </Field>
@@ -47,6 +39,10 @@
             <SelectTrigger
               id="bars-indicator-form-competency"
               data-testid="bars-indicator-form-competency"
+              :aria-invalid="Boolean(errors.competencyId)"
+              :aria-describedby="
+                errors.competencyId ? 'bars-indicator-form-competency-error' : undefined
+              "
               aria-labelledby="bars-indicator-form-competency-label bars-indicator-form-competency-value"
             >
               <SelectValue id="bars-indicator-form-competency-value" />
@@ -65,6 +61,7 @@
           </Select>
           <FieldError
             v-if="errors.competencyId"
+            id="bars-indicator-form-competency-error"
             data-testid="bars-indicator-form-competency-error"
             >{{ errors.competencyId }}</FieldError
           >
@@ -79,6 +76,8 @@
             <SelectTrigger
               id="bars-indicator-form-role"
               data-testid="bars-indicator-form-role"
+              :aria-invalid="Boolean(errors.roleId)"
+              :aria-describedby="errors.roleId ? 'bars-indicator-form-role-error' : undefined"
               aria-labelledby="bars-indicator-form-role-label bars-indicator-form-role-value"
             >
               <SelectValue id="bars-indicator-form-role-value" />
@@ -94,9 +93,12 @@
               </SelectGroup>
             </SelectContent>
           </Select>
-          <FieldError v-if="errors.roleId" data-testid="bars-indicator-form-role-error">{{
-            errors.roleId
-          }}</FieldError>
+          <FieldError
+            v-if="errors.roleId"
+            id="bars-indicator-form-role-error"
+            data-testid="bars-indicator-form-role-error"
+            >{{ errors.roleId }}</FieldError
+          >
         </Field>
 
         <Field :data-invalid="Boolean(errors.textEn)">
@@ -107,12 +109,16 @@
             id="bars-indicator-form-text-en"
             v-model="textEn"
             :aria-invalid="Boolean(errors.textEn)"
+            :aria-describedby="errors.textEn ? 'bars-indicator-form-text-en-error' : undefined"
             data-testid="bars-indicator-form-text-en"
             @blur="validateRequired('textEn', textEn, 'textEnRequired')"
           />
-          <FieldError v-if="errors.textEn" data-testid="bars-indicator-form-text-en-error">{{
-            errors.textEn
-          }}</FieldError>
+          <FieldError
+            v-if="errors.textEn"
+            id="bars-indicator-form-text-en-error"
+            data-testid="bars-indicator-form-text-en-error"
+            >{{ errors.textEn }}</FieldError
+          >
         </Field>
         <Field :data-invalid="Boolean(errors.textIt)">
           <FieldLabel for="bars-indicator-form-text-it">{{
@@ -122,11 +128,15 @@
             id="bars-indicator-form-text-it"
             v-model="textIt"
             :aria-invalid="Boolean(errors.textIt)"
+            :aria-describedby="errors.textIt ? 'bars-indicator-form-text-it-error' : undefined"
             data-testid="bars-indicator-form-text-it"
           />
-          <FieldError v-if="errors.textIt" data-testid="bars-indicator-form-text-it-error">{{
-            errors.textIt
-          }}</FieldError>
+          <FieldError
+            v-if="errors.textIt"
+            id="bars-indicator-form-text-it-error"
+            data-testid="bars-indicator-form-text-it-error"
+            >{{ errors.textIt }}</FieldError
+          >
         </Field>
 
         <Field :data-invalid="Boolean(errors.anchor5En)">
@@ -137,12 +147,18 @@
             id="bars-indicator-form-anchor5-en"
             v-model="anchor5En"
             :aria-invalid="Boolean(errors.anchor5En)"
+            :aria-describedby="
+              errors.anchor5En ? 'bars-indicator-form-anchor5-en-error' : undefined
+            "
             data-testid="bars-indicator-form-anchor5-en"
             @blur="validateRequired('anchor5En', anchor5En, 'anchor5EnRequired')"
           />
-          <FieldError v-if="errors.anchor5En" data-testid="bars-indicator-form-anchor5-en-error">{{
-            errors.anchor5En
-          }}</FieldError>
+          <FieldError
+            v-if="errors.anchor5En"
+            id="bars-indicator-form-anchor5-en-error"
+            data-testid="bars-indicator-form-anchor5-en-error"
+            >{{ errors.anchor5En }}</FieldError
+          >
         </Field>
         <Field :data-invalid="Boolean(errors.anchor5It)">
           <FieldLabel for="bars-indicator-form-anchor5-it">{{
@@ -152,11 +168,17 @@
             id="bars-indicator-form-anchor5-it"
             v-model="anchor5It"
             :aria-invalid="Boolean(errors.anchor5It)"
+            :aria-describedby="
+              errors.anchor5It ? 'bars-indicator-form-anchor5-it-error' : undefined
+            "
             data-testid="bars-indicator-form-anchor5-it"
           />
-          <FieldError v-if="errors.anchor5It" data-testid="bars-indicator-form-anchor5-it-error">{{
-            errors.anchor5It
-          }}</FieldError>
+          <FieldError
+            v-if="errors.anchor5It"
+            id="bars-indicator-form-anchor5-it-error"
+            data-testid="bars-indicator-form-anchor5-it-error"
+            >{{ errors.anchor5It }}</FieldError
+          >
         </Field>
 
         <Field :data-invalid="Boolean(errors.anchor3En)">
@@ -167,12 +189,18 @@
             id="bars-indicator-form-anchor3-en"
             v-model="anchor3En"
             :aria-invalid="Boolean(errors.anchor3En)"
+            :aria-describedby="
+              errors.anchor3En ? 'bars-indicator-form-anchor3-en-error' : undefined
+            "
             data-testid="bars-indicator-form-anchor3-en"
             @blur="validateRequired('anchor3En', anchor3En, 'anchor3EnRequired')"
           />
-          <FieldError v-if="errors.anchor3En" data-testid="bars-indicator-form-anchor3-en-error">{{
-            errors.anchor3En
-          }}</FieldError>
+          <FieldError
+            v-if="errors.anchor3En"
+            id="bars-indicator-form-anchor3-en-error"
+            data-testid="bars-indicator-form-anchor3-en-error"
+            >{{ errors.anchor3En }}</FieldError
+          >
         </Field>
         <Field :data-invalid="Boolean(errors.anchor3It)">
           <FieldLabel for="bars-indicator-form-anchor3-it">{{
@@ -182,11 +210,17 @@
             id="bars-indicator-form-anchor3-it"
             v-model="anchor3It"
             :aria-invalid="Boolean(errors.anchor3It)"
+            :aria-describedby="
+              errors.anchor3It ? 'bars-indicator-form-anchor3-it-error' : undefined
+            "
             data-testid="bars-indicator-form-anchor3-it"
           />
-          <FieldError v-if="errors.anchor3It" data-testid="bars-indicator-form-anchor3-it-error">{{
-            errors.anchor3It
-          }}</FieldError>
+          <FieldError
+            v-if="errors.anchor3It"
+            id="bars-indicator-form-anchor3-it-error"
+            data-testid="bars-indicator-form-anchor3-it-error"
+            >{{ errors.anchor3It }}</FieldError
+          >
         </Field>
 
         <Field :data-invalid="Boolean(errors.anchor1En)">
@@ -197,12 +231,18 @@
             id="bars-indicator-form-anchor1-en"
             v-model="anchor1En"
             :aria-invalid="Boolean(errors.anchor1En)"
+            :aria-describedby="
+              errors.anchor1En ? 'bars-indicator-form-anchor1-en-error' : undefined
+            "
             data-testid="bars-indicator-form-anchor1-en"
             @blur="validateRequired('anchor1En', anchor1En, 'anchor1EnRequired')"
           />
-          <FieldError v-if="errors.anchor1En" data-testid="bars-indicator-form-anchor1-en-error">{{
-            errors.anchor1En
-          }}</FieldError>
+          <FieldError
+            v-if="errors.anchor1En"
+            id="bars-indicator-form-anchor1-en-error"
+            data-testid="bars-indicator-form-anchor1-en-error"
+            >{{ errors.anchor1En }}</FieldError
+          >
         </Field>
         <Field :data-invalid="Boolean(errors.anchor1It)">
           <FieldLabel for="bars-indicator-form-anchor1-it">{{
@@ -212,11 +252,17 @@
             id="bars-indicator-form-anchor1-it"
             v-model="anchor1It"
             :aria-invalid="Boolean(errors.anchor1It)"
+            :aria-describedby="
+              errors.anchor1It ? 'bars-indicator-form-anchor1-it-error' : undefined
+            "
             data-testid="bars-indicator-form-anchor1-it"
           />
-          <FieldError v-if="errors.anchor1It" data-testid="bars-indicator-form-anchor1-it-error">{{
-            errors.anchor1It
-          }}</FieldError>
+          <FieldError
+            v-if="errors.anchor1It"
+            id="bars-indicator-form-anchor1-it-error"
+            data-testid="bars-indicator-form-anchor1-it-error"
+            >{{ errors.anchor1It }}</FieldError
+          >
         </Field>
 
         <FormMessage
@@ -429,16 +475,32 @@ async function onSubmit(): Promise<void> {
     }
     emit('saved')
   } catch (error) {
+    let mapped = false
+    // Edit mode renders no competency/role control (the pair is immutable), so
+    // a refusal keyed on them has no FieldError to land in: it goes to the
+    // banner like any other unmapped message, never silently dropped.
+    const hidden: string[] = []
     const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
+      if (isEditing && (key === 'competencyId' || key === 'roleId')) {
+        hidden.push(message)
+        return
+      }
+      mapped = true
       errors.value[key] = translateServerCode({ t, te }, 'catalogue.serverError', message)
     })
+    const bannerCodes = [...(unmapped ?? []), ...hidden]
     formMessage.value =
-      unmapped && unmapped.length > 0
+      bannerCodes.length > 0
         ? {
             kind: 'error',
-            text: translateServerCodes({ t, te }, 'catalogue.serverError', unmapped).join(' '),
+            text: translateServerCodes({ t, te }, 'catalogue.serverError', bannerCodes).join(' '),
           }
-        : actionErrorMessage(error, t, 'catalogue.form.saveError')
+        : mapped
+          ? // Every returned key reached a rendered field: the exact reason is
+            // under its control, and a generic "could not save" on top would
+            // only invite a retry that fails identically.
+            null
+          : actionErrorMessage(error, t, 'catalogue.form.saveError')
   } finally {
     saving.value = false
   }

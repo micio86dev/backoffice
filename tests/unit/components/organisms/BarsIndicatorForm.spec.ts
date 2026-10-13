@@ -368,4 +368,114 @@ describe('BarsIndicatorForm', () => {
 
     wrapper.unmount()
   })
+
+  describe('form-level banner vs mapped field errors', () => {
+    async function submitUpdate(rejection: Error) {
+      updateBarsIndicatorMock.mockRejectedValueOnce(rejection)
+      const wrapper = mount(BarsIndicatorForm, {
+        props: { indicator: indicator(), competencies: COMPETENCIES, roles: ROLES, indicators: [] },
+        global: { mocks: { $t: tMock } },
+      })
+      await wrapper.get('[data-testid="bars-indicator-form"]').trigger('submit')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('shows no generic banner on top of a mapped 422 field error', async () => {
+      const wrapper = await submitUpdate(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { 'anchor_5.it': ['anchor_5.it_blank'] } },
+        })
+      )
+
+      expect(wrapper.find('[data-testid="bars-indicator-form-anchor5-it-error"]').exists()).toBe(
+        true
+      )
+      expect(wrapper.find('[data-testid="bars-indicator-form-banner"]').exists()).toBe(false)
+    })
+
+    it('links a mapped field error to its control, since it is the only signal left', async () => {
+      const wrapper = await submitUpdate(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { 'anchor_5.it': ['anchor_5.it_blank'] } },
+        })
+      )
+
+      const error = wrapper.get('[data-testid="bars-indicator-form-anchor5-it-error"]')
+      expect(error.attributes('id')).toBeTruthy()
+      expect(
+        wrapper.get('[data-testid="bars-indicator-form-anchor5-it"]').attributes('aria-describedby')
+      ).toBe(error.attributes('id'))
+    })
+
+    it.each([
+      ['text.en', 'text-en'],
+      ['text.it', 'text-it'],
+      ['anchor_5.en', 'anchor5-en'],
+      ['anchor_5.it', 'anchor5-it'],
+      ['anchor_3.en', 'anchor3-en'],
+      ['anchor_3.it', 'anchor3-it'],
+      ['anchor_1.en', 'anchor1-en'],
+      ['anchor_1.it', 'anchor1-it'],
+    ])(
+      'a server refusal on %s renders its field error and no generic banner',
+      async (serverKey, errorTestId) => {
+        const wrapper = await submitUpdate(
+          Object.assign(new Error('422'), {
+            status: 422,
+            data: { errors: { [serverKey]: ['some_refusal'] } },
+          })
+        )
+
+        expect(
+          wrapper.find(`[data-testid="bars-indicator-form-${errorTestId}-error"]`).exists()
+        ).toBe(true)
+        expect(wrapper.find('[data-testid="bars-indicator-form-banner"]').exists()).toBe(false)
+      }
+    )
+
+    it.each(['competency_id', 'role_id'])(
+      'surfaces a refusal on %s in the banner when editing, since that control is not rendered',
+      async (serverKey) => {
+        const wrapper = await submitUpdate(
+          Object.assign(new Error('422'), {
+            status: 422,
+            data: { errors: { [serverKey]: ['pair_refusal'] } },
+          })
+        )
+
+        expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toContain(
+          'pair_refusal'
+        )
+      }
+    )
+
+    it('keeps the banner, with the unmapped message, when only SOME error keys have a field', async () => {
+      const wrapper = await submitUpdate(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: {
+            errors: { 'anchor_5.it': ['anchor_5.it_blank'], position: ['unmapped_refusal'] },
+          },
+        })
+      )
+
+      expect(wrapper.find('[data-testid="bars-indicator-form-anchor5-it-error"]').exists()).toBe(
+        true
+      )
+      expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toContain(
+        'unmapped_refusal'
+      )
+    })
+
+    it('keeps the generic banner for a 5xx failure', async () => {
+      const wrapper = await submitUpdate(Object.assign(new Error('500'), { status: 500 }))
+
+      expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toBe(
+        'catalogue.form.saveError'
+      )
+    })
+  })
 })

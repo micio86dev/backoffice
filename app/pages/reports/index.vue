@@ -2,6 +2,10 @@
   <div class="flex flex-col gap-6">
     <PageHeader :title="$t('reports.title')" :subtitle="$t('reports.subtitle')" />
 
+    <!-- The filter bar stays mounted in the error state: a failed load must be
+         recoverable by changing a filter or retrying, without a page reload. -->
+    <ReportFilters v-model="filters" :projects="projects" />
+
     <Alert
       v-if="loadError"
       :variant="loadError === 'not-ready' ? 'default' : 'destructive'"
@@ -10,11 +14,18 @@
     >
       <AlertTitle>{{ $t(loadErrorTitleKey) }}</AlertTitle>
       <AlertDescription>{{ $t(loadErrorMessageKey) }}</AlertDescription>
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="loading"
+        data-testid="reports-retry"
+        @click="load"
+      >
+        {{ $t('reports.retry') }}
+      </Button>
     </Alert>
 
     <template v-else>
-      <ReportFilters v-model="filters" :projects="projects" />
-
       <!-- Summary is a secondary panel — code-split (D10), never blocking the table. -->
       <ReportSummary v-if="summary" :summary="summary" />
 
@@ -26,6 +37,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
+import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import ReportFilters from '@/components/molecules/ReportFilters.vue'
 import EvaluationsTable, { type EvaluationRow } from '@/components/organisms/EvaluationsTable.vue'
@@ -64,21 +76,44 @@ const loadError = ref<ResourceErrorState | null>(null)
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))
 
+const loading = ref(false)
+// Each load takes a ticket; only the latest ticket may write state, so a slow
+// stale response (an older filter set, a retry overtaken by a filter change)
+// can never overwrite or error over a newer result.
+let latestLoad = 0
+
 async function load(): Promise<void> {
+  const ticket = ++latestLoad
+  loading.value = true
   try {
     const [indexResponse, summaryResponse] = await Promise.all([
       index(filters.value),
       fetchSummary(filters.value),
     ])
+    if (ticket !== latestLoad) return
     rows.value = indexResponse.data
     // The generated `by_status` type (`unknown[]`) is a Scramble mistype —
     // it is actually a status-keyed object at runtime (see
     // ReportSummary.vue's own note, verified against
     // `EvaluationIndexController.php:114-123`'s `pluck('aggregate', 'status')`).
-    summary.value = summaryResponse.data as unknown as EvaluationsSummary
+    // Only the mistyped field is cast; `competencies` stays compiler-checked
+    // against the generated schema (pinned by
+    // tests/nuxt/evaluations-summary-contract.ts).
+    // The summary is secondary: a response without `data` degrades the panel
+    // (hidden) and must never throw into the table's error state.
+    const summaryData = summaryResponse?.data
+    summary.value = summaryData
+      ? {
+          by_status: (summaryData.by_status ?? {}) as unknown as EvaluationsSummary['by_status'],
+          competencies: summaryData.competencies ?? [],
+        }
+      : null
     loadError.value = null
   } catch (error) {
+    if (ticket !== latestLoad) return
     loadError.value = resolveResourceErrorState(error)
+  } finally {
+    if (ticket === latestLoad) loading.value = false
   }
 }
 

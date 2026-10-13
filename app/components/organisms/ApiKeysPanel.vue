@@ -8,6 +8,15 @@
       </Button>
     </div>
 
+    <Alert
+      v-if="revokeMessage"
+      variant="destructive"
+      role="alert"
+      data-testid="api-key-revoke-error"
+    >
+      <AlertDescription>{{ revokeMessage }}</AlertDescription>
+    </Alert>
+
     <Table>
       <TableHeader>
         <TableRow>
@@ -22,7 +31,19 @@
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableEmpty v-if="clients.length === 0" :colspan="6">
+        <TableEmpty v-if="loadFailed" :colspan="6">
+          <div
+            role="alert"
+            class="flex flex-col items-center gap-2"
+            data-testid="api-keys-load-error"
+          >
+            <span>{{ loadMessage }}</span>
+            <Button variant="outline" size="sm" data-testid="api-keys-retry" @click="load">
+              {{ $t('settings.apiKeys.retry') }}
+            </Button>
+          </div>
+        </TableEmpty>
+        <TableEmpty v-else-if="clients.length === 0" :colspan="6">
           {{ $t('settings.apiKeys.empty') }}
         </TableEmpty>
         <TableRow v-for="client in clients" :key="client.id">
@@ -48,6 +69,7 @@
               @click="revokeTarget = client"
             >
               {{ $t('settings.apiKeys.revoke') }}
+              <span class="sr-only"> {{ client.name }}</span>
             </Button>
           </TableCell>
         </TableRow>
@@ -115,7 +137,7 @@
                 variant="destructive"
                 data-testid="api-key-abilities-error"
               >
-                <AlertDescription>{{ $t('settings.apiKeys.abilitiesLoadError') }}</AlertDescription>
+                <AlertDescription>{{ abilitiesMessage }}</AlertDescription>
               </Alert>
               <ul
                 v-else
@@ -191,7 +213,10 @@
           <DialogTitle>{{ $t('settings.apiKeys.rawKeyTitle') }}</DialogTitle>
         </DialogHeader>
         <Alert variant="destructive">
-          <AlertDescription>{{ $t('settings.apiKeys.rawKeyWarning') }}</AlertDescription>
+          <!-- The dialog's accessible description: reka-ui warns (and AT users get nothing) without one. -->
+          <DialogDescription as-child>
+            <AlertDescription>{{ $t('settings.apiKeys.rawKeyWarning') }}</AlertDescription>
+          </DialogDescription>
         </Alert>
         <p
           class="bg-muted rounded-lg p-3 font-mono text-sm break-all"
@@ -252,13 +277,19 @@ import { Input } from '@/components/ui/input'
 import CheckboxField from '@/components/molecules/CheckboxField.vue'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import FormDrawer from '@/components/organisms/FormDrawer.vue'
 import FormattedDate from '@/components/atoms/FormattedDate.vue'
 import ApiKeyStateBadge from '@/components/atoms/ApiKeyStateBadge.vue'
 import { useApiClients, type ApiClient } from '@/composables/useApiClients'
-import { applyServerFieldErrors } from '@/utils/http-error'
+import { applyServerFieldErrors, getErrorStatus } from '@/utils/http-error'
 
 /**
  * DOM-safe id for an ability name (`participants:create` -> `participants-create`).
@@ -293,6 +324,7 @@ const name = ref('')
 const selectedAbilities = ref<string[]>([])
 const abilityCatalog = ref<string[]>([])
 const abilitiesError = ref(false)
+const abilitiesMessage = ref('')
 
 /**
  * An ability the server advertises but this build has no translation for still
@@ -317,8 +349,33 @@ const rawKeyReveal = ref<string | null>(null)
 const copied = ref(false)
 const revokeTarget = ref<ApiClient | null>(null)
 
+/**
+ * 403, 404 and 409 stay distinct (each is a different thing for the operator
+ * to do); anything else gets the caller's generic copy.
+ */
+function failureMessage(error: unknown, fallbackKey: string): string {
+  const status = getErrorStatus(error)
+
+  return status === 403 || status === 404 || status === 409
+    ? t(`settings.apiKeys.statusError.${status}`)
+    : t(fallbackKey)
+}
+
+const loadFailed = ref(false)
+const loadMessage = ref('')
+const revokeMessage = ref<string | null>(null)
+
 async function load(): Promise<void> {
-  const response = await listClients()
+  let response
+  try {
+    response = await listClients()
+  } catch (error) {
+    // A failed read must never render as "No API keys yet.".
+    loadFailed.value = true
+    loadMessage.value = failureMessage(error, 'settings.apiKeys.loadError')
+    return
+  }
+  loadFailed.value = false
   // Correct rather than accidentally-correct-for-page-one:
   // `ApiClientController::index` now returns every org-scoped client
   // unpaginated (generated-client-truth-and-session-safety D5), so
@@ -331,7 +388,8 @@ async function loadAbilities(): Promise<void> {
     const response = await listAbilities()
     abilityCatalog.value = response.data
     abilitiesError.value = false
-  } catch {
+  } catch (error) {
+    abilitiesMessage.value = failureMessage(error, 'settings.apiKeys.abilitiesLoadError')
     // Non-fatal for the LIST, which is the primary content here — but the
     // create form cannot offer a grant it could not look up, so it says so
     // rather than rendering an empty checkbox group that reads as "no
@@ -384,7 +442,9 @@ async function onCreate(): Promise<void> {
     // per-organization key limit) still has to reach the operator — the
     // server's own message beats a generic banner that hides it.
     formMessage.value =
-      unmapped && unmapped.length > 0 ? unmapped.join(' ') : t('settings.apiKeys.createError')
+      unmapped && unmapped.length > 0
+        ? unmapped.join(' ')
+        : failureMessage(error, 'settings.apiKeys.createError')
   } finally {
     creatingKey.value = false
   }
@@ -406,7 +466,13 @@ async function onRevokeConfirmed(): Promise<void> {
   if (revokeTarget.value === null) return
   const id = revokeTarget.value.id
   revokeTarget.value = null
-  await revokeClient(id)
+  revokeMessage.value = null
+  try {
+    await revokeClient(id)
+  } catch (error) {
+    revokeMessage.value = failureMessage(error, 'settings.apiKeys.revokeError')
+    return
+  }
   await load()
 }
 

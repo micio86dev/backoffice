@@ -24,7 +24,7 @@ function mountWithLocale(lang: string | undefined) {
     vi.fn(() => ref(lang === undefined ? {} : { htmlAttrs: { lang } }))
   )
 
-  mount(AppRoot)
+  mount(AppRoot, { global: { stubs: { ConsentBanner: true } } })
 
   const headInput = useHeadMock.mock.calls[0]?.[0] as {
     htmlAttrs?: { lang?: { value?: string } }
@@ -37,7 +37,7 @@ describe('app.vue — noindex policy (D30)', () => {
     const useHeadMock = vi.fn()
     vi.stubGlobal('useHead', useHeadMock)
 
-    mount(AppRoot)
+    mount(AppRoot, { global: { stubs: { ConsentBanner: true } } })
 
     expect(useHeadMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -55,7 +55,7 @@ describe('app.vue — noindex policy (D30)', () => {
     const useHeadMock = vi.fn()
     vi.stubGlobal('useHead', useHeadMock)
 
-    mount(AppRoot)
+    mount(AppRoot, { global: { stubs: { ConsentBanner: true } } })
 
     // Must be called exactly once — no env-conditional logic
     expect(useHeadMock).toHaveBeenCalledTimes(1)

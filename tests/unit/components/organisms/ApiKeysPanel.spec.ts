@@ -778,3 +778,156 @@ describe('ApiKeysPanel — state badge and Revoke guard (D3)', () => {
     })
   })
 })
+
+describe('ApiKeysPanel — failures are visible and stay distinct', () => {
+  beforeEach(() => {
+    listClientsMock.mockReset().mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: 'CI key',
+          abilities: ['read'],
+          is_active: true,
+          state: 'active',
+          expires_at: null,
+          last_used_at: null,
+          created_at: '2026-03-01T10:00:00Z',
+        },
+      ],
+    })
+    listAbilitiesMock.mockReset().mockResolvedValue({ data: ['participants:read'] })
+    createClientMock.mockReset()
+    revokeClientMock.mockReset().mockResolvedValue(undefined)
+  })
+
+  const httpError = (status: number) => Object.assign(new Error(String(status)), { status })
+
+  it('renders a failed list read as an error with a retry, never as the empty state', async () => {
+    listClientsMock.mockRejectedValueOnce(httpError(500))
+
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="api-keys-load-error"]').text()).toContain(
+      'settings.apiKeys.loadError'
+    )
+    expect(wrapper.text()).not.toContain('settings.apiKeys.empty')
+
+    await wrapper.get('[data-testid="api-keys-retry"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="api-keys-load-error"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('CI key')
+  })
+
+  it.each([
+    [403, 'settings.apiKeys.statusError.403'],
+    [404, 'settings.apiKeys.statusError.404'],
+    [409, 'settings.apiKeys.statusError.409'],
+    [500, 'settings.apiKeys.loadError'],
+  ])('maps a %s on the list read to its own message', async (status, key) => {
+    listClientsMock.mockRejectedValueOnce(httpError(status))
+
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="api-keys-load-error"]').text()).toContain(key)
+  })
+
+  it('shows a failed revoke instead of swallowing it, and keeps the list as it was', async () => {
+    revokeClientMock.mockRejectedValueOnce(httpError(403))
+
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="api-key-revoke-1"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-confirm"]'),
+      'the revoke confirmation dialog to mount'
+    )
+    const confirmButton = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="confirm-dialog-confirm"]'
+    )
+    confirmButton!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirmButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => wrapper.find('[data-testid="api-key-revoke-error"]').exists(),
+      'the revoke failure to render'
+    )
+
+    expect(wrapper.get('[data-testid="api-key-revoke-error"]').text()).toContain(
+      'settings.apiKeys.statusError.403'
+    )
+    expect(listClientsMock).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it.each([
+    [403, 'settings.apiKeys.statusError.403'],
+    [404, 'settings.apiKeys.statusError.404'],
+    [409, 'settings.apiKeys.statusError.409'],
+    [500, 'settings.apiKeys.abilitiesLoadError'],
+  ])('maps a %s on the abilities catalogue to its own message', async (status, key) => {
+    listAbilitiesMock.mockRejectedValueOnce(httpError(status))
+
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+    await waitForDialogOpen()
+
+    expect(
+      document.body.querySelector('[data-testid="api-key-abilities-error"]')?.textContent
+    ).toContain(key)
+
+    wrapper.unmount()
+  })
+
+  it('names the key in each Revoke button for assistive tech', async () => {
+    const wrapper = mount(ApiKeysPanel, { global: { mocks: { $t: tMock } } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="api-key-revoke-1"]').text()).toContain('CI key')
+  })
+
+  it('tells a 403 on create apart from the generic create error', async () => {
+    createClientMock.mockRejectedValueOnce(httpError(403))
+
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+    await waitForDialogOpen()
+
+    const nameInput = document.body.querySelector<HTMLInputElement>(
+      '[data-testid="api-key-form-name"]'
+    )
+    nameInput!.value = 'New key'
+    nameInput!.dispatchEvent(new Event('input'))
+    await flushPromises()
+    document.body
+      .querySelector<HTMLElement>('[data-testid="api-key-ability-participants-read"]')!
+      .click()
+    await flushPromises()
+    document.body
+      .querySelector<HTMLFormElement>('[data-testid="api-key-form"]')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await waitFor(
+      () => document.body.querySelector('[data-testid="api-key-form-banner"]'),
+      'the create failure banner'
+    )
+
+    expect(
+      document.body.querySelector('[data-testid="api-key-form-banner"]')?.textContent
+    ).toContain('settings.apiKeys.statusError.403')
+
+    wrapper.unmount()
+  })
+})

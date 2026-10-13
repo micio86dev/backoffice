@@ -476,20 +476,29 @@ async function onSubmit(): Promise<void> {
     emit('saved')
   } catch (error) {
     let mapped = false
+    // Edit mode renders no competency/role control (the pair is immutable), so
+    // a refusal keyed on them has no FieldError to land in: it goes to the
+    // banner like any other unmapped message, never silently dropped.
+    const hidden: string[] = []
     const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
+      if (isEditing && (key === 'competencyId' || key === 'roleId')) {
+        hidden.push(message)
+        return
+      }
       mapped = true
       errors.value[key] = translateServerCode({ t, te }, 'catalogue.serverError', message)
     })
+    const bannerCodes = [...(unmapped ?? []), ...hidden]
     formMessage.value =
-      unmapped && unmapped.length > 0
+      bannerCodes.length > 0
         ? {
             kind: 'error',
-            text: translateServerCodes({ t, te }, 'catalogue.serverError', unmapped).join(' '),
+            text: translateServerCodes({ t, te }, 'catalogue.serverError', bannerCodes).join(' '),
           }
         : mapped
-          ? // A mapped 422 already shows the exact reason under its control;
-            // stacking a generic "could not save" on top invites a retry that
-            // fails identically (same guard as OrganizationProfileForm).
+          ? // Every returned key reached a rendered field: the exact reason is
+            // under its control, and a generic "could not save" on top would
+            // only invite a retry that fails identically.
             null
           : actionErrorMessage(error, t, 'catalogue.form.saveError')
   } finally {

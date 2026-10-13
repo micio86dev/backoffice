@@ -410,6 +410,66 @@ describe('BarsIndicatorForm', () => {
       ).toBe(error.attributes('id'))
     })
 
+    it.each([
+      ['text.en', 'text-en'],
+      ['text.it', 'text-it'],
+      ['anchor_5.en', 'anchor5-en'],
+      ['anchor_5.it', 'anchor5-it'],
+      ['anchor_3.en', 'anchor3-en'],
+      ['anchor_3.it', 'anchor3-it'],
+      ['anchor_1.en', 'anchor1-en'],
+      ['anchor_1.it', 'anchor1-it'],
+    ])(
+      'a server refusal on %s renders its field error and no generic banner',
+      async (serverKey, errorTestId) => {
+        const wrapper = await submitUpdate(
+          Object.assign(new Error('422'), {
+            status: 422,
+            data: { errors: { [serverKey]: ['some_refusal'] } },
+          })
+        )
+
+        expect(
+          wrapper.find(`[data-testid="bars-indicator-form-${errorTestId}-error"]`).exists()
+        ).toBe(true)
+        expect(wrapper.find('[data-testid="bars-indicator-form-banner"]').exists()).toBe(false)
+      }
+    )
+
+    it.each(['competency_id', 'role_id'])(
+      'surfaces a refusal on %s in the banner when editing, since that control is not rendered',
+      async (serverKey) => {
+        const wrapper = await submitUpdate(
+          Object.assign(new Error('422'), {
+            status: 422,
+            data: { errors: { [serverKey]: ['pair_refusal'] } },
+          })
+        )
+
+        expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toContain(
+          'pair_refusal'
+        )
+      }
+    )
+
+    it('keeps the banner, with the unmapped message, when only SOME error keys have a field', async () => {
+      const wrapper = await submitUpdate(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: {
+            errors: { 'anchor_5.it': ['anchor_5.it_blank'], position: ['unmapped_refusal'] },
+          },
+        })
+      )
+
+      expect(wrapper.find('[data-testid="bars-indicator-form-anchor5-it-error"]').exists()).toBe(
+        true
+      )
+      expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toContain(
+        'unmapped_refusal'
+      )
+    })
+
     it('keeps the generic banner for a 5xx failure', async () => {
       const wrapper = await submitUpdate(Object.assign(new Error('500'), { status: 500 }))
 

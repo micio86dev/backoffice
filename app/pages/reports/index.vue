@@ -14,7 +14,13 @@
     >
       <AlertTitle>{{ $t(loadErrorTitleKey) }}</AlertTitle>
       <AlertDescription>{{ $t(loadErrorMessageKey) }}</AlertDescription>
-      <Button variant="outline" size="sm" data-testid="reports-retry" @click="load">
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="loading"
+        data-testid="reports-retry"
+        @click="load"
+      >
         {{ $t('reports.retry') }}
       </Button>
     </Alert>
@@ -70,12 +76,21 @@ const loadError = ref<ResourceErrorState | null>(null)
 const loadErrorTitleKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'title'))
 const loadErrorMessageKey = computed(() => resourceErrorKey(loadError.value ?? 'error', 'message'))
 
+const loading = ref(false)
+// Each load takes a ticket; only the latest ticket may write state, so a slow
+// stale response (an older filter set, a retry overtaken by a filter change)
+// can never overwrite or error over a newer result.
+let latestLoad = 0
+
 async function load(): Promise<void> {
+  const ticket = ++latestLoad
+  loading.value = true
   try {
     const [indexResponse, summaryResponse] = await Promise.all([
       index(filters.value),
       fetchSummary(filters.value),
     ])
+    if (ticket !== latestLoad) return
     rows.value = indexResponse.data
     // The generated `by_status` type (`unknown[]`) is a Scramble mistype —
     // it is actually a status-keyed object at runtime (see
@@ -84,13 +99,21 @@ async function load(): Promise<void> {
     // Only the mistyped field is cast; `competencies` stays compiler-checked
     // against the generated schema (pinned by
     // tests/nuxt/evaluations-summary-contract.ts).
-    summary.value = {
-      by_status: summaryResponse.data.by_status as unknown as EvaluationsSummary['by_status'],
-      competencies: summaryResponse.data.competencies,
-    }
+    // The summary is secondary: a response without `data` degrades the panel
+    // (hidden) and must never throw into the table's error state.
+    const summaryData = summaryResponse?.data
+    summary.value = summaryData
+      ? {
+          by_status: (summaryData.by_status ?? {}) as unknown as EvaluationsSummary['by_status'],
+          competencies: summaryData.competencies ?? [],
+        }
+      : null
     loadError.value = null
   } catch (error) {
+    if (ticket !== latestLoad) return
     loadError.value = resolveResourceErrorState(error)
+  } finally {
+    if (ticket === latestLoad) loading.value = false
   }
 }
 

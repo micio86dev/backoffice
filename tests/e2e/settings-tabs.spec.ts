@@ -129,7 +129,7 @@ test.describe('Settings tabs (Unit 6)', () => {
     await expect(page.getByText('Ada Lovelace')).toBeVisible()
 
     await page.getByRole('tab', { name: 'Chiavi API' }).click()
-    await expect(page.getByText('CI key')).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'CI key', exact: true })).toBeVisible()
   })
 
   // dates-and-destructive-actions, design.md D3 — the badge reflects the
@@ -179,8 +179,8 @@ test.describe('Settings tabs (Unit 6)', () => {
     await page.goto('/settings')
     await page.getByRole('tab', { name: 'Chiavi API' }).click()
 
-    await expect(page.getByText('CI key 1', { exact: true })).toBeVisible()
-    await expect(page.getByText('CI key 25', { exact: true })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'CI key 1', exact: true })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'CI key 25', exact: true })).toBeVisible()
     await expect(page.getByRole('row')).toHaveCount(26) // 25 data rows + header row
   })
 

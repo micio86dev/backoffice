@@ -401,3 +401,147 @@ describe('currencies.* copy', () => {
     })
   }
 })
+
+const chfInactive = {
+  code: 'CHF',
+  symbol: 'Fr',
+  decimals: 2,
+  rate_per_usd: '0.9',
+  rate_as_of: '2026-10-01',
+  is_active: false,
+}
+
+describe('CurrencyCatalogPanel — activating a currency that already has a rate', () => {
+  it('activates immediately, without a confirmation, and reloads the catalogue', async () => {
+    listCurrencies.mockResolvedValue([usd, chfInactive])
+    const wrapper = await mountPanel()
+    expect(listCurrencies).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-testid="currency-toggle-CHF"]').trigger('click')
+    await flushPromises()
+
+    expect(updateCurrency).toHaveBeenCalledExactlyOnceWith('CHF', { is_active: true })
+    expect(listCurrencies).toHaveBeenCalledTimes(2)
+    expect(document.body.querySelector('[data-testid="confirm-dialog-confirm"]')).toBeNull()
+  })
+
+  it('shows the localized 422 copy when the server refuses the activation', async () => {
+    listCurrencies.mockResolvedValue([usd, chfInactive])
+    updateCurrency.mockRejectedValueOnce(
+      rejection(422, { errors: { is_active: ['currency_activation_requires_rate'] } })
+    )
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="currency-toggle-CHF"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="currency-conflict"]').text()).toBe(
+      'currencies.serverError.currency_activation_requires_rate'
+    )
+  })
+
+  it('never shows a slug it does not know, falling back to the generic action error', async () => {
+    listCurrencies.mockResolvedValue([usd, chfInactive])
+    updateCurrency.mockRejectedValueOnce(
+      rejection(422, { errors: { is_active: ['some_future_slug'] } })
+    )
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="currency-toggle-CHF"]').trigger('click')
+    await flushPromises()
+
+    const banner = wrapper.get('[data-testid="currency-conflict"]').text()
+    expect(banner).toBe('currencies.actionError')
+    expect(banner).not.toContain('some_future_slug')
+  })
+})
+
+describe('CurrencyCatalogPanel — client-side validation refuses before any request', () => {
+  async function openCreateWith(values: Record<string, string>) {
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="currency-new"]').trigger('click')
+    await waitForTestId('currency-form')
+    const defaults = { code: 'SEK', symbol: 'kr', decimals: '2', rate: '', 'as-of': '' }
+    for (const [field, value] of Object.entries({ ...defaults, ...values })) {
+      setValue(`currency-form-${field}`, value)
+    }
+    await submit('currency-form')
+  }
+
+  const errorText = (field: string) =>
+    document.body.querySelector(`[data-testid="currency-form-${field}-error"]`)?.textContent
+
+  it.each([
+    ['code', { code: 'sek' }, 'currencies.validation.code'],
+    ['symbol', { symbol: '   ' }, 'currencies.validation.symbol'],
+    ['symbol', { symbol: 'toolongsym' }, 'currencies.validation.symbol'],
+    ['decimals', { decimals: '7' }, 'currencies.validation.decimals'],
+    ['rate', { rate: '0', 'as-of': '2026-10-09' }, 'currencies.validation.rate'],
+    ['rate', { 'as-of': '2026-10-09' }, 'currencies.validation.rateAndDate'],
+    ['as-of', { rate: '1.5' }, 'currencies.validation.asOf'],
+  ])('flags %s for %j', async (field, values, copy) => {
+    await openCreateWith(values)
+
+    expect(errorText(field)).toContain(copy)
+    expect(createCurrency).not.toHaveBeenCalled()
+  })
+
+  it('blocks blanking only the date of a stored rate, naming the stored-rate rule', async () => {
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="currency-edit-GBP"]').trigger('click')
+    await waitForTestId('currency-edit-form')
+    setValue('currency-edit-form-as-of', '')
+    await submit('currency-edit-form')
+
+    expect(updateCurrency).not.toHaveBeenCalled()
+    expect(
+      document.body.querySelector('[data-testid="currency-edit-form-as-of-error"]')?.textContent
+    ).toContain('currencies.validation.rateStored')
+  })
+})
+
+describe('CurrencyCatalogPanel — a refused save stays in the form', () => {
+  async function fillAndSubmit() {
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="currency-new"]').trigger('click')
+    await waitForTestId('currency-form')
+    setValue('currency-form-code', 'SEK')
+    setValue('currency-form-symbol', 'kr')
+    await submit('currency-form')
+    return wrapper
+  }
+
+  const banner = () =>
+    document.body.querySelector('[data-testid="currency-form-banner"]')?.textContent
+
+  it('shows the generic save error for a failure with no field body', async () => {
+    createCurrency.mockRejectedValueOnce(rejection(500, {}))
+    await fillAndSubmit()
+
+    expect(banner()).toContain('currencies.saveError')
+    expect(document.body.querySelector('[data-testid="currency-form"]')).not.toBeNull()
+  })
+
+  it('keeps a 403 distinct from the generic save error', async () => {
+    createCurrency.mockRejectedValueOnce(rejection(403, {}))
+    await fillAndSubmit()
+
+    expect(banner()).toContain('currencies.error.forbidden')
+  })
+
+  it('routes a field the form has no control for into the banner as localized copy', async () => {
+    createCurrency.mockRejectedValueOnce(
+      rejection(422, { errors: { is_active: ['currency_active_invalid'] } })
+    )
+    await fillAndSubmit()
+
+    expect(banner()).toContain('currencies.serverError.currency_active_invalid')
+  })
+
+  it('falls back to the generic save error when a 422 names no field at all', async () => {
+    createCurrency.mockRejectedValueOnce(rejection(422, { errors: {} }))
+    await fillAndSubmit()
+
+    expect(banner()).toContain('currencies.saveError')
+  })
+})

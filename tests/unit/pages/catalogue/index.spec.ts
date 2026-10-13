@@ -8,7 +8,7 @@
  * is `CatalogueDefaultQuestionsPanel.spec.ts`'s job; this file owns the
  * revision header and the rail shape only.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { confirmDialog } from '../../support/confirm'
 import { realI18n } from '../../support/i18n'
@@ -86,6 +86,13 @@ describe('pages/catalogue/index.vue', () => {
     document.body.innerHTML = ''
   })
 
+  // `unstubAllGlobals` would also drop the file-level stubs (definePageMeta),
+  // so only the `useHead` this file replaces is put back.
+  const originalUseHead = (globalThis as Record<string, unknown>).useHead
+  afterEach(() => {
+    vi.stubGlobal('useHead', originalUseHead)
+  })
+
   it('renders the section rail as a vertical tablist, never a horizontal strip', async () => {
     fetchCurrentRevision.mockResolvedValue({ data: revision() })
     const wrapper = await mountPage()
@@ -130,6 +137,42 @@ describe('pages/catalogue/index.vue', () => {
     await confirmDialog('confirm')
 
     expect(publishRevision).toHaveBeenCalledOnce()
+  })
+
+  it('cancelling the Publish confirmation publishes nothing and closes the dialog', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="catalogue-publish"]').trigger('click')
+    await confirmDialog('cancel')
+
+    expect(publishRevision).not.toHaveBeenCalled()
+    expect(document.body.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+
+  it('shows the untitled placeholder for a revision without a label', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ label: null }) })
+    const wrapper = await mountPage()
+
+    expect(wrapper.get('[data-testid="catalogue-revision-label"]').text()).toBe(
+      'catalogue.revision.untitled'
+    )
+  })
+
+  it('sets a translated, noindex page head', async () => {
+    const useHeadMock = vi.fn()
+    vi.stubGlobal('useHead', useHeadMock)
+    fetchCurrentRevision.mockResolvedValue({ data: revision() })
+    await mountPage()
+
+    expect(useHeadMock).toHaveBeenCalledTimes(1)
+    const head = useHeadMock.mock.calls[0]?.[0] as {
+      title: () => string
+      meta: { name: string; content: string }[]
+    }
+
+    expect(head.title()).toBe('catalogue.title')
+    expect(head.meta).toContainEqual({ name: 'robots', content: 'noindex, nofollow' })
   })
 
   it('shows Discard draft only while the revision is a draft', async () => {

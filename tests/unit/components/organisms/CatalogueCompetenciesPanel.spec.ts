@@ -277,6 +277,64 @@ describe('CatalogueCompetenciesPanel', () => {
 
     wrapper.unmount()
   })
+
+  it('opens the edit drawer prefilled with the chosen competency, and Cancel closes it without saving', async () => {
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="competency-edit-1"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="competency-form-code"]'),
+      'the competency form to mount inside the drawer'
+    )
+
+    expect(
+      document.body.querySelector<HTMLInputElement>('[data-testid="competency-form-code"]')?.value
+    ).toBe('COL')
+
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="form-drawer-cancel"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => document.body.querySelector('[data-testid="competency-form"]') === null,
+      'the drawer to close'
+    )
+
+    expect(updateCompetency).not.toHaveBeenCalled()
+    expect(createCompetency).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('keeps the competency when the delete confirmation is cancelled', async () => {
+    const wrapper = mount(CatalogueCompetenciesPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="competency-delete-1"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-cancel"]'),
+      'the confirm dialog to open'
+    )
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-cancel"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-cancel"]') === null,
+      'the confirm dialog to close'
+    )
+
+    expect(deleteCompetency).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
 })
 
 describe('CatalogueCompetenciesPanel — read-only (published revision)', () => {

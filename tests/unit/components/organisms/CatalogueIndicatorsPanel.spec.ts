@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { waitFor } from '../../support/wait-for'
+import { waitFor, waitForTestId } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 
@@ -413,6 +413,108 @@ describe('CatalogueIndicatorsPanel', () => {
     ).toBe('First')
 
     wrapper.unmount()
+  })
+
+  it('reports a failed delete through the action-error banner and keeps the row', async () => {
+    deleteBarsIndicator.mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="indicator-delete-1"]').trigger('click')
+    const confirmButton = await waitForTestId<HTMLButtonElement>('confirm-dialog-confirm')
+    expect(confirmButton).toBeTruthy()
+    confirmButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirmButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => wrapper.find('[data-testid="indicators-action-error"]').exists(),
+      'the delete failure banner'
+    )
+
+    expect(wrapper.get('[data-testid="indicators-action-error"]').text()).toContain(
+      'catalogue.indicators.deleteError'
+    )
+    expect(wrapper.emitted('refresh-revision')).toBeFalsy()
+    expect(wrapper.text()).toContain('First')
+
+    wrapper.unmount()
+  })
+
+  it('keeps the indicator when the delete confirmation is cancelled', async () => {
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="indicator-delete-1"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-cancel"]'),
+      'the confirm dialog to open'
+    )
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-cancel"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => document.body.querySelector('[data-testid="confirm-dialog-cancel"]') === null,
+      'the confirm dialog to close'
+    )
+
+    expect(deleteBarsIndicator).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('closes the edit drawer on Cancel without saving', async () => {
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="indicator-edit-1"]').trigger('click')
+    await waitFor(
+      () => document.body.querySelector('[data-testid="bars-indicator-form"]'),
+      'the indicator form to mount inside the drawer'
+    )
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="form-drawer-cancel"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => document.body.querySelector('[data-testid="bars-indicator-form"]') === null,
+      'the drawer to close'
+    )
+
+    expect(updateBarsIndicator).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('labels role-less pairs, falls back to the id for an unknown role, and to English text', async () => {
+    listBarsIndicators.mockResolvedValue({
+      data: [
+        indicator({ id: 1, role_id: null, text: { en: 'Roleless text' } }),
+        indicator({ id: 2, role_id: 99, text: { en: 'Orphan role text' } }),
+        indicator({ id: 3, role_id: 1, text: undefined }),
+      ],
+    })
+    const wrapper = mount(CatalogueIndicatorsPanel, {
+      props: { editable: true },
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+
+    const group = wrapper.get('[data-testid="indicators-competency-11"]').text()
+    expect(group).toContain('catalogue.indicators.roleless')
+    expect(group).toContain('99')
+    expect(group).toContain('Roleless text')
+    expect(group).toContain('Orphan role text')
+    expect(group).toContain('ICO')
   })
 })
 

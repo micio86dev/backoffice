@@ -27,4 +27,21 @@ describe('ProjectStatusBadge', () => {
     expect(wrapper.text()).toContain('projects.status.draft')
     expect(wrapper.text()).not.toContain('active')
   })
+
+  it.each([
+    ['draft', 'outline'],
+    ['active', 'success'],
+    ['archived', 'neutral'],
+    ['something_new', 'outline'],
+  ])(
+    'maps %s onto the %s badge variant (an unknown status stays neutral, never throws)',
+    (status, variant) => {
+      const wrapper = mount(ProjectStatusBadge, {
+        props: { status },
+        global: { mocks: { $t: tMock } },
+      })
+
+      expect(wrapper.attributes('data-variant')).toBe(variant)
+    }
+  )
 })

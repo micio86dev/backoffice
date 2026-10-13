@@ -27,4 +27,24 @@ describe('CompetencyMean', () => {
     expect(wrapper.text()).toContain('–')
     expect(wrapper.text()).not.toContain('0')
   })
+
+  it.each([
+    [1.2, 'text-destructive'],
+    [2.49, 'text-destructive'],
+    [2.5, 'text-warning-dark'],
+    [3.5, 'text-warning-dark'],
+    [3.51, 'text-success-dark'],
+    [5, 'text-success-dark'],
+  ])('colours a mean of %s with %s', (mean, expected) => {
+    expect(mountMean(mean).classes()).toContain(expected)
+  })
+
+  it('renders an unassessable (null) mean muted, not in a score colour', () => {
+    const classes = mountMean(null).classes()
+
+    expect(classes).toContain('text-muted-foreground')
+    expect(classes.some((c) => /^text-(?:destructive|warning-dark|success-dark)$/.test(c))).toBe(
+      false
+    )
+  })
 })

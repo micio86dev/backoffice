@@ -61,4 +61,10 @@ describe('useProjects', () => {
 
     await expect(useProjects().listProjects()).rejects.toThrow()
   })
+
+  it('deletes with DELETE', async () => {
+    await expect(useProjects().deleteProject(3)).resolves.toBeUndefined()
+
+    expect(apiFetch).toHaveBeenCalledWith('/projects/3', { method: 'DELETE' })
+  })
 })

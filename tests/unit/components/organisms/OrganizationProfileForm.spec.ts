@@ -32,6 +32,8 @@ const OrganizationProfileForm = (
   await import('../../../../app/components/organisms/OrganizationProfileForm.vue')
 ).default
 
+const CurrencyForm = (await import('../../../../app/components/organisms/CurrencyForm.vue')).default
+
 describe('OrganizationProfileForm', () => {
   beforeEach(() => {
     role.current = 'admin'
@@ -101,6 +103,26 @@ describe('OrganizationProfileForm', () => {
     expect(html.indexOf('organization-profile-banner')).toBeLessThan(
       html.indexOf('organization-profile-submit')
     )
+  })
+
+  it('refuses a blank name on submit without calling the API', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="organization-profile-name"]').setValue('   ')
+    await wrapper.get('[data-testid="organization-profile-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="organization-profile-name-error"]').exists()).toBe(true)
+    expect(updateOrganizationMock).not.toHaveBeenCalled()
+    expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('relays the currency form saved event so the page can refresh', async () => {
+    const wrapper = mountForm()
+
+    wrapper.findComponent(CurrencyForm).vm.$emit('saved')
+
+    expect(wrapper.emitted('saved')).toHaveLength(1)
   })
 
   it('saves the name via useOrganization on submit and emits saved', async () => {

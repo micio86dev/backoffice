@@ -5,10 +5,16 @@
  * `status` via `ToggleGroup`, date range), emits ONE filter object.
  */
 import { describe, it, expect } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import ReportFilters from '../../../../app/components/molecules/ReportFilters.vue'
 
 const tMock = (key: string) => key
+
+const statusToggle = (wrapper: VueWrapper, key: 'statusCompleted' | 'statusPending') =>
+  wrapper
+    .get('[data-testid="report-filter-status"]')
+    .findAll('button')
+    .find((b) => b.text() === `reports.filters.${key}`)!
 
 describe('ReportFilters', () => {
   it('emits a single filter object when the status toggle changes', async () => {
@@ -17,8 +23,7 @@ describe('ReportFilters', () => {
       global: { mocks: { $t: tMock } },
     })
 
-    const completedButton = wrapper.get('[data-testid="report-filter-status"] button:first-child')
-    await completedButton.trigger('click')
+    await statusToggle(wrapper, 'statusCompleted').trigger('click')
 
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([{ status: 'completed' }])
   })
@@ -96,5 +101,94 @@ describe('ReportFilters', () => {
 
     expect(fieldset).not.toBeNull()
     expect(fieldset!.querySelector('legend')?.textContent).toContain('reports.filters.status')
+  })
+
+  function mountWith(modelValue: Record<string, unknown> = {}) {
+    return mount(ReportFilters, {
+      props: {
+        projects: [
+          { id: 7, name: 'Autumn intake' },
+          { id: 9, name: 'Spring intake' },
+        ],
+        modelValue,
+      },
+      global: { mocks: { $t: tMock } },
+    })
+  }
+
+  const lastEmit = (wrapper: ReturnType<typeof mountWith>) =>
+    wrapper.emitted('update:modelValue')?.at(-1)
+
+  it('emits the project id as a NUMBER, not the select’s string value', async () => {
+    const wrapper = mountWith()
+
+    await wrapper.get('[data-testid="report-filter-project"]').setValue('9')
+
+    expect(lastEmit(wrapper)).toEqual([{ project_id: 9 }])
+  })
+
+  it('clears the project filter when "all projects" is chosen again', async () => {
+    const wrapper = mountWith({ project_id: 7 })
+
+    await wrapper.get('[data-testid="report-filter-project"]').setValue('')
+
+    expect(lastEmit(wrapper)?.[0]).toMatchObject({ project_id: undefined })
+  })
+
+  it('emits the role code filter and the end of the period', async () => {
+    const wrapper = mountWith()
+
+    await wrapper.get('[data-testid="report-filter-role"]').setValue('MLL')
+    expect(lastEmit(wrapper)).toEqual([{ role_code: 'MLL' }])
+
+    await wrapper.get('[data-testid="report-filter-to"]').setValue('2026-03-31')
+    expect(lastEmit(wrapper)).toEqual([{ evaluated_to: '2026-03-31' }])
+  })
+
+  it('keeps the other filters when one changes (one object, patched)', async () => {
+    const wrapper = mountWith({ role_code: 'FLL', status: 'pending' })
+
+    await wrapper.get('[data-testid="report-filter-assessment-type"]').setValue('potential')
+
+    expect(lastEmit(wrapper)).toEqual([
+      { role_code: 'FLL', status: 'pending', assessment_type: 'potential' },
+    ])
+  })
+
+  it('clears a date by emptying the field', async () => {
+    const wrapper = mountWith({ evaluated_from: '2026-01-01' })
+
+    await wrapper.get('[data-testid="report-filter-from"]').setValue('')
+
+    expect(lastEmit(wrapper)?.[0]).toMatchObject({ evaluated_from: undefined })
+  })
+
+  it('un-pressing the active status toggle removes the status filter', async () => {
+    const wrapper = mountWith({ status: 'completed' })
+
+    await statusToggle(wrapper, 'statusCompleted').trigger('click')
+
+    expect(lastEmit(wrapper)?.[0]).toMatchObject({ status: undefined })
+  })
+
+  it('shows neither the count nor the reset while nothing is filtered', () => {
+    const wrapper = mountWith({})
+
+    expect(wrapper.find('[data-testid="report-filters-active-count"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="report-filters-clear"]').exists()).toBe(false)
+  })
+
+  it('does not count a filter that was emptied (undefined or empty string)', () => {
+    const wrapper = mountWith({ project_id: 7, role_code: '', status: undefined })
+
+    expect(wrapper.get('[data-testid="report-filters-active-count"]').text()).toBe('1')
+  })
+
+  it('clears every filter at once with an empty object', async () => {
+    const wrapper = mountWith({ project_id: 7, status: 'pending', evaluated_to: '2026-03-31' })
+
+    await wrapper.get('[data-testid="report-filters-clear"]').trigger('click')
+
+    expect(lastEmit(wrapper)).toEqual([{}])
   })
 })

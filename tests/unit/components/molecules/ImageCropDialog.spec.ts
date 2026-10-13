@@ -258,4 +258,171 @@ describe('ImageCropDialog', () => {
 
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:source')
   })
+
+  describe('pointer and wheel operation', () => {
+    const pointer = (type: string, clientX: number, clientY = 0) =>
+      new PointerEvent(type, { clientX, clientY, pointerId: 1, bubbles: true })
+
+    it('drags the image by the pointer delta and stops following once released', async () => {
+      mountDialog()
+      await flushPromises()
+      // 800x400 cover in a 360 square: 720 wide, so +/-180 of horizontal play.
+      await loadImage(800, 400)
+      const frame = body('image-crop-frame')
+
+      frame.dispatchEvent(pointer('pointerdown', 100))
+      await flushPromises()
+      expect(frame.className).toContain('cursor-grabbing')
+
+      frame.dispatchEvent(pointer('pointermove', 160))
+      await flushPromises()
+      expect(Number(frame.getAttribute('data-offset-x'))).toBe(60)
+
+      frame.dispatchEvent(pointer('pointerup', 160))
+      await flushPromises()
+      expect(frame.className).toContain('cursor-grab')
+      expect(frame.className).not.toContain('cursor-grabbing')
+
+      frame.dispatchEvent(pointer('pointermove', 20))
+      await flushPromises()
+      expect(Number(frame.getAttribute('data-offset-x'))).toBe(60)
+    })
+
+    it('clamps a drag that overshoots, so the frame never shows a gap', async () => {
+      mountDialog()
+      await flushPromises()
+      await loadImage(800, 400)
+      const frame = body('image-crop-frame')
+
+      frame.dispatchEvent(pointer('pointerdown', 0))
+      frame.dispatchEvent(pointer('pointermove', 5000))
+      await flushPromises()
+
+      expect(Number(frame.getAttribute('data-offset-x'))).toBe(180)
+    })
+
+    it('ignores a pointermove that was never preceded by a pointerdown', async () => {
+      mountDialog()
+      await flushPromises()
+      await loadImage(800, 400)
+      const frame = body('image-crop-frame')
+
+      frame.dispatchEvent(pointer('pointermove', 90))
+      frame.dispatchEvent(pointer('pointerup', 90))
+      await flushPromises()
+
+      expect(Number(frame.getAttribute('data-offset-x'))).toBe(0)
+    })
+
+    it('does not start a drag before the image has reported its size', async () => {
+      mountDialog()
+      await flushPromises()
+      const frame = body('image-crop-frame')
+
+      frame.dispatchEvent(pointer('pointerdown', 0))
+      frame.dispatchEvent(pointer('pointermove', 80))
+      await flushPromises()
+
+      expect(frame.className).not.toContain('cursor-grabbing')
+      expect(Number(frame.getAttribute('data-offset-x'))).toBe(0)
+    })
+
+    it('zooms with the wheel (up zooms in) and never beyond the bounds', async () => {
+      mountDialog()
+      await flushPromises()
+      await loadImage()
+      const frame = body('image-crop-frame')
+
+      frame.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -200, bubbles: true, cancelable: true })
+      )
+      await flushPromises()
+      const zoomedIn = Number(frame.getAttribute('data-zoom'))
+      expect(zoomedIn).toBeGreaterThan(1)
+
+      frame.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -1e6, bubbles: true, cancelable: true })
+      )
+      await flushPromises()
+      const max = Number(frame.getAttribute('data-zoom'))
+      expect(max).toBeGreaterThanOrEqual(zoomedIn)
+
+      frame.dispatchEvent(new WheelEvent('wheel', { deltaY: 1e7, bubbles: true, cancelable: true }))
+      await flushPromises()
+      expect(Number(frame.getAttribute('data-zoom'))).toBeLessThan(max)
+      expect(Number(frame.getAttribute('data-zoom'))).toBeGreaterThan(0)
+    })
+
+    it('prevents the page from scrolling under a wheel gesture on the frame', async () => {
+      mountDialog()
+      await flushPromises()
+      await loadImage()
+
+      const event = new WheelEvent('wheel', { deltaY: 10, bubbles: true, cancelable: true })
+      body('image-crop-frame').dispatchEvent(event)
+
+      expect(event.defaultPrevented).toBe(true)
+    })
+
+    it('follows the zoom slider', async () => {
+      mountDialog()
+      await flushPromises()
+      await loadImage()
+      const slider = body<HTMLInputElement>('image-crop-zoom')
+
+      slider.value = '2'
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      await flushPromises()
+
+      expect(Number(body('image-crop-frame').getAttribute('data-zoom'))).toBe(2)
+    })
+
+    it('shrinking the zoom re-clamps the offsets so the image cannot slide off the frame', async () => {
+      mountDialog()
+      await flushPromises()
+      await loadImage(800, 400)
+      const frame = body('image-crop-frame')
+      const slider = body<HTMLInputElement>('image-crop-zoom')
+
+      slider.value = '3'
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      frame.dispatchEvent(pointer('pointerdown', 0))
+      frame.dispatchEvent(pointer('pointermove', 5000))
+      frame.dispatchEvent(pointer('pointerup', 5000))
+      await flushPromises()
+      const wide = Number(frame.getAttribute('data-offset-x'))
+      expect(wide).toBeGreaterThan(180)
+
+      slider.value = '1'
+      slider.dispatchEvent(new Event('input', { bubbles: true }))
+      await flushPromises()
+
+      expect(Number(frame.getAttribute('data-offset-x'))).toBe(180)
+    })
+  })
+
+  it('treats Escape as a cancel, exactly once', async () => {
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    body('image-crop-dialog').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    )
+    await flushPromises()
+
+    expect(wrapper.emitted('cancel')).toHaveLength(1)
+    expect(wrapper.emitted('confirm')).toBeUndefined()
+  })
+
+  it('does not export before the image has loaded', async () => {
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    body<HTMLButtonElement>('image-crop-confirm').dispatchEvent(
+      new MouseEvent('click', { bubbles: true })
+    )
+    await flushPromises()
+
+    expect(wrapper.emitted('confirm')).toBeUndefined()
+  })
 })

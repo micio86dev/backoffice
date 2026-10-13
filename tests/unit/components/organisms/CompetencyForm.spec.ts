@@ -5,7 +5,7 @@
  * D4 server field-error mapping — same doctrine as `UserForm.spec.ts`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { realI18n } from '../../support/i18n'
 
 const tMock = (key: string) => key
@@ -186,6 +186,55 @@ describe('CompetencyForm', () => {
 
     expect(wrapper.get('[data-testid="competency-form-banner"]').text()).toContain(
       'errors.states.forbidden.message'
+    )
+  })
+  it('sends the Italian name and definition when authored', async () => {
+    const wrapper = mount(CompetencyForm, {
+      props: { competency: null },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="competency-form-code"]').setValue('COL')
+    await wrapper.get('[data-testid="competency-form-name-en"]').setValue('Collaboration')
+    await wrapper.get('[data-testid="competency-form-name-it"]').setValue('Collaborazione')
+    await wrapper.get('[data-testid="competency-form-definition-en"]').setValue('Definition.')
+    await wrapper.get('[data-testid="competency-form-definition-it"]').setValue('Definizione.')
+    await wrapper.get('[data-testid="competency-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(createCompetencyMock).toHaveBeenCalledWith({
+      code: 'COL',
+      type: 'standard',
+      name: { en: 'Collaboration', it: 'Collaborazione' },
+      definition: { en: 'Definition.', it: 'Definizione.' },
+    })
+  })
+
+  it('maps server refusals of the Italian fields onto their own controls', async () => {
+    createCompetencyMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { 'name.it': ['name_it_bad'], 'definition.it': ['definition_it_bad'] } },
+      })
+    )
+    const wrapper = mount(CompetencyForm, {
+      props: { competency: null },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="competency-form-code"]').setValue('COL')
+    await wrapper.get('[data-testid="competency-form-name-en"]').setValue('Collaboration')
+    await wrapper.get('[data-testid="competency-form-definition-en"]').setValue('Definition.')
+    await wrapper.get('[data-testid="competency-form"]').trigger('submit')
+    await flushPromises()
+
+    const nameError = wrapper.get('[data-testid="competency-form-name-it-error"]')
+    const nameInput = wrapper.get('[data-testid="competency-form-name-it"]')
+    expect(nameError.text()).toBe('name_it_bad')
+    expect(nameInput.attributes('aria-invalid')).toBe('true')
+    expect(nameInput.attributes('aria-describedby')).toBe(nameError.attributes('id'))
+    expect(wrapper.get('[data-testid="competency-form-definition-it-error"]').text()).toBe(
+      'definition_it_bad'
     )
   })
 })

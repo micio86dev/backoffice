@@ -606,3 +606,47 @@ describe('unsaved competencies', () => {
     ).toBe(false)
   })
 })
+
+describe('the exposed API', () => {
+  it('startNew opens the editor inside the requested competency group', async () => {
+    const wrapper = await mountPanel()
+
+    ;(wrapper.vm as unknown as { startNew: (competencyId: number) => void }).startNew(22)
+    await flushPromises()
+
+    expect(
+      wrapper
+        .find('[data-testid="question-group-22"]')
+        .find('[data-testid="question-editor"]')
+        .exists()
+    ).toBe(true)
+    expect(wrapper.findAll('[data-testid="question-editor"]')).toHaveLength(1)
+  })
+})
+
+describe('tolerant loading', () => {
+  it('renders a question that arrived without any text instead of failing the whole list', async () => {
+    const wrapper = await mountPanel([question({ id: 9, competency_id: 11, text: null })])
+
+    expect(wrapper.find('[data-testid="question-row-9"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="project-questions-banner"]').exists()).toBe(false)
+  })
+
+  it('reports a 409 on load as waiting, not as a permanent error', async () => {
+    fetchQuestions.mockReset().mockRejectedValue(Object.assign(new Error('409'), { status: 409 }))
+
+    const { default: ProjectQuestionsPanel } =
+      await import('../../../../app/components/organisms/ProjectQuestionsPanel.vue')
+
+    const wrapper = mount(ProjectQuestionsPanel, {
+      props: { projectId: 5, competencies: COMPETENCIES, locale: 'en' },
+      global: { mocks: { $t: tMock }, stubs: { ConfirmDialog: true } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-questions-banner"]').text()).toContain(
+      'errors.states.notReady.message'
+    )
+  })
+})

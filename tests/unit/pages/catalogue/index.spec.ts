@@ -132,6 +132,41 @@ describe('pages/catalogue/index.vue', () => {
     expect(publishRevision).toHaveBeenCalledOnce()
   })
 
+  it('cancelling the Publish confirmation publishes nothing and closes the dialog', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'draft' }) })
+    const wrapper = await mountPage()
+
+    await wrapper.get('[data-testid="catalogue-publish"]').trigger('click')
+    await confirmDialog('cancel')
+
+    expect(publishRevision).not.toHaveBeenCalled()
+    expect(document.body.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+
+  it('shows the untitled placeholder for a revision without a label', async () => {
+    fetchCurrentRevision.mockResolvedValue({ data: revision({ label: null }) })
+    const wrapper = await mountPage()
+
+    expect(wrapper.get('[data-testid="catalogue-revision-label"]').text()).toBe(
+      'catalogue.revision.untitled'
+    )
+  })
+
+  it('sets a translated, noindex page head', async () => {
+    const useHeadMock = vi.fn()
+    vi.stubGlobal('useHead', useHeadMock)
+    fetchCurrentRevision.mockResolvedValue({ data: revision() })
+    await mountPage()
+
+    const head = useHeadMock.mock.calls[0]?.[0] as {
+      title: () => string
+      meta: { name: string; content: string }[]
+    }
+
+    expect(head.title()).toBe('catalogue.title')
+    expect(head.meta).toContainEqual({ name: 'robots', content: 'noindex, nofollow' })
+  })
+
   it('shows Discard draft only while the revision is a draft', async () => {
     fetchCurrentRevision.mockResolvedValue({ data: revision({ state: 'published' }) })
     const wrapper = await mountPage()

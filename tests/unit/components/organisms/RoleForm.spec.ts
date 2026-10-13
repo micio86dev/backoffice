@@ -6,7 +6,7 @@
  * `responsibilities` is optional on BOTH locales, unlike `name`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { realI18n } from '../../support/i18n'
 
 const tMock = (key: string) => key
@@ -131,5 +131,64 @@ describe('RoleForm', () => {
     expect(wrapper.get('[data-testid="role-form-banner"]').text()).toContain(
       'errors.states.notReady.message'
     )
+  })
+  it.each(['ico', 'A-B', 'A'.repeat(17)])(
+    'rejects the malformed code %j on submit, never reaching the API',
+    async (badCode) => {
+      const wrapper = mount(RoleForm, { props: { role: null }, global: { mocks: { $t: tMock } } })
+
+      await wrapper.get('[data-testid="role-form-code"]').setValue(badCode)
+      await wrapper.get('[data-testid="role-form-name-en"]').setValue('Name')
+      await wrapper.get('[data-testid="role-form"]').trigger('submit')
+
+      expect(wrapper.get('[data-testid="role-form-code-error"]').text()).toBe(
+        'catalogue.form.codeInvalid'
+      )
+      expect(createRoleMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it('sends the Italian name and both responsibilities when authored', async () => {
+    const wrapper = mount(RoleForm, { props: { role: null }, global: { mocks: { $t: tMock } } })
+
+    await wrapper.get('[data-testid="role-form-code"]').setValue('ICO')
+    await wrapper.get('[data-testid="role-form-name-en"]').setValue('Contributor')
+    await wrapper.get('[data-testid="role-form-name-it"]').setValue('Contributore')
+    await wrapper.get('[data-testid="role-form-responsibilities-it"]').setValue('Consegna.')
+    await wrapper.get('[data-testid="role-form"]').trigger('submit')
+
+    expect(createRoleMock).toHaveBeenCalledWith({
+      code: 'ICO',
+      name: { en: 'Contributor', it: 'Contributore' },
+      responsibilities: { en: undefined, it: 'Consegna.' },
+    })
+  })
+
+  it('flags a blank English name on blur', async () => {
+    const wrapper = mount(RoleForm, { props: { role: null }, global: { mocks: { $t: tMock } } })
+
+    await wrapper.get('[data-testid="role-form-name-en"]').trigger('blur')
+
+    expect(wrapper.get('[data-testid="role-form-name-en-error"]').text()).toBe(
+      'catalogue.form.nameEnRequired'
+    )
+  })
+
+  it('shows a refusal on a field the form has no control for in the banner', async () => {
+    createRoleMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { responsibilities: ['responsibilities_bad'] } },
+      })
+    )
+    const wrapper = mount(RoleForm, { props: { role: null }, global: { mocks: { $t: tMock } } })
+
+    await wrapper.get('[data-testid="role-form-code"]').setValue('ICO')
+    await wrapper.get('[data-testid="role-form-name-en"]').setValue('Contributor')
+    await wrapper.get('[data-testid="role-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="role-form-banner"]').text()).toContain('responsibilities_bad')
+    expect(wrapper.emitted('saved')).toBeUndefined()
   })
 })

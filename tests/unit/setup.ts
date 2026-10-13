@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import { config } from '@vue/test-utils'
 import { ref, computed, reactive, watch, watchEffect, nextTick, toRef, toRefs } from 'vue'
 
 // Expose Vue reactivity APIs as globals — Nuxt auto-imports them but Vitest doesn't
@@ -56,12 +57,16 @@ vi.stubGlobal(
   'useLocalePath',
   vi.fn(() => (path: string) => path)
 )
-// Nuxt auto-import. Stubbed globally for the same reason as `useI18n` above:
-// the app shell reaches for the route (NavBar renders HelpSheet, which picks
-// its topic from the current path), and a spec that mounts a shell component
-// should not have to know which of its descendants reads the route. Specs that
-// care about a SPECIFIC path re-stub it themselves.
-vi.stubGlobal(
-  'useRoute',
-  vi.fn(() => ({ path: '/', fullPath: '/', params: {}, query: {} }))
-)
+
+// Nuxt registers these components globally in the running app; a bare
+// `mount()` has no such registry and warns "Failed to resolve component".
+// NuxtLink renders a real anchor so href/text assertions keep working; the
+// layout/page/announcer stand-ins just render their slot. A spec that needs
+// something richer passes its own `global.stubs`, which wins over these.
+config.global.stubs = {
+  NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
+  NuxtLayout: { template: '<div><slot /></div>' },
+  NuxtPage: { template: '<div />' },
+  NuxtRouteAnnouncer: { template: '<div />' },
+  ...config.global.stubs,
+}

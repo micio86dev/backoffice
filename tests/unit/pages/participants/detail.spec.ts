@@ -74,6 +74,11 @@ function detailResponse(
       language: 'it',
       ...reference,
       reusable_link: reusableLink,
+      // Required keys on the real response: a participant with no retry
+      // history is not retryable and has no authorization timestamp.
+      retry_available: false,
+      retry_attempt: false,
+      retry_authorized_at: null,
       status,
       project_id: 1,
       // operator-interview-link, design D5: nested gate fields, defaulted to

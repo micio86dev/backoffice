@@ -831,6 +831,14 @@
       "expiresAt": "Scadenza",
       "create": "Crea chiave",
       "createError": "Non è stato possibile creare questa chiave. Controlla i campi evidenziati.",
+      "loadError": "Non è stato possibile caricare le chiavi API. Riprova.",
+      "revokeError": "Non è stato possibile revocare questa chiave. Riprova.",
+      "retry": "Riprova",
+      "statusError": {
+        "403": "Non hai il permesso di eseguire questa azione.",
+        "404": "Questa chiave non esiste più. Ricarica l'elenco.",
+        "409": "Il sistema non è ancora pronto. Riprova tra poco."
+      },
       "rawKeyTitle": "Copia questa chiave ora",
       "rawKeyWarning": "Questa è l'unica volta in cui la chiave in chiaro viene mostrata. Non potrà più essere recuperata dopo aver chiuso questa finestra.",
       "copy": "Copia",

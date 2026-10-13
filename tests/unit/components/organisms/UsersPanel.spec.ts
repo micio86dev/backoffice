@@ -216,3 +216,144 @@ describe('UsersPanel', () => {
     })
   })
 })
+
+describe('UsersPanel — edit, activate and refused actions', () => {
+  const ada = {
+    id: 1,
+    name: 'Ada',
+    email: 'ada@example.com',
+    role: 'admin',
+    is_deactivated: false,
+    created_at: null,
+    updated_at: null,
+  }
+  const grace = {
+    id: 2,
+    name: 'Grace',
+    email: 'grace@example.com',
+    role: null,
+    is_deactivated: true,
+    created_at: null,
+    updated_at: null,
+  }
+
+  beforeEach(() => {
+    listUsersMock.mockReset().mockResolvedValue({ data: [ada, grace] })
+    deactivateUserMock.mockReset().mockResolvedValue(undefined)
+    activateUserMock.mockReset().mockResolvedValue(undefined)
+    updateUserMock.mockReset().mockResolvedValue({ data: {} })
+  })
+
+  async function mountPanel() {
+    const wrapper = mount(UsersPanel, {
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    return wrapper
+  }
+
+  async function confirm(): Promise<void> {
+    const button = await waitFor(
+      () =>
+        document.body.querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-confirm"]'),
+      'the confirm button'
+    )
+    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+  }
+
+  it('reads a deactivated user without an access level as such, offering Activate not Deactivate', async () => {
+    const wrapper = await mountPanel()
+
+    const row = wrapper.findAll('tr').find((tr) => tr.text().includes('Grace'))!
+    expect(row.text()).toContain('users.table.noAccessLevel')
+    expect(row.text()).toContain('users.state.deactivated')
+    expect(wrapper.find('[data-testid="user-deactivate-2"]').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('activates only after confirming, then refetches the list', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="user-activate-2"]').trigger('click')
+    expect(activateUserMock).not.toHaveBeenCalled()
+    await confirm()
+
+    expect(activateUserMock).toHaveBeenCalledExactlyOnceWith(2)
+    expect(listUsersMock).toHaveBeenCalledTimes(2)
+
+    wrapper.unmount()
+  })
+
+  it('cancelling the confirmation changes nothing', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="user-deactivate-1"]').trigger('click')
+    const cancel = await waitFor(
+      () => document.body.querySelector<HTMLButtonElement>('[data-testid="confirm-dialog-cancel"]'),
+      'the cancel button'
+    )
+    cancel.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    cancel.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    expect(deactivateUserMock).not.toHaveBeenCalled()
+    expect(activateUserMock).not.toHaveBeenCalled()
+    expect(listUsersMock).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('opens the edit drawer prefilled with that user and saves against its id', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="user-edit-1"]').trigger('click')
+    const nameInput = await waitFor(
+      () => document.body.querySelector<HTMLInputElement>('[data-testid="user-form-name"]'),
+      'the edit form to mount'
+    )
+    expect(nameInput.value).toBe('Ada')
+
+    document.body
+      .querySelector<HTMLButtonElement>('[data-testid="form-drawer-save"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(() => updateUserMock.mock.calls.length > 0, 'the update call')
+
+    expect(updateUserMock.mock.calls[0]?.[0]).toBe(1)
+
+    wrapper.unmount()
+  })
+
+  it('explains a refused deactivation in the operator language and keeps the list as it was', async () => {
+    deactivateUserMock.mockRejectedValueOnce({
+      status: 422,
+      data: { error: 'last_admin', message: 'English prose.' },
+    })
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="user-deactivate-1"]').trigger('click')
+    await confirm()
+
+    const text = wrapper.get('[data-testid="users-action-error"]').text()
+    expect(text).toContain('users.serverError.last_admin')
+    expect(text).not.toContain('English prose.')
+    expect(listUsersMock).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('shows the generic action error when the failure carries no guard code', async () => {
+    activateUserMock.mockRejectedValueOnce({ status: 500 })
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="user-activate-2"]').trigger('click')
+    await confirm()
+
+    expect(wrapper.get('[data-testid="users-action-error"]').text()).toContain('users.actionError')
+
+    wrapper.unmount()
+  })
+})

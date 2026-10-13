@@ -248,6 +248,97 @@ describe('BarsIndicatorForm', () => {
     wrapper.unmount()
   })
 
+  it.each([
+    ['text-en', 'text-en-error'],
+    ['anchor5-en', 'anchor5-en-error'],
+    ['anchor3-en', 'anchor3-en-error'],
+    ['anchor1-en', 'anchor1-en-error'],
+  ])('flags a blank %s on blur and clears it once filled', async (field, errorSuffix) => {
+    const wrapper = mount(BarsIndicatorForm, {
+      props: { indicator: indicator(), competencies: COMPETENCIES, roles: ROLES, indicators: [] },
+      global: { mocks: { $t: tMock } },
+    })
+    const input = wrapper.get(`[data-testid="bars-indicator-form-${field}"]`)
+
+    await input.setValue('   ')
+    await input.trigger('blur')
+    expect(wrapper.find(`[data-testid="bars-indicator-form-${errorSuffix}"]`).exists()).toBe(true)
+
+    await input.setValue('Filled')
+    await input.trigger('blur')
+    expect(wrapper.find(`[data-testid="bars-indicator-form-${errorSuffix}"]`).exists()).toBe(false)
+  })
+
+  it('renders a server refusal on every Italian field, and an unmapped one in the banner', async () => {
+    updateBarsIndicatorMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: {
+          errors: {
+            'text.it': ['text_it_bad'],
+            'anchor_3.it': ['anchor_3_it_bad'],
+            'anchor_1.it': ['anchor_1_it_bad'],
+            position: ['position_bad'],
+          },
+        },
+      })
+    )
+    const wrapper = mount(BarsIndicatorForm, {
+      props: { indicator: indicator(), competencies: COMPETENCIES, roles: ROLES, indicators: [] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="bars-indicator-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="bars-indicator-form-text-it-error"]').text()).toBe(
+      'text_it_bad'
+    )
+    expect(wrapper.get('[data-testid="bars-indicator-form-anchor3-it-error"]').text()).toBe(
+      'anchor_3_it_bad'
+    )
+    expect(wrapper.get('[data-testid="bars-indicator-form-anchor1-it-error"]').text()).toBe(
+      'anchor_1_it_bad'
+    )
+    expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toContain(
+      'position_bad'
+    )
+    expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('falls back to a generic banner when the save fails without a validation body', async () => {
+    updateBarsIndicatorMock.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = mount(BarsIndicatorForm, {
+      props: { indicator: indicator(), competencies: COMPETENCIES, roles: ROLES, indicators: [] },
+      global: { mocks: { $t: tMock } },
+    })
+
+    await wrapper.get('[data-testid="bars-indicator-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toBe(
+      'catalogue.form.saveError'
+    )
+    expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('labels a role-less indicator and an unknown competency without crashing', () => {
+    const wrapper = mount(BarsIndicatorForm, {
+      props: {
+        indicator: indicator({ role_id: null, competency_id: 999 }),
+        competencies: COMPETENCIES,
+        roles: ROLES,
+        indicators: [],
+      },
+      global: { mocks: { $t: tMock } },
+    })
+
+    expect(wrapper.get('[data-testid="bars-indicator-form-role-static"]').text()).toBe(
+      'catalogue.indicators.roleOption.none'
+    )
+    expect(wrapper.get('[data-testid="bars-indicator-form-competency-static"]').text()).toBe('999')
+  })
+
   it('maps a server bars_indicator_pair_full refusal onto the competency field', async () => {
     createBarsIndicatorMock.mockRejectedValueOnce(
       Object.assign(new Error('422'), {

@@ -58,4 +58,34 @@ describe('useOrganization', () => {
       expect(api.currencyCode.value).toBe('USD')
     })
   })
+
+  it('uploads the logo as multipart FormData under the "logo" field, with no explicit Content-Type', async () => {
+    const file = new File(['x'], 'logo.png', { type: 'image/png' })
+
+    await useOrganization().uploadLogo(file)
+
+    const [path, options] = apiFetch.mock.calls[0]!
+    expect(path).toBe('/organization/logo')
+    expect(options.method).toBe('POST')
+    expect(options.body).toBeInstanceOf(FormData)
+    expect((options.body as FormData).get('logo')).toBe(file)
+    expect(options.headers).toBeUndefined()
+  })
+
+  it('removes the logo with DELETE', async () => {
+    await useOrganization().removeLogo()
+
+    expect(apiFetch).toHaveBeenCalledWith('/organization/logo', { method: 'DELETE' })
+  })
+
+  it('keeps the previous currency when a save answers without one', async () => {
+    const api = useOrganization()
+    apiFetch.mockResolvedValueOnce({ data: { currency_code: 'EUR' } })
+    await api.fetchOrganization()
+
+    apiFetch.mockResolvedValueOnce({ data: {} })
+    await api.updateOrganization({ name: 'Renamed' })
+
+    expect(api.currencyCode.value).toBe('EUR')
+  })
 })

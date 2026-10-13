@@ -23,8 +23,14 @@ const CopyTemplateDialog = (
   await import('../../../../app/components/organisms/CopyTemplateDialog.vue')
 ).default
 
+// The result line renders as `<organization> :: <name>` so a test reads what
+// the operator reads, instead of a serialised parameter bag.
 const tMock = (key: string, params?: Record<string, unknown>) =>
-  params ? `${key} ${JSON.stringify(params)}` : key
+  key === 'avatar_templates.copy.resultItem'
+    ? `${params?.organization} :: ${params?.name}`
+    : params
+      ? `${key} ${JSON.stringify(params)}`
+      : key
 
 vi.stubGlobal(
   'useI18n',
@@ -151,8 +157,8 @@ describe('CopyTemplateDialog', () => {
 
     const result = await waitForTestId('copy-template-result')
     expect(result.getAttribute('role')).toBe('status')
-    expect(result.textContent).toContain('"organization":"Beta Org"')
-    expect(result.textContent).toContain('"name":"Recruiter voice (copy)"')
+    expect(q('copy-result-90')?.textContent?.trim()).toBe('Beta Org :: Recruiter voice')
+    expect(q('copy-result-91')?.textContent).toContain(' :: Recruiter voice (copy)')
     expect(result.textContent).toContain('avatar_templates.copy.resultInactive')
     expect(q('org-multiselect')).toBeNull()
     await waitFor(
@@ -279,5 +285,77 @@ describe('CopyTemplateDialog', () => {
       expect(q('copy-template-platform-badge')).toBeNull()
       expect(q('copy-template-independence')).toBeNull()
     })
+  })
+})
+
+describe('CopyTemplateDialog — closing and edge cases', () => {
+  const pressEscape = () =>
+    q('copy-template-dialog')!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+
+  it('asks its parent to close on Escape', async () => {
+    const wrapper = await mountOpen()
+
+    pressEscape()
+    await flushPromises()
+
+    expect(wrapper.emitted('update:open')?.at(-1)).toEqual([false])
+  })
+
+  it('ignores Escape while the copy is in flight, so the operator cannot lose the outcome', async () => {
+    let resolve!: (value: unknown) => void
+    duplicateTemplate.mockReturnValue(new Promise((r) => (resolve = r)))
+    const wrapper = await mountOpen()
+    await click('org-option-2')
+    await click('copy-template-submit')
+
+    pressEscape()
+    await flushPromises()
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+
+    resolve({ data: [{ organization_id: 2, id: 90, name: 'X' }] })
+    await waitForTestId('copy-template-result')
+    pressEscape()
+    await flushPromises()
+    expect(wrapper.emitted('update:open')?.at(-1)).toEqual([false])
+  })
+
+  it('closes from the Done button once the summary is showing', async () => {
+    duplicateTemplate.mockResolvedValue({ data: [{ organization_id: 2, id: 90, name: 'X' }] })
+    const wrapper = await mountOpen()
+    await click('org-option-2')
+    await click('copy-template-submit')
+    await waitForTestId('copy-template-result')
+
+    await click('copy-template-done')
+
+    expect(wrapper.emitted('update:open')?.at(-1)).toEqual([false])
+  })
+
+  it('names a copy by its organization id when that organization is no longer listed', async () => {
+    duplicateTemplate.mockResolvedValue({ data: [{ organization_id: 42, id: 90, name: 'X' }] })
+    await mountOpen()
+    await click('org-option-2')
+    await click('copy-template-submit')
+
+    const item = await waitForTestId('copy-result-90')
+    expect(item.textContent?.trim()).toBe('42 :: X')
+  })
+
+  it('does not call the API when there is no template to copy', async () => {
+    const wrapper = mount(CopyTemplateDialog, {
+      props: { open: true, template: null },
+      global: { mocks: { $t: tMock } },
+      attachTo: document.body,
+    })
+    await waitForTestId('org-multiselect')
+    await click('org-option-2')
+    await click('copy-template-submit')
+
+    expect(duplicateTemplate).not.toHaveBeenCalled()
+    expect(q('copy-template-result')).toBeNull()
+
+    wrapper.unmount()
   })
 })

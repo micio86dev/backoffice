@@ -30,7 +30,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { waitFor } from '../../support/wait-for'
-import { ref } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 
 // Pre-warm every panel loaded via `defineAsyncComponent` (D10 code-split).
 // `vi.resetModules()` in this file's `beforeEach` clears Vitest's module
@@ -832,5 +832,84 @@ describe('pages/settings/index.vue', () => {
     expect(wrapper.text()).not.toContain('settings.tabs.llmCredentials')
     expect(wrapper.text()).not.toContain('settings.tabs.users')
     expect(wrapper.findAll('[role="tabpanel"][data-state="active"]')).toHaveLength(1)
+  })
+
+  it('re-reads the organization when a section reports it saved, so the form shows server state', async () => {
+    // The real form is replaced by a one-button double: this asserts the PAGE's
+    // wiring of `@saved`, and the real form re-rendering mid module-reset is
+    // the Field.vue race this file already documents.
+    const FormDouble = defineComponent({
+      name: 'OrganizationProfileForm',
+      props: { organization: { type: Object, required: true } },
+      emits: ['saved'],
+      setup(props, { emit }) {
+        return () =>
+          h(
+            'button',
+            { 'data-testid': 'form-double-save', onClick: () => emit('saved') },
+            String((props.organization as { name: string }).name)
+          )
+      },
+    })
+    vi.doMock('../../../../app/components/organisms/OrganizationProfileForm.vue', () => ({
+      __esModule: true,
+      default: FormDouble,
+    }))
+    try {
+      mockCurrentUserAsync('admin')
+      const fetchOrganization = vi
+        .fn()
+        .mockResolvedValueOnce(organizationResponse())
+        .mockResolvedValueOnce({ data: { ...organizationResponse().data, name: 'Acme Renamed' } })
+      vi.doMock('../../../../app/composables/useOrganization', () => ({
+        useOrganization: () => ({ fetchOrganization, updateOrganization: vi.fn() }),
+      }))
+
+      const wrapper = await mountSettings()
+      await waitFor(() => wrapper.find('[data-testid="form-double-save"]').exists())
+      expect(wrapper.get('[data-testid="form-double-save"]').text()).toBe('Acme')
+
+      await wrapper.get('[data-testid="form-double-save"]').trigger('click')
+      await flushPromises()
+
+      expect(fetchOrganization).toHaveBeenCalledTimes(2)
+      expect(wrapper.get('[data-testid="form-double-save"]').text()).toBe('Acme Renamed')
+    } finally {
+      vi.doUnmock('../../../../app/components/organisms/OrganizationProfileForm.vue')
+    }
+  })
+
+  it('renders a 409 as the neutral not-ready state, not the destructive one', async () => {
+    mockCurrentUserAsync('admin')
+    vi.doMock('../../../../app/composables/useOrganization', () => ({
+      useOrganization: () => ({
+        fetchOrganization: vi.fn().mockRejectedValue({ status: 409 }),
+        updateOrganization: vi.fn(),
+      }),
+    }))
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.find('[data-testid="settings-error"]').exists())
+
+    const alert = wrapper.get('[data-testid="settings-error"]')
+    expect(alert.attributes('data-state')).toBe('not-ready')
+    expect(alert.classes()).not.toContain('text-destructive')
+  })
+
+  it('renders any other failure with the destructive variant', async () => {
+    mockCurrentUserAsync('admin')
+    vi.doMock('../../../../app/composables/useOrganization', () => ({
+      useOrganization: () => ({
+        fetchOrganization: vi.fn().mockRejectedValue({ status: 500 }),
+        updateOrganization: vi.fn(),
+      }),
+    }))
+
+    const wrapper = await mountSettings()
+    await waitFor(() => wrapper.find('[data-testid="settings-error"]').exists())
+
+    const alert = wrapper.get('[data-testid="settings-error"]')
+    expect(alert.attributes('data-state')).toBe('error')
+    expect(alert.classes().join(' ')).toContain('destructive')
   })
 })

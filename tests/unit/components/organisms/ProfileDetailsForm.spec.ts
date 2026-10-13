@@ -29,14 +29,14 @@ describe('ProfileDetailsForm', () => {
     updatePasswordMock.mockReset()
   })
 
-  function mountForm() {
+  function mountForm(locale: string | null = 'en') {
     return mount(ProfileDetailsForm, {
       props: {
         profile: {
           id: 1,
           name: 'Ada Lovelace',
           email: 'ada@example.test',
-          locale: 'en',
+          locale: locale as 'en',
           role: 'operator',
           organization: { id: 1, name: 'Acme' },
         },
@@ -111,5 +111,73 @@ describe('ProfileDetailsForm', () => {
     const banner = wrapper.get('[data-testid="profile-details-banner"]')
     expect(banner.attributes('role')).toBe('alert')
     expect(banner.text()).toContain('role is not an editable field on this resource.')
+  })
+  it('refuses a blank name and a blank email, naming each, without calling the API', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="profile-details-name"]').setValue('  ')
+    await wrapper.get('[data-testid="profile-details-email"]').setValue('')
+    await wrapper.get('[data-testid="profile-details-form"]').trigger('submit')
+
+    expect(wrapper.get('[data-testid="profile-details-name-error"]').text()).toBe(
+      'profile.details.nameRequired'
+    )
+    expect(wrapper.get('[data-testid="profile-details-email-error"]').text()).toBe(
+      'profile.details.emailRequired'
+    )
+    expect(updateProfileMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    'no-at-sign',
+    '@example.test',
+    'a@@example.test',
+    'a b@example.test',
+    'a@nodot',
+    'a@x.',
+  ])('rejects the implausible email %j', async (value) => {
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="profile-details-email"]').setValue(value)
+    await wrapper.get('[data-testid="profile-details-email"]').trigger('blur')
+
+    expect(wrapper.get('[data-testid="profile-details-email-error"]').text()).toBe(
+      'profile.details.emailInvalid'
+    )
+  })
+
+  it('clears a name error on blur once the name is filled in', async () => {
+    const wrapper = mountForm()
+    const name = wrapper.get('[data-testid="profile-details-name"]')
+
+    await name.setValue('')
+    await name.trigger('blur')
+    expect(wrapper.find('[data-testid="profile-details-name-error"]').exists()).toBe(true)
+
+    await name.setValue('Ada')
+    await name.trigger('blur')
+    expect(wrapper.find('[data-testid="profile-details-name-error"]').exists()).toBe(false)
+  })
+
+  it('shows the generic save error when the failure carries no validation body', async () => {
+    updateProfileMock.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = mountForm()
+
+    await wrapper.get('[data-testid="profile-details-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="profile-details-banner"]').text()).toContain(
+      'profile.details.saveError'
+    )
+    expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('defaults the locale to English when the profile carries none', async () => {
+    const wrapper = mountForm(null)
+
+    await wrapper.get('[data-testid="profile-details-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateProfileMock).toHaveBeenCalledWith(expect.objectContaining({ locale: 'en' }))
   })
 })

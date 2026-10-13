@@ -131,4 +131,100 @@ describe('ProfilePasswordForm', () => {
       wrapper.get('[data-testid="profile-password-confirmation"]').attributes('autocomplete')
     ).toBe('new-password')
   })
+  async function fill(current: string, next: string, confirm: string) {
+    const wrapper = mountForm()
+    await wrapper.get('[data-testid="profile-password-current"]').setValue(current)
+    await wrapper.get('[data-testid="profile-password-new"]').setValue(next)
+    await wrapper.get('[data-testid="profile-password-confirmation"]').setValue(confirm)
+    return wrapper
+  }
+
+  it('refuses blank fields and a too-short new password, never calling the API', async () => {
+    const blank = mountForm()
+    await blank.get('[data-testid="profile-password-form"]').trigger('submit')
+
+    expect(blank.get('[data-testid="profile-password-current-error"]').text()).toBe(
+      'profile.password.currentRequired'
+    )
+    expect(blank.get('[data-testid="profile-password-new-error"]').text()).toBe(
+      'profile.password.newRequired'
+    )
+
+    const short = await fill('current-pass', 'short', 'short')
+    await short.get('[data-testid="profile-password-form"]').trigger('submit')
+
+    expect(short.get('[data-testid="profile-password-new-error"]').text()).toBe(
+      'profile.password.newTooShort'
+    )
+    expect(updatePasswordMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses a confirmation that differs from the new password', async () => {
+    const wrapper = await fill('current-pass', 'a-new-password-123', 'a-new-password-124')
+    await wrapper.get('[data-testid="profile-password-form"]').trigger('submit')
+
+    expect(wrapper.get('[data-testid="profile-password-confirmation-error"]').text()).toBe(
+      'profile.password.confirmMismatch'
+    )
+    expect(updatePasswordMock).not.toHaveBeenCalled()
+  })
+
+  it('validates each field on blur and clears the error once valid', async () => {
+    const wrapper = mountForm()
+    const next = wrapper.get('[data-testid="profile-password-new"]')
+
+    await next.trigger('blur')
+    expect(wrapper.find('[data-testid="profile-password-new-error"]').exists()).toBe(true)
+
+    await next.setValue('long-enough-pass')
+    await next.trigger('blur')
+    expect(wrapper.find('[data-testid="profile-password-new-error"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="profile-password-confirmation"]').trigger('blur')
+    expect(wrapper.find('[data-testid="profile-password-confirmation-error"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="profile-password-current"]').trigger('blur')
+    expect(wrapper.find('[data-testid="profile-password-current-error"]').exists()).toBe(true)
+  })
+
+  it('clears every password field after a successful change', async () => {
+    const wrapper = await fill('current-pass', 'a-new-password-123', 'a-new-password-123')
+    await wrapper.get('[data-testid="profile-password-form"]').trigger('submit')
+    await flushPromises()
+
+    for (const id of ['current', 'new', 'confirmation']) {
+      expect(
+        (wrapper.get(`[data-testid="profile-password-${id}"]`).element as HTMLInputElement).value
+      ).toBe('')
+    }
+  })
+
+  it('shows the generic save error on a failure without a validation body, keeping the session', async () => {
+    updatePasswordMock.mockRejectedValueOnce(new Error('network down'))
+    const wrapper = await fill('current-pass', 'a-new-password-123', 'a-new-password-123')
+    await wrapper.get('[data-testid="profile-password-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="profile-password-banner"]').text()).toContain(
+      'profile.password.saveError'
+    )
+    expect(setSessionMock).not.toHaveBeenCalled()
+    expect(wrapper.emitted('saved')).toBeUndefined()
+  })
+
+  it('puts a refusal on a field the form has no control for in the banner', async () => {
+    updatePasswordMock.mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { throttle: ['Too many attempts.'] } },
+      })
+    )
+    const wrapper = await fill('current-pass', 'a-new-password-123', 'a-new-password-123')
+    await wrapper.get('[data-testid="profile-password-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="profile-password-banner"]').text()).toContain(
+      'Too many attempts.'
+    )
+  })
 })

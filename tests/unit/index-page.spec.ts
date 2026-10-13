@@ -584,3 +584,143 @@ describe('IndexPage — cost KPI', () => {
     expect(wrapper.text()).not.toContain('not measured ms')
   })
 })
+
+describe('IndexPage — superseded and empty loads', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    resetMoney()
+    vi.doMock('../../app/composables/useOrganization', organizationDouble)
+    vi.doMock('../../app/composables/useCurrencies', currenciesDouble)
+    vi.stubGlobal('definePageMeta', vi.fn())
+    vi.stubGlobal('useHead', vi.fn())
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: composableTMock, locale: ref('en') }))
+    )
+  })
+
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => {}
+    let reject: (reason: unknown) => void = () => {}
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+
+  function activityRow(name: string) {
+    return {
+      id: 1,
+      candidate_ref: 'ref-1',
+      display_name: name,
+      status: 'in_corso',
+      project_name: 'Demo Project',
+      updated_at: '2026-03-01T10:00:00+00:00',
+    }
+  }
+
+  async function mountPage(
+    fetchMetrics: ReturnType<typeof vi.fn>,
+    fetchActivity: ReturnType<typeof vi.fn>
+  ) {
+    vi.doMock('../../app/composables/useDashboardMetrics', () => ({
+      useDashboardMetrics: () => ({ fetchMetrics, fetchActivity }),
+    }))
+    const IndexPage = (await import('../../app/pages/index.vue')).default
+    const wrapper = mount(IndexPage, { global: { mocks: { $t: tMock } } })
+    const changeRange = async () => {
+      wrapper.findComponent({ name: 'DashboardFilters' }).vm.$emit('change', { from: '2025-01-01' })
+      await flushPromises()
+    }
+    return { wrapper, changeRange }
+  }
+
+  it('says there is no data when the API answers with a null payload, not an error', async () => {
+    const { wrapper } = await mountPage(
+      vi.fn().mockResolvedValue({ data: null }),
+      vi.fn().mockResolvedValue({ data: [] })
+    )
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('dashboard.kpi.noData')
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(false)
+  })
+
+  it('does not show a superseded load failure over the newer period', async () => {
+    const stale = deferred<never>()
+    const { wrapper, changeRange } = await mountPage(
+      vi.fn().mockReturnValueOnce(stale.promise).mockResolvedValue(metricsResponse()),
+      vi.fn().mockResolvedValue({ data: [] })
+    )
+
+    await changeRange()
+    stale.reject(httpError(500))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="dashboard-total-participants"]').exists()).toBe(true)
+  })
+
+  it('drops a superseded activity feed instead of overwriting the newer one', async () => {
+    const staleFeed = deferred<{ data: unknown[] }>()
+    const { wrapper, changeRange } = await mountPage(
+      vi.fn().mockResolvedValue(metricsResponse()),
+      vi
+        .fn()
+        .mockReturnValueOnce(staleFeed.promise)
+        .mockResolvedValue({ data: [activityRow('Fresh Person')] })
+    )
+    // Let load #1 reach its (hanging) feed request before the period changes.
+    await flushPromises()
+
+    await changeRange()
+    staleFeed.resolve({ data: [activityRow('Stale Person')] })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Fresh Person')
+    expect(wrapper.text()).not.toContain('Stale Person')
+  })
+
+  it('drops a superseded activity failure instead of flagging the newer feed as failed', async () => {
+    const staleFeed = deferred<{ data: unknown[] }>()
+    const { wrapper, changeRange } = await mountPage(
+      vi.fn().mockResolvedValue(metricsResponse()),
+      vi
+        .fn()
+        .mockReturnValueOnce(staleFeed.promise)
+        .mockResolvedValue({ data: [activityRow('Fresh Person')] })
+    )
+    await flushPromises()
+
+    await changeRange()
+    staleFeed.reject(httpError(500))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="activity-failed"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Fresh Person')
+  })
+
+  it('keeps the skeletons while the newer load is still in flight after a stale one lands', async () => {
+    const first = deferred<ReturnType<typeof metricsResponse>>()
+    const second = deferred<ReturnType<typeof metricsResponse>>()
+    const { wrapper, changeRange } = await mountPage(
+      vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise),
+      vi.fn().mockResolvedValue({ data: [] })
+    )
+
+    await changeRange()
+    first.resolve(metricsResponse(1))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="dashboard-total-participants"]').exists()).toBe(false)
+
+    second.resolve(metricsResponse(999))
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="dashboard-loading"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="dashboard-total-participants"]').exists()).toBe(true)
+  })
+})

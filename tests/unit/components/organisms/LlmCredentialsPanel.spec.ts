@@ -496,3 +496,181 @@ describe('LlmCredentialsPanel — the create and rotate drawers', () => {
     wrapper.unmount()
   })
 })
+
+describe('LlmCredentialsPanel — failure modes and edge states', () => {
+  const unprocessable = (errors: Record<string, string[]>) =>
+    Object.assign(new Error('422'), { status: 422, data: { errors } })
+
+  function setValue(testId: string, value: string): void {
+    const input = document.body.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)
+    input!.value = value
+    input!.dispatchEvent(new Event('input'))
+  }
+
+  async function mountPanel(errorHandler?: (error: unknown) => void) {
+    const wrapper = mount(LlmCredentialsPanel, {
+      global: { mocks: { $t: tMock }, config: errorHandler ? { errorHandler } : {} },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    return wrapper
+  }
+
+  async function submitCreate(name: string, apiKey: string): Promise<void> {
+    setValue('llm-credential-form-name', name)
+    setValue('llm-credential-form-api-key', apiKey)
+    await flushPromises()
+    document.body
+      .querySelector<HTMLFormElement>('[data-testid="llm-credential-form"]')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+  }
+
+  async function confirmRemove(wrapper: Awaited<ReturnType<typeof mountPanel>>): Promise<void> {
+    await wrapper.get('[data-testid="llm-credential-remove-1"]').trigger('click')
+    const button = await waitForTestId('confirm-dialog-confirm')
+    button.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+  }
+
+  it('never reads a credential with neither validated_at nor a known error as verified', async () => {
+    listCredentialsMock.mockResolvedValue({
+      data: [{ ...rateLimitedCredential, id: 5, validation_error: null }],
+    })
+    const wrapper = await mountPanel()
+
+    const status = wrapper.get('[data-testid="llm-credential-status-5"]').text()
+    expect(status).toContain('settings.llmCredentials.status.unknown')
+    expect(status).not.toContain('settings.llmCredentials.status.verified')
+
+    wrapper.unmount()
+  })
+
+  it('refuses an empty create form without calling the API and flags both fields', async () => {
+    const wrapper = await mountPanel()
+    await openCreateDialog(wrapper)
+    await submitCreate('   ', '')
+
+    expect(createCredentialMock).not.toHaveBeenCalled()
+    expect(
+      document.body.querySelector('[data-testid="llm-credential-form-name-error"]')?.textContent
+    ).toContain('settings.llmCredentials.nameRequired')
+    expect(
+      document.body.querySelector('[data-testid="llm-credential-form-api-key-error"]')?.textContent
+    ).toContain('settings.llmCredentials.apiKeyRequired')
+
+    wrapper.unmount()
+  })
+
+  it('shows an unrecognised api_key code verbatim rather than inventing copy', async () => {
+    createCredentialMock.mockRejectedValueOnce(unprocessable({ api_key: ['brand_new_code'] }))
+    const wrapper = await mountPanel()
+    await openCreateDialog(wrapper)
+    await submitCreate('New key', 'some-key')
+
+    expect(
+      document.body.querySelector('[data-testid="llm-credential-form-api-key-error"]')?.textContent
+    ).toContain('brand_new_code')
+
+    wrapper.unmount()
+  })
+
+  it('maps a server name error to the name field and keeps the form open', async () => {
+    createCredentialMock.mockRejectedValueOnce(unprocessable({ name: ['Name already taken.'] }))
+    const wrapper = await mountPanel()
+    await openCreateDialog(wrapper)
+    await submitCreate('Dup', 'some-key')
+
+    expect(
+      document.body.querySelector('[data-testid="llm-credential-form-name-error"]')?.textContent
+    ).toContain('Name already taken.')
+    expect(document.body.querySelector('[data-testid="llm-credential-form"]')).not.toBeNull()
+
+    wrapper.unmount()
+  })
+
+  it('routes a field with no control into the banner, and a bodyless failure to the generic error', async () => {
+    createCredentialMock
+      .mockRejectedValueOnce(unprocessable({ vendor: ['Vendor not supported.'] }))
+      .mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
+    const wrapper = await mountPanel()
+    await openCreateDialog(wrapper)
+
+    await submitCreate('New key', 'some-key')
+    const banner = () =>
+      document.body.querySelector('[data-testid="llm-credential-form-banner"]')?.textContent
+    expect(banner()).toContain('Vendor not supported.')
+
+    await submitCreate('New key', 'some-key')
+    expect(banner()).toContain('settings.llmCredentials.createError')
+    expect(banner()).not.toContain('Vendor not supported.')
+
+    wrapper.unmount()
+  })
+
+  it('shows the generic rotate error when the failure carries no api_key code', async () => {
+    rotateCredentialMock.mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credential-rotate-1"]').trigger('click')
+    await waitForTestId('llm-credential-rotate-form')
+    setValue('llm-credential-rotate-api-key', 'a-fresh-key')
+    await flushPromises()
+    document.body
+      .querySelector<HTMLFormElement>('[data-testid="llm-credential-rotate-form"]')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    const error = await waitForTestId('llm-credential-rotate-error')
+
+    expect(error.textContent).toContain('settings.llmCredentials.rotateError')
+
+    wrapper.unmount()
+  })
+
+  it('does not call the API when a rotation is submitted with no key typed', async () => {
+    const wrapper = await mountPanel()
+
+    await wrapper.get('[data-testid="llm-credential-rotate-1"]').trigger('click')
+    await waitForTestId('llm-credential-rotate-form')
+    document.body
+      .querySelector<HTMLFormElement>('[data-testid="llm-credential-rotate-form"]')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    expect(rotateCredentialMock).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('lists the bound templates for a credential_in_use refusal even without a server message', async () => {
+    deleteCredentialMock.mockRejectedValueOnce(
+      Object.assign(new Error('Conflict'), {
+        status: 409,
+        data: { error: 'credential_in_use', templates: ['Sales bot'] },
+      })
+    )
+    const wrapper = await mountPanel()
+    await confirmRemove(wrapper)
+
+    expect(
+      document.body.querySelector('[data-testid="llm-credential-remove-conflict-templates"]')
+        ?.textContent
+    ).toBe('Sales bot')
+
+    wrapper.unmount()
+  })
+
+  it('does not swallow an unrecognised delete failure as a conflict', async () => {
+    const boom = Object.assign(new Error('boom'), { status: 500 })
+    deleteCredentialMock.mockRejectedValueOnce(boom)
+    const errorHandler = vi.fn()
+    const wrapper = await mountPanel(errorHandler)
+    await confirmRemove(wrapper)
+
+    expect(errorHandler).toHaveBeenCalledOnce()
+    expect(errorHandler.mock.calls[0]?.[0]).toBe(boom)
+    expect(document.body.querySelector('[data-testid="llm-credential-remove-conflict"]')).toBeNull()
+
+    wrapper.unmount()
+  })
+})

@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { realI18n } from '../../support/i18n'
-import { waitFor } from '../../support/wait-for'
+import { waitFor, waitForTestId } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 
@@ -282,5 +282,34 @@ describe('UsersPanel — failures are visible, and the scope is authoritative', 
 
     expect(listPlatformUsersMock).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="user-deactivate-1"]').exists()).toBe(false)
+  })
+})
+
+describe('UsersPanel — platform activation', () => {
+  beforeEach(() => {
+    listPlatformUsersMock.mockReset().mockResolvedValue({
+      data: [{ ...PLATFORM_USER, is_deactivated: true }],
+    })
+    activatePlatformUserMock.mockReset().mockResolvedValue(undefined)
+    activateUserMock.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('activates through the PLATFORM endpoint, never the organization one', async () => {
+    const wrapper = mountPanel('platform')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="user-activate-9"]').trigger('click')
+    await flushPromises()
+    const confirm = await waitForTestId<HTMLButtonElement>('confirm-dialog-confirm')
+    expect(confirm).toBeTruthy()
+    confirm.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirm.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => activatePlatformUserMock.mock.calls.length > 0,
+      'the platform activation call'
+    )
+
+    expect(activatePlatformUserMock).toHaveBeenCalledWith(9)
+    expect(activateUserMock).not.toHaveBeenCalled()
   })
 })

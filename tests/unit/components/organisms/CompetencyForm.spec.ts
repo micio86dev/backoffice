@@ -237,4 +237,76 @@ describe('CompetencyForm', () => {
       'definition_it_bad'
     )
   })
+
+  describe('form-level banner vs mapped field errors', () => {
+    async function submitFilled(rejection: Error) {
+      createCompetencyMock.mockRejectedValueOnce(rejection)
+      const wrapper = mount(CompetencyForm, {
+        props: { competency: null },
+        global: { mocks: { $t: tMock } },
+      })
+      await wrapper.get('[data-testid="competency-form-code"]').setValue('COL')
+      await wrapper.get('[data-testid="competency-form-name-en"]').setValue('Collaboration')
+      await wrapper.get('[data-testid="competency-form-definition-en"]').setValue('Definition.')
+      await wrapper.get('[data-testid="competency-form"]').trigger('submit')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('shows no generic banner on top of a mapped 422 field error', async () => {
+      const wrapper = await submitFilled(
+        Object.assign(new Error('422'), { status: 422, data: { errors: { code: ['code_taken'] } } })
+      )
+
+      expect(wrapper.find('[data-testid="competency-form-code-error"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="competency-form-banner"]').exists()).toBe(false)
+    })
+
+    it.each([
+      ['code', 'code'],
+      ['name', 'name-en'],
+      ['name.en', 'name-en'],
+      ['name.it', 'name-it'],
+      ['definition', 'definition-en'],
+      ['definition.en', 'definition-en'],
+      ['definition.it', 'definition-it'],
+    ])(
+      'a server refusal on %s renders its field error and no generic banner',
+      async (serverKey, errorTestId) => {
+        const wrapper = await submitFilled(
+          Object.assign(new Error('422'), {
+            status: 422,
+            data: { errors: { [serverKey]: ['some_refusal'] } },
+          })
+        )
+
+        expect(wrapper.find(`[data-testid="competency-form-${errorTestId}-error"]`).exists()).toBe(
+          true
+        )
+        expect(wrapper.find('[data-testid="competency-form-banner"]').exists()).toBe(false)
+      }
+    )
+
+    it('keeps the banner, with the unmapped message, when only SOME error keys have a field', async () => {
+      const wrapper = await submitFilled(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { code: ['code_taken'], type: ['unmapped_refusal'] } },
+        })
+      )
+
+      expect(wrapper.find('[data-testid="competency-form-code-error"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="competency-form-banner"]').text()).toContain(
+        'unmapped_refusal'
+      )
+    })
+
+    it('keeps the generic banner for a non-422 failure', async () => {
+      const wrapper = await submitFilled(Object.assign(new Error('500'), { status: 500 }))
+
+      expect(wrapper.get('[data-testid="competency-form-banner"]').text()).toBe(
+        'catalogue.form.saveError'
+      )
+    })
+  })
 })

@@ -153,6 +153,31 @@ describe('InterviewIntroPhraseForm', () => {
     expect(updateInterviewIntroPhrase).toHaveBeenCalledTimes(1)
   })
 
+  it('measures the trimmed text, as it is what gets sent', async () => {
+    const w = await mountForm(null)
+    const counter = () => w.get('[data-testid="intro-phrase-en-counter"]').text()
+
+    // 600 characters once trimmed, 610 raw: savable, counter and estimate agree.
+    await en(w).setValue(`  ${'a'.repeat(600)}        `)
+    expect(counter()).toContain('"count":600')
+    expect(counter()).toContain('"seconds":40')
+    expect(counter()).not.toContain('overBy')
+    expect(en(w).attributes('aria-invalid')).toBe('false')
+    await submit(w)
+    expect(updateInterviewIntroPhrase).toHaveBeenCalledWith({ en: 'a'.repeat(600) })
+  })
+
+  it('still blocks padded text that is over the limit once trimmed', async () => {
+    const w = await mountForm(null)
+
+    await en(w).setValue(`  ${'a'.repeat(601)}  `)
+    expect(w.get('[data-testid="intro-phrase-en-counter"]').text()).toContain('"over":1')
+    await submit(w)
+
+    expect(updateInterviewIntroPhrase).not.toHaveBeenCalled()
+    expect(w.find('[data-testid="intro-phrase-en-error"]').exists()).toBe(true)
+  })
+
   it('requires English when only Italian is filled', async () => {
     const w = await mountForm(null)
 

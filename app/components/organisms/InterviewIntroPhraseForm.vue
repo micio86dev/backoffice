@@ -152,7 +152,8 @@ function seed(phrase: StoredInterviewIntroPhrase | undefined): void {
 watch(() => props.initial, seed, { immediate: true })
 
 // Code points, not UTF-16 units: the API counts characters, and an emoji is one.
-const length = (locale: Locale): number => Array.from(values[locale]).length
+// Trimmed, because the trimmed value is what onSubmit sends.
+const length = (locale: Locale): number => Array.from(values[locale].trim()).length
 const isOver = (locale: Locale): boolean => length(locale) > MAX_CHARACTERS
 const seconds = (locale: Locale): number => Math.ceil(length(locale) / CHARACTERS_PER_SECOND)
 

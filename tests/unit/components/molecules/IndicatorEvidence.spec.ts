@@ -125,6 +125,25 @@ describe('IndicatorEvidence', () => {
       'report.excerpts.empty'
     )
   })
+
+  it('treats a missing excerpts list like an empty one', () => {
+    const behavior = { ...SCORED, excerpts: undefined } as unknown as EvaluationBehavior
+
+    expect(mountItem(behavior, true).find('[role="region"]').text()).toContain(
+      'report.excerpts.empty'
+    )
+  })
+
+  it.each([[null], [undefined], ['   \n']])(
+    'omits the rationale block for an explanation of %j',
+    (explanation) => {
+      const behavior = { ...SCORED, explanation } as unknown as EvaluationBehavior
+
+      expect(mountItem(behavior, true).find('[role="region"]').text()).not.toContain(
+        'report.evidence.explanation'
+      )
+    }
+  )
 })
 
 // scoring-audit-jev P6.8/P6.9 (admin-backoffice spec — "A Net-New

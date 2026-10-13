@@ -235,4 +235,142 @@ describe('TemplatePortability', () => {
     expect(description).not.toContain('Template 11')
     expect(description).toContain('avatar_templates.confirm.importMore')
   })
+
+  describe('export', () => {
+    let click: ReturnType<typeof vi.fn>
+    let createObjectURL: ReturnType<typeof vi.fn>
+    let revokeObjectURL: ReturnType<typeof vi.fn>
+    let blobs: Blob[]
+    let download: string | undefined
+    let originalUrlApi: { create: typeof URL.createObjectURL; revoke: typeof URL.revokeObjectURL }
+
+    beforeEach(() => {
+      click = vi.fn(function (this: HTMLAnchorElement) {
+        download = this.download
+      })
+      blobs = []
+      download = undefined
+      createObjectURL = vi.fn((blob: Blob) => {
+        blobs.push(blob)
+        return 'blob:fake'
+      })
+      revokeObjectURL = vi.fn()
+      originalUrlApi = { create: URL.createObjectURL, revoke: URL.revokeObjectURL }
+      URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL
+      URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(click)
+    })
+
+    afterEach(() => {
+      URL.createObjectURL = originalUrlApi.create
+      URL.revokeObjectURL = originalUrlApi.revoke
+      vi.restoreAllMocks()
+    })
+
+    it('downloads the exported document as pretty-printed JSON under a stable filename', async () => {
+      const exported = { schema: 'beai.avatar-template/1', templates: [{ name: 'A' }] }
+      exportMock.mockResolvedValue(exported)
+      const wrapper = mountIt(true)
+
+      await wrapper.get('[data-testid="template-export"]').trigger('click')
+      await flushPromises()
+
+      expect(click).toHaveBeenCalledOnce()
+      expect(download).toBe('beai-avatar-templates.json')
+      expect(blobs[0]!.type).toBe('application/json')
+      expect(await blobs[0]!.text()).toBe(JSON.stringify(exported, null, 2))
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:fake')
+      expect(wrapper.find('[data-testid="portability-result"]').exists()).toBe(false)
+    })
+
+    it('reports a failed export and offers no download', async () => {
+      exportMock.mockRejectedValue(new Error('network'))
+      const wrapper = mountIt(true)
+
+      await wrapper.get('[data-testid="template-export"]').trigger('click')
+      await flushPromises()
+
+      expect(click).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="portability-result"]').text()).toContain(
+        'avatar_templates.portability.importFailed'
+      )
+    })
+  })
+
+  it('disables import and points at the acting-client notice while blocked, but keeps export', () => {
+    const wrapper = mount(TemplatePortability, {
+      props: { isAdmin: true, importBlocked: true },
+      global: { mocks: { $t: tMock } },
+    })
+
+    const button = wrapper.get('[data-testid="template-import"]')
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.attributes('aria-describedby')).toBeTruthy()
+    expect(wrapper.get('[data-testid="template-export"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('does not point at the notice when import is available', () => {
+    const wrapper = mountIt(true)
+
+    expect(
+      wrapper.get('[data-testid="template-import"]').attributes('aria-describedby')
+    ).toBeUndefined()
+  })
+
+  it('falls back to a positional label for a template without a usable name', async () => {
+    const wrapper = mountIt(true)
+
+    await chooseFile(wrapper, jsonFile({ templates: [{ name: 'A' }, { name: '' }, {}, null] }))
+
+    const body = document.body.textContent ?? ''
+    expect(body).toContain('A, #2, #3, #4')
+  })
+
+  it('translates a machine code from the server instead of showing it raw', async () => {
+    importMock.mockRejectedValue({ data: { message: 'organization_context_required' } })
+    const wrapper = mountIt(true)
+
+    await chooseFile(wrapper, jsonFile({ templates: [{ name: 'A' }] }))
+    await confirmDialog('confirm')
+
+    expect(wrapper.get('[data-testid="portability-result"]').text()).toContain(
+      'avatar_templates.serverError.organization_context_required'
+    )
+  })
+
+  it('joins every field error into the reason when the server sends a validation map', async () => {
+    importMock.mockRejectedValue({
+      data: {
+        message: 'The given data was invalid.',
+        errors: { 'templates.0': ['Unknown key a.'], 'templates.1': ['Unknown key b.'] },
+      },
+    })
+    const wrapper = mountIt(true)
+
+    await chooseFile(wrapper, jsonFile({ templates: [{ name: 'A' }, { name: 'B' }] }))
+    await confirmDialog('confirm')
+
+    expect(wrapper.get('[data-testid="portability-result"]').text()).toContain(
+      'Unknown key a. Unknown key b.'
+    )
+  })
+
+  it('falls back to the error message when there is neither a code nor a field map', async () => {
+    importMock.mockRejectedValue(new Error('socket hang up'))
+    const wrapper = mountIt(true)
+
+    await chooseFile(wrapper, jsonFile({ templates: [{ name: 'A' }] }))
+    await confirmDialog('confirm')
+
+    expect(wrapper.get('[data-testid="portability-result"]').text()).toContain('socket hang up')
+  })
+
+  it('emits imported after a successful import so the list can refresh', async () => {
+    const wrapper = mountIt(true)
+
+    await chooseFile(wrapper, jsonFile({ templates: [{ name: 'A' }] }))
+    await confirmDialog('confirm')
+
+    expect(wrapper.emitted('imported')).toHaveLength(1)
+  })
 })

@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
 import { waitFor } from '../../support/wait-for'
 
 const tMock = (key: string) => key
@@ -929,5 +930,107 @@ describe('ApiKeysPanel — failures are visible and stay distinct', () => {
     ).toContain('settings.apiKeys.statusError.403')
 
     wrapper.unmount()
+  })
+})
+
+describe('ApiKeysPanel — copying the one-time raw key and untranslated abilities', () => {
+  const created = {
+    data: {
+      id: 2,
+      name: 'New key',
+      abilities: ['read'],
+      is_active: true,
+      state: 'active',
+      expires_at: null,
+      last_used_at: null,
+      created_at: '2026-03-01T10:00:00Z',
+    },
+    api_key: 'beai_live_raw_secret',
+  }
+
+  beforeEach(() => {
+    listClientsMock.mockReset().mockResolvedValue({ data: [] })
+    listAbilitiesMock.mockReset().mockResolvedValue({ data: ['participants:read'] })
+    createClientMock.mockReset().mockResolvedValue(created)
+    revokeClientMock.mockReset()
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'clipboard')
+  })
+
+  async function revealKey() {
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
+    await flushPromises()
+    await openCreateDialogAndFill(wrapper, 'New key', ['participants-read'])
+    return wrapper
+  }
+
+  const copyButton = () =>
+    document.body.querySelector<HTMLButtonElement>('[data-testid="api-key-copy"]')!
+
+  it('writes the raw key to the clipboard and flips the button to the copied label', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const wrapper = await revealKey()
+    expect(copyButton().textContent).toContain('settings.apiKeys.copy')
+    expect(copyButton().textContent).not.toContain('settings.apiKeys.copied')
+
+    copyButton().click()
+    await waitFor(
+      () => copyButton().textContent?.includes('settings.apiKeys.copied'),
+      'the copied label'
+    )
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('beai_live_raw_secret')
+
+    wrapper.unmount()
+  })
+
+  it('stays on the copy label, without throwing, when the browser denies clipboard access', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('NotAllowedError'))
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const wrapper = await revealKey()
+
+    copyButton().click()
+    await flushPromises()
+
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(copyButton().textContent).not.toContain('settings.apiKeys.copied')
+    // The secret is still on screen to be copied by hand.
+    expect(document.body.textContent).toContain('beai_live_raw_secret')
+
+    wrapper.unmount()
+  })
+
+  it('labels an ability the build has no translation for with its literal name', async () => {
+    listAbilitiesMock.mockResolvedValue({ data: ['invented:ability'] })
+    const original = (globalThis as { useI18n?: unknown }).useI18n
+    vi.stubGlobal(
+      'useI18n',
+      vi.fn(() => ({ t: (key: string) => key, te: () => false, locale: ref('it') }))
+    )
+    try {
+      const wrapper = mount(ApiKeysPanel, {
+        attachTo: document.body,
+        global: { mocks: { $t: tMock } },
+      })
+      await flushPromises()
+      await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
+      await waitForDialogOpen()
+
+      expect(
+        document.body.querySelector('[data-testid="api-key-ability-invented-ability"]')
+      ).not.toBeNull()
+      expect(document.body.textContent).toContain('invented:ability')
+      expect(document.body.textContent).not.toContain('settings.apiKeys.ability.inventedAbility')
+
+      wrapper.unmount()
+    } finally {
+      vi.stubGlobal('useI18n', original)
+    }
   })
 })

@@ -284,3 +284,30 @@ describe('UsersPanel — failures are visible, and the scope is authoritative', 
     expect(wrapper.find('[data-testid="user-deactivate-1"]').exists()).toBe(false)
   })
 })
+
+describe('UsersPanel — platform activation', () => {
+  beforeEach(() => {
+    listPlatformUsersMock.mockReset().mockResolvedValue({
+      data: [{ ...PLATFORM_USER, is_deactivated: true }],
+    })
+    activatePlatformUserMock.mockReset().mockResolvedValue(undefined)
+    activateUserMock.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('activates through the PLATFORM endpoint, never the organization one', async () => {
+    const wrapper = mountPanel('platform')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="user-activate-9"]').trigger('click')
+    await flushPromises()
+    const confirm = document.body.querySelector<HTMLButtonElement>(
+      '[data-testid="confirm-dialog-confirm"]'
+    )
+    confirm?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirm?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(() => activatePlatformUserMock.mock.calls.length > 0)
+
+    expect(activatePlatformUserMock).toHaveBeenCalledWith(9)
+    expect(activateUserMock).not.toHaveBeenCalled()
+  })
+})

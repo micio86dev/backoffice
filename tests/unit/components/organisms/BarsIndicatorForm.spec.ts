@@ -368,4 +368,54 @@ describe('BarsIndicatorForm', () => {
 
     wrapper.unmount()
   })
+
+  describe('form-level banner vs mapped field errors', () => {
+    async function submitUpdate(rejection: Error) {
+      updateBarsIndicatorMock.mockRejectedValueOnce(rejection)
+      const wrapper = mount(BarsIndicatorForm, {
+        props: { indicator: indicator(), competencies: COMPETENCIES, roles: ROLES, indicators: [] },
+        global: { mocks: { $t: tMock } },
+      })
+      await wrapper.get('[data-testid="bars-indicator-form"]').trigger('submit')
+      await flushPromises()
+      return wrapper
+    }
+
+    it('shows no generic banner on top of a mapped 422 field error', async () => {
+      const wrapper = await submitUpdate(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { 'anchor_5.it': ['anchor_5.it_blank'] } },
+        })
+      )
+
+      expect(wrapper.find('[data-testid="bars-indicator-form-anchor5-it-error"]').exists()).toBe(
+        true
+      )
+      expect(wrapper.find('[data-testid="bars-indicator-form-banner"]').exists()).toBe(false)
+    })
+
+    it('links a mapped field error to its control, since it is the only signal left', async () => {
+      const wrapper = await submitUpdate(
+        Object.assign(new Error('422'), {
+          status: 422,
+          data: { errors: { 'anchor_5.it': ['anchor_5.it_blank'] } },
+        })
+      )
+
+      const error = wrapper.get('[data-testid="bars-indicator-form-anchor5-it-error"]')
+      expect(error.attributes('id')).toBeTruthy()
+      expect(
+        wrapper.get('[data-testid="bars-indicator-form-anchor5-it"]').attributes('aria-describedby')
+      ).toBe(error.attributes('id'))
+    })
+
+    it('keeps the generic banner for a 5xx failure', async () => {
+      const wrapper = await submitUpdate(Object.assign(new Error('500'), { status: 500 }))
+
+      expect(wrapper.get('[data-testid="bars-indicator-form-banner"]').text()).toBe(
+        'catalogue.form.saveError'
+      )
+    })
+  })
 })

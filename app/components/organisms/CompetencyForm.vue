@@ -273,7 +273,9 @@ async function onSubmit(): Promise<void> {
     }
     emit('saved')
   } catch (error) {
+    let mapped = false
     const unmapped = applyServerFieldErrors(error, SERVER_FIELD_TO_ERROR_KEY, (key, message) => {
+      mapped = true
       errors.value[key] = translateServerCode({ t, te }, 'catalogue.serverError', message)
     })
     // A 403/404/409 with no field payload renders through the SAME D4 state
@@ -287,7 +289,12 @@ async function onSubmit(): Promise<void> {
             kind: 'error',
             text: translateServerCodes({ t, te }, 'catalogue.serverError', unmapped).join(' '),
           }
-        : actionErrorMessage(error, t, 'catalogue.form.saveError')
+        : mapped
+          ? // A mapped 422 already shows the exact reason under its control;
+            // stacking a generic "could not save" on top invites a retry that
+            // fails identically (same guard as OrganizationProfileForm).
+            null
+          : actionErrorMessage(error, t, 'catalogue.form.saveError')
   } finally {
     saving.value = false
   }

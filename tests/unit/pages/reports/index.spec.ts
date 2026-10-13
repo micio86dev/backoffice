@@ -200,10 +200,8 @@ describe('pages/reports/index.vue', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="reports-error"]').exists()).toBe(true)
 
-    // The filter bar is hidden while the error shows (so ReportFilters cannot
-    // emit here, and the page offers no retry control), hence this one test
-    // writes the `filters` state its v-model would. The emitted-event path is
-    // covered by the test below, while the bar is visible.
+    // Direct state write; the real ReportFilters emit path in the error state is
+    // covered in 'error state keeps the filters usable' below.
     const vm = wrapper.vm as unknown as { filters: Record<string, unknown> }
     vm.filters = { project_id: 1 }
     await flushPromises()
@@ -243,6 +241,60 @@ describe('pages/reports/index.vue', () => {
       expect(wrapper.find('[data-testid="reports-error"]').exists()).toBe(true)
       expect(wrapper.text()).toContain(`${key}.title`)
       expect(wrapper.text()).not.toContain('reports.table.empty')
+    })
+  })
+  describe('error state keeps the filters usable', () => {
+    async function mountFailingOnce() {
+      const indexMock = vi
+        .fn()
+        .mockRejectedValueOnce(httpError(500))
+        .mockResolvedValue(indexResponse())
+      const summaryMock = vi.fn().mockResolvedValue(summaryResponse())
+      vi.doMock('../../../../app/composables/useEvaluations', () => ({
+        useEvaluations: () => ({ index: indexMock, summary: summaryMock }),
+      }))
+      vi.doMock('../../../../app/composables/useProjects', () => ({
+        useProjects: () => ({ listProjects: vi.fn().mockResolvedValue({ data: [] }) }),
+      }))
+      const ReportsPage = (await import('../../../../app/pages/reports/index.vue')).default
+      const ReportFilters = (await import('../../../../app/components/molecules/ReportFilters.vue'))
+        .default
+      const wrapper = mount(ReportsPage, {
+        global: { mocks: { $t: tMock }, stubs: { NuxtLink: true } },
+      })
+      await flushPromises()
+      return { wrapper, ReportFilters, indexMock, summaryMock }
+    }
+
+    it('shows the error alert while the filter bar stays rendered', async () => {
+      const { wrapper, ReportFilters } = await mountFailingOnce()
+
+      expect(wrapper.find('[data-testid="reports-error"]').exists()).toBe(true)
+      expect(wrapper.findComponent(ReportFilters).exists()).toBe(true)
+    })
+
+    it('retry re-fetches both endpoints and clears the error on success', async () => {
+      const { wrapper, indexMock, summaryMock } = await mountFailingOnce()
+
+      await wrapper.get('[data-testid="reports-retry"]').trigger('click')
+      await flushPromises()
+
+      expect(indexMock).toHaveBeenCalledTimes(2)
+      expect(summaryMock).toHaveBeenCalledTimes(2)
+      expect(wrapper.find('[data-testid="reports-error"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Demo Project')
+    })
+
+    it('a filter changed through the real ReportFilters in the error state refetches and clears the error', async () => {
+      const { wrapper, indexMock, summaryMock } = await mountFailingOnce()
+
+      await wrapper.get('[data-testid="report-filter-assessment-type"]').setValue('potential')
+      await flushPromises()
+
+      expect(indexMock).toHaveBeenCalledTimes(2)
+      expect(indexMock).toHaveBeenLastCalledWith({ assessment_type: 'potential' })
+      expect(summaryMock).toHaveBeenLastCalledWith({ assessment_type: 'potential' })
+      expect(wrapper.find('[data-testid="reports-error"]').exists()).toBe(false)
     })
   })
 })

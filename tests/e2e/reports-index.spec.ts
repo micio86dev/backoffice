@@ -164,4 +164,30 @@ test.describe('Reports index (Unit 7)', () => {
 
     await checkA11y(page)
   })
+
+  test('a failed load keeps the filters usable and the retry recovers the table', async ({
+    page,
+  }) => {
+    await mockAdminApi(page)
+    await login(page)
+
+    // Registered after the happy-path mock, so it wins until it falls back.
+    let fail = true
+    await page.route(
+      (url) => url.pathname === '/evaluations',
+      (route) =>
+        isDataRequest(route) && fail
+          ? route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+          : route.fallback()
+    )
+
+    await page.goto('/reports')
+    await expect(page.getByTestId('reports-error')).toBeVisible()
+    await expect(page.getByTestId('report-filters')).toBeVisible()
+
+    fail = false
+    await page.getByTestId('reports-retry').click()
+    await expect(page.getByTestId('reports-error')).toBeHidden()
+    await expect(page.getByRole('link', { name: 'Mario Rossi' })).toBeVisible()
+  })
 })

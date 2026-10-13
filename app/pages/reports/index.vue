@@ -2,6 +2,10 @@
   <div class="flex flex-col gap-6">
     <PageHeader :title="$t('reports.title')" :subtitle="$t('reports.subtitle')" />
 
+    <!-- The filter bar stays mounted in the error state: a failed load must be
+         recoverable by changing a filter or retrying, without a page reload. -->
+    <ReportFilters v-model="filters" :projects="projects" />
+
     <Alert
       v-if="loadError"
       :variant="loadError === 'not-ready' ? 'default' : 'destructive'"
@@ -10,11 +14,12 @@
     >
       <AlertTitle>{{ $t(loadErrorTitleKey) }}</AlertTitle>
       <AlertDescription>{{ $t(loadErrorMessageKey) }}</AlertDescription>
+      <Button variant="outline" size="sm" data-testid="reports-retry" @click="load">
+        {{ $t('reports.retry') }}
+      </Button>
     </Alert>
 
     <template v-else>
-      <ReportFilters v-model="filters" :projects="projects" />
-
       <!-- Summary is a secondary panel — code-split (D10), never blocking the table. -->
       <ReportSummary v-if="summary" :summary="summary" />
 
@@ -26,6 +31,7 @@
 <script setup lang="ts">
 import PageHeader from '@/components/molecules/PageHeader.vue'
 import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
+import { Button } from '@/components/ui/button'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import ReportFilters from '@/components/molecules/ReportFilters.vue'
 import EvaluationsTable, { type EvaluationRow } from '@/components/organisms/EvaluationsTable.vue'
@@ -75,7 +81,13 @@ async function load(): Promise<void> {
     // it is actually a status-keyed object at runtime (see
     // ReportSummary.vue's own note, verified against
     // `EvaluationIndexController.php:114-123`'s `pluck('aggregate', 'status')`).
-    summary.value = summaryResponse.data as unknown as EvaluationsSummary
+    // Only the mistyped field is cast; `competencies` stays compiler-checked
+    // against the generated schema (pinned by
+    // tests/nuxt/evaluations-summary-contract.ts).
+    summary.value = {
+      by_status: summaryResponse.data.by_status as unknown as EvaluationsSummary['by_status'],
+      competencies: summaryResponse.data.competencies,
+    }
     loadError.value = null
   } catch (error) {
     loadError.value = resolveResourceErrorState(error)

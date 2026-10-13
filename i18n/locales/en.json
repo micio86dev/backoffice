@@ -944,7 +944,29 @@
       },
       "saved": "Platform settings saved.",
       "saveFailed": "Could not save the platform settings.",
-      "loadFailed": "Could not load the platform settings. The values shown are the defaults."
+      "loadFailed": "Could not load the platform settings. The values shown are the defaults.",
+      "introPhrase": {
+        "title": "Interview intro phrase",
+        "description": "Spoken by the avatar before the first question of every interview. It counts against the interview time limit, so keep it short, and do not use the closing phrases. Leave both fields empty to have no intro.",
+        "label": {
+          "en": "Intro phrase — English (required)",
+          "it": "Intro phrase — Italian (optional)"
+        },
+        "help": {
+          "en": "Used for English interviews, and as the fallback for any language without its own text.",
+          "it": "Used for Italian interviews. If empty, the English text is spoken."
+        },
+        "counter": "{count} / {max} characters · ≈ {seconds} s spoken",
+        "overBy": "Over the limit by {over}: shorten the text.",
+        "tooLong": "Use at most {max} characters.",
+        "enRequired": "Add the English text: it is required when any intro is set.",
+        "saved": "Interview intro saved.",
+        "cleared": "Interview intro removed.",
+        "saveFailed": "Could not save the interview intro.",
+        "clear": "Clear intro",
+        "clearConfirmTitle": "Remove the interview intro?",
+        "clearConfirmDescription": "Interviews will start directly with the first question."
+      }
     }
   },
   "users": {

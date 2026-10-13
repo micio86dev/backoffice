@@ -43,6 +43,24 @@ describe('usePlatformSettings', () => {
     ).resolves.toBe(merged)
   })
 
+  it('PATCHes only interview_intro_phrase when saving the intro, never the caps', async () => {
+    await usePlatformSettings().updateInterviewIntroPhrase({ en: 'Hello', it: 'Ciao' })
+
+    expect(apiFetch).toHaveBeenCalledWith('/admin/settings', {
+      method: 'PATCH',
+      body: { interview_intro_phrase: { en: 'Hello', it: 'Ciao' } },
+    })
+  })
+
+  it('sends an explicit null to clear the intro', async () => {
+    await usePlatformSettings().updateInterviewIntroPhrase(null)
+
+    expect(apiFetch).toHaveBeenCalledWith('/admin/settings', {
+      method: 'PATCH',
+      body: { interview_intro_phrase: null },
+    })
+  })
+
   it('lets a refusal (403/422) propagate to the caller', async () => {
     const refusal = Object.assign(new Error('forbidden'), { status: 403 })
     apiFetch.mockRejectedValue(refusal)

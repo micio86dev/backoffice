@@ -66,9 +66,13 @@ async function mockSuperadminSettings(page: Page) {
       if (route.request().resourceType() === 'document') return route.continue()
 
       if (route.request().method() === 'PATCH') {
-        const body = route.request().postDataJSON() as { interview_intro_phrase?: Intro }
+        const body: unknown = route.request().postDataJSON()
+        expect(body, 'the PATCH must carry a JSON object body').toEqual(expect.any(Object))
+        if (body === null || typeof body !== 'object') return route.abort()
         state.patches.push(body)
-        if ('interview_intro_phrase' in body) state.intro = body.interview_intro_phrase ?? null
+        if ('interview_intro_phrase' in body) {
+          state.intro = (body as { interview_intro_phrase: Intro }).interview_intro_phrase ?? null
+        }
       }
 
       return route.fulfill({
@@ -102,9 +106,8 @@ test.describe('Settings → Piattaforma: interview intro phrase', () => {
 
     // 30 characters at ~15 per second: exactly 2 s. The counter names both.
     const counter = page.getByTestId('intro-phrase-en-counter')
-    await expect(counter).toContainText('30')
-    await expect(counter).toContainText('600')
-    await expect(counter).toContainText('2 s')
+    // The words around the numbers are localised; the numbers and the unit are not.
+    await expect(counter).toHaveText(/^30 \/ 600\b.*≈ 2 s\b/)
 
     await page.getByTestId('intro-phrase-it').fill('Benvenuto in BEAI.')
     await page.getByTestId('intro-phrase-submit').click()
@@ -128,10 +131,15 @@ test.describe('Settings → Piattaforma: interview intro phrase', () => {
     await page.getByRole('tab', { name: /^Piattaforma/ }).click()
     await page.getByTestId('intro-phrase-en').fill('a'.repeat(610))
 
-    await expect(page.getByTestId('intro-phrase-en-counter')).toContainText('10')
+    const counter = page.getByTestId('intro-phrase-en-counter')
+    await expect(counter).toHaveText(/^610 \/ 600\b/)
+    // The overage is the warning in words: exactly 10, not the 10 inside 610.
+    await expect(counter.locator('strong')).toHaveText(/(?<!\d)10(?!\d)/)
     await page.getByTestId('intro-phrase-submit').click()
 
+    // Settled: the refusal is shown and the form is idle again, so a late PATCH would have fired.
     await expect(page.getByTestId('intro-phrase-en-error')).toBeVisible()
+    await expect(page.getByTestId('intro-phrase-submit')).toBeEnabled()
     expect(state.patches).toEqual([])
   })
 })

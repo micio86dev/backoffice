@@ -137,7 +137,6 @@ describe('analytics.client.ts', () => {
     const [event, name, payload] = gtag.mock.calls[0]!
     expect([event, name]).toEqual(['event', 'page_view'])
     expect(payload.page_location).toBe('')
-    expect(payload.page_path).not.toContain('42')
-    expect(payload.page_path).not.toContain('a@b.it')
+    expect(payload.page_path).toBe('/participants/:id')
   })
 })

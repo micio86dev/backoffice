@@ -1,7 +1,7 @@
 /**
  * NavBar.vue (task 15.3, DESIGN.md §8.1 — RED)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
 import { SidebarProvider } from '../../../../app/components/ui/sidebar'
@@ -14,6 +14,15 @@ const Harness = defineComponent({
 })
 
 describe('NavBar', () => {
+  // Every doMock below is paired with its doUnmock here, so no test depends on
+  // the mocks an earlier one registered (file order or --sequence.shuffle).
+  afterEach(() => {
+    for (const name of ['useCurrentUser', 'useSuperadmin', 'useApi', 'useOrganization']) {
+      vi.doUnmock(`../../../../app/composables/${name}`)
+    }
+    vi.resetModules()
+  })
+
   beforeEach(() => {
     sessionStorage.clear()
     // Wipes setup.ts's globals too, so anything NavBar's subtree auto-imports

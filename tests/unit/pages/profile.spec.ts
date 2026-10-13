@@ -6,7 +6,7 @@
  * the account form and the password form submit fully independently of
  * each other.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { realI18n } from '../support/i18n'
 import { ref } from 'vue'
@@ -65,6 +65,10 @@ describe('pages/profile.vue', () => {
     // stub answering true to everything would let a missing key render as
     // its own name.
     vi.stubGlobal('useI18n', () => ({ ...realI18n(), locale: ref('en') }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   async function mountPage() {
@@ -178,7 +182,15 @@ describe('pages/profile.vue', () => {
   it('shows the organization name read-only when there is one', async () => {
     const wrapper = await mountPage()
 
-    expect(wrapper.get('[data-testid="profile-organization"]').text()).toBe('Acme')
+    const organization = wrapper.get('[data-testid="profile-organization"]')
+    expect(organization.text()).toBe('Acme')
+    expect(organization.element.tagName).not.toBe('INPUT')
+    expect(organization.find('input, select, textarea').exists()).toBe(false)
+    // No editable control anywhere on the page carries the organization name.
+    const editableValues = wrapper
+      .findAll('input, select, textarea')
+      .map((c) => (c.element as HTMLInputElement).value)
+    expect(editableValues).not.toContain('Acme')
     expect(wrapper.get('[data-testid="profile-email"]').text()).toBe('ada@example.test')
   })
 
@@ -188,6 +200,7 @@ describe('pages/profile.vue', () => {
 
     await mountPage()
 
+    expect(useHeadMock).toHaveBeenCalledTimes(1)
     const options = useHeadMock.mock.calls[0]![0] as {
       title: () => string
       meta: Array<{ name: string; content: string }>

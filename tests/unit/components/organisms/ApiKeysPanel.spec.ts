@@ -976,48 +976,51 @@ describe('ApiKeysPanel — copying the one-time raw key and untranslated abiliti
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const wrapper = await revealKey()
-    expect(copyButton().textContent).toContain('settings.apiKeys.copy')
-    expect(copyButton().textContent).not.toContain('settings.apiKeys.copied')
+    try {
+      expect(copyButton().textContent).toContain('settings.apiKeys.copy')
+      expect(copyButton().textContent).not.toContain('settings.apiKeys.copied')
 
-    copyButton().click()
-    await waitFor(
-      () => copyButton().textContent?.includes('settings.apiKeys.copied'),
-      'the copied label'
-    )
+      copyButton().click()
+      await waitFor(
+        () => copyButton().textContent?.includes('settings.apiKeys.copied'),
+        'the copied label'
+      )
 
-    expect(writeText).toHaveBeenCalledExactlyOnceWith('beai_live_raw_secret')
-
-    wrapper.unmount()
+      expect(writeText).toHaveBeenCalledExactlyOnceWith('beai_live_raw_secret')
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('stays on the copy label, without throwing, when the browser denies clipboard access', async () => {
     const writeText = vi.fn().mockRejectedValue(new Error('NotAllowedError'))
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const wrapper = await revealKey()
+    try {
+      copyButton().click()
+      await flushPromises()
 
-    copyButton().click()
-    await flushPromises()
-
-    expect(writeText).toHaveBeenCalledOnce()
-    expect(copyButton().textContent).not.toContain('settings.apiKeys.copied')
-    // The secret is still on screen to be copied by hand.
-    expect(document.body.textContent).toContain('beai_live_raw_secret')
-
-    wrapper.unmount()
+      expect(writeText).toHaveBeenCalledOnce()
+      expect(copyButton().textContent).not.toContain('settings.apiKeys.copied')
+      // The secret is still on screen to be copied by hand.
+      expect(document.body.textContent).toContain('beai_live_raw_secret')
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('labels an ability the build has no translation for with its literal name', async () => {
     listAbilitiesMock.mockResolvedValue({ data: ['invented:ability'] })
-    const original = (globalThis as { useI18n?: unknown }).useI18n
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'useI18n')
     vi.stubGlobal(
       'useI18n',
       vi.fn(() => ({ t: (key: string) => key, te: () => false, locale: ref('it') }))
     )
+    const wrapper = mount(ApiKeysPanel, {
+      attachTo: document.body,
+      global: { mocks: { $t: tMock } },
+    })
     try {
-      const wrapper = mount(ApiKeysPanel, {
-        attachTo: document.body,
-        global: { mocks: { $t: tMock } },
-      })
       await flushPromises()
       await wrapper.get('[data-testid="api-keys-new"]').trigger('click')
       await waitForDialogOpen()
@@ -1027,10 +1030,12 @@ describe('ApiKeysPanel — copying the one-time raw key and untranslated abiliti
       ).not.toBeNull()
       expect(document.body.textContent).toContain('invented:ability')
       expect(document.body.textContent).not.toContain('settings.apiKeys.ability.inventedAbility')
-
-      wrapper.unmount()
     } finally {
-      vi.stubGlobal('useI18n', original)
+      wrapper.unmount()
+      // Put back exactly what was there: the original descriptor, or no
+      // property at all if there was none (never a property set to undefined).
+      Reflect.deleteProperty(globalThis, 'useI18n')
+      if (descriptor) Object.defineProperty(globalThis, 'useI18n', descriptor)
     }
   })
 })

@@ -8,7 +8,7 @@
  * is `CatalogueDefaultQuestionsPanel.spec.ts`'s job; this file owns the
  * revision header and the rail shape only.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { confirmDialog } from '../../support/confirm'
 import { realI18n } from '../../support/i18n'
@@ -86,6 +86,13 @@ describe('pages/catalogue/index.vue', () => {
     document.body.innerHTML = ''
   })
 
+  // `unstubAllGlobals` would also drop the file-level stubs (definePageMeta),
+  // so only the `useHead` this file replaces is put back.
+  const originalUseHead = (globalThis as Record<string, unknown>).useHead
+  afterEach(() => {
+    vi.stubGlobal('useHead', originalUseHead)
+  })
+
   it('renders the section rail as a vertical tablist, never a horizontal strip', async () => {
     fetchCurrentRevision.mockResolvedValue({ data: revision() })
     const wrapper = await mountPage()
@@ -158,6 +165,7 @@ describe('pages/catalogue/index.vue', () => {
     fetchCurrentRevision.mockResolvedValue({ data: revision() })
     await mountPage()
 
+    expect(useHeadMock).toHaveBeenCalledTimes(1)
     const head = useHeadMock.mock.calls[0]?.[0] as {
       title: () => string
       meta: { name: string; content: string }[]

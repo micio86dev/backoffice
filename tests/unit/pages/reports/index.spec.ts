@@ -153,6 +153,31 @@ describe('pages/reports/index.vue', () => {
     expect(wrapper.text()).toContain('Demo Project')
   })
 
+  it('refetches both endpoints with the filters ReportFilters emits', async () => {
+    const indexMock = vi.fn().mockResolvedValue(indexResponse())
+    const summaryMock = vi.fn().mockResolvedValue(summaryResponse())
+    vi.doMock('../../../../app/composables/useEvaluations', () => ({
+      useEvaluations: () => ({ index: indexMock, summary: summaryMock }),
+    }))
+    vi.doMock('../../../../app/composables/useProjects', () => ({
+      useProjects: () => ({ listProjects: vi.fn().mockResolvedValue({ data: [] }) }),
+    }))
+
+    const ReportsPage = (await import('../../../../app/pages/reports/index.vue')).default
+    const ReportFilters = (await import('../../../../app/components/molecules/ReportFilters.vue'))
+      .default
+    const wrapper = mount(ReportsPage, {
+      global: { mocks: { $t: tMock }, stubs: { NuxtLink: true } },
+    })
+    await flushPromises()
+
+    wrapper.findComponent(ReportFilters).vm.$emit('update:modelValue', { project_id: 7 })
+    await flushPromises()
+
+    expect(indexMock).toHaveBeenLastCalledWith({ project_id: 7 })
+    expect(summaryMock).toHaveBeenLastCalledWith({ project_id: 7 })
+  })
+
   it('clears a previous error once a later fetch succeeds', async () => {
     const indexMock = vi
       .fn()
@@ -175,8 +200,10 @@ describe('pages/reports/index.vue', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="reports-error"]').exists()).toBe(true)
 
-    // The filter bar is hidden while the error shows, so change the filters
-    // state directly: that is what its v-model does.
+    // The filter bar is hidden while the error shows (so ReportFilters cannot
+    // emit here, and the page offers no retry control), hence this one test
+    // writes the `filters` state its v-model would. The emitted-event path is
+    // covered by the test below, while the bar is visible.
     const vm = wrapper.vm as unknown as { filters: Record<string, unknown> }
     vm.filters = { project_id: 1 }
     await flushPromises()

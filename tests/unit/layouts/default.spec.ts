@@ -13,6 +13,10 @@ import DefaultLayout from '../../../app/layouts/default.vue'
 const tMock = (key: string) => key
 
 describe('layouts/default.vue', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('renders the sidebar, the nav bar and the page slot content without throwing', () => {
     vi.stubGlobal(
       'useRoute',

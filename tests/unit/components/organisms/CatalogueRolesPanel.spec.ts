@@ -9,6 +9,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { waitFor } from '../../support/wait-for'
+import { realI18n } from '../../support/i18n'
+import { ref } from 'vue'
 
 const tMock = (key: string) => key
 
@@ -337,16 +339,38 @@ describe('CatalogueRolesPanel — names, editing, dismissal and refused deletes'
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
       )
 
-  it('prefers the UI locale, falls back to English, and marks a nameless role for assistive tech', async () => {
-    const wrapper = await mountPanel()
-    const rows = wrapper.findAll('tbody tr')
+  describe('with an explicit UI locale', () => {
+    const originalUseI18n = (globalThis as Record<string, unknown>).useI18n
+    const withLocale = (code: string) =>
+      vi.stubGlobal('useI18n', () => ({ ...realI18n(), locale: ref(code) }))
 
-    expect(rows[0]!.text()).toContain('Individual Contributor')
-    expect(rows[1]!.text()).toContain('Primo livello')
-    expect(rows[1]!.text()).not.toContain('First Line')
-    expect(rows[2]!.text()).toContain('catalogue.roles.table.noName')
+    afterEach(() => {
+      vi.stubGlobal('useI18n', originalUseI18n)
+    })
 
-    wrapper.unmount()
+    it('prefers the UI locale, falls back to English, and marks a nameless role for assistive tech', async () => {
+      withLocale('it')
+      const wrapper = await mountPanel()
+      const rows = wrapper.findAll('tbody tr')
+
+      expect(rows[0]!.text()).toContain('Individual Contributor')
+      expect(rows[1]!.text()).toContain('Primo livello')
+      expect(rows[1]!.text()).not.toContain('First Line')
+      expect(rows[2]!.text()).toContain('catalogue.roles.table.noName')
+
+      wrapper.unmount()
+    })
+
+    it('shows the English name when English is the UI locale', async () => {
+      withLocale('en')
+      const wrapper = await mountPanel()
+      const rows = wrapper.findAll('tbody tr')
+
+      expect(rows[1]!.text()).toContain('First Line')
+      expect(rows[1]!.text()).not.toContain('Primo livello')
+
+      wrapper.unmount()
+    })
   })
 
   it('opens the edit drawer prefilled with that role and saves against its id', async () => {

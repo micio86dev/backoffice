@@ -23,8 +23,14 @@ const CopyTemplateDialog = (
   await import('../../../../app/components/organisms/CopyTemplateDialog.vue')
 ).default
 
+// The result line renders as `<organization> :: <name>` so a test reads what
+// the operator reads, instead of a serialised parameter bag.
 const tMock = (key: string, params?: Record<string, unknown>) =>
-  params ? `${key} ${JSON.stringify(params)}` : key
+  key === 'avatar_templates.copy.resultItem'
+    ? `${params?.organization} :: ${params?.name}`
+    : params
+      ? `${key} ${JSON.stringify(params)}`
+      : key
 
 vi.stubGlobal(
   'useI18n',
@@ -151,8 +157,8 @@ describe('CopyTemplateDialog', () => {
 
     const result = await waitForTestId('copy-template-result')
     expect(result.getAttribute('role')).toBe('status')
-    expect(result.textContent).toContain('"organization":"Beta Org"')
-    expect(result.textContent).toContain('"name":"Recruiter voice (copy)"')
+    expect(q('copy-result-90')?.textContent?.trim()).toBe('Beta Org :: Recruiter voice')
+    expect(q('copy-result-91')?.textContent).toContain(' :: Recruiter voice (copy)')
     expect(result.textContent).toContain('avatar_templates.copy.resultInactive')
     expect(q('org-multiselect')).toBeNull()
     await waitFor(
@@ -334,7 +340,7 @@ describe('CopyTemplateDialog — closing and edge cases', () => {
     await click('copy-template-submit')
 
     const item = await waitForTestId('copy-result-90')
-    expect(item.textContent).toContain('"organization":"42"')
+    expect(item.textContent?.trim()).toBe('42 :: X')
   })
 
   it('does not call the API when there is no template to copy', async () => {

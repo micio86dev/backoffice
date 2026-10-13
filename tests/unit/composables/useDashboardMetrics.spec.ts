@@ -1,10 +1,15 @@
 /**
  * useDashboardMetrics.ts (PR B2, task 17.5 — RED)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 describe('useDashboardMetrics', () => {
   beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.doUnmock('../../../app/composables/useApi')
     vi.resetModules()
   })
 

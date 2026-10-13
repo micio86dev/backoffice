@@ -11,7 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { realI18n } from '../../support/i18n'
-import { waitFor } from '../../support/wait-for'
+import { waitFor, waitForTestId } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 
@@ -300,12 +300,14 @@ describe('UsersPanel — platform activation', () => {
 
     await wrapper.get('[data-testid="user-activate-9"]').trigger('click')
     await flushPromises()
-    const confirm = document.body.querySelector<HTMLButtonElement>(
-      '[data-testid="confirm-dialog-confirm"]'
+    const confirm = await waitForTestId<HTMLButtonElement>('confirm-dialog-confirm')
+    expect(confirm).toBeTruthy()
+    confirm.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirm.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await waitFor(
+      () => activatePlatformUserMock.mock.calls.length > 0,
+      'the platform activation call'
     )
-    confirm?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    confirm?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await waitFor(() => activatePlatformUserMock.mock.calls.length > 0)
 
     expect(activatePlatformUserMock).toHaveBeenCalledWith(9)
     expect(activateUserMock).not.toHaveBeenCalled()

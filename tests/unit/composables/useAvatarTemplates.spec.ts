@@ -258,7 +258,9 @@ describe('useAvatarTemplates', () => {
   it('reads the picker options from the role-readable endpoint, not the admin list', async () => {
     await useAvatarTemplates().listTemplateOptions()
 
-    expect(apiFetch).toHaveBeenCalledWith('/avatar-templates/options')
+    expect(apiFetch).toHaveBeenCalledTimes(1)
+    expect(apiFetch.mock.calls[0]![0]).toBe('/avatar-templates/options')
+    expect(apiFetch).not.toHaveBeenCalledWith('/avatar-templates')
   })
 
   it('deactivates through its own endpoint', async () => {

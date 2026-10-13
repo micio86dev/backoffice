@@ -700,7 +700,12 @@ describe('ProjectTable — a project with no competencies', () => {
 })
 
 describe('ProjectTable — invite drawer lifecycle and BARS coverage', () => {
+  // Every wrapper opened here is unmounted even when an assertion throws first,
+  // so a failing test cannot leak a mounted drawer into the next one.
+  const mounted: Array<{ unmount: () => void }> = []
+
   afterEach(() => {
+    mounted.splice(0).forEach((w) => w.unmount())
     document.body.innerHTML = ''
   })
 
@@ -715,6 +720,7 @@ describe('ProjectTable — invite drawer lifecycle and BARS coverage', () => {
       attachTo: document.body,
       global: { mocks: { $t: tMock } },
     })
+    mounted.push(wrapper)
     await wrapper.get('[data-testid="project-row-invite-1"]').trigger('click')
     return wrapper
   }
@@ -735,8 +741,6 @@ describe('ProjectTable — invite drawer lifecycle and BARS coverage', () => {
     expect(inBody('entry-link-url')).toBeNull()
     expect(inBody('entry-link-form')).not.toBeNull()
     expect(inBody('form-drawer-save')).not.toBeNull()
-
-    wrapper.unmount()
   })
 
   it('discards the minted link when the drawer is dismissed, and ignores an "open" signal', async () => {
@@ -753,8 +757,6 @@ describe('ProjectTable — invite drawer lifecycle and BARS coverage', () => {
     await wrapper.vm.$nextTick()
     expect(inBody('entry-link-url')).toBeNull()
     expect((wrapper.vm as unknown as { inviteTarget: unknown }).inviteTarget).toBeNull()
-
-    wrapper.unmount()
   })
 
   describe('uncovered-competency count', () => {

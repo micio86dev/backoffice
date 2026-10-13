@@ -5,10 +5,16 @@
  * `status` via `ToggleGroup`, date range), emits ONE filter object.
  */
 import { describe, it, expect } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import ReportFilters from '../../../../app/components/molecules/ReportFilters.vue'
 
 const tMock = (key: string) => key
+
+const statusToggle = (wrapper: VueWrapper, key: 'statusCompleted' | 'statusPending') =>
+  wrapper
+    .get('[data-testid="report-filter-status"]')
+    .findAll('button')
+    .find((b) => b.text() === `reports.filters.${key}`)!
 
 describe('ReportFilters', () => {
   it('emits a single filter object when the status toggle changes', async () => {
@@ -17,8 +23,7 @@ describe('ReportFilters', () => {
       global: { mocks: { $t: tMock } },
     })
 
-    const completedButton = wrapper.get('[data-testid="report-filter-status"] button:first-child')
-    await completedButton.trigger('click')
+    await statusToggle(wrapper, 'statusCompleted').trigger('click')
 
     expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual([{ status: 'completed' }])
   })
@@ -161,7 +166,7 @@ describe('ReportFilters', () => {
   it('un-pressing the active status toggle removes the status filter', async () => {
     const wrapper = mountWith({ status: 'completed' })
 
-    await wrapper.get('[data-testid="report-filter-status"] button:first-child').trigger('click')
+    await statusToggle(wrapper, 'statusCompleted').trigger('click')
 
     expect(lastEmit(wrapper)?.[0]).toMatchObject({ status: undefined })
   })

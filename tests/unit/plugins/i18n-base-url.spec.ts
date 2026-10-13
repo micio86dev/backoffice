@@ -3,12 +3,16 @@
  * does not survive the static SPA's JSON-serialised runtime config. The plugin
  * re-installs it on the live config object, before the i18n module reads it.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 describe('i18n-base-url.client.ts', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.stubGlobal('defineNuxtPlugin', (definition: unknown) => definition)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('runs before the i18n module plugin', async () => {
@@ -31,6 +35,10 @@ describe('i18n-base-url.client.ts', () => {
 
     plugin.setup()
 
-    expect(config.public.i18n.baseUrl?.()).toBe(window.location.origin)
+    vi.stubGlobal('location', { origin: 'https://first.example' })
+    expect(config.public.i18n.baseUrl?.()).toBe('https://first.example')
+
+    vi.stubGlobal('location', { origin: 'https://second.example' })
+    expect(config.public.i18n.baseUrl?.()).toBe('https://second.example')
   })
 })

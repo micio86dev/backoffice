@@ -44,8 +44,13 @@ describe('useApiClients', () => {
   })
 
   it('reads the grantable abilities from the server, never a local copy', async () => {
-    await useApiClients().listAbilities()
+    const served = { data: ['read', 'server-only-ability'] }
+    apiFetch.mockResolvedValue(served)
 
+    const result = await useApiClients().listAbilities()
+
+    expect(apiFetch).toHaveBeenCalledTimes(1)
     expect(apiFetch).toHaveBeenCalledWith('/m2m/abilities')
+    expect(result).toEqual(served)
   })
 })

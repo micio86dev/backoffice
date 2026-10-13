@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { waitFor } from '../../support/wait-for'
+import { waitFor, waitForTestId } from '../../support/wait-for'
 
 const tMock = (key: string) => key
 
@@ -425,11 +425,10 @@ describe('CatalogueIndicatorsPanel', () => {
     await flushPromises()
 
     await wrapper.get('[data-testid="indicator-delete-1"]').trigger('click')
-    const confirmButton = document.body.querySelector<HTMLButtonElement>(
-      '[data-testid="confirm-dialog-confirm"]'
-    )
-    confirmButton?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    confirmButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    const confirmButton = await waitForTestId<HTMLButtonElement>('confirm-dialog-confirm')
+    expect(confirmButton).toBeTruthy()
+    confirmButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    confirmButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await waitFor(
       () => wrapper.find('[data-testid="indicators-action-error"]').exists(),
       'the delete failure banner'

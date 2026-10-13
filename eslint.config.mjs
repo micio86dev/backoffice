@@ -26,6 +26,10 @@ export default createConfigForNuxt({
       // signatures (surfaced by the vendored shadcn-vue Input/Sidebar components).
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': 'error',
+      // Prettier owns formatting (`stylistic: false` above) and prints void elements
+      // self-closed (`<input />`); this rule's default asks for the opposite, so the
+      // two tools undid each other on every commit. Leave the void-element style to Prettier.
+      'vue/html-self-closing': ['warn', { html: { void: 'any' } }],
     },
   })
   // Vendored shadcn-vue primitives. `label-has-for` cannot see through a

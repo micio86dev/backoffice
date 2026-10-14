@@ -229,6 +229,7 @@ import {
 } from '@/composables/usePlatformAvatarTemplates'
 import type {
   AvatarTemplate,
+  AvatarTemplateSubmit,
   FieldSpec,
   PlatformTemplate,
   ProviderName,
@@ -276,7 +277,7 @@ const editing = ref<Partial<AvatarTemplate> | null>(null)
 const impact = ref<{
   action: 'edit' | 'retire' | 'delete'
   template: PlatformTemplate
-  payload?: Partial<AvatarTemplate>
+  payload?: AvatarTemplateSubmit
 } | null>(null)
 
 const formTitle = computed(() =>
@@ -375,7 +376,7 @@ async function perform(
   }
 }
 
-async function send(payload: Partial<AvatarTemplate>): Promise<void> {
+async function send(payload: AvatarTemplateSubmit): Promise<void> {
   // Same gate as perform(): a save must not overlap another row write, and
   // while it runs Offer / Retire / Delete are disabled through `busy`.
   if (busy.value) return
@@ -391,6 +392,7 @@ async function send(payload: Partial<AvatarTemplate>): Promise<void> {
     const binding = {
       llm_model_id: payload.llm_model_id ?? null,
       llm_credential_id: payload.llm_credential_id ?? null,
+      persona: payload.persona,
     }
     const response = payload.id
       ? await update(payload.id, {
@@ -420,7 +422,7 @@ async function send(payload: Partial<AvatarTemplate>): Promise<void> {
   }
 }
 
-function onSubmit(payload: Partial<AvatarTemplate>): void {
+function onSubmit(payload: AvatarTemplateSubmit): void {
   const row = templates.value.find((candidate) => candidate.id === payload.id)
 
   // An edit of something in use is held for the warning; everything else goes.

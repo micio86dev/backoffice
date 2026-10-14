@@ -1188,6 +1188,8 @@
       "default": "Default",
       "dependentUnavailable": "Not used with the current speech engine. Choose an engine that offers several models (Cartesia or ElevenLabs) to set it.",
       "required": "Required",
+      "persona_display_name": "Interviewer display name",
+      "persona_display_name_hint": "Shown to candidates before every caption. Optional: when empty, candidates see the generic label \"AI interviewer\". Up to 60 characters.",
       "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it.",
       "help": {
         "name": "Must be different from every other template name in your organization."
@@ -1195,6 +1197,7 @@
       "errors": {
         "nameRequired": "Enter a template name.",
         "nameTooLong": "The name must be at most 120 characters.",
+        "personaDisplayNameInvalid": "Enter a name of up to 60 characters, without markup or the name of a technology provider.",
         "descriptionTooLong": "The description must be at most 500 characters.",
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."

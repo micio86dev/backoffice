@@ -341,7 +341,12 @@ import {
 import { serverMessageCode } from '@/utils/http-error'
 import { translateServerCode } from '@/utils/server-message'
 import { useMoney } from '@/composables/useMoney'
-import type { AvatarTemplate, FieldSpec, ProviderName } from '@/types/avatar-template'
+import type {
+  AvatarTemplate,
+  AvatarTemplateSubmit,
+  FieldSpec,
+  ProviderName,
+} from '@/types/avatar-template'
 
 definePageMeta({ name: 'avatar-templates' })
 
@@ -543,7 +548,7 @@ function startEdit(template: AvatarTemplate): void {
   editing.value = { ...template, config: { ...template.config } }
 }
 
-async function save(payload: Partial<AvatarTemplate>): Promise<void> {
+async function save(payload: AvatarTemplateSubmit): Promise<void> {
   saving.value = true
   submitError.value = null
 
@@ -555,6 +560,7 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
           config: payload.config ?? {},
           llm_model_id: payload.llm_model_id ?? null,
           llm_credential_id: payload.llm_credential_id ?? null,
+          persona: payload.persona,
         })
       : await createTemplate({
           name: payload.name ?? '',
@@ -563,6 +569,7 @@ async function save(payload: Partial<AvatarTemplate>): Promise<void> {
           config: payload.config ?? {},
           llm_model_id: payload.llm_model_id ?? null,
           llm_credential_id: payload.llm_credential_id ?? null,
+          persona: payload.persona,
         })
 
     warning.value = response.warning ?? null

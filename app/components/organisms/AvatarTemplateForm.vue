@@ -80,6 +80,34 @@
         </FieldError>
       </Field>
 
+      <Field :data-invalid="Boolean(personaError)">
+        <FieldLabel for="template-persona-display-name">{{
+          $t('avatar_templates.form.persona_display_name')
+        }}</FieldLabel>
+        <input
+          id="template-persona-display-name"
+          v-model="draft.personaDisplayName"
+          data-testid="template-field-persona-display-name"
+          type="text"
+          autocomplete="off"
+          :maxlength="PERSONA_DISPLAY_NAME_MAX_LENGTH"
+          :aria-invalid="Boolean(personaError)"
+          :aria-describedby="personaDescribedBy"
+          :class="formControlClass"
+          @input="personaError = undefined"
+        />
+        <FieldDescription id="template-persona-display-name-help">
+          {{ $t('avatar_templates.form.persona_display_name_hint') }}
+        </FieldDescription>
+        <FieldError
+          v-if="personaError"
+          id="template-persona-display-name-error"
+          data-testid="template-persona-display-name-error"
+        >
+          {{ personaError }}
+        </FieldError>
+      </Field>
+
       <Field>
         <FieldLabel for="template-provider">{{ $t('avatar_templates.form.provider') }}</FieldLabel>
         <!--
@@ -419,6 +447,7 @@ import type { VoicePreviewRequest } from '@/composables/useVoicePreview'
 import {
   CATALOGUED_TTS_ENGINES,
   type AvatarTemplate,
+  type AvatarTemplateSubmit,
   type CatalogueProvider,
   type FieldSpec,
   type ProviderName,
@@ -433,13 +462,15 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', payload: Partial<AvatarTemplate>): void
+  (e: 'submit', payload: AvatarTemplateSubmit): void
 }>()
 
 const { t, te } = useI18n()
 
 const NAME_MAX_LENGTH = 120
 const DESCRIPTION_MAX_LENGTH = 500
+// Mirrors the api's `PersonaDisplayName::MAX`; the api stays authoritative.
+const PERSONA_DISPLAY_NAME_MAX_LENGTH = 60
 
 // feature/form-drawer: two columns benefit the GENERATED provider fields (up
 // to 15 for tavus, 11 for heygen) once there are enough to fill a row each —
@@ -457,6 +488,7 @@ const draft = ref({
   description: props.template.description ?? '',
   provider: (props.template.provider ?? 'heygen') as ProviderName,
   config: { ...(props.template.config ?? {}) } as Record<string, unknown>,
+  personaDisplayName: props.template.persona?.display_name ?? '',
   // pluggable-conversation-llm PR P8. `llmModelKey` is the PICKER's value
   // (design D1's natural key — `LlmModelPicker` is built around it, not a
   // numeric id). `llmCredentialId` needs no such translation:
@@ -514,6 +546,7 @@ const { guardBlur } = usePointerPressGuard()
 
 const nameError = ref<string | undefined>(undefined)
 const descriptionError = ref<string | undefined>(undefined)
+const personaError = ref<string | undefined>(undefined)
 const configErrors = ref<Record<string, string | undefined>>({})
 const unmappedErrors = ref<string[]>([])
 const llmModelError = ref<string | undefined>(undefined)
@@ -645,6 +678,15 @@ function resolveModelId(key: string | null): number | null {
 
 const nameDescribedBy = computed(() =>
   [nameError.value ? 'template-name-error' : null, 'template-name-help']
+    .filter((id): id is string => id !== null)
+    .join(' ')
+)
+
+const personaDescribedBy = computed(() =>
+  [
+    personaError.value ? 'template-persona-display-name-error' : null,
+    'template-persona-display-name-help',
+  ]
     .filter((id): id is string => id !== null)
     .join(' ')
 )
@@ -1029,6 +1071,7 @@ watch(
   (submitError) => {
     nameError.value = undefined
     descriptionError.value = undefined
+    personaError.value = undefined
     configErrors.value = {}
     unmappedErrors.value = []
     llmModelError.value = undefined
@@ -1103,13 +1146,29 @@ watch(
         continue
       }
 
-      if (serverField === 'name') nameError.value = message
+      // The api's sentence is English-only and unlocalised: show this form's own copy.
+      if (serverField === 'persona.display_name') {
+        personaError.value = t('avatar_templates.form.errors.personaDisplayNameInvalid')
+      } else if (serverField === 'name') nameError.value = message
       else if (serverField === 'description') descriptionError.value = message
       else if (!unmappedErrors.value.includes(message)) unmappedErrors.value.push(message)
     }
   },
   { immediate: true }
 )
+
+/**
+ * `{display_name}` when named; otherwise `{}` on an update (the only payload
+ * that clears the stored name: an absent key changes nothing and an empty
+ * string is refused) and nothing at all on a create.
+ */
+function personaPayload(): { persona?: { display_name?: string } } {
+  const name = draft.value.personaDisplayName.trim()
+
+  if (name !== '') return { persona: { display_name: name } }
+
+  return isNew.value ? {} : { persona: {} }
+}
 
 function submit(): void {
   // Every validator runs before the early return — never short-circuited —
@@ -1129,6 +1188,7 @@ function submit(): void {
     config: draft.value.config,
     llm_model_id: effectiveModelId.value,
     llm_credential_id: draft.value.llmCredentialId,
+    ...personaPayload(),
   })
 }
 </script>

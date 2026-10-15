@@ -119,10 +119,10 @@ describe('InterviewIntroPhraseForm', () => {
     expect(w.find('#intro-phrase-en-help').exists()).toBe(true)
   })
 
-  it('warns and blocks saving when a locale is over 600 characters', async () => {
+  it('warns and blocks saving when a locale is over 3600 characters', async () => {
     const w = await mountForm(null)
 
-    await en(w).setValue('a'.repeat(601))
+    await en(w).setValue('a'.repeat(3601))
     await submit(w)
 
     expect(updateInterviewIntroPhrase).not.toHaveBeenCalled()
@@ -137,7 +137,7 @@ describe('InterviewIntroPhraseForm', () => {
 
     expect(w.get('[data-testid="intro-phrase-en-counter"]').text()).not.toContain('overBy')
 
-    await en(w).setValue('a'.repeat(605))
+    await en(w).setValue('a'.repeat(3605))
 
     expect(w.get('[data-testid="intro-phrase-en-counter"]').text()).toContain(
       'settings.platform.introPhrase.overBy:{"over":5}'
@@ -147,7 +147,7 @@ describe('InterviewIntroPhraseForm', () => {
   it('counts characters, not UTF-16 units, like the API does', async () => {
     const w = await mountForm(null)
 
-    await en(w).setValue('😀'.repeat(600))
+    await en(w).setValue('😀'.repeat(3600))
     await submit(w)
 
     expect(updateInterviewIntroPhrase).toHaveBeenCalledTimes(1)
@@ -157,20 +157,20 @@ describe('InterviewIntroPhraseForm', () => {
     const w = await mountForm(null)
     const counter = () => w.get('[data-testid="intro-phrase-en-counter"]').text()
 
-    // 600 characters once trimmed, 610 raw: savable, counter and estimate agree.
-    await en(w).setValue(`  ${'a'.repeat(600)}        `)
-    expect(counter()).toContain('"count":600')
-    expect(counter()).toContain('"seconds":40')
+    // 3600 characters once trimmed, 3610 raw: savable, counter and estimate agree.
+    await en(w).setValue(`  ${'a'.repeat(3600)}        `)
+    expect(counter()).toContain('"count":3600')
+    expect(counter()).toContain('"seconds":240')
     expect(counter()).not.toContain('overBy')
     expect(en(w).attributes('aria-invalid')).toBe('false')
     await submit(w)
-    expect(updateInterviewIntroPhrase).toHaveBeenCalledWith({ en: 'a'.repeat(600) })
+    expect(updateInterviewIntroPhrase).toHaveBeenCalledWith({ en: 'a'.repeat(3600) })
   })
 
   it('still blocks padded text that is over the limit once trimmed', async () => {
     const w = await mountForm(null)
 
-    await en(w).setValue(`  ${'a'.repeat(601)}  `)
+    await en(w).setValue(`  ${'a'.repeat(3601)}  `)
     expect(w.get('[data-testid="intro-phrase-en-counter"]').text()).toContain('"over":1')
     await submit(w)
 
@@ -194,7 +194,7 @@ describe('InterviewIntroPhraseForm', () => {
     const w = await mountForm(null)
 
     await en(w).setValue('Hello')
-    await it_(w).setValue('a'.repeat(601))
+    await it_(w).setValue('a'.repeat(3601))
     await submit(w)
 
     expect(updateInterviewIntroPhrase).not.toHaveBeenCalled()

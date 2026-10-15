@@ -134,7 +134,7 @@ type Locale = 'en' | 'it'
 const LOCALES: readonly Locale[] = ['en', 'it']
 
 /** Mirrors the API's cap. */
-const MAX_CHARACTERS = 600
+const MAX_CHARACTERS = 3600
 /** Rough speaking rate used for the estimate only; the API never sees it. */
 const CHARACTERS_PER_SECOND = 15
 

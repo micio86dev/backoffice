@@ -61,6 +61,24 @@ describe('usePlatformSettings', () => {
     })
   })
 
+  it('PATCHes only interview_closing_phrase when saving the closing greeting', async () => {
+    await usePlatformSettings().updateInterviewClosingPhrase({ en: 'Thanks', it: 'Grazie' })
+
+    expect(apiFetch).toHaveBeenCalledWith('/admin/settings', {
+      method: 'PATCH',
+      body: { interview_closing_phrase: { en: 'Thanks', it: 'Grazie' } },
+    })
+  })
+
+  it('sends an explicit null to clear the closing greeting', async () => {
+    await usePlatformSettings().updateInterviewClosingPhrase(null)
+
+    expect(apiFetch).toHaveBeenCalledWith('/admin/settings', {
+      method: 'PATCH',
+      body: { interview_closing_phrase: null },
+    })
+  })
+
   it('lets a refusal (403/422) propagate to the caller', async () => {
     const refusal = Object.assign(new Error('forbidden'), { status: 403 })
     apiFetch.mockRejectedValue(refusal)

@@ -450,6 +450,15 @@ describe('AvatarTemplatesPage', () => {
     expect(api.createTemplate).not.toHaveBeenCalled()
   })
 
+  it('forwards the persona payload so an update can clear the interviewer name', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await submitTemplateForm()
+
+    expect(api.updateTemplate).toHaveBeenCalledWith(1, expect.objectContaining({ persona: {} }))
+  })
+
   // generated-client-truth-and-session-safety D6: the server now keys each
   // invalid knob under its own `config.{knob}` field instead of flattening
   // every knob's error into one `config` array. The page passes the caught

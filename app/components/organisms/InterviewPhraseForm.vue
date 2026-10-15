@@ -9,46 +9,69 @@
           </p>
         </div>
 
-        <Field v-for="locale in LOCALES" :key="locale" :data-invalid="Boolean(errors[locale])">
-          <FieldLabel :for="`${testIdPrefix}-${locale}`">
-            {{ $t(`${i18nPrefix}.label.${locale}`) }}
-          </FieldLabel>
-          <Textarea
-            :id="`${testIdPrefix}-${locale}`"
-            v-model="values[locale]"
-            rows="4"
-            :aria-invalid="Boolean(errors[locale]) || isOver(locale)"
-            :aria-describedby="describedBy(locale)"
-            :data-testid="`${testIdPrefix}-${locale}`"
-          />
-          <FieldDescription :id="`${testIdPrefix}-${locale}-help`">
-            {{ $t(`${i18nPrefix}.help.${locale}`) }}
-          </FieldDescription>
-          <p
-            :id="`${testIdPrefix}-${locale}-counter`"
-            :class="['text-sm', isOver(locale) ? 'text-destructive' : 'text-muted-foreground']"
-            :data-testid="`${testIdPrefix}-${locale}-counter`"
-          >
-            {{
-              $t(`${i18nPrefix}.counter`, {
-                count: length(locale),
-                max: MAX_CHARACTERS,
-                seconds: seconds(locale),
-              })
-            }}
-            <!-- Words as well as colour: WCAG 1.4.1. -->
-            <strong v-if="isOver(locale)">
-              {{ $t(`${i18nPrefix}.overBy`, { over: length(locale) - MAX_CHARACTERS }) }}
-            </strong>
-          </p>
-          <FieldError
-            v-if="errors[locale]"
-            :id="`${testIdPrefix}-${locale}-error`"
-            :data-testid="`${testIdPrefix}-${locale}-error`"
-          >
-            {{ errors[locale] }}
-          </FieldError>
-        </Field>
+        <Tabs v-model="activeLocale">
+          <TabsList>
+            <TabsTrigger
+              v-for="locale in LOCALES"
+              :key="locale"
+              :value="locale"
+              :data-testid="`${testIdPrefix}-tab-${locale}`"
+            >
+              {{ $t(`settings.platform.phraseLocale.${locale}`) }}
+              <!-- Errors in a hidden tab must not be invisible: dot for sight, words for the rest. -->
+              <template v-if="errors[locale]">
+                <span class="size-2 rounded-full bg-destructive" aria-hidden="true" />
+                <span class="sr-only" :data-testid="`${testIdPrefix}-tab-${locale}-error`">
+                  {{ $t('settings.platform.phraseTabError') }}
+                </span>
+              </template>
+            </TabsTrigger>
+          </TabsList>
+
+          <!-- Force-mounted: every textarea stays in the DOM (hidden), so nothing is lost on a switch. -->
+          <TabsContent v-for="locale in LOCALES" :key="locale" :value="locale" force-mount>
+            <Field :data-invalid="Boolean(errors[locale])">
+              <FieldLabel :for="`${testIdPrefix}-${locale}`">
+                {{ $t(`${i18nPrefix}.label.${locale}`) }}
+              </FieldLabel>
+              <Textarea
+                :id="`${testIdPrefix}-${locale}`"
+                v-model="values[locale]"
+                rows="4"
+                :aria-invalid="Boolean(errors[locale]) || isOver(locale)"
+                :aria-describedby="describedBy(locale)"
+                :data-testid="`${testIdPrefix}-${locale}`"
+              />
+              <FieldDescription :id="`${testIdPrefix}-${locale}-help`">
+                {{ $t(`${i18nPrefix}.help.${locale}`) }}
+              </FieldDescription>
+              <p
+                :id="`${testIdPrefix}-${locale}-counter`"
+                :class="['text-sm', isOver(locale) ? 'text-destructive' : 'text-muted-foreground']"
+                :data-testid="`${testIdPrefix}-${locale}-counter`"
+              >
+                {{
+                  $t(`${i18nPrefix}.counter`, {
+                    count: length(locale),
+                    max: MAX_CHARACTERS,
+                    seconds: seconds(locale),
+                  })
+                }}
+                <!-- Words as well as colour: WCAG 1.4.1. -->
+                <strong v-if="isOver(locale)">
+                  {{ $t(`${i18nPrefix}.overBy`, { over: length(locale) - MAX_CHARACTERS }) }}
+                </strong>
+              </p>
+              <FieldError
+                v-if="errors[locale]"
+                :id="`${testIdPrefix}-${locale}-error`"
+                :data-testid="`${testIdPrefix}-${locale}-error`"
+              >
+                {{ errors[locale] }}
+              </FieldError>
+            </Field>
+          </TabsContent>
+        </Tabs>
 
         <FormMessage
           v-if="formMessage"
@@ -105,15 +128,23 @@ import { reactive, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FormFieldset } from '@/components/ui/form-fieldset'
 import ConfirmDialog from '@/components/molecules/ConfirmDialog.vue'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
+import type {
+  InterviewIntroPhrase,
+  StoredInterviewIntroPhrase,
+} from '@/composables/usePlatformSettings'
 import { applyServerFieldErrors } from '@/utils/http-error'
 
-/** What is sent: `en` always, `it` optionally, or `null` to clear. */
-export type PhrasePayload = { en: string; it?: string } | null
-/** What is read back: the response schema types every locale optional. */
-export type StoredPhrase = { en?: string; it?: string } | null | undefined
+/**
+ * The intro and the closing greeting share one API shape, so the intro's
+ * generated types stand for both; each wrapper's typecheck proves its own
+ * field still matches.
+ */
+export type PhrasePayload = InterviewIntroPhrase
+export type StoredPhrase = StoredInterviewIntroPhrase | undefined
 
 const props = defineProps<{
   /** The API field, e.g. `interview_intro_phrase`; keys the server-error mapping. */
@@ -142,6 +173,7 @@ const MAX_CHARACTERS = 3600
 /** Rough speaking rate used for the estimate only; the API never sees it. */
 const CHARACTERS_PER_SECOND = 15
 
+const activeLocale = ref<Locale>('en')
 const values = reactive<Record<Locale, string>>({ en: '', it: '' })
 const errors = ref<Partial<Record<Locale, string>>>({})
 const formMessage = ref<{ kind: FormMessageKind; text: string } | null>(null)
@@ -169,6 +201,12 @@ function describedBy(locale: Locale): string {
     .join(' ')
 }
 
+/** Switch to the first locale with an error, so one in a hidden tab is seen. */
+function revealFirstError(): void {
+  const first = LOCALES.find((locale) => errors.value[locale])
+  if (first) activeLocale.value = first
+}
+
 function validate(): boolean {
   const next: Partial<Record<Locale, string>> = {}
 
@@ -182,6 +220,7 @@ function validate(): boolean {
   }
 
   errors.value = next
+  revealFirstError()
   return Object.keys(next).length === 0
 }
 
@@ -203,6 +242,7 @@ async function persist(phrase: PhrasePayload, successKey: string): Promise<void>
         errors.value[key] = msg
       }
     )
+    revealFirstError()
 
     // Banner only for what no control could show: suppressed when every key
     // was mapped, generic when the rejection had no field errors at all.

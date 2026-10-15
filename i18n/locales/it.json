@@ -945,6 +945,11 @@
       "saved": "Impostazioni di piattaforma salvate.",
       "saveFailed": "Non è stato possibile salvare le impostazioni di piattaforma.",
       "loadFailed": "Non è stato possibile caricare le impostazioni di piattaforma. I valori mostrati sono quelli predefiniti.",
+      "phraseLocale": {
+        "en": "Inglese",
+        "it": "Italiano"
+      },
+      "phraseTabError": "La lingua contiene un errore",
       "introPhrase": {
         "title": "Frase introduttiva del colloquio",
         "description": "Pronunciata dall'avatar prima della prima domanda di ogni colloquio. Conta nel tempo limite del colloquio, quindi mantienila breve ed evita le frasi di chiusura. Lascia vuoti entrambi i campi per non avere alcuna introduzione.",
@@ -987,7 +992,7 @@
         "saveFailed": "Impossibile salvare il saluto finale del colloquio.",
         "clear": "Rimuovi saluto",
         "clearConfirmTitle": "Rimuovere il saluto finale?",
-        "clearConfirmDescription": "I colloqui termineranno solo con la frase finale standard."
+        "clearConfirmDescription": "I colloqui termineranno solo con la consueta frase finale."
       }
     }
   },

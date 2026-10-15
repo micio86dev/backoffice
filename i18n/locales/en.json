@@ -945,6 +945,11 @@
       "saved": "Platform settings saved.",
       "saveFailed": "Could not save the platform settings.",
       "loadFailed": "Could not load the platform settings. The values shown are the defaults.",
+      "phraseLocale": {
+        "en": "English",
+        "it": "Italian"
+      },
+      "phraseTabError": "Language has an error",
       "introPhrase": {
         "title": "Interview intro phrase",
         "description": "Spoken by the avatar before the first question of every interview. It counts against the interview time limit, so keep it short, and do not use the closing phrases. Leave both fields empty to have no intro.",
@@ -987,7 +992,7 @@
         "saveFailed": "Could not save the interview closing greeting.",
         "clear": "Clear greeting",
         "clearConfirmTitle": "Remove the closing greeting?",
-        "clearConfirmDescription": "Interviews will end with the standard final phrase only."
+        "clearConfirmDescription": "Interviews will end with the usual final phrase only."
       }
     }
   },

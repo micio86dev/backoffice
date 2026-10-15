@@ -177,6 +177,83 @@ describe('InterviewPhraseForm', () => {
     expect(w.get('[data-testid="some-phrase-clear"]').attributes('disabled')).toBeDefined()
   })
 
+  describe('locale tabs', () => {
+    const tab = (w: W, locale: 'en' | 'it') => w.get(`[data-testid="some-phrase-tab-${locale}"]`)
+    const select = async (w: W, locale: 'en' | 'it') => {
+      await tab(w, locale).trigger('mousedown', { button: 0 })
+      await flushPromises()
+    }
+    const selected = (w: W, locale: 'en' | 'it') => tab(w, locale).attributes('aria-selected')
+
+    it('offers one tab per locale, English first and selected', async () => {
+      const w = await mountForm(null)
+
+      expect(tab(w, 'en').text()).toContain('settings.platform.phraseLocale.en')
+      expect(tab(w, 'it').text()).toContain('settings.platform.phraseLocale.it')
+      expect(selected(w, 'en')).toBe('true')
+      expect(selected(w, 'it')).toBe('false')
+    })
+
+    it('keeps what was typed in each locale across tab switches', async () => {
+      const w = await mountForm(null)
+
+      await en(w).setValue('Hello')
+      await select(w, 'it')
+      expect(selected(w, 'it')).toBe('true')
+      await it_(w).setValue('Ciao')
+      await select(w, 'en')
+
+      expect(value(en(w))).toBe('Hello')
+      expect(value(it_(w))).toBe('Ciao')
+    })
+
+    it('marks the tab of a locale that has an error, in words for screen readers', async () => {
+      const w = await mountForm(null)
+      expect(w.find('[data-testid="some-phrase-tab-it-error"]').exists()).toBe(false)
+
+      await it_(w).setValue('a'.repeat(3601))
+      await en(w).setValue('Hello')
+      await submit(w)
+
+      const marker = w.get('[data-testid="some-phrase-tab-it-error"]')
+      expect(marker.text()).toBe('settings.platform.phraseTabError')
+      expect(w.find('[data-testid="some-phrase-tab-en-error"]').exists()).toBe(false)
+    })
+
+    it('jumps to the first tab with an error on submit', async () => {
+      const w = await mountForm(null)
+
+      await it_(w).setValue('a'.repeat(3601))
+      await en(w).setValue('Hello')
+      expect(selected(w, 'en')).toBe('true')
+      await submit(w)
+
+      expect(selected(w, 'it')).toBe('true')
+    })
+
+    it('stays on English when English is the first with an error', async () => {
+      const w = await mountForm(null)
+
+      await select(w, 'it')
+      await it_(w).setValue('Ciao')
+      await submit(w)
+
+      expect(selected(w, 'en')).toBe('true')
+    })
+
+    it('jumps to the tab a server refusal names', async () => {
+      save.mockRejectedValue(refusal({ 'some_phrase.it': ['Nope.'] }))
+      const w = await mountForm(null)
+
+      await en(w).setValue('Hello')
+      await it_(w).setValue('Ciao')
+      await submit(w)
+
+      expect(selected(w, 'it')).toBe('true')
+      expect(w.find('[data-testid="some-phrase-tab-it-error"]').exists()).toBe(true)
+    })
+  })
+
   describe('clearing', () => {
     it('asks first, then sends null and empties both fields', async () => {
       save.mockResolvedValue(null)

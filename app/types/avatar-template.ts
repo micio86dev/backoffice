@@ -327,3 +327,22 @@ export type PlatformTemplateCreatePayload = Omit<PlatformStoreBody, 'config'> & 
 export type PlatformTemplateUpdatePayload = Omit<PlatformUpdateBody, 'config'> & {
   config?: Record<string, unknown>
 }
+
+/**
+ * The persona a WRITE may carry, derived from the generated store body so a
+ * rename or narrowing in the api breaks this file's compile.
+ */
+export type PersonaWrite = NonNullable<
+  paths['/avatar-templates']['post']['requestBody']['content']['application/json']['persona']
+>
+
+/**
+ * What the template form emits on submit.
+ *
+ * `persona` is narrowed from the read shape (`{display_name: string | null}`)
+ * because a WRITE says less: `{}` clears the interviewer name, and an absent key
+ * leaves it untouched. See `useAvatarTemplates.updateTemplate`.
+ */
+export type AvatarTemplateSubmit = Omit<Partial<AvatarTemplate>, 'persona'> & {
+  persona?: PersonaWrite
+}

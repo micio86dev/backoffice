@@ -12,6 +12,7 @@ import type {
   CatalogueResponse,
   DuplicateTemplateResponse,
   FieldSpecsResponse,
+  PersonaWrite,
   TemplateListResponse,
   TemplateOptionsResponse,
   TemplateResponse,
@@ -152,6 +153,8 @@ export function useAvatarTemplates() {
      */
     llm_model_id?: number | null
     llm_credential_id?: number | null
+    /** `{display_name}` to name the interviewer; omitted to leave it unset. */
+    persona?: PersonaWrite
   }): Promise<TemplateResponse> {
     return apiFetch<TemplateResponse>('/avatar-templates', { method: 'POST', body: payload })
   }
@@ -164,6 +167,8 @@ export function useAvatarTemplates() {
       config?: Record<string, unknown>
       llm_model_id?: number | null
       llm_credential_id?: number | null
+      /** `{}` CLEARS the display name; absent leaves it untouched. Never an empty string. */
+      persona?: PersonaWrite
     }
   ): Promise<TemplateResponse> {
     // `provider` is deliberately absent from the accepted payload. The API

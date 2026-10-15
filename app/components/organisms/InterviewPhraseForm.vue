@@ -41,6 +41,7 @@
                 :aria-invalid="Boolean(errors[locale]) || isOver(locale)"
                 :aria-describedby="describedBy(locale)"
                 :data-testid="`${testIdPrefix}-${locale}`"
+                @update:model-value="clearError(locale)"
               />
               <FieldDescription :id="`${testIdPrefix}-${locale}-help`">
                 {{ $t(`${i18nPrefix}.help.${locale}`) }}
@@ -199,6 +200,13 @@ function describedBy(locale: Locale): string {
   return [errors.value[locale] ? `${id}-error` : null, `${id}-help`, `${id}-counter`]
     .filter((part): part is string => part !== null)
     .join(' ')
+}
+
+/** An edit answers that locale's error: drop it, and its tab marker, until the next submit. */
+function clearError(locale: Locale): void {
+  if (!errors.value[locale]) return
+  const { [locale]: _cleared, ...rest } = errors.value
+  errors.value = rest
 }
 
 /** Switch to the first locale with an error, so one in a hidden tab is seen. */

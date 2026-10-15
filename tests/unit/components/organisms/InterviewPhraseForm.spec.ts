@@ -113,6 +113,20 @@ describe('InterviewPhraseForm', () => {
     expect(en(w).attributes('aria-describedby')).toContain('some-phrase-en-error')
   })
 
+  it('clears a locale error, and its tab marker, as soon as that locale is edited', async () => {
+    const w = await mountForm(null)
+
+    await en(w).setValue('a'.repeat(3601))
+    await submit(w)
+    expect(w.find('[data-testid="some-phrase-en-error"]').exists()).toBe(true)
+    expect(w.find('[data-testid="some-phrase-tab-en-error"]').exists()).toBe(true)
+
+    await en(w).setValue('Hello')
+
+    expect(w.find('[data-testid="some-phrase-en-error"]').exists()).toBe(false)
+    expect(w.find('[data-testid="some-phrase-tab-en-error"]').exists()).toBe(false)
+  })
+
   it('accepts exactly 3600 trimmed characters', async () => {
     const w = await mountForm(null)
 

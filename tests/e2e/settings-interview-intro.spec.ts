@@ -107,7 +107,7 @@ test.describe('Settings → Piattaforma: interview intro phrase', () => {
     // 30 characters at ~15 per second: exactly 2 s. The counter names both.
     const counter = page.getByTestId('intro-phrase-en-counter')
     // The words around the numbers are localised; the numbers and the unit are not.
-    await expect(counter).toHaveText(/^30 \/ 600\b.*≈ 2 s\b/)
+    await expect(counter).toHaveText(/^30 \/ 3600\b.*≈ 2 s\b/)
 
     await page.getByTestId('intro-phrase-it').fill('Benvenuto in BEAI.')
     await page.getByTestId('intro-phrase-submit').click()
@@ -124,16 +124,16 @@ test.describe('Settings → Piattaforma: interview intro phrase', () => {
     await expect(page.getByTestId('intro-phrase-it')).toHaveValue('Benvenuto in BEAI.')
   })
 
-  test('a text over 600 characters is flagged in words and cannot be saved', async ({ page }) => {
+  test('a text over 3600 characters is flagged in words and cannot be saved', async ({ page }) => {
     const state = await mockSuperadminSettings(page)
 
     await page.goto('/settings')
     await page.getByRole('tab', { name: /^Piattaforma/ }).click()
-    await page.getByTestId('intro-phrase-en').fill('a'.repeat(610))
+    await page.getByTestId('intro-phrase-en').fill('a'.repeat(3610))
 
     const counter = page.getByTestId('intro-phrase-en-counter')
-    await expect(counter).toHaveText(/^610 \/ 600\b/)
-    // The overage is the warning in words: exactly 10, not the 10 inside 610.
+    await expect(counter).toHaveText(/^3610 \/ 3600\b/)
+    // The overage is the warning in words: exactly 10, not the 10 inside 3610.
     await expect(counter.locator('strong')).toHaveText(/(?<!\d)10(?!\d)/)
     await page.getByTestId('intro-phrase-submit').click()
 

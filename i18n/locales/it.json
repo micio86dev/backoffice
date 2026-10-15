@@ -966,6 +966,28 @@
         "clear": "Rimuovi introduzione",
         "clearConfirmTitle": "Rimuovere l'introduzione del colloquio?",
         "clearConfirmDescription": "I colloqui inizieranno direttamente con la prima domanda."
+      },
+      "closingPhrase": {
+        "title": "Saluto finale del colloquio",
+        "description": "Pronunciato dall'avatar dopo l'ultima domanda, subito prima della fine del colloquio. Non usare la frase che chiude una competenza (ad esempio \"Passiamo alla prossima domanda.\"). Lascia vuoti entrambi i campi per non avere alcun saluto finale.",
+        "label": {
+          "en": "Saluto finale — inglese (obbligatorio)",
+          "it": "Saluto finale — italiano (facoltativo)"
+        },
+        "help": {
+          "en": "Usato per i colloqui in inglese e come alternativa per le lingue senza un testo proprio.",
+          "it": "Usato per i colloqui in italiano. Se vuoto, viene pronunciato il testo inglese."
+        },
+        "counter": "{count} / {max} caratteri · ≈ {seconds} s di parlato",
+        "overBy": "Oltre il limite di {over}: accorcia il testo.",
+        "tooLong": "Usa al massimo {max} caratteri.",
+        "enRequired": "Aggiungi il testo inglese: è obbligatorio quando è impostato un saluto finale.",
+        "saved": "Saluto finale del colloquio salvato.",
+        "cleared": "Saluto finale del colloquio rimosso.",
+        "saveFailed": "Impossibile salvare il saluto finale del colloquio.",
+        "clear": "Rimuovi saluto",
+        "clearConfirmTitle": "Rimuovere il saluto finale?",
+        "clearConfirmDescription": "I colloqui termineranno solo con la frase finale standard."
       }
     }
   },

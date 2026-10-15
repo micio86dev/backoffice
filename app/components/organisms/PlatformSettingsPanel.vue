@@ -83,6 +83,7 @@
       </FormFieldset>
     </form>
     <InterviewIntroPhraseForm :initial="intro" :loaded="loaded" @saved="emit('saved')" />
+    <InterviewClosingPhraseForm :initial="closing" :loaded="loaded" @saved="emit('saved')" />
   </div>
 </template>
 
@@ -110,9 +111,11 @@ import { Button } from '@/components/ui/button'
 import { FormFieldset } from '@/components/ui/form-fieldset'
 import FormMessage, { type FormMessageKind } from '@/components/molecules/FormMessage.vue'
 import InterviewIntroPhraseForm from '@/components/organisms/InterviewIntroPhraseForm.vue'
+import InterviewClosingPhraseForm from '@/components/organisms/InterviewClosingPhraseForm.vue'
 import {
   usePlatformSettings,
   type StoredInterviewIntroPhrase,
+  type StoredInterviewClosingPhrase,
   type PlatformSettingsCaps,
 } from '@/composables/usePlatformSettings'
 import { applyServerFieldErrors } from '@/utils/http-error'
@@ -128,8 +131,9 @@ const { t } = useI18n()
 const standard = ref('1')
 const potential = ref('4')
 const saving = ref(false)
-// Owned by the intro form once seeded; the read happens here, once, for both.
+// Owned by the phrase forms once seeded; the read happens here, once, for all.
 const intro = ref<StoredInterviewIntroPhrase | undefined>(undefined)
+const closing = ref<StoredInterviewClosingPhrase | undefined>(undefined)
 
 /**
  * Has the current stored value actually been READ?
@@ -276,6 +280,7 @@ onMounted(async () => {
     const response = await fetchPlatformSettings()
     apply(response.data.max_questions_per_competency)
     intro.value = response.data.interview_intro_phrase
+    closing.value = response.data.interview_closing_phrase
     loaded.value = true
   } catch {
     // The numbers stay on screen — they are the product's real defaults, and

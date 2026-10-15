@@ -1188,6 +1188,8 @@
       "default": "Predefinito",
       "dependentUnavailable": "Non usato con il motore vocale attuale. Scegli un motore con più modelli (Cartesia o ElevenLabs) per impostarlo.",
       "required": "Obbligatorio",
+      "persona_display_name": "Nome dell'intervistatore",
+      "persona_display_name_hint": "Mostrato ai candidati prima di ogni sottotitolo. Facoltativo: se vuoto, i candidati vedono l'etichetta generica \"Intervistatore AI\". Massimo 60 caratteri.",
       "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai.",
       "help": {
         "name": "Deve essere diverso dal nome di ogni altro template della tua organizzazione."
@@ -1195,6 +1197,7 @@
       "errors": {
         "nameRequired": "Inserisci il nome del template.",
         "nameTooLong": "Il nome deve avere al massimo 120 caratteri.",
+        "personaDisplayNameInvalid": "Inserisci un nome di al massimo 60 caratteri, senza markup e senza il nome di un fornitore di tecnologia.",
         "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."

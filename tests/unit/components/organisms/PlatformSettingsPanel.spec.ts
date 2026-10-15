@@ -16,12 +16,14 @@ const tMock = (key: string) => key
 const fetchPlatformSettings = vi.fn()
 const updatePlatformSettings = vi.fn()
 const updateInterviewIntroPhrase = vi.fn()
+const updateInterviewClosingPhrase = vi.fn()
 
 vi.mock('../../../../app/composables/usePlatformSettings', () => ({
   usePlatformSettings: () => ({
     fetchPlatformSettings,
     updatePlatformSettings,
     updateInterviewIntroPhrase,
+    updateInterviewClosingPhrase,
   }),
 }))
 
@@ -220,6 +222,55 @@ describe('PlatformSettingsPanel', () => {
 
       expect(
         wrapper.get('[data-testid="intro-phrase-submit"]').attributes('disabled')
+      ).toBeDefined()
+    })
+  })
+
+  describe('interview closing greeting', () => {
+    it('seeds the closing form from the same read, next to the intro', async () => {
+      fetchPlatformSettings.mockResolvedValue({
+        data: {
+          max_questions_per_competency: { standard: 2, potential: 4 },
+          interview_intro_phrase: { en: 'Hello' },
+          interview_closing_phrase: { en: 'Thanks', it: 'Grazie' },
+        },
+      })
+
+      const wrapper = await mountPanel()
+
+      expect(
+        (wrapper.get('[data-testid="closing-phrase-en"]').element as HTMLTextAreaElement).value
+      ).toBe('Thanks')
+      expect(
+        (wrapper.get('[data-testid="closing-phrase-it"]').element as HTMLTextAreaElement).value
+      ).toBe('Grazie')
+      expect(
+        (wrapper.get('[data-testid="intro-phrase-en"]').element as HTMLTextAreaElement).value
+      ).toBe('Hello')
+    })
+
+    it('saves the closing greeting alone, never the intro or the caps', async () => {
+      updateInterviewClosingPhrase.mockResolvedValue({
+        data: { interview_closing_phrase: { en: 'Bye' } },
+      })
+      const wrapper = await mountPanel()
+
+      await wrapper.get('[data-testid="closing-phrase-en"]').setValue('Bye')
+      await wrapper.get('[data-testid="closing-phrase-form"]').trigger('submit')
+      await flushPromises()
+
+      expect(updateInterviewClosingPhrase).toHaveBeenCalledWith({ en: 'Bye' })
+      expect(updateInterviewIntroPhrase).not.toHaveBeenCalled()
+      expect(updatePlatformSettings).not.toHaveBeenCalled()
+    })
+
+    it('keeps the closing form closed when the read failed', async () => {
+      fetchPlatformSettings.mockRejectedValue(new Error('offline'))
+
+      const wrapper = await mountPanel()
+
+      expect(
+        wrapper.get('[data-testid="closing-phrase-submit"]').attributes('disabled')
       ).toBeDefined()
     })
   })

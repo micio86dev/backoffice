@@ -31,6 +31,12 @@ export type InterviewIntroPhrase = UpdatePlatformSettingsPayload['interview_intr
 /** The same map as READ: the response schema types every locale optional. */
 export type StoredInterviewIntroPhrase = PlatformSettingsResponse['data']['interview_intro_phrase']
 
+/** The spoken closing greeting: same shape and rules as the intro. */
+export type InterviewClosingPhrase = UpdatePlatformSettingsPayload['interview_closing_phrase']
+
+export type StoredInterviewClosingPhrase =
+  PlatformSettingsResponse['data']['interview_closing_phrase']
+
 export function usePlatformSettings() {
   const { apiFetch } = useApi()
 
@@ -72,5 +78,20 @@ export function usePlatformSettings() {
     })
   }
 
-  return { fetchPlatformSettings, updatePlatformSettings, updateInterviewIntroPhrase }
+  /** Closing greeting only, for the same reason as the intro. */
+  async function updateInterviewClosingPhrase(
+    phrase: InterviewClosingPhrase
+  ): Promise<PlatformSettingsResponse> {
+    return apiFetch<PlatformSettingsResponse>('/admin/settings', {
+      method: 'PATCH',
+      body: { interview_closing_phrase: phrase },
+    })
+  }
+
+  return {
+    fetchPlatformSettings,
+    updatePlatformSettings,
+    updateInterviewIntroPhrase,
+    updateInterviewClosingPhrase,
+  }
 }

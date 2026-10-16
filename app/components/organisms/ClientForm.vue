@@ -65,7 +65,7 @@
               :aria-invalid="Boolean(colorError)"
               :aria-describedby="describedBy('client-color', Boolean(colorError))"
               data-testid="client-color-picker"
-              class="h-9 w-12 cursor-pointer rounded border border-border bg-card"
+              class="h-9 w-12 cursor-pointer disabled:cursor-not-allowed rounded border border-border bg-card"
               @input="onColorPicked"
             />
             <Input
@@ -94,6 +94,54 @@
           </FieldDescription>
           <FieldError v-if="colorError" id="client-color-error" data-testid="client-color-error">
             {{ colorError }}
+          </FieldError>
+        </Field>
+
+        <Field :data-invalid="Boolean(backgroundError)">
+          <FieldLabel for="client-background">{{
+            $t('settings.branding.backgroundColor')
+          }}</FieldLabel>
+          <div class="flex items-center gap-3">
+            <input
+              id="client-background"
+              type="color"
+              :value="background || BACKGROUND_DEFAULT"
+              :aria-invalid="Boolean(backgroundError)"
+              :aria-describedby="describedBy('client-background', Boolean(backgroundError))"
+              data-testid="client-background-picker"
+              class="h-9 w-12 cursor-pointer disabled:cursor-not-allowed rounded border border-border bg-card"
+              @input="onBackgroundPicked"
+            />
+            <Input
+              v-model="background"
+              :aria-label="$t('settings.branding.backgroundHexLabel')"
+              autocomplete="off"
+              :placeholder="BACKGROUND_DEFAULT"
+              :aria-invalid="Boolean(backgroundError)"
+              :aria-describedby="describedBy('client-background', Boolean(backgroundError))"
+              data-testid="client-background-text"
+              class="max-w-40"
+              @blur="validateBackground"
+            />
+            <Button
+              v-if="background"
+              type="button"
+              variant="outline"
+              data-testid="client-background-clear"
+              @click="clearBackground"
+            >
+              {{ $t('settings.branding.colorClear') }}
+            </Button>
+          </div>
+          <FieldDescription id="client-background-help">
+            {{ $t('settings.branding.help.backgroundColor') }}
+          </FieldDescription>
+          <FieldError
+            v-if="backgroundError"
+            id="client-background-error"
+            data-testid="client-background-error"
+          >
+            {{ backgroundError }}
           </FieldError>
         </Field>
 
@@ -141,7 +189,7 @@
  * Create or edit an organization (superadmin only; template-provider-fixes T7).
  *
  * One form for both. Create takes a name, an optional slug and an optional
- * primary colour; edit loads the organization, changes name and colour, and
+ * primary and background colour; edit loads the organization, changes name and colour, and
  * shows the slug read-only because the API refuses to change it.
  *
  * The create endpoint accepts no colour, so a colour chosen at creation is
@@ -169,6 +217,9 @@ import { translateServerCodes } from '@/utils/server-message'
 /** Lowercase words joined by single hyphens — what the API accepts as a slug. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
+/** What an unset background renders as on the candidate page. */
+const BACKGROUND_DEFAULT = '#0f172a'
+
 const props = defineProps<{
   /** Present to edit that organization; absent to create one. */
   clientId?: number
@@ -190,12 +241,15 @@ const isEdit = computed(() => props.clientId !== undefined)
 const name = ref('')
 const slug = ref('')
 const color = ref('')
+// Candidate-page canvas; empty means the default dark canvas.
+const background = ref('')
 // USD is the platform anchor and the column default (organization-currencies).
 const currencyCode = ref('USD')
 
 const nameError = ref<string | undefined>(undefined)
 const slugError = ref<string | undefined>(undefined)
 const colorError = ref<string | undefined>(undefined)
+const backgroundError = ref<string | undefined>(undefined)
 const currencyError = ref<string | undefined>(undefined)
 const formMessage = ref<string | null>(null)
 
@@ -235,6 +289,7 @@ onMounted(async () => {
     name.value = data.name
     slug.value = data.slug
     color.value = data.primary_color ?? ''
+    background.value = data.background_color ?? ''
     currencyCode.value = data.currency_code ?? 'USD'
   } catch {
     // Never a form the operator could save blind: a name and colour that were
@@ -287,17 +342,44 @@ function onColorPicked(event: Event): void {
   validateColor()
 }
 
+function validateBackground(): boolean {
+  // Empty is VALID: it means "use the default dark canvas".
+  backgroundError.value =
+    background.value === '' || HEX.test(background.value)
+      ? undefined
+      : t('clients.form.errors.background_color_invalid')
+
+  return backgroundError.value === undefined
+}
+
+function clearBackground(): void {
+  background.value = ''
+  validateBackground()
+}
+
+function onBackgroundPicked(event: Event): void {
+  background.value = (event.target as HTMLInputElement).value
+  validateBackground()
+}
+
 /** Which errors landed on a field, and which the banner still has to say. */
 function showServerError(error: unknown): void {
   const unmapped = applyServerFieldErrors(
     error,
-    { name: 'name', slug: 'slug', primary_color: 'color', currency_code: 'currency' } as const,
+    {
+      name: 'name',
+      slug: 'slug',
+      primary_color: 'color',
+      background_color: 'background',
+      currency_code: 'currency',
+    } as const,
     (key, message) => {
       const translated = translateServerCodes({ t, te }, 'clients.form.serverError', [message])[0]
 
       if (key === 'name') nameError.value = translated
       else if (key === 'slug') slugError.value = translated
       else if (key === 'color') colorError.value = translated
+      else if (key === 'background') backgroundError.value = translated
       else currencyError.value = translated
     }
   )
@@ -306,6 +388,7 @@ function showServerError(error: unknown): void {
     nameError.value !== undefined ||
     slugError.value !== undefined ||
     colorError.value !== undefined ||
+    backgroundError.value !== undefined ||
     currencyError.value !== undefined
 
   if (unmapped !== null && unmapped.length > 0) {
@@ -325,7 +408,8 @@ async function onSubmit(): Promise<void> {
   const nameOk = validateName()
   const slugOk = validateSlug()
   const colorOk = validateColor()
-  if (!nameOk || !slugOk || !colorOk) return
+  const backgroundOk = validateBackground()
+  if (!nameOk || !slugOk || !colorOk || !backgroundOk) return
 
   saving.value = true
 
@@ -338,11 +422,17 @@ async function onSubmit(): Promise<void> {
       })
       targetId.value = created.data.id
 
-      if (color.value !== '') await updateClient(targetId.value, { primary_color: color.value })
+      // Only the colours actually chosen: an unset one is already the default.
+      const colours = {
+        ...(color.value === '' ? {} : { primary_color: color.value }),
+        ...(background.value === '' ? {} : { background_color: background.value }),
+      }
+      if (Object.keys(colours).length > 0) await updateClient(targetId.value, colours)
     } else {
       await updateClient(targetId.value, {
         name: name.value.trim(),
         primary_color: color.value === '' ? null : color.value,
+        background_color: background.value === '' ? null : background.value,
         currency_code: currencyCode.value,
       })
     }

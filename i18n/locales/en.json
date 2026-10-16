@@ -1841,13 +1841,15 @@
       "errors": {
         "name_required": "Enter a name.",
         "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
-        "primary_color_invalid": "Enter a colour as #RRGGBB."
+        "primary_color_invalid": "Enter a colour as #RRGGBB.",
+        "background_color_invalid": "Enter a colour as #RRGGBB."
       },
       "serverError": {
         "name_required": "Enter a name.",
         "slug_taken": "This identifier is already used by another client.",
         "slug_invalid": "Use lowercase letters, digits and single hyphens only.",
         "primary_color_invalid": "Enter a colour as #RRGGBB.",
+        "background_color_invalid": "Enter a colour as #RRGGBB.",
         "currency_unavailable": "This currency is not available. Choose one from the list."
       },
       "saveError": "Could not save the client. Please try again."

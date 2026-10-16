@@ -492,6 +492,45 @@ describe('AvatarTemplatesPage', () => {
     )
   })
 
+  it('re-seeds the whole form when another template is opened without closing the drawer', async () => {
+    const a = template({
+      id: 1,
+      name: 'Template A',
+      config: { avatarId: 'av_a', voiceId: 'vo_a' },
+      persona: { display_name: 'Ann' },
+      answer_min_seconds: 20,
+      answer_max_seconds: 40,
+    })
+    const b = template({
+      id: 2,
+      name: 'Template B',
+      config: { avatarId: 'av_b', voiceId: 'vo_b' },
+      persona: { display_name: 'Bob' },
+      answer_min_seconds: 30,
+      answer_max_seconds: 45,
+    })
+    const { wrapper, api } = await mountPage({
+      listTemplates: vi.fn().mockResolvedValue({ data: [a, b] }),
+    })
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await waitForTestId('template-form')
+    await wrapper.find('[data-testid="template-edit-2"]').trigger('click')
+    await flushPromises()
+    await submitTemplateForm()
+
+    expect(api.updateTemplate).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({
+        name: 'Template B',
+        config: expect.objectContaining({ avatarId: 'av_b', voiceId: 'vo_b' }),
+        persona: { display_name: 'Bob' },
+        answer_min_seconds: 30,
+        answer_max_seconds: 45,
+      })
+    )
+  })
+
   it('forwards the persona payload so an update can clear the interviewer name', async () => {
     const { wrapper, api } = await mountPage()
 

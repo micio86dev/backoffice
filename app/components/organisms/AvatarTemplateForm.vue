@@ -572,15 +572,6 @@ const draft = ref({
 
 const isNew = computed(() => props.template.id === undefined)
 
-// The instance may be reused for another template without a remount: the range
-// must follow it, or the previous template's values would be submitted.
-watch(
-  () => props.template,
-  (template) => {
-    draft.value.answerMinSeconds = template.answer_min_seconds ?? DEFAULT_ANSWER_MIN_SECONDS
-    draft.value.answerMaxSeconds = template.answer_max_seconds ?? DEFAULT_ANSWER_MAX_SECONDS
-  }
-)
 const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
 
 /**

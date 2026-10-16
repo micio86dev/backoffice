@@ -169,6 +169,7 @@
     >
       <AvatarTemplateForm
         v-if="editing !== null"
+        :key="editing.id ?? 'new'"
         :template="editing"
         :field-specs="fieldSpecs"
         :saving="saving || busy"

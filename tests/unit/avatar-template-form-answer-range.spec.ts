@@ -141,32 +141,6 @@ describe('client validation', () => {
   })
 })
 
-describe('reusing the instance for another template', () => {
-  it('re-seeds the range from the new template and resets it for a new one', async () => {
-    const wrapper = mountForm({ id: 4, answer_min_seconds: 60, answer_max_seconds: 120 })
-
-    await wrapper.setProps({
-      template: {
-        id: 9,
-        name: 'Other',
-        provider: 'heygen',
-        config: {},
-        answer_min_seconds: 30,
-        answer_max_seconds: 45,
-      },
-    })
-    expect(await submitted(wrapper)).toMatchObject({
-      id: 9,
-      answer_min_seconds: 30,
-      answer_max_seconds: 45,
-    })
-
-    await wrapper.setProps({ template: { name: 'Fresh', provider: 'heygen', config: {} } })
-    expect(value(wrapper, MIN)).toBe('90')
-    expect(value(wrapper, MAX)).toBe('150')
-  })
-})
-
 describe('a server refusal', () => {
   const refusal = (field: string) =>
     Object.assign(new Error('422'), {

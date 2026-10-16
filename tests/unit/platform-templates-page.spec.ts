@@ -275,6 +275,42 @@ describe('PlatformTemplatesPage', () => {
       expect(dialogText()).toBe('')
     })
 
+    it('re-seeds the whole form when another template is opened without closing the drawer', async () => {
+      const { wrapper, api } = await mountPage([
+        template({
+          id: 1,
+          name: 'Template A',
+          config: { avatarId: 'av_a' },
+          persona: { display_name: 'Ann' },
+          answer_min_seconds: 20,
+          answer_max_seconds: 40,
+        }),
+        template({
+          id: 2,
+          name: 'Template B',
+          config: { avatarId: 'av_b' },
+          persona: { display_name: 'Bob' },
+          answer_min_seconds: 30,
+          answer_max_seconds: 45,
+        }),
+      ])
+
+      await click(wrapper, 'platform-template-edit-1')
+      await click(wrapper, 'platform-template-edit-2')
+      await submitForm()
+
+      expect(api.update).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({
+          name: 'Template B',
+          config: expect.objectContaining({ avatarId: 'av_b' }),
+          persona: { display_name: 'Bob' },
+          answer_min_seconds: 30,
+          answer_max_seconds: 45,
+        })
+      )
+    })
+
     it('sends NO update for an in-use template until the usage warning is confirmed', async () => {
       const { wrapper, api } = await mountPage([template({ usage: IN_USE })])
 

@@ -909,14 +909,22 @@
       "logo": "Logo",
       "logoRemove": "Rimuovi",
       "primaryColor": "Colore primario",
+      "backgroundColor": "Colore di sfondo",
+      "backgroundHexLabel": "Colore di sfondo, valore esadecimale",
+      "presetDark": "Scuro",
+      "presetLight": "Chiaro",
+      "presets": "Sfondi predefiniti",
+      "invalidBackgroundColor": "Inserisci un colore in formato #rrggbb, ad esempio #0f172a.",
       "colorClear": "Azzera",
       "invalidColor": "Inserisci un colore in formato #rrggbb, ad esempio #771AAF.",
       "saveError": "Non è stato possibile salvare. Riprova.",
       "help": {
+        "backgroundColor": "Formato #rrggbb. Lascia vuoto per usare lo sfondo scuro nella pagina del candidato.",
         "logo": "JPEG o PNG, massimo 1 MB. Non accettiamo SVG: può contenere codice eseguibile. Lascia vuoto per usare il logo BEAI.",
         "primaryColor": "Formato #rrggbb. Lascia vuoto per usare la palette BEAI."
       },
       "serverError": {
+        "background_color_invalid": "Inserisci un colore in sei cifre esadecimali, ad esempio #0f172a.",
         "logo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
         "logo_too_large": "Il file supera la dimensione massima consentita.",
         "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito.",

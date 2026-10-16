@@ -909,14 +909,22 @@
       "logo": "Logo",
       "logoRemove": "Remove",
       "primaryColor": "Primary colour",
+      "backgroundColor": "Background colour",
+      "backgroundHexLabel": "Background colour, hex value",
+      "presetDark": "Dark",
+      "presetLight": "Light",
+      "presets": "Background presets",
+      "invalidBackgroundColor": "Enter a colour in #rrggbb format, for example #0f172a.",
       "colorClear": "Clear",
       "invalidColor": "Enter a colour in #rrggbb format, for example #771AAF.",
       "saveError": "Could not save. Please try again.",
       "help": {
+        "backgroundColor": "Format #rrggbb. Leave empty to use the dark background on the candidate page.",
         "logo": "JPEG or PNG, 1 MB maximum. SVG is not accepted: it can carry executable code. Leave empty to use the BEAI logo.",
         "primaryColor": "Format #rrggbb. Leave empty to use the BEAI palette."
       },
       "serverError": {
+        "background_color_invalid": "Enter a colour as six hexadecimal digits, for example #0f172a.",
         "logo_invalid_image": "The file is not a valid JPEG or PNG image.",
         "logo_too_large": "The file exceeds the maximum allowed size.",
         "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed.",

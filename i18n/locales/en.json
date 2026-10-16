@@ -1217,6 +1217,10 @@
       "required": "Required",
       "persona_display_name": "Interviewer display name",
       "persona_display_name_hint": "Shown to candidates before every caption. Optional: when empty, candidates see the generic label \"AI interviewer\". Up to 60 characters.",
+      "answer_min_seconds": "Minimum answer length (seconds)",
+      "answer_min_seconds_hint": "Below this the candidate sees the answer as too short. Default 90 (1:30). A good answer lasts between the minimum and the maximum: the bar in the candidate call highlights this zone. 10 to 600.",
+      "answer_max_seconds": "Maximum answer length (seconds)",
+      "answer_max_seconds_hint": "Beyond this the candidate sees the answer as long. Default 150 (2:30). Guidance only: nothing ends the answer. Must be greater than the minimum, up to 600.",
       "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it.",
       "help": {
         "name": "Must be different from every other template name in your organization."
@@ -1225,6 +1229,9 @@
         "nameRequired": "Enter a template name.",
         "nameTooLong": "The name must be at most 120 characters.",
         "personaDisplayNameInvalid": "Enter a name of up to 60 characters, without markup or the name of a technology provider.",
+        "answerMinInvalid": "Enter a whole number of seconds from 10 to 600.",
+        "answerMaxInvalid": "Enter a whole number of seconds from 10 to 600.",
+        "answerMaxNotAboveMin": "The maximum must be greater than the minimum.",
         "descriptionTooLong": "The description must be at most 500 characters.",
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."

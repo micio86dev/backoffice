@@ -436,7 +436,9 @@ describe('AvatarTemplatesPage', () => {
 
     await submitTemplateForm()
 
-    expect(api.createTemplate).toHaveBeenCalled()
+    expect(api.createTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ answer_min_seconds: 90, answer_max_seconds: 150 })
+    )
     expect(api.updateTemplate).not.toHaveBeenCalled()
   })
 
@@ -448,6 +450,18 @@ describe('AvatarTemplatesPage', () => {
 
     expect(api.updateTemplate).toHaveBeenCalled()
     expect(api.createTemplate).not.toHaveBeenCalled()
+  })
+
+  it('forwards the answer range on update and on create', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await submitTemplateForm()
+
+    expect(api.updateTemplate).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ answer_min_seconds: 90, answer_max_seconds: 150 })
+    )
   })
 
   it('forwards the persona payload so an update can clear the interviewer name', async () => {

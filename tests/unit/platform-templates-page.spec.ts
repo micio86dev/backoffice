@@ -246,7 +246,12 @@ describe('PlatformTemplatesPage', () => {
       await submitForm()
 
       expect(api.create).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'Fresh voice', provider: 'heygen' })
+        expect.objectContaining({
+          name: 'Fresh voice',
+          provider: 'heygen',
+          answer_min_seconds: 90,
+          answer_max_seconds: 150,
+        })
       )
       expect(api.list).toHaveBeenCalledTimes(2)
     })
@@ -259,7 +264,14 @@ describe('PlatformTemplatesPage', () => {
       await click(wrapper, 'platform-template-edit-1')
       await submitForm()
 
-      expect(api.update).toHaveBeenCalledWith(1, expect.objectContaining({ name: 'Studio voice' }))
+      expect(api.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          name: 'Studio voice',
+          answer_min_seconds: 90,
+          answer_max_seconds: 150,
+        })
+      )
       expect(dialogText()).toBe('')
     })
 

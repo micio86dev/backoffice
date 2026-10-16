@@ -1217,6 +1217,10 @@
       "required": "Obbligatorio",
       "persona_display_name": "Nome dell'intervistatore",
       "persona_display_name_hint": "Mostrato ai candidati prima di ogni sottotitolo. Facoltativo: se vuoto, i candidati vedono l'etichetta generica \"Intervistatore AI\". Massimo 60 caratteri.",
+      "answer_min_seconds": "Durata minima risposta (secondi)",
+      "answer_min_seconds_hint": "Sotto questa soglia il candidato vede la risposta come troppo breve. Predefinito 90 (1:30). Una buona risposta dura tra il minimo e il massimo: la barra nella chiamata del candidato evidenzia questa zona. Da 10 a 600.",
+      "answer_max_seconds": "Durata massima risposta (secondi)",
+      "answer_max_seconds_hint": "Oltre questa soglia il candidato vede la risposta come lunga. Predefinito 150 (2:30). Solo indicazione: nulla interrompe la risposta. Deve essere maggiore del minimo, fino a 600.",
       "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai.",
       "help": {
         "name": "Deve essere diverso dal nome di ogni altro template della tua organizzazione."
@@ -1225,6 +1229,9 @@
         "nameRequired": "Inserisci il nome del template.",
         "nameTooLong": "Il nome deve avere al massimo 120 caratteri.",
         "personaDisplayNameInvalid": "Inserisci un nome di al massimo 60 caratteri, senza markup e senza il nome di un fornitore di tecnologia.",
+        "answerMinInvalid": "Inserisci un numero intero di secondi da 10 a 600.",
+        "answerMaxInvalid": "Inserisci un numero intero di secondi da 10 a 600.",
+        "answerMaxNotAboveMin": "Il massimo deve essere maggiore del minimo.",
         "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."

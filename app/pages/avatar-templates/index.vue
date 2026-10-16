@@ -561,6 +561,8 @@ async function save(payload: AvatarTemplateSubmit): Promise<void> {
           llm_model_id: payload.llm_model_id ?? null,
           llm_credential_id: payload.llm_credential_id ?? null,
           persona: payload.persona,
+          answer_min_seconds: payload.answer_min_seconds,
+          answer_max_seconds: payload.answer_max_seconds,
         })
       : await createTemplate({
           name: payload.name ?? '',
@@ -570,6 +572,8 @@ async function save(payload: AvatarTemplateSubmit): Promise<void> {
           llm_model_id: payload.llm_model_id ?? null,
           llm_credential_id: payload.llm_credential_id ?? null,
           persona: payload.persona,
+          answer_min_seconds: payload.answer_min_seconds,
+          answer_max_seconds: payload.answer_max_seconds,
         })
 
     warning.value = response.warning ?? null

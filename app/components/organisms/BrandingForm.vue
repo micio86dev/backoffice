@@ -106,6 +106,94 @@
         </Field>
 
         <!--
+          The BACKGROUND COLOUR of the candidate page (canvas). Candidate-only:
+          the backoffice's own theme never reads it. Empty means the default
+          dark canvas, so the hint says so instead of showing a blank field.
+          The two presets are the common case; the picker + hex are the escape
+          hatch, same pattern as the primary colour.
+        -->
+        <Field :data-invalid="Boolean(backgroundError)">
+          <FieldLabel for="branding-background">{{
+            $t('settings.branding.backgroundColor')
+          }}</FieldLabel>
+
+          <div
+            role="group"
+            :aria-label="$t('settings.branding.presets')"
+            class="flex flex-wrap gap-2"
+          >
+            <button
+              v-for="preset in BACKGROUND_PRESETS"
+              :key="preset.id"
+              type="button"
+              :aria-pressed="isPreset(preset.value)"
+              :data-testid="`branding-background-${preset.id}`"
+              class="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              :class="
+                isPreset(preset.value)
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border bg-card text-muted-foreground hover:text-foreground'
+              "
+              @click="pickPreset(preset.value)"
+            >
+              <span
+                aria-hidden="true"
+                class="size-5 rounded-full border border-border"
+                :style="{ backgroundColor: preset.value }"
+              />
+              {{ $t(`settings.branding.${preset.label}`) }}
+              <!-- Selection is not carried by colour alone (WCAG 1.4.1). -->
+              <CheckIcon v-if="isPreset(preset.value)" aria-hidden="true" class="size-4" />
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <input
+              id="branding-background"
+              type="color"
+              :value="background || BACKGROUND_DEFAULT"
+              :aria-invalid="Boolean(backgroundError)"
+              :aria-describedby="describedBy('branding-background', Boolean(backgroundError))"
+              data-testid="branding-background-picker"
+              class="h-9 w-12 rounded border border-border bg-card"
+              :class="saving ? 'cursor-not-allowed' : 'cursor-pointer'"
+              @input="onBackgroundPicked"
+            />
+            <Input
+              v-model="background"
+              :aria-label="$t('settings.branding.backgroundHexLabel')"
+              autocomplete="off"
+              :placeholder="BACKGROUND_DEFAULT"
+              :aria-invalid="Boolean(backgroundError)"
+              :aria-describedby="describedBy('branding-background', Boolean(backgroundError))"
+              data-testid="branding-background-text"
+              class="max-w-40"
+              @blur="validateBackground"
+            />
+            <Button
+              v-if="background"
+              type="button"
+              variant="outline"
+              data-testid="branding-background-clear"
+              @click="clearBackground"
+            >
+              {{ $t('settings.branding.colorClear') }}
+            </Button>
+          </div>
+
+          <FieldDescription id="branding-background-help">{{
+            $t('settings.branding.help.backgroundColor')
+          }}</FieldDescription>
+
+          <FieldError
+            v-if="backgroundError"
+            id="branding-background-error"
+            data-testid="branding-background-error"
+            >{{ backgroundError }}</FieldError
+          >
+        </Field>
+
+        <!--
           The SHARED banner, not a hand-rolled Alert. `FormMessage` exists so
           "which role, which live region, which variant" is answered once —
           this copy had drifted to `role="alert"` with no live region while
@@ -146,7 +234,7 @@
 
 <script setup lang="ts">
 /**
- * Per-organization branding — logo and primary colour (product decision 9,
+ * Per-organization branding — logo, primary colour and candidate-page background (product decision 9,
  * reopened 2026-09-01).
  *
  * Admin-only, enforced by the section registry AND by the API. Both fields are
@@ -155,6 +243,7 @@
  * unfinished one.
  */
 import { ref } from 'vue'
+import { CheckIcon } from '@lucide/vue'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -189,12 +278,21 @@ const { updateOrganization, uploadLogo, removeLogo } = useOrganization()
 const { t, te } = useI18n()
 
 const color = ref(props.organization.primary_color ?? '')
+const background = ref(props.organization.background_color ?? '')
+
+/** Candidate-page canvas presets; `DARK` is also what an unset value renders. */
+const BACKGROUND_DEFAULT = '#0f172a'
+const BACKGROUND_PRESETS = [
+  { id: 'dark', label: 'presetDark', value: BACKGROUND_DEFAULT },
+  { id: 'light', label: 'presetLight', value: '#f1f5f9' },
+] as const
 // The API builds `logo_url` from APP_URL; in local docker that is an http
 // cross-origin URL the CSP blocks, so it is normalised to a same-origin path.
 const logoUrl = ref(toSameOriginImageUrl(props.organization.logo_url))
 const pendingFile = ref<File | null>(null)
 
 const colorError = ref<string | undefined>(undefined)
+const backgroundError = ref<string | undefined>(undefined)
 const logoError = ref<string | undefined>(undefined)
 const formMessage = ref<string | null>(null)
 const logoField = ref<{ clear: () => void } | null>(null)
@@ -233,6 +331,35 @@ function validateColor(): boolean {
     color.value === '' || HEX.test(color.value) ? undefined : t('settings.branding.invalidColor')
 
   return colorError.value === undefined
+}
+
+function isPreset(value: string): boolean {
+  return background.value.toLowerCase() === value
+}
+
+function pickPreset(value: string): void {
+  background.value = value
+  validateBackground()
+}
+
+function clearBackground(): void {
+  background.value = ''
+  validateBackground()
+}
+
+function validateBackground(): boolean {
+  // Empty is VALID: it means the default dark canvas.
+  backgroundError.value =
+    background.value === '' || HEX.test(background.value)
+      ? undefined
+      : t('settings.branding.invalidBackgroundColor')
+
+  return backgroundError.value === undefined
+}
+
+function onBackgroundPicked(event: Event): void {
+  background.value = (event.target as HTMLInputElement).value
+  validateBackground()
 }
 
 function onColorPicked(event: Event): void {
@@ -321,7 +448,9 @@ async function onSubmit(): Promise<void> {
   formMessage.value = null
   logoError.value = undefined
 
-  if (!validateColor()) return
+  // Both run: short-circuiting would leave the second field's error unannounced.
+  const valid = [validateColor(), validateBackground()].every(Boolean)
+  if (!valid) return
 
   saving.value = true
 
@@ -329,7 +458,10 @@ async function onSubmit(): Promise<void> {
     // The colour first. The two are separate endpoints because `logo_path` is
     // written only where a file was actually stored — so a failed upload must
     // not silently discard a colour the operator also changed.
-    await updateOrganization({ primary_color: color.value || null })
+    await updateOrganization({
+      primary_color: color.value || null,
+      background_color: background.value || null,
+    })
 
     // Paint it NOW. `applyBrandColor` ran only in `layouts/default.vue` on
     // mount, so an admin who picked a colour kept seeing the old one until
@@ -376,18 +508,22 @@ async function onSubmit(): Promise<void> {
 
     const unmapped = applyServerFieldErrors(
       submitError,
-      { primary_color: 'color', logo: 'logo' } as const,
+      { primary_color: 'color', background_color: 'background', logo: 'logo' } as const,
       (key, message) => {
         const translated = translateServerCodes({ t, te }, 'settings.branding.serverError', [
           message,
         ])[0]
 
         if (key === 'color') colorError.value = translated
+        else if (key === 'background') backgroundError.value = translated
         else logoError.value = translated
       }
     )
 
-    const mapped = colorError.value !== undefined || logoError.value !== undefined
+    const mapped =
+      colorError.value !== undefined ||
+      backgroundError.value !== undefined ||
+      logoError.value !== undefined
 
     // The banner is for what the FIELDS could not say. When a 422 mapped
     // cleanly, the operator already has the exact reason under the control,

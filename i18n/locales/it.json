@@ -909,14 +909,22 @@
       "logo": "Logo",
       "logoRemove": "Rimuovi",
       "primaryColor": "Colore primario",
+      "backgroundColor": "Colore di sfondo",
+      "backgroundHexLabel": "Colore di sfondo, valore esadecimale",
+      "presetDark": "Scuro",
+      "presetLight": "Chiaro",
+      "presets": "Sfondi predefiniti",
+      "invalidBackgroundColor": "Inserisci un colore in formato #rrggbb, ad esempio #0f172a.",
       "colorClear": "Azzera",
       "invalidColor": "Inserisci un colore in formato #rrggbb, ad esempio #771AAF.",
       "saveError": "Non è stato possibile salvare. Riprova.",
       "help": {
+        "backgroundColor": "Formato #rrggbb. Lascia vuoto per usare lo sfondo scuro nella pagina del candidato.",
         "logo": "JPEG o PNG, massimo 1 MB. Non accettiamo SVG: può contenere codice eseguibile. Lascia vuoto per usare il logo BEAI.",
         "primaryColor": "Formato #rrggbb. Lascia vuoto per usare la palette BEAI."
       },
       "serverError": {
+        "background_color_invalid": "Inserisci un colore in sei cifre esadecimali, ad esempio #0f172a.",
         "logo_invalid_image": "Il file non è un'immagine JPEG o PNG valida.",
         "logo_too_large": "Il file supera la dimensione massima consentita.",
         "logo_dimensions_invalid": "Le dimensioni dell'immagine non sono valide o superano il massimo consentito.",
@@ -1217,6 +1225,10 @@
       "required": "Obbligatorio",
       "persona_display_name": "Nome dell'intervistatore",
       "persona_display_name_hint": "Mostrato ai candidati prima di ogni sottotitolo. Facoltativo: se vuoto, i candidati vedono l'etichetta generica \"Intervistatore AI\". Massimo 60 caratteri.",
+      "answer_min_seconds": "Durata minima risposta (secondi)",
+      "answer_min_seconds_hint": "Sotto questa soglia il candidato vede la risposta come troppo breve. Predefinito 90 (1:30). Una buona risposta dura tra il minimo e il massimo: la barra nella chiamata del candidato evidenzia questa zona. Da 10 a 600.",
+      "answer_max_seconds": "Durata massima risposta (secondi)",
+      "answer_max_seconds_hint": "Oltre questa soglia il candidato vede la risposta come lunga. Predefinito 150 (2:30). Solo indicazione: nulla interrompe la risposta. Deve essere maggiore del minimo, fino a 600.",
       "provider_hint": "Il nome del servizio è visibile solo qui: ti serve per sapere da quale dashboard copiare gli identificativi. Il candidato non lo vede mai.",
       "help": {
         "name": "Deve essere diverso dal nome di ogni altro template della tua organizzazione."
@@ -1225,6 +1237,12 @@
         "nameRequired": "Inserisci il nome del template.",
         "nameTooLong": "Il nome deve avere al massimo 120 caratteri.",
         "personaDisplayNameInvalid": "Inserisci un nome di al massimo 60 caratteri, senza markup e senza il nome di un fornitore di tecnologia.",
+        "answerMinInvalid": "Inserisci un numero intero di secondi da 10 a 600.",
+        "answerMaxInvalid": "Inserisci un numero intero di secondi da 10 a 600.",
+        "answerMaxNotAboveMin": "Il massimo deve essere maggiore del minimo.",
+        "answerRange": "Inserisci un numero di secondi da 10 a 600.",
+        "answerInteger": "Inserisci un numero intero di secondi.",
+        "answerInvalid": "Questo valore non è stato accettato. Controllalo e riprova.",
         "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."

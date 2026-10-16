@@ -909,14 +909,22 @@
       "logo": "Logo",
       "logoRemove": "Remove",
       "primaryColor": "Primary colour",
+      "backgroundColor": "Background colour",
+      "backgroundHexLabel": "Background colour, hex value",
+      "presetDark": "Dark",
+      "presetLight": "Light",
+      "presets": "Background presets",
+      "invalidBackgroundColor": "Enter a colour in #rrggbb format, for example #0f172a.",
       "colorClear": "Clear",
       "invalidColor": "Enter a colour in #rrggbb format, for example #771AAF.",
       "saveError": "Could not save. Please try again.",
       "help": {
+        "backgroundColor": "Format #rrggbb. Leave empty to use the dark background on the candidate page.",
         "logo": "JPEG or PNG, 1 MB maximum. SVG is not accepted: it can carry executable code. Leave empty to use the BEAI logo.",
         "primaryColor": "Format #rrggbb. Leave empty to use the BEAI palette."
       },
       "serverError": {
+        "background_color_invalid": "Enter a colour as six hexadecimal digits, for example #0f172a.",
         "logo_invalid_image": "The file is not a valid JPEG or PNG image.",
         "logo_too_large": "The file exceeds the maximum allowed size.",
         "logo_dimensions_invalid": "The image dimensions are invalid or exceed the maximum allowed.",
@@ -1217,6 +1225,10 @@
       "required": "Required",
       "persona_display_name": "Interviewer display name",
       "persona_display_name_hint": "Shown to candidates before every caption. Optional: when empty, candidates see the generic label \"AI interviewer\". Up to 60 characters.",
+      "answer_min_seconds": "Minimum answer length (seconds)",
+      "answer_min_seconds_hint": "Below this the candidate sees the answer as too short. Default 90 (1:30). A good answer lasts between the minimum and the maximum: the bar in the candidate call highlights this zone. 10 to 600.",
+      "answer_max_seconds": "Maximum answer length (seconds)",
+      "answer_max_seconds_hint": "Beyond this the candidate sees the answer as long. Default 150 (2:30). Guidance only: nothing ends the answer. Must be greater than the minimum, up to 600.",
       "provider_hint": "The service name is visible here only: you need it to know which dashboard to copy identifiers from. The candidate never sees it.",
       "help": {
         "name": "Must be different from every other template name in your organization."
@@ -1225,6 +1237,12 @@
         "nameRequired": "Enter a template name.",
         "nameTooLong": "The name must be at most 120 characters.",
         "personaDisplayNameInvalid": "Enter a name of up to 60 characters, without markup or the name of a technology provider.",
+        "answerMinInvalid": "Enter a whole number of seconds from 10 to 600.",
+        "answerMaxInvalid": "Enter a whole number of seconds from 10 to 600.",
+        "answerMaxNotAboveMin": "The maximum must be greater than the minimum.",
+        "answerRange": "Enter a number of seconds from 10 to 600.",
+        "answerInteger": "Enter a whole number of seconds.",
+        "answerInvalid": "This value was not accepted. Check it and try again.",
         "descriptionTooLong": "The description must be at most 500 characters.",
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."

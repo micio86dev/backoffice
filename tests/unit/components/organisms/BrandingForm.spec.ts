@@ -105,9 +105,11 @@ const stubs = {
   },
 }
 
-function mountForm(primary: string | null) {
+function mountForm(primary: string | null, background: string | null = null) {
   return mount(BrandingForm, {
-    props: { organization: { primary_color: primary, logo_url: null } },
+    props: {
+      organization: { primary_color: primary, background_color: background, logo_url: null },
+    },
     global: {
       stubs,
       mocks: { $t: (k: string) => k },
@@ -137,7 +139,10 @@ describe('BrandingForm', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(updateOrganization).toHaveBeenCalledWith({ primary_color: '#123456' })
+    expect(updateOrganization).toHaveBeenCalledWith({
+      primary_color: '#123456',
+      background_color: null,
+    })
     expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('#123456')
   })
 
@@ -150,7 +155,10 @@ describe('BrandingForm', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(updateOrganization).toHaveBeenCalledWith({ primary_color: null })
+    expect(updateOrganization).toHaveBeenCalledWith({
+      primary_color: null,
+      background_color: null,
+    })
     expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('')
   })
 })
@@ -582,5 +590,120 @@ describe('BrandingForm — removing when nothing is stored', () => {
 
     expect(wrapper.find('[data-testid="confirm-dialog-confirm"]').exists()).toBe(true)
     expect(removeLogo).not.toHaveBeenCalled()
+  })
+})
+
+describe('BrandingForm — the background colour', () => {
+  const pressed = (w: ReturnType<typeof mountForm>, id: 'dark' | 'light') =>
+    w.get(`[data-testid="branding-background-${id}"]`).attributes('aria-pressed')
+
+  it('starts from the stored background and highlights the matching preset', () => {
+    const wrapper = mountForm(null, '#F1F5F9')
+
+    expect(
+      (wrapper.get('[data-testid="branding-background-text"]').element as HTMLInputElement).value
+    ).toBe('#F1F5F9')
+    // Case-insensitive: the API may store either case.
+    expect(pressed(wrapper, 'light')).toBe('true')
+    expect(pressed(wrapper, 'dark')).toBe('false')
+  })
+
+  it('marks the selected preset with a non-colour cue (a check icon)', async () => {
+    const wrapper = mountForm(null, '#0f172a')
+    const dark = wrapper.get('[data-testid="branding-background-dark"]')
+    const light = wrapper.get('[data-testid="branding-background-light"]')
+
+    expect(dark.find('svg').exists()).toBe(true)
+    expect(dark.find('svg').attributes('aria-hidden')).toBe('true')
+    expect(light.find('svg').exists()).toBe(false)
+
+    await light.trigger('click')
+    expect(light.find('svg').exists()).toBe(true)
+    expect(dark.find('svg').exists()).toBe(false)
+  })
+
+  it('presses neither preset for a free colour or an empty value', () => {
+    for (const value of ['#123456', null]) {
+      const wrapper = mountForm(null, value)
+      expect(pressed(wrapper, 'dark')).toBe('false')
+      expect(pressed(wrapper, 'light')).toBe('false')
+    }
+  })
+
+  it('sets the value from the Dark and Light presets', async () => {
+    const wrapper = mountForm(null)
+
+    await wrapper.get('[data-testid="branding-background-dark"]').trigger('click')
+    expect(pressed(wrapper, 'dark')).toBe('true')
+
+    await wrapper.get('[data-testid="branding-background-light"]').trigger('click')
+    expect(pressed(wrapper, 'light')).toBe('true')
+    expect(pressed(wrapper, 'dark')).toBe('false')
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(updateOrganization).toHaveBeenCalledWith({
+      primary_color: null,
+      background_color: '#f1f5f9',
+    })
+  })
+
+  it('sends a free colour picked with the native picker', async () => {
+    const wrapper = mountForm('#123456')
+    const picker = wrapper.get('[data-testid="branding-background-picker"]')
+
+    ;(picker.element as HTMLInputElement).value = '#0a0b0c'
+    await picker.trigger('input')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateOrganization).toHaveBeenCalledWith({
+      primary_color: '#123456',
+      background_color: '#0a0b0c',
+    })
+  })
+
+  it('clears to null, meaning the default dark canvas', async () => {
+    const wrapper = mountForm(null, '#123456')
+
+    await wrapper.get('[data-testid="branding-background-clear"]').trigger('click')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateOrganization).toHaveBeenCalledWith({
+      primary_color: null,
+      background_color: null,
+    })
+  })
+
+  it('refuses an invalid hex without a request', async () => {
+    const wrapper = mountForm(null)
+
+    await wrapper.get('[data-testid="branding-background-text"]').setValue('zzz')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateOrganization).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="branding-background-error"]').text()).toContain(
+      'settings.branding.invalidBackgroundColor'
+    )
+  })
+
+  it('maps background_color_invalid under the background field', async () => {
+    updateOrganization.mockReset().mockRejectedValueOnce(
+      Object.assign(new Error('422'), {
+        status: 422,
+        data: { errors: { background_color: ['background_color_invalid'] } },
+      })
+    )
+
+    const wrapper = mountForm(null, '#123456')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="branding-background-error"]').text()).toContain(
+      'settings.branding.serverError.background_color_invalid'
+    )
+    expect(wrapper.find('[data-testid="branding-banner"]').exists()).toBe(false)
   })
 })

@@ -23,6 +23,7 @@ const ORGANIZATION = {
   name: 'Acme',
   slug: 'acme',
   primary_color: null as string | null,
+  background_color: null as string | null,
   logo_url: null as string | null,
   default_webhook_url: null,
   default_webhook_events: null,

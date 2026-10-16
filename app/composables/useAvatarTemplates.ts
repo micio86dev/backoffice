@@ -155,6 +155,8 @@ export function useAvatarTemplates() {
     llm_credential_id?: number | null
     /** `{display_name}` to name the interviewer; omitted to leave it unset. */
     persona?: PersonaWrite
+    answer_min_seconds?: number
+    answer_max_seconds?: number
   }): Promise<TemplateResponse> {
     return apiFetch<TemplateResponse>('/avatar-templates', { method: 'POST', body: payload })
   }
@@ -169,6 +171,8 @@ export function useAvatarTemplates() {
       llm_credential_id?: number | null
       /** `{}` CLEARS the display name; absent leaves it untouched. Never an empty string. */
       persona?: PersonaWrite
+      answer_min_seconds?: number
+      answer_max_seconds?: number
     }
   ): Promise<TemplateResponse> {
     // `provider` is deliberately absent from the accepted payload. The API

@@ -61,6 +61,7 @@ function organization(code: string): Organization {
     name: 'Acme',
     slug: 'acme',
     primary_color: null,
+    background_color: null,
     currency_code: code,
     logo_url: null,
     default_webhook_url: null,

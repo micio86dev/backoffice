@@ -108,6 +108,68 @@
         </FieldError>
       </Field>
 
+      <div class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+        <Field :data-invalid="Boolean(answerMinError)">
+          <FieldLabel for="template-answer-min-seconds">{{
+            $t('avatar_templates.form.answer_min_seconds')
+          }}</FieldLabel>
+          <input
+            id="template-answer-min-seconds"
+            v-model="draft.answerMinSeconds"
+            data-testid="template-field-answer-min-seconds"
+            type="number"
+            inputmode="numeric"
+            step="1"
+            :min="ANSWER_SECONDS_MIN"
+            :max="ANSWER_SECONDS_MAX"
+            :aria-invalid="Boolean(answerMinError)"
+            :aria-describedby="answerMinDescribedBy"
+            :class="formControlClass"
+            @input="answerMinError = undefined"
+          />
+          <FieldDescription id="template-answer-min-seconds-help">
+            {{ $t('avatar_templates.form.answer_min_seconds_hint') }}
+          </FieldDescription>
+          <FieldError
+            v-if="answerMinError"
+            id="template-answer-min-seconds-error"
+            data-testid="template-answer-min-seconds-error"
+          >
+            {{ answerMinError }}
+          </FieldError>
+        </Field>
+
+        <Field :data-invalid="Boolean(answerMaxError)">
+          <FieldLabel for="template-answer-max-seconds">{{
+            $t('avatar_templates.form.answer_max_seconds')
+          }}</FieldLabel>
+          <input
+            id="template-answer-max-seconds"
+            v-model="draft.answerMaxSeconds"
+            data-testid="template-field-answer-max-seconds"
+            type="number"
+            inputmode="numeric"
+            step="1"
+            :min="ANSWER_SECONDS_MIN"
+            :max="ANSWER_SECONDS_MAX"
+            :aria-invalid="Boolean(answerMaxError)"
+            :aria-describedby="answerMaxDescribedBy"
+            :class="formControlClass"
+            @input="answerMaxError = undefined"
+          />
+          <FieldDescription id="template-answer-max-seconds-help">
+            {{ $t('avatar_templates.form.answer_max_seconds_hint') }}
+          </FieldDescription>
+          <FieldError
+            v-if="answerMaxError"
+            id="template-answer-max-seconds-error"
+            data-testid="template-answer-max-seconds-error"
+          >
+            {{ answerMaxError }}
+          </FieldError>
+        </Field>
+      </div>
+
       <Field>
         <FieldLabel for="template-provider">{{ $t('avatar_templates.form.provider') }}</FieldLabel>
         <!--
@@ -471,6 +533,11 @@ const NAME_MAX_LENGTH = 120
 const DESCRIPTION_MAX_LENGTH = 500
 // Mirrors the api's `PersonaDisplayName::MAX`; the api stays authoritative.
 const PERSONA_DISPLAY_NAME_MAX_LENGTH = 60
+// Mirror the api's answer range rule (10..600, min < max); the api stays authoritative.
+const ANSWER_SECONDS_MIN = 10
+const ANSWER_SECONDS_MAX = 600
+const DEFAULT_ANSWER_MIN_SECONDS = 90
+const DEFAULT_ANSWER_MAX_SECONDS = 150
 
 // feature/form-drawer: two columns benefit the GENERATED provider fields (up
 // to 15 for tavus, 11 for heygen) once there are enough to fill a row each —
@@ -489,6 +556,11 @@ const draft = ref({
   provider: (props.template.provider ?? 'heygen') as ProviderName,
   config: { ...(props.template.config ?? {}) } as Record<string, unknown>,
   personaDisplayName: props.template.persona?.display_name ?? '',
+  // `number | ''`: a cleared <input type="number"> yields '' under v-model.
+  answerMinSeconds: (props.template.answer_min_seconds ?? DEFAULT_ANSWER_MIN_SECONDS) as
+    number | string,
+  answerMaxSeconds: (props.template.answer_max_seconds ?? DEFAULT_ANSWER_MAX_SECONDS) as
+    number | string,
   // pluggable-conversation-llm PR P8. `llmModelKey` is the PICKER's value
   // (design D1's natural key — `LlmModelPicker` is built around it, not a
   // numeric id). `llmCredentialId` needs no such translation:
@@ -499,6 +571,7 @@ const draft = ref({
 })
 
 const isNew = computed(() => props.template.id === undefined)
+
 const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
 
 /**
@@ -547,6 +620,8 @@ const { guardBlur } = usePointerPressGuard()
 const nameError = ref<string | undefined>(undefined)
 const descriptionError = ref<string | undefined>(undefined)
 const personaError = ref<string | undefined>(undefined)
+const answerMinError = ref<string | undefined>(undefined)
+const answerMaxError = ref<string | undefined>(undefined)
 const configErrors = ref<Record<string, string | undefined>>({})
 const unmappedErrors = ref<string[]>([])
 const llmModelError = ref<string | undefined>(undefined)
@@ -686,6 +761,24 @@ const personaDescribedBy = computed(() =>
   [
     personaError.value ? 'template-persona-display-name-error' : null,
     'template-persona-display-name-help',
+  ]
+    .filter((id): id is string => id !== null)
+    .join(' ')
+)
+
+const answerMinDescribedBy = computed(() =>
+  [
+    answerMinError.value ? 'template-answer-min-seconds-error' : null,
+    'template-answer-min-seconds-help',
+  ]
+    .filter((id): id is string => id !== null)
+    .join(' ')
+)
+
+const answerMaxDescribedBy = computed(() =>
+  [
+    answerMaxError.value ? 'template-answer-max-seconds-error' : null,
+    'template-answer-max-seconds-help',
   ]
     .filter((id): id is string => id !== null)
     .join(' ')
@@ -1072,6 +1165,8 @@ watch(
     nameError.value = undefined
     descriptionError.value = undefined
     personaError.value = undefined
+    answerMinError.value = undefined
+    answerMaxError.value = undefined
     configErrors.value = {}
     unmappedErrors.value = []
     llmModelError.value = undefined
@@ -1149,6 +1244,10 @@ watch(
       // The api's sentence is English-only and unlocalised: show this form's own copy.
       if (serverField === 'persona.display_name') {
         personaError.value = t('avatar_templates.form.errors.personaDisplayNameInvalid')
+      } else if (serverField === 'answer_min_seconds') {
+        answerMinError.value = t(`avatar_templates.form.errors.${answerRefusalCode('min')}`)
+      } else if (serverField === 'answer_max_seconds') {
+        answerMaxError.value = t(`avatar_templates.form.errors.${answerRefusalCode('max')}`)
       } else if (serverField === 'name') nameError.value = message
       else if (serverField === 'description') descriptionError.value = message
       else if (!unmappedErrors.value.includes(message)) unmappedErrors.value.push(message)
@@ -1170,6 +1269,49 @@ function personaPayload(): { persona?: { display_name?: string } } {
   return isNew.value ? {} : { persona: {} }
 }
 
+/** A whole number of seconds inside the api's accepted window, or null. */
+function answerSeconds(raw: number | string): number | null {
+  const n = typeof raw === 'number' ? raw : raw.trim() === '' ? Number.NaN : Number(raw)
+
+  return Number.isInteger(n) && n >= ANSWER_SECONDS_MIN && n <= ANSWER_SECONDS_MAX ? n : null
+}
+
+/**
+ * Why the api refused a bound. Its sentence is English and unlocalised, so the
+ * reason is derived from the value that was sent, by the api's own rules
+ * (integer, 10..600, min < max); anything else gets the generic copy.
+ */
+function answerRefusalCode(
+  which: 'min' | 'max'
+): 'answerInteger' | 'answerRange' | 'answerMaxNotAboveMin' | 'answerInvalid' {
+  const raw = which === 'min' ? draft.value.answerMinSeconds : draft.value.answerMaxSeconds
+  const n = typeof raw === 'number' ? raw : raw.trim() === '' ? Number.NaN : Number(raw)
+
+  if (!Number.isInteger(n)) return 'answerInteger'
+  if (n < ANSWER_SECONDS_MIN || n > ANSWER_SECONDS_MAX) return 'answerRange'
+
+  const min = answerSeconds(draft.value.answerMinSeconds)
+  if (which === 'max' && min !== null && n <= min) return 'answerMaxNotAboveMin'
+
+  return 'answerInvalid'
+}
+
+function validateAnswerRange(): boolean {
+  const min = answerSeconds(draft.value.answerMinSeconds)
+  const max = answerSeconds(draft.value.answerMaxSeconds)
+
+  answerMinError.value =
+    min === null ? t('avatar_templates.form.errors.answerMinInvalid') : undefined
+  answerMaxError.value =
+    max === null
+      ? t('avatar_templates.form.errors.answerMaxInvalid')
+      : min !== null && max <= min
+        ? t('avatar_templates.form.errors.answerMaxNotAboveMin')
+        : undefined
+
+  return answerMinError.value === undefined && answerMaxError.value === undefined
+}
+
 function submit(): void {
   // Every validator runs before the early return — never short-circuited —
   // so an operator with two problems is shown both, not one per submit.
@@ -1177,8 +1319,9 @@ function submit(): void {
   const descriptionOk = validateDescription()
   const configOk = validateAllConfigFields()
   const llmBindingOk = validateLlmBinding()
+  const answerRangeOk = validateAnswerRange()
 
-  if (!nameOk || !descriptionOk || !configOk || !llmBindingOk) return
+  if (!nameOk || !descriptionOk || !configOk || !llmBindingOk || !answerRangeOk) return
 
   emit('submit', {
     ...(props.template.id === undefined ? {} : { id: props.template.id }),
@@ -1188,6 +1331,8 @@ function submit(): void {
     config: draft.value.config,
     llm_model_id: effectiveModelId.value,
     llm_credential_id: draft.value.llmCredentialId,
+    answer_min_seconds: Number(draft.value.answerMinSeconds),
+    answer_max_seconds: Number(draft.value.answerMaxSeconds),
     ...personaPayload(),
   })
 }

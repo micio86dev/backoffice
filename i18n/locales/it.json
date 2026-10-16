@@ -1841,13 +1841,15 @@
       "errors": {
         "name_required": "Inserisci un nome.",
         "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
-        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB."
+        "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB.",
+        "background_color_invalid": "Inserisci un colore nel formato #RRGGBB."
       },
       "serverError": {
         "name_required": "Inserisci un nome.",
         "slug_taken": "Questo identificativo è già usato da un altro cliente.",
         "slug_invalid": "Usa solo lettere minuscole, cifre e trattini singoli.",
         "primary_color_invalid": "Inserisci un colore nel formato #RRGGBB.",
+        "background_color_invalid": "Inserisci un colore nel formato #RRGGBB.",
         "currency_unavailable": "Questa valuta non è disponibile. Scegline una dall'elenco."
       },
       "saveError": "Impossibile salvare il cliente. Riprova."

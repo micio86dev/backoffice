@@ -9,6 +9,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
+import enMessages from '../../../../i18n/locales/en.json'
+import itMessages from '../../../../i18n/locales/it.json'
 import ClientForm from '../../../../app/components/organisms/ClientForm.vue'
 
 const createClientMock = vi.fn()
@@ -177,6 +179,46 @@ describe('create', () => {
     expect(wrapper.emitted('saved')).toHaveLength(1)
   })
 
+  it('sets the background colour after creating, together with the primary colour', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get(sel('client-name')).setValue('Acme Spa')
+    await wrapper.get(sel('client-color-text')).setValue('#AABBCC')
+    await wrapper.get(sel('client-background-text')).setValue('#f1f5f9')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateClientMock).toHaveBeenCalledWith(9, {
+      primary_color: '#AABBCC',
+      background_color: '#f1f5f9',
+    })
+  })
+
+  it('sets only the background colour after creating when no primary is chosen', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get(sel('client-name')).setValue('Acme Spa')
+    await wrapper.get(sel('client-background-text')).setValue('#f1f5f9')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateClientMock).toHaveBeenCalledWith(9, { background_color: '#f1f5f9' })
+  })
+
+  it('refuses a malformed background colour client-side', async () => {
+    const wrapper = mountForm()
+
+    await wrapper.get(sel('client-name')).setValue('Acme')
+    await wrapper.get(sel('client-background-text')).setValue('dark')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(createClientMock).not.toHaveBeenCalled()
+    expect(wrapper.get(sel('client-background-error')).text()).toContain(
+      'clients.form.errors.background_color_invalid'
+    )
+  })
+
   it('refuses a blank name without calling the API', async () => {
     const wrapper = mountForm()
 
@@ -288,6 +330,7 @@ describe('edit', () => {
     expect(updateClientMock).toHaveBeenCalledWith(4, {
       name: 'Quint Group',
       primary_color: '#445566',
+      background_color: null,
       currency_code: 'USD',
     })
     expect(createClientMock).not.toHaveBeenCalled()
@@ -305,8 +348,78 @@ describe('edit', () => {
     expect(updateClientMock).toHaveBeenCalledWith(4, {
       name: 'Quint',
       primary_color: null,
+      background_color: null,
       currency_code: 'USD',
     })
+  })
+
+  it('loads the background colour, treating null as empty', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, background_color: '#f1f5f9' } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    expect((wrapper.get(sel('client-background-text')).element as HTMLInputElement).value).toBe(
+      '#f1f5f9'
+    )
+  })
+
+  it('shows an empty background field and the dark fallback in the picker when null', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, background_color: null } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    expect((wrapper.get(sel('client-background-text')).element as HTMLInputElement).value).toBe('')
+    expect((wrapper.get(sel('client-background-picker')).element as HTMLInputElement).value).toBe(
+      '#0f172a'
+    )
+    expect(wrapper.find(sel('client-background-clear')).exists()).toBe(false)
+  })
+
+  it('PATCHes a changed background colour alongside the primary one', async () => {
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    await wrapper.get(sel('client-background-text')).setValue('#0a0b0c')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateClientMock).toHaveBeenCalledWith(4, {
+      name: 'Quint',
+      primary_color: '#112233',
+      background_color: '#0a0b0c',
+      currency_code: 'USD',
+    })
+  })
+
+  it('clearing the background sends null, returning to the dark default canvas', async () => {
+    fetchClientMock.mockResolvedValue({ data: { ...EXISTING.data, background_color: '#f1f5f9' } })
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    await wrapper.get(sel('client-background-clear')).trigger('click')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(updateClientMock).toHaveBeenCalledWith(
+      4,
+      expect.objectContaining({ background_color: null })
+    )
+  })
+
+  it('shows a server background refusal under the background field', async () => {
+    updateClientMock.mockRejectedValue(
+      validationError({ background_color: ['background_color_invalid'] })
+    )
+    const wrapper = mountForm(4)
+    await flushPromises()
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get(sel('client-background-error')).text()).toContain(
+      'clients.form.serverError.background_color_invalid'
+    )
+    expect(wrapper.find(sel('client-form-banner')).exists()).toBe(false)
   })
 
   it('shows a server colour refusal under the colour field', async () => {
@@ -331,5 +444,23 @@ describe('edit', () => {
 
     expect(wrapper.find(sel('client-load-error')).exists()).toBe(true)
     expect(wrapper.find(sel('client-name')).exists()).toBe(false)
+  })
+})
+
+describe('background colour copy', () => {
+  const lookup = (messages: unknown, key: string): unknown =>
+    key
+      .split('.')
+      .reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], messages)
+
+  it.each([
+    'settings.branding.backgroundColor',
+    'settings.branding.backgroundHexLabel',
+    'settings.branding.help.backgroundColor',
+    'clients.form.errors.background_color_invalid',
+    'clients.form.serverError.background_color_invalid',
+  ])('has %s in both locales', (key) => {
+    expect(typeof lookup(enMessages, key)).toBe('string')
+    expect(typeof lookup(itMessages, key)).toBe('string')
   })
 })

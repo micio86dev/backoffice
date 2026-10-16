@@ -272,7 +272,7 @@ const editing = ref<Partial<AvatarTemplate> | null>(null)
 
 // Bumped every time `editing` is assigned a draft, and used as the form's
 // `:key`, so EVERY opened draft remounts the form (a plain `id ?? 'new'` key
-// let new-to-new and edit-to-new keep the previous draft's values). The draft
+// let new-to-new and a re-opened same-id draft keep the previous draft's values). The draft
 // is a copy: a list reload with the same id while the drawer is open does not
 // touch it, so unsaved edits survive. A successful save closes the drawer.
 const draftKey = ref(0)

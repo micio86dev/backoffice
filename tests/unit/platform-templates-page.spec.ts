@@ -311,6 +311,71 @@ describe('PlatformTemplatesPage', () => {
       )
     })
 
+    describe('draft remounting', () => {
+      function type(testId: string, value: string) {
+        const input = document.body.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)!
+        input.value = value
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      const field = (testId: string) =>
+        document.body.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)!
+
+      it('opens New with a blank name and the default answer range after an existing template, without closing', async () => {
+        const { wrapper, api } = await mountPage([
+          template({ id: 1, answer_min_seconds: 20, answer_max_seconds: 40 }),
+        ])
+
+        await click(wrapper, 'platform-template-edit-1')
+        await waitForTestId('template-form')
+        await click(wrapper, 'platform-template-new')
+
+        expect(nameInput()!.value).toBe('')
+        type('template-field-name', 'Fresh')
+        await submitForm()
+
+        expect(api.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'Fresh',
+            answer_min_seconds: 90,
+            answer_max_seconds: 150,
+          })
+        )
+        expect(api.update).not.toHaveBeenCalled()
+      })
+
+      it('gives a second New fresh defaults, dropping what was typed in the first', async () => {
+        const { wrapper } = await mountPage([])
+
+        await click(wrapper, 'platform-template-new')
+        await waitForTestId('template-form')
+        type('template-field-name', 'Typed in the first')
+        type('template-field-answer-min-seconds', '10')
+        type('template-field-answer-max-seconds', '20')
+        await click(wrapper, 'platform-template-new')
+
+        expect(nameInput()!.value).toBe('')
+        expect(field('template-field-answer-min-seconds').value).toBe('90')
+        expect(field('template-field-answer-max-seconds').value).toBe('150')
+      })
+
+      it('keeps unsaved edits when the list refreshes with the same id while the drawer is open', async () => {
+        const { wrapper, api } = await mountPage([template({ id: 1, is_active: true })])
+        api.list.mockResolvedValue({ data: [template({ id: 1, name: 'Renamed by server' })] })
+
+        await click(wrapper, 'platform-template-edit-1')
+        await waitForTestId('template-form')
+        type('template-field-name', 'Unsaved edit')
+        type('template-field-answer-min-seconds', '60')
+        type('template-field-answer-max-seconds', '120')
+        await click(wrapper, 'platform-template-retire-1')
+
+        expect(api.list).toHaveBeenCalledTimes(2)
+        expect(nameInput()!.value).toBe('Unsaved edit')
+        expect(field('template-field-answer-min-seconds').value).toBe('60')
+        expect(field('template-field-answer-max-seconds').value).toBe('120')
+      })
+    })
+
     it('sends NO update for an in-use template until the usage warning is confirmed', async () => {
       const { wrapper, api } = await mountPage([template({ usage: IN_USE })])
 

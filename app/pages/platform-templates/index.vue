@@ -169,7 +169,7 @@
     >
       <AvatarTemplateForm
         v-if="editing !== null"
-        :key="editing.id ?? 'new'"
+        :key="draftKey"
         :template="editing"
         :field-specs="fieldSpecs"
         :saving="saving || busy"
@@ -270,6 +270,13 @@ const copyTarget = ref<PlatformTemplate | null>(null)
 /** null = closed; an object with no id = creating. */
 const editing = ref<Partial<AvatarTemplate> | null>(null)
 
+// Bumped every time `editing` is assigned a draft, and used as the form's
+// `:key`, so EVERY opened draft remounts the form (a plain `id ?? 'new'` key
+// let new-to-new and edit-to-new keep the previous draft's values). The draft
+// is a copy: a list reload with the same id while the drawer is open does not
+// touch it, so unsaved edits survive. A successful save closes the drawer.
+const draftKey = ref(0)
+
 /**
  * The action awaiting the usage warning. `payload` is the edit held back until
  * the superadmin confirms; the form stays open behind the dialog so a cancel
@@ -317,12 +324,14 @@ onMounted(load)
 
 function startCreate(): void {
   submitError.value = null
+  draftKey.value++
   editing.value = { name: '', description: '', provider: 'heygen', config: {} }
 }
 
 function startEdit(row: PlatformTemplate): void {
   submitError.value = null
   // A copy, so abandoning the form leaves the list untouched.
+  draftKey.value++
   editing.value = { ...row, config: { ...row.config } } as Partial<AvatarTemplate>
 }
 

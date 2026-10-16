@@ -257,7 +257,7 @@
     >
       <AvatarTemplateForm
         v-if="editing !== null"
-        :key="editing.id ?? 'new'"
+        :key="draftKey"
         :template="editing"
         :field-specs="fieldSpecs"
         :saving="saving"
@@ -464,6 +464,13 @@ const submitError = ref<unknown | null>(null)
 /** null = closed; an object with no id = creating. */
 const editing = ref<Partial<AvatarTemplate> | null>(null)
 
+// Bumped every time `editing` is assigned a draft, and used as the form's
+// `:key`, so EVERY opened draft remounts the form (a plain `id ?? 'new'` key
+// let new-to-new and edit-to-new keep the previous draft's values). The draft
+// is a copy: a list reload with the same id while the drawer is open does not
+// touch it, so unsaved edits survive. A successful save closes the drawer.
+const draftKey = ref(0)
+
 // FormDrawer's own title, not AvatarTemplateForm's — the form is layout-only
 // now (feature/form-drawer) and no longer renders a heading of its own.
 const formTitle = computed(() =>
@@ -539,6 +546,7 @@ onMounted(async () => {
 function startCreate(): void {
   submitError.value = null
   warning.value = null
+  draftKey.value++
   editing.value = { name: '', description: '', provider: 'heygen', config: {} }
 }
 
@@ -546,6 +554,7 @@ function startEdit(template: AvatarTemplate): void {
   submitError.value = null
   warning.value = null
   // A copy, so abandoning the form leaves the list untouched.
+  draftKey.value++
   editing.value = { ...template, config: { ...template.config } }
 }
 

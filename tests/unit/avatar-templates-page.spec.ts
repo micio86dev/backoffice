@@ -531,6 +531,75 @@ describe('AvatarTemplatesPage', () => {
     )
   })
 
+  describe('draft remounting', () => {
+    const field = (testId: string) =>
+      document.body.querySelector<HTMLInputElement>(`[data-testid="${testId}"]`)!
+
+    function type(testId: string, value: string) {
+      const input = field(testId)
+      input.value = value
+      input.dispatchEvent(new Event('input'))
+    }
+
+    const edited = () => template({ id: 1, answer_min_seconds: 20, answer_max_seconds: 40 })
+
+    it('opens New with a blank name and the default answer range after an existing template, without closing', async () => {
+      const { wrapper, api } = await mountPage({
+        listTemplates: vi.fn().mockResolvedValue({ data: [edited()] }),
+      })
+
+      await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+      await waitForTestId('template-form')
+      await wrapper.find('[data-testid="template-new"]').trigger('click')
+      await flushPromises()
+
+      expect(field('template-field-name').value).toBe('')
+      type('template-field-name', 'Fresh')
+      await submitTemplateForm()
+
+      expect(api.createTemplate).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Fresh', answer_min_seconds: 90, answer_max_seconds: 150 })
+      )
+      expect(api.updateTemplate).not.toHaveBeenCalled()
+    })
+
+    it('gives a second New fresh defaults, dropping what was typed in the first', async () => {
+      const { wrapper } = await mountPage()
+
+      await wrapper.find('[data-testid="template-new"]').trigger('click')
+      await waitForTestId('template-form')
+      type('template-field-name', 'Typed in the first')
+      await setAnswerRange(templateForm()!, '10', '20')
+      await wrapper.find('[data-testid="template-new"]').trigger('click')
+      await flushPromises()
+
+      expect(field('template-field-name').value).toBe('')
+      expect(field('template-field-answer-min-seconds').value).toBe('90')
+      expect(field('template-field-answer-max-seconds').value).toBe('150')
+    })
+
+    it('keeps unsaved edits when the list refreshes with the same id while the drawer is open', async () => {
+      const { wrapper, api } = await mountPage({
+        listTemplates: vi
+          .fn()
+          .mockResolvedValueOnce({ data: [template({ id: 1, is_active: true })] })
+          .mockResolvedValue({ data: [template({ id: 1, name: 'Renamed by server' })] }),
+      })
+
+      await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+      await waitForTestId('template-form')
+      type('template-field-name', 'Unsaved edit')
+      await setAnswerRange(templateForm()!, '60', '120')
+      await wrapper.find('[data-testid="template-deactivate-1"]').trigger('click')
+      await flushPromises()
+
+      expect(api.listTemplates).toHaveBeenCalledTimes(2)
+      expect(field('template-field-name').value).toBe('Unsaved edit')
+      expect(field('template-field-answer-min-seconds').value).toBe('60')
+      expect(field('template-field-answer-max-seconds').value).toBe('120')
+    })
+  })
+
   it('forwards the persona payload so an update can clear the interviewer name', async () => {
     const { wrapper, api } = await mountPage()
 

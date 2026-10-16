@@ -452,15 +452,43 @@ describe('AvatarTemplatesPage', () => {
     expect(api.createTemplate).not.toHaveBeenCalled()
   })
 
-  it('forwards the answer range on update and on create', async () => {
+  async function setAnswerRange(form: Element, min: string, max: string) {
+    for (const [id, v] of [
+      ['template-field-answer-min-seconds', min],
+      ['template-field-answer-max-seconds', max],
+    ] as const) {
+      const input = form.querySelector<HTMLInputElement>(`[data-testid="${id}"]`)!
+      input.value = v
+      input.dispatchEvent(new Event('input'))
+    }
+  }
+
+  it('forwards the edited answer range on update', async () => {
     const { wrapper, api } = await mountPage()
 
     await wrapper.find('[data-testid="template-edit-1"]').trigger('click')
+    await setAnswerRange(await waitForTestId('template-form'), '60', '120')
     await submitTemplateForm()
 
     expect(api.updateTemplate).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ answer_min_seconds: 90, answer_max_seconds: 150 })
+      expect.objectContaining({ answer_min_seconds: 60, answer_max_seconds: 120 })
+    )
+  })
+
+  it('forwards the edited answer range on create', async () => {
+    const { wrapper, api } = await mountPage()
+
+    await wrapper.find('[data-testid="template-new"]').trigger('click')
+    const form = await waitForTestId('template-form')
+    const nameField = form.querySelector<HTMLInputElement>('[data-testid="template-field-name"]')
+    nameField!.value = 'Fresh'
+    nameField!.dispatchEvent(new Event('input'))
+    await setAnswerRange(form, '60', '120')
+    await submitTemplateForm()
+
+    expect(api.createTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ answer_min_seconds: 60, answer_max_seconds: 120 })
     )
   })
 

@@ -1232,6 +1232,9 @@
         "answerMinInvalid": "Inserisci un numero intero di secondi da 10 a 600.",
         "answerMaxInvalid": "Inserisci un numero intero di secondi da 10 a 600.",
         "answerMaxNotAboveMin": "Il massimo deve essere maggiore del minimo.",
+        "answerRange": "Inserisci un numero di secondi da 10 a 600.",
+        "answerInteger": "Inserisci un numero intero di secondi.",
+        "answerInvalid": "Questo valore non è stato accettato. Controllalo e riprova.",
         "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
         "fieldRequired": "Questa impostazione è obbligatoria.",
         "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."

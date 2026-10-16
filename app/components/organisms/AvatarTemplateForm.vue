@@ -571,6 +571,16 @@ const draft = ref({
 })
 
 const isNew = computed(() => props.template.id === undefined)
+
+// The instance may be reused for another template without a remount: the range
+// must follow it, or the previous template's values would be submitted.
+watch(
+  () => props.template,
+  (template) => {
+    draft.value.answerMinSeconds = template.answer_min_seconds ?? DEFAULT_ANSWER_MIN_SECONDS
+    draft.value.answerMaxSeconds = template.answer_max_seconds ?? DEFAULT_ANSWER_MAX_SECONDS
+  }
+)
 const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
 
 /**
@@ -1244,9 +1254,9 @@ watch(
       if (serverField === 'persona.display_name') {
         personaError.value = t('avatar_templates.form.errors.personaDisplayNameInvalid')
       } else if (serverField === 'answer_min_seconds') {
-        answerMinError.value = t('avatar_templates.form.errors.answerMinInvalid')
+        answerMinError.value = t(`avatar_templates.form.errors.${answerRefusalCode('min')}`)
       } else if (serverField === 'answer_max_seconds') {
-        answerMaxError.value = t('avatar_templates.form.errors.answerMaxNotAboveMin')
+        answerMaxError.value = t(`avatar_templates.form.errors.${answerRefusalCode('max')}`)
       } else if (serverField === 'name') nameError.value = message
       else if (serverField === 'description') descriptionError.value = message
       else if (!unmappedErrors.value.includes(message)) unmappedErrors.value.push(message)
@@ -1273,6 +1283,26 @@ function answerSeconds(raw: number | string): number | null {
   const n = typeof raw === 'number' ? raw : raw.trim() === '' ? Number.NaN : Number(raw)
 
   return Number.isInteger(n) && n >= ANSWER_SECONDS_MIN && n <= ANSWER_SECONDS_MAX ? n : null
+}
+
+/**
+ * Why the api refused a bound. Its sentence is English and unlocalised, so the
+ * reason is derived from the value that was sent, by the api's own rules
+ * (integer, 10..600, min < max); anything else gets the generic copy.
+ */
+function answerRefusalCode(
+  which: 'min' | 'max'
+): 'answerInteger' | 'answerRange' | 'answerMaxNotAboveMin' | 'answerInvalid' {
+  const raw = which === 'min' ? draft.value.answerMinSeconds : draft.value.answerMaxSeconds
+  const n = typeof raw === 'number' ? raw : raw.trim() === '' ? Number.NaN : Number(raw)
+
+  if (!Number.isInteger(n)) return 'answerInteger'
+  if (n < ANSWER_SECONDS_MIN || n > ANSWER_SECONDS_MAX) return 'answerRange'
+
+  const min = answerSeconds(draft.value.answerMinSeconds)
+  if (which === 'max' && min !== null && n <= min) return 'answerMaxNotAboveMin'
+
+  return 'answerInvalid'
 }
 
 function validateAnswerRange(): boolean {

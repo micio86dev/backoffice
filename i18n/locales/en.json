@@ -1232,6 +1232,9 @@
         "answerMinInvalid": "Enter a whole number of seconds from 10 to 600.",
         "answerMaxInvalid": "Enter a whole number of seconds from 10 to 600.",
         "answerMaxNotAboveMin": "The maximum must be greater than the minimum.",
+        "answerRange": "Enter a number of seconds from 10 to 600.",
+        "answerInteger": "Enter a whole number of seconds.",
+        "answerInvalid": "This value was not accepted. Check it and try again.",
         "descriptionTooLong": "The description must be at most 500 characters.",
         "fieldRequired": "This setting is required.",
         "numberOutOfRange": "Enter a value within the allowed range."

@@ -141,6 +141,32 @@ describe('client validation', () => {
   })
 })
 
+describe('reusing the instance for another template', () => {
+  it('re-seeds the range from the new template and resets it for a new one', async () => {
+    const wrapper = mountForm({ id: 4, answer_min_seconds: 60, answer_max_seconds: 120 })
+
+    await wrapper.setProps({
+      template: {
+        id: 9,
+        name: 'Other',
+        provider: 'heygen',
+        config: {},
+        answer_min_seconds: 30,
+        answer_max_seconds: 45,
+      },
+    })
+    expect(await submitted(wrapper)).toMatchObject({
+      id: 9,
+      answer_min_seconds: 30,
+      answer_max_seconds: 45,
+    })
+
+    await wrapper.setProps({ template: { name: 'Fresh', provider: 'heygen', config: {} } })
+    expect(value(wrapper, MIN)).toBe('90')
+    expect(value(wrapper, MAX)).toBe('150')
+  })
+})
+
 describe('a server refusal', () => {
   const refusal = (field: string) =>
     Object.assign(new Error('422'), {
@@ -150,7 +176,7 @@ describe('a server refusal', () => {
 
   it('on answer_max_seconds shows the i18n copy next to the input and keeps the value', () => {
     const wrapper = mountForm(
-      { id: 4, answer_min_seconds: 60, answer_max_seconds: 200 },
+      { id: 4, answer_min_seconds: 200, answer_max_seconds: 100 },
       refusal('answer_max_seconds')
     )
 
@@ -159,14 +185,58 @@ describe('a server refusal', () => {
     expect(wrapper.text()).not.toContain('must be greater than min')
     expect(wrapper.get(MAX).attributes('aria-invalid')).toBe('true')
     expect(wrapper.get(MAX).attributes('aria-describedby')).toContain(error.attributes('id'))
-    expect(value(wrapper, MAX)).toBe('200')
+    expect(value(wrapper, MAX)).toBe('100')
     expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
   })
 
-  it('on answer_min_seconds shows the i18n copy next to the min input', () => {
+  it('on answer_min_seconds with a valid-looking value falls back to the generic copy', () => {
     const wrapper = mountForm({ id: 4 }, refusal('answer_min_seconds'))
 
-    expect(wrapper.get(MIN_ERROR).text()).toContain('avatar_templates.form.errors.answerMinInvalid')
+    expect(wrapper.get(MIN_ERROR).text()).toContain('avatar_templates.form.errors.answerInvalid')
+    expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
+  })
+
+  it.each([
+    ['min out of range', 'answer_min_seconds', { answer_min_seconds: 5 }, MIN_ERROR, 'answerRange'],
+    [
+      'min not an integer',
+      'answer_min_seconds',
+      { answer_min_seconds: 90.5 },
+      MIN_ERROR,
+      'answerInteger',
+    ],
+    [
+      'max out of range',
+      'answer_max_seconds',
+      { answer_max_seconds: 700 },
+      MAX_ERROR,
+      'answerRange',
+    ],
+    [
+      'max not an integer',
+      'answer_max_seconds',
+      { answer_max_seconds: 150.5 },
+      MAX_ERROR,
+      'answerInteger',
+    ],
+    [
+      'max not above min',
+      'answer_max_seconds',
+      { answer_min_seconds: 200, answer_max_seconds: 100 },
+      MAX_ERROR,
+      'answerMaxNotAboveMin',
+    ],
+    [
+      'max with an unknown reason',
+      'answer_max_seconds',
+      { answer_min_seconds: 60, answer_max_seconds: 120 },
+      MAX_ERROR,
+      'answerInvalid',
+    ],
+  ])('maps the reason: %s', (_label, field, template, selector, code) => {
+    const wrapper = mountForm({ id: 4, ...template }, refusal(field))
+
+    expect(wrapper.get(selector).text()).toContain(`avatar_templates.form.errors.${code}`)
     expect(wrapper.find('[data-testid="template-form-errors"]').exists()).toBe(false)
   })
 })
@@ -180,6 +250,9 @@ describe('copy', () => {
     ['form', 'errors', 'answerMinInvalid'],
     ['form', 'errors', 'answerMaxInvalid'],
     ['form', 'errors', 'answerMaxNotAboveMin'],
+    ['form', 'errors', 'answerRange'],
+    ['form', 'errors', 'answerInteger'],
+    ['form', 'errors', 'answerInvalid'],
   ]
 
   const lookup = (table: unknown, path: string[]): unknown =>

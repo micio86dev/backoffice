@@ -13,7 +13,7 @@
       role="combobox"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
-      :aria-controls="isOpen ? panelId : undefined"
+      :aria-controls="hasListbox ? listboxId : undefined"
       :aria-busy="state === 'loading' ? 'true' : undefined"
       :class="cn(formSelectClass, 'flex items-center justify-between gap-2 text-left')"
       @click="toggle"
@@ -131,13 +131,28 @@
         />
       </div>
 
-      <p
-        v-else-if="state === 'empty'"
-        :data-testid="`${testIdPrefix}-empty`"
-        class="px-2 py-3 text-sm text-muted-foreground"
-      >
-        {{ t('avatar_templates.form.catalogue.empty') }}
-      </p>
+      <template v-else-if="state === 'empty'">
+        <p :data-testid="`${testIdPrefix}-empty`" class="px-2 py-3 text-sm text-muted-foreground">
+          {{ t('avatar_templates.form.catalogue.empty') }}
+        </p>
+        <!--
+          An organization's first HR-Avatar config may not exist yet, and the
+          form must never be blocked on it: the same manual entry the provider
+          error offers, opted into per field so every other list is unchanged.
+        -->
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+        <input
+          v-if="manualOnEmpty"
+          type="text"
+          autocomplete="off"
+          :value="modelValue"
+          :data-testid="`${testIdPrefix}-manual`"
+          :aria-label="t('avatar_templates.form.catalogue.manualLabel')"
+          :placeholder="t('avatar_templates.form.catalogue.manualLabel')"
+          :class="formControlClass"
+          @input="emit('change', ($event.target as HTMLInputElement).value)"
+        />
+      </template>
 
       <p
         v-else-if="visibleEntries.length === 0"
@@ -149,6 +164,7 @@
 
       <div
         v-else
+        :id="listboxId"
         role="listbox"
         :aria-label="t(field.label_key)"
         class="flex max-h-72 flex-col gap-1 overflow-y-auto"
@@ -240,7 +256,7 @@
             <img
               v-if="resource !== 'voice' && candidate.preview_image_url !== null"
               :src="candidate.preview_image_url"
-              :alt="candidate.label"
+              alt=""
               :data-testid="`${testIdPrefix}-thumb-${candidate.id}`"
               class="size-10 shrink-0 rounded object-cover"
               loading="lazy"
@@ -473,6 +489,8 @@ const props = defineProps<{
    * the vendor, not Tavus. Absent: sample the catalogue's own provider.
    */
   preview?: { provider: 'heygen' | 'tavus' | 'cartesia' | 'elevenlabs'; ttsEngine?: string | null }
+  /** Also offer manual entry of the id when the catalogue answers empty (default: only on a provider error). */
+  manualOnEmpty?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -493,6 +511,8 @@ const { isOpen, close, toggle } = useExclusivePopover(rootRef)
 const resource = computed<CatalogueResource>(() => props.field.catalogue_resource ?? 'voice')
 // Tavus's own stock voices have no synthesised sample (the button would only
 // ever be disabled), so a Tavus list row gets none.
+// An HR-Avatar config has no voice sample either, so it never gets one. The
+// `preview` prop type and `useVoicePreview` are deliberately untouched.
 const previewProvider = computed<'heygen' | 'cartesia' | 'elevenlabs' | null>(() =>
   props.provider === 'tavus' || props.provider === 'hr_avatar' ? null : props.provider
 )
@@ -505,6 +525,7 @@ const blockPreview = computed(() => {
 })
 const testIdPrefix = computed(() => `template-config-${props.field.key}`)
 const panelId = computed(() => `${testIdPrefix.value}-panel`)
+const listboxId = computed(() => `${testIdPrefix.value}-listbox`)
 
 type State = 'loading' | 'ok' | 'empty' | 'provider_error'
 
@@ -574,6 +595,16 @@ const visibleEntries = computed(() => {
   })
 })
 
+/** A listbox is rendered only when the panel is open on a non-empty, ready list. */
+const hasListbox = computed(
+  () =>
+    isOpen.value &&
+    state.value !== 'loading' &&
+    state.value !== 'provider_error' &&
+    state.value !== 'empty' &&
+    visibleEntries.value.length > 0
+)
+
 function describe(candidate: CatalogueEntry): string {
   return [
     t(`avatar_templates.provider.${candidate.provider}`),
@@ -597,6 +628,7 @@ const showsImagePreview = computed(
   () =>
     resource.value !== 'voice' &&
     resource.value !== 'pal' &&
+    resource.value !== 'avatar_config' &&
     props.modelValue !== '' &&
     selected.value !== null
 )

@@ -47,7 +47,22 @@
 
 import type { components, paths } from '../../types/api'
 
+/**
+ * `Omit` that REFUSES a key the type does not have. A plain `Omit` accepts any
+ * key, so a narrowing of a field the api later drops keeps compiling; this one
+ * stops compiling, which is what the header below promises.
+ */
+export type OmitStrict<T, K extends keyof T> = Omit<T, K>
+
 export type ProviderName = 'heygen' | 'tavus'
+
+/**
+ * An ORGANIZATION template's provider. `hr_avatar` exists only while the api
+ * reports it (hr-avatar-adapter D-BO-TYPES). `ProviderName` is deliberately
+ * left narrow: it keys `Record<ProviderName, …>` maps and types the platform
+ * templates, none of which can ever be `hr_avatar`.
+ */
+export type TemplateProvider = ProviderName | 'hr_avatar'
 
 type CatalogueQuery = NonNullable<
   paths['/avatar-templates/catalogue']['get']['parameters']['query']
@@ -96,7 +111,10 @@ type FieldSpecsBody =
  * server-side appears without a frontend change — and a knob the server does
  * not know about cannot appear at all.
  */
-export type FieldSpec = Omit<FieldSpecsBody['data']['heygen'][number], 'catalogue_resource'> & {
+export type FieldSpec = OmitStrict<
+  FieldSpecsBody['data']['heygen'][number],
+  'catalogue_resource'
+> & {
   /**
    * Which provider catalogue resource the field's picker draws from
    * (avatar-template-catalogue design D2). Present on exactly `avatarId`/
@@ -130,7 +148,7 @@ type GeneratedCatalogueEntry = CatalogueBody['data']['items'][number]
  * stock persona whose voice/persona settings Tavus refuses to modify,
  * `null`/absent = unknown, which is never treated as editable.
  */
-export type CatalogueEntry = Omit<GeneratedCatalogueEntry, 'provider'> & {
+export type CatalogueEntry = OmitStrict<GeneratedCatalogueEntry, 'provider'> & {
   provider: CatalogueProvider
 }
 
@@ -144,16 +162,21 @@ export type CatalogueErrorCode = NonNullable<CatalogueBody['data']['code']>
  * an exception, so the picker can say WHY it is empty instead of showing a
  * blank list that reads as a bug.
  */
-export type CatalogueResponse = Omit<CatalogueBody['data'], 'items'> & {
+export type CatalogueResponse = OmitStrict<CatalogueBody['data'], 'items'> & {
   items: CatalogueEntry[]
 }
 
 /** The `{data}` envelope `GET /avatar-templates/catalogue` answers with. */
-export type CatalogueEnvelope = Omit<CatalogueBody, 'data'> & { data: CatalogueResponse }
+export type CatalogueEnvelope = OmitStrict<CatalogueBody, 'data'> & { data: CatalogueResponse }
 
-export type FieldSpecsResponse = Omit<FieldSpecsBody, 'data'> & {
-  data: Record<ProviderName, FieldSpec[]>
-}
+/**
+ * The field-specs map: `heygen` and `tavus` always, `hr_avatar` only when the
+ * api reports the capability (its presence IS the capability signal; its list
+ * is empty because an `hr_avatar` template has no provider knobs).
+ */
+export type FieldSpecMap = Record<ProviderName, FieldSpec[]> & { hr_avatar?: FieldSpec[] }
+
+export type FieldSpecsResponse = OmitStrict<FieldSpecsBody, 'data'> & { data: FieldSpecMap }
 
 type GeneratedTemplate = components['schemas']['AvatarTemplateResource']
 
@@ -189,12 +212,12 @@ export type PalSync = GeneratedTemplate['pal_sync']
 
 export type PalSyncCode = NonNullable<PalSync['code']>
 
-export type AvatarTemplate = Omit<
+export type AvatarTemplate = OmitStrict<
   GeneratedTemplate,
   'config' | 'provider' | 'description' | 'pal_sync'
 > & {
   config: Record<string, unknown>
-  provider: ProviderName
+  provider: TemplateProvider
   description: string | null
   pal_sync: PalSync
 }
@@ -210,12 +233,12 @@ export type AvatarTemplate = Omit<
  * Absent from the generated schema because it is conditional: Scramble sees the
  * resource, not the `additional()` an unhappy path attaches.
  */
-export type TemplateResponse = Omit<
+export type TemplateResponse = OmitStrict<
   paths['/avatar-templates']['post']['responses']['201']['content']['application/json'],
   'data'
 > & { data: AvatarTemplate; warning?: PalSyncCode }
 
-export type TemplateListResponse = Omit<
+export type TemplateListResponse = OmitStrict<
   paths['/avatar-templates']['get']['responses']['200']['content']['application/json'],
   'data'
 > & { data: AvatarTemplate[] }
@@ -252,7 +275,7 @@ type GeneratedPlatformTemplate = components['schemas']['PlatformAvatarTemplateRe
  * `usage` counts non-deleted pinning projects across EVERY organization and is
  * the only cross-tenant number the api exposes (never organization names).
  */
-export type PlatformTemplate = Omit<
+export type PlatformTemplate = OmitStrict<
   GeneratedPlatformTemplate,
   'config' | 'provider' | 'description' | 'pal_sync'
 > & {
@@ -265,13 +288,13 @@ export type PlatformTemplate = Omit<
 export type PlatformTemplateUsage = GeneratedPlatformTemplate['usage']
 
 /** Same conditional `warning` code as `TemplateResponse`, for the platform routes. */
-export type PlatformTemplateResponse = Omit<
+export type PlatformTemplateResponse = OmitStrict<
   paths['/admin/avatar-templates']['post']['responses']['201']['content']['application/json'],
   'data'
 > & { data: PlatformTemplate; warning?: PalSyncCode }
 
 /** Derived from the generated list response; only `data` is re-narrowed. */
-export type PlatformTemplateListResponse = Omit<
+export type PlatformTemplateListResponse = OmitStrict<
   paths['/admin/avatar-templates']['get']['responses']['200']['content']['application/json'],
   'data'
 > & { data: PlatformTemplate[] }
@@ -288,10 +311,10 @@ type PlatformUpdateBody = NonNullable<
  * `array` rule as a list) — the same narrowing `AvatarTemplate['config']` has,
  * pinned by `tests/nuxt/avatar-template-config-contract.ts`.
  */
-export type PlatformTemplateCreatePayload = Omit<PlatformStoreBody, 'config'> & {
+export type PlatformTemplateCreatePayload = OmitStrict<PlatformStoreBody, 'config'> & {
   config: Record<string, unknown>
 }
-export type PlatformTemplateUpdatePayload = Omit<PlatformUpdateBody, 'config'> & {
+export type PlatformTemplateUpdatePayload = OmitStrict<PlatformUpdateBody, 'config'> & {
   config?: Record<string, unknown>
 }
 
@@ -315,10 +338,10 @@ type UpdateBody = NonNullable<
  * Scramble reading a PHP `array` rule as a list), like the platform bodies
  * above. `provider` is absent from the update: the api refuses to change it.
  */
-export type TemplateCreatePayload = Omit<StoreBody, 'config'> & {
+export type TemplateCreatePayload = OmitStrict<StoreBody, 'config'> & {
   config: Record<string, unknown>
 }
-export type TemplateUpdatePayload = Omit<UpdateBody, 'config'> & {
+export type TemplateUpdatePayload = OmitStrict<UpdateBody, 'config'> & {
   config?: Record<string, unknown>
 }
 
@@ -337,6 +360,6 @@ export type ImportTemplatesResponse =
  * because a WRITE says less: `{}` clears the interviewer name, and an absent key
  * leaves it untouched. See `useAvatarTemplates.updateTemplate`.
  */
-export type AvatarTemplateSubmit = Omit<Partial<AvatarTemplate>, 'persona'> & {
+export type AvatarTemplateSubmit = OmitStrict<Partial<AvatarTemplate>, 'persona'> & {
   persona?: PersonaWrite
 }

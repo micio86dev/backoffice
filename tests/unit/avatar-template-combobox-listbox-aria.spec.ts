@@ -92,8 +92,9 @@ describe('combobox listbox ARIA ownership', () => {
     expect(wrapper.emitted('change')?.[0]).toEqual(['v1'])
   })
 
-  it('points aria-controls at the panel only while the panel exists', async () => {
-    fetchCatalogue.mockResolvedValue({ status: 'ok', items: [entry('v1')] })
+  it('points aria-controls at the listbox, only while one is rendered', async () => {
+    let resolve: (value: unknown) => void = () => undefined
+    fetchCatalogue.mockReturnValue(new Promise((r) => (resolve = r)))
     const wrapper = mount(AvatarTemplateProviderCombobox, {
       props: { field: voiceField, provider: 'elevenlabs', modelValue: '' },
       attachTo: document.body,
@@ -103,11 +104,16 @@ describe('combobox listbox ARIA ownership', () => {
 
     expect(trigger.attributes('aria-controls')).toBeUndefined()
 
+    // Open while loading: there is a panel but no listbox yet.
     await trigger.trigger('click')
+    expect(trigger.attributes('aria-controls')).toBeUndefined()
+
+    resolve({ status: 'ok', items: [entry('v1')] })
     await flushPromises()
 
-    expect(trigger.attributes('aria-controls')).toBeDefined()
-    expect(wrapper.find(`#${trigger.attributes('aria-controls')}`).exists()).toBe(true)
+    const controls = trigger.attributes('aria-controls')
+    expect(controls).toBeDefined()
+    expect(wrapper.get(`#${controls}`).attributes('role')).toBe('listbox')
   })
 
   it('gives the listbox an accessible name and uses elements that allow the roles', async () => {

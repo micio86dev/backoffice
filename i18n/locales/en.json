@@ -536,7 +536,8 @@
     },
     "avatarProvider": {
       "heygen": "HeyGen",
-      "tavus": "Tavus"
+      "tavus": "Tavus",
+      "hr_avatar": "HR-Avatar"
     },
     "delete": {
       "title": "Delete this project",
@@ -1190,7 +1191,8 @@
       "heygen": "HeyGen",
       "tavus": "Tavus",
       "cartesia": "Cartesia",
-      "elevenlabs": "ElevenLabs"
+      "elevenlabs": "ElevenLabs",
+      "hr_avatar": "HR-Avatar"
     },
     "action": {
       "new": "New template",
@@ -1245,7 +1247,8 @@
         "answerInvalid": "This value was not accepted. Check it and try again.",
         "descriptionTooLong": "The description must be at most 500 characters.",
         "fieldRequired": "This setting is required.",
-        "numberOutOfRange": "Enter a value within the allowed range."
+        "numberOutOfRange": "Enter a value within the allowed range.",
+        "hrAvatarConfigIdInvalid": "Enter a valid configuration ID: avc_ followed by letters and digits."
       },
       "ttsVoiceNote": "Saving writes this voice to the Tavus persona and replaces the voice the persona had. With an external engine (Cartesia, ElevenLabs, Azure) the engine, model and voice you choose here are sent; leave the engine on \"tavus-auto\" and no external voice is written, so Tavus chooses the voice.",
       "voicePreview": {
@@ -1442,7 +1445,8 @@
       "turnTakingPatience": "Turn-taking patience",
       "interruptibility": "Interruptibility",
       "voiceIsolation": "Voice isolation",
-      "idleEngagement": "Idle engagement"
+      "idleEngagement": "Idle engagement",
+      "hr_avatar_config_id": "Avatar configuration ID"
     },
     "portability": {
       "export": "Export JSON",
@@ -1483,7 +1487,8 @@
       "voiceSpeed": "How fast the avatar speaks. 1 = normal; below 1 slower, above 1 faster (range 0.8–1.2).",
       "voiceStability": "How steady the tone is (0–1). High = more uniform and predictable; low = more expressive but variable.",
       "voiceStyle": "How much emphasis/expressiveness to add (0–1). 0 = neutral. High values can sound over the top.",
-      "voiceUseSpeakerBoost": "Makes the voice clearer and more present, closer to the original. Costs a little extra latency. Usually worth keeping on."
+      "voiceUseSpeakerBoost": "Makes the voice clearer and more present, closer to the original. Costs a little extra latency. Usually worth keeping on.",
+      "hr_avatar_config_id": "The HR-Avatar configuration this template uses. Choose one from the list; if the list is unavailable, enter its ID (it starts with avc_)."
     },
     "llmForecastIntro": "Each template below carries an estimate of what one typical interview costs in conversation-LLM tokens. Avatar minutes are billed by a different vendor on a different meter and are not included here.",
     "llmForecast": "{amount} in LLM tokens for a typical {minutes}-minute, {turns}-turn interview. An estimate, and a total for that whole interview — not a rate per minute.",

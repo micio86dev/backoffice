@@ -54,12 +54,12 @@ import { computed } from 'vue'
 import FormattedDate from '@/components/atoms/FormattedDate.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { PAL_SYNC_CODES, type PalSync } from '@/types/avatar-template'
+import { PAL_SYNC_CODES, type PalSync, type TemplateProvider } from '@/types/avatar-template'
 
 const props = withDefaults(
   defineProps<{
     sync?: PalSync | null
-    provider: 'heygen' | 'tavus'
+    provider: TemplateProvider
     layout?: 'row' | 'banner'
   }>(),
   { sync: null, layout: 'row' }

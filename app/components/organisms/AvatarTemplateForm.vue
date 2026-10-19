@@ -192,8 +192,10 @@
           v-model="draft.provider"
           data-testid="template-field-provider"
           :disabled="!isNew"
-          :aria-describedby="isNew ? undefined : 'template-provider-locked'"
           autocomplete="off"
+          :aria-describedby="
+            isNew ? 'template-provider-hint' : 'template-provider-locked template-provider-hint'
+          "
           :class="formSelectClass"
         >
           <option v-for="name in providers" :key="name" :value="name">
@@ -213,7 +215,7 @@
         Converges onto FieldDescription (D5/D6) — same string, no copy change,
         just no longer a raw <span> a Field-conversion could orphan.
       -->
-        <FieldDescription>
+        <FieldDescription id="template-provider-hint">
           {{ $t('avatar_templates.form.provider_hint') }}
         </FieldDescription>
       </Field>
@@ -276,6 +278,7 @@
                 :aria-required="field.required ? 'true' : undefined"
                 :aria-describedby="describedBy(field)"
                 :preview="voicePreviewFor(field) ?? undefined"
+                :manual-on-empty="field.key === HR_AVATAR_ID_KEY"
                 @change="onFieldChange(field, $event)"
                 @loaded="onCatalogueLoaded(field.key, $event)"
               />
@@ -399,7 +402,9 @@
       (I2/I5 gate on the MODEL, not on `provider`), so it does not belong
       inside `activeFields`'s provider-keyed loop.
     -->
+      <!-- Hidden for `hr_avatar`: its conversation model lives in the HR-Avatar config. -->
       <fieldset
+        v-if="draft.provider !== 'hr_avatar'"
         class="flex flex-col gap-3 border-t border-border pt-4"
         data-testid="template-llm-section"
       >
@@ -524,13 +529,14 @@ import {
   type AvatarTemplateSubmit,
   type CatalogueProvider,
   type FieldSpec,
-  type ProviderName,
+  type FieldSpecMap,
+  type TemplateProvider,
 } from '@/types/avatar-template'
 import type { LlmCredential, LlmModel } from '@/types/llm'
 
 const props = defineProps<{
   template: Partial<AvatarTemplate>
-  fieldSpecs: Record<ProviderName, FieldSpec[]>
+  fieldSpecs: FieldSpecMap
   saving: boolean
   submitError: unknown | null
 }>()
@@ -595,13 +601,33 @@ const DEFAULT_ANSWER_MAX_SECONDS = 150
 // column starts pulling its own weight.
 const TWO_COLUMN_MIN_FIELDS = 5
 
-const providers: ProviderName[] = ['heygen', 'tavus']
+// hr-avatar-adapter: an `hr_avatar` template has no provider knobs, only the id
+// of the HR-Avatar config it points at. The id travels in `draft.config` under
+// this key so the picker, the required check and the per-field error placement
+// are the ones every other catalogue field already has, and it is lifted out
+// at submit (`config` is sent as `{}`, the id as `hr_avatar_config_id`).
+const HR_AVATAR_ID_KEY = 'hr_avatar_config_id'
+// Mirrors the api's format rule; the api stays authoritative.
+const HR_AVATAR_ID_PATTERN = /^avc_[0-9A-Za-z]+$/
+const HR_AVATAR_FIELD: FieldSpec = {
+  key: HR_AVATAR_ID_KEY,
+  type: 'text',
+  label_key: 'avatar_templates.field.hr_avatar_config_id',
+  hint_key: 'avatar_templates.hint.hr_avatar_config_id',
+  required: true,
+  catalogue_resource: 'avatar_config',
+}
 
 const draft = ref({
   name: props.template.name ?? '',
   description: props.template.description ?? '',
-  provider: (props.template.provider ?? 'heygen') as ProviderName,
-  config: { ...(props.template.config ?? {}) } as Record<string, unknown>,
+  provider: (props.template.provider ?? 'heygen') as TemplateProvider,
+  config: {
+    ...(props.template.config ?? {}),
+    ...(props.template.provider === 'hr_avatar' && props.template.hr_avatar_config_id
+      ? { [HR_AVATAR_ID_KEY]: props.template.hr_avatar_config_id }
+      : {}),
+  } as Record<string, unknown>,
   personaDisplayName: props.template.persona?.display_name ?? '',
   // `number | ''`: a cleared <input type="number"> yields '' under v-model.
   answerMinSeconds: (props.template.answer_min_seconds ?? DEFAULT_ANSWER_MIN_SECONDS) as
@@ -619,7 +645,25 @@ const draft = ref({
 
 const isNew = computed(() => props.template.id === undefined)
 
-const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
+/**
+ * The provider options, from the keys the api served: `heygen` and `tavus`
+ * always, in that order, and `hr_avatar` only when the api reports the
+ * capability. An EXISTING `hr_avatar` template keeps naming its provider even
+ * if the capability is gone, or the locked select would render blank.
+ */
+const providers = computed<TemplateProvider[]>(() => [
+  'heygen',
+  'tavus',
+  ...(props.fieldSpecs.hr_avatar !== undefined || draft.value.provider === 'hr_avatar'
+    ? (['hr_avatar'] as const)
+    : []),
+])
+
+const activeFields = computed(() =>
+  draft.value.provider === 'hr_avatar'
+    ? [HR_AVATAR_FIELD]
+    : (props.fieldSpecs[draft.value.provider] ?? [])
+)
 
 /**
  * The fields the form actually renders and validates: every spec field except
@@ -913,9 +957,12 @@ function voicePreviewFor(field: FieldSpec): {
   voiceId: string
   ttsEngine?: string | null
 } | null {
+  const provider = draft.value.provider
+
+  // An HR-Avatar config has no voice sample.
+  if (provider === 'hr_avatar') return null
   if (field.catalogue_resource !== 'voice' && field.key !== 'ttsExternalVoiceId') return null
 
-  const provider = draft.value.provider
   const voiceId = stringValue(field.key)
 
   if (provider === 'tavus') {
@@ -1110,6 +1157,12 @@ function validateConfigField(field: FieldSpec): boolean {
     return false
   }
 
+  if (field.key === HR_AVATAR_ID_KEY && !HR_AVATAR_ID_PATTERN.test(String(value))) {
+    configErrors.value[field.key] = t('avatar_templates.form.errors.hrAvatarConfigIdInvalid')
+
+    return false
+  }
+
   if (field.type === 'number' && typeof value === 'number') {
     const belowMin = field.min !== undefined && field.min !== null && value < field.min
     const aboveMax = field.max !== undefined && field.max !== null && value > field.max
@@ -1146,6 +1199,9 @@ function validateReferences(): boolean {
 
   for (const field of activeFields.value) {
     const value = draft.value.config[field.key]
+    // The proxy lists only configs that can start a conversation, and its list is
+    // cached: an id it does not show is not proof the api would refuse it.
+    if (field.key === HR_AVATAR_ID_KEY) continue
     if (typeof value !== 'string' || value === '' || catalogueFor(field) === null) continue
 
     const ids = catalogueIds.value[field.key]
@@ -1277,6 +1333,13 @@ watch(
         continue
       }
 
+      // A top-level field, not a `config.{knob}`: the picker carries it.
+      if (serverField === HR_AVATAR_ID_KEY) {
+        configErrors.value[HR_AVATAR_ID_KEY] = configCopy(message)
+
+        continue
+      }
+
       if (serverField.startsWith(CONFIG_PREFIX)) {
         const key = serverField.slice(CONFIG_PREFIX.length)
 
@@ -1373,7 +1436,9 @@ function submit(): void {
   const nameOk = validateName()
   const descriptionOk = validateDescription()
   const configOk = validateAllConfigFields()
-  const llmBindingOk = validateLlmBinding()
+  // The binding fieldset is not rendered for `hr_avatar`, so a half-set pair left
+  // over from another provider must not block a submit that never sends it.
+  const llmBindingOk = draft.value.provider === 'hr_avatar' || validateLlmBinding()
   const answerRangeOk = validateAnswerRange()
 
   if (!nameOk || !descriptionOk || !configOk || !llmBindingOk || !answerRangeOk) return
@@ -1383,9 +1448,13 @@ function submit(): void {
     name: draft.value.name,
     description: draft.value.description === '' ? null : draft.value.description,
     provider: draft.value.provider,
-    config: draft.value.config,
-    llm_model_id: effectiveModelId.value,
-    llm_credential_id: draft.value.llmCredentialId,
+    ...(draft.value.provider === 'hr_avatar'
+      ? { config: {}, [HR_AVATAR_ID_KEY]: stringValue(HR_AVATAR_ID_KEY) }
+      : {
+          config: draft.value.config,
+          llm_model_id: effectiveModelId.value,
+          llm_credential_id: draft.value.llmCredentialId,
+        }),
     answer_min_seconds: Number(draft.value.answerMinSeconds),
     answer_max_seconds: Number(draft.value.answerMaxSeconds),
     ...personaPayload(),

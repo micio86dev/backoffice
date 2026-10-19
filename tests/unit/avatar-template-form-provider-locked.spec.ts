@@ -36,7 +36,7 @@ describe('provider select, locked after creation', () => {
     const select = wrapper.get('#template-provider')
 
     expect(select.attributes('disabled')).toBeDefined()
-    expect(select.attributes('aria-describedby')).toBe('template-provider-locked')
+    expect(select.attributes('aria-describedby')).toContain('template-provider-locked')
     expect(wrapper.get('#template-provider-locked').text()).toBe(
       'avatar_templates.form.provider_locked'
     )
@@ -45,7 +45,9 @@ describe('provider select, locked after creation', () => {
   it('has no description while the provider can still be chosen', async () => {
     const wrapper = await mountForm({})
 
-    expect(wrapper.get('#template-provider').attributes('aria-describedby')).toBeUndefined()
+    expect(wrapper.get('#template-provider').attributes('aria-describedby')).not.toContain(
+      'template-provider-locked'
+    )
     expect(wrapper.find('#template-provider-locked').exists()).toBe(false)
   })
 })

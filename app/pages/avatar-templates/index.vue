@@ -349,8 +349,8 @@ import { useMoney } from '@/composables/useMoney'
 import type {
   AvatarTemplate,
   AvatarTemplateSubmit,
-  FieldSpec,
-  ProviderName,
+  FieldSpecMap,
+  TemplateProvider,
 } from '@/types/avatar-template'
 
 definePageMeta({ name: 'avatar-templates' })
@@ -401,7 +401,7 @@ const {
 } = useAvatarTemplates()
 
 const templates = ref<AvatarTemplate[]>([])
-const fieldSpecs = ref<Record<ProviderName, FieldSpec[]>>({ heygen: [], tavus: [] })
+const fieldSpecs = ref<FieldSpecMap>({ heygen: [], tavus: [] })
 const loadError = ref(false)
 const loadErrorState = ref<ResourceErrorState | null>(null)
 
@@ -566,14 +566,22 @@ async function save(payload: AvatarTemplateSubmit): Promise<void> {
   saving.value = true
   submitError.value = null
 
+  // An `hr_avatar` template carries its config id and no LLM binding (the api
+  // refuses one); every other body stays exactly as it was.
+  const bindingOrConfigId = payload.hr_avatar_config_id
+    ? { hr_avatar_config_id: payload.hr_avatar_config_id }
+    : {
+        llm_model_id: payload.llm_model_id ?? null,
+        llm_credential_id: payload.llm_credential_id ?? null,
+      }
+
   try {
     const response = payload.id
       ? await updateTemplate(payload.id, {
           name: payload.name,
           description: payload.description ?? null,
           config: payload.config ?? {},
-          llm_model_id: payload.llm_model_id ?? null,
-          llm_credential_id: payload.llm_credential_id ?? null,
+          ...bindingOrConfigId,
           persona: payload.persona,
           answer_min_seconds: payload.answer_min_seconds,
           answer_max_seconds: payload.answer_max_seconds,
@@ -581,10 +589,9 @@ async function save(payload: AvatarTemplateSubmit): Promise<void> {
       : await createTemplate({
           name: payload.name ?? '',
           description: payload.description ?? null,
-          provider: (payload.provider ?? 'heygen') as ProviderName,
+          provider: (payload.provider ?? 'heygen') as TemplateProvider,
           config: payload.config ?? {},
-          llm_model_id: payload.llm_model_id ?? null,
-          llm_credential_id: payload.llm_credential_id ?? null,
+          ...bindingOrConfigId,
           persona: payload.persona,
           answer_min_seconds: payload.answer_min_seconds,
           answer_max_seconds: payload.answer_max_seconds,

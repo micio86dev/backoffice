@@ -9,7 +9,7 @@
  * the new fallback into a catch-all fails in this file too.
  */
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AvatarTemplateForm from '../../app/components/organisms/AvatarTemplateForm.vue'
 import en from '../../i18n/locales/en.json'
 import it_ from '../../i18n/locales/it.json'
@@ -24,6 +24,11 @@ vi.mock('@/composables/useLlmModels', () => ({
 vi.mock('@/composables/useLlmCredentials', () => ({
   useLlmCredentials: () => ({ listCredentials: () => Promise.resolve({ data: [] }) }),
 }))
+
+// The once-per-file baseline `tests/unit/setup.ts` stubs. A blanket
+// `vi.unstubAllGlobals()` would wipe it (ref, computed, ...), so only the global
+// these cases re-stub is put back.
+const baselineUseI18n = (globalThis as { useI18n?: unknown }).useI18n
 
 const FIELD_SPECS: FieldSpecMap = { heygen: [], tavus: [] }
 const ERRORS = '[data-testid="template-form-errors"]'
@@ -56,16 +61,11 @@ describe('template form: a save failure with no field and no code', () => {
 
   // The network copy is for a request that never got an answer, not for any
   // rejection that happens to lack a status.
-  it.each([
-    ['a fetch TypeError', new TypeError('Failed to fetch')],
-    [
-      'an ofetch network FetchError',
-      Object.assign(new Error('[POST] "/api/avatar-templates": <no response> Failed to fetch'), {
-        name: 'FetchError',
-        cause: new TypeError('Failed to fetch'),
-      }),
-    ],
-  ])('shows network copy for %s', async (_label, error) => {
+  it('shows network copy for an ofetch network FetchError', async () => {
+    const error = Object.assign(
+      new Error('[POST] "/api/avatar-templates": <no response> Failed to fetch'),
+      { name: 'FetchError', cause: new TypeError('Failed to fetch') }
+    )
     const wrapper = await mountWith(error)
 
     expect(wrapper.get(ERRORS).text()).toContain('avatar_templates.error.save.network')
@@ -74,6 +74,8 @@ describe('template form: a save failure with no field and no code', () => {
 
   it.each([
     ['a plain Error', new Error('boom')],
+    // A programming fault is a TypeError too; it must not tell the operator to check the connection.
+    ['a bare TypeError', new TypeError('Cannot read properties of undefined')],
     ['an object with no status', { data: {} }],
     ['a string', 'boom'],
   ])('shows generic save-failed copy, not the network copy, for %s', async (_label, error) => {
@@ -135,6 +137,9 @@ describe('a coded refusal that has no copy under the config namespace', () => {
       te: (key: string) => !key.endsWith('.brand_new_nocopy'),
     }))
   })
+  afterEach(() => {
+    vi.stubGlobal('useI18n', baselineUseI18n)
+  })
 
   it('falls back to the status copy when the status says more than "invalid"', async () => {
     const wrapper = await mountWith({ status: 409, data: { message: 'brand_new_nocopy' } })
@@ -153,6 +158,9 @@ describe('a translator that only stubs `t`', () => {
   beforeEach(() => {
     vi.stubGlobal('useI18n', () => ({ t: (key: string) => key }))
   })
+  afterEach(() => {
+    vi.stubGlobal('useI18n', baselineUseI18n)
+  })
 
   it('does not throw and shows the generic copy for an unknown code', async () => {
     const wrapper = await mountWith({
@@ -166,5 +174,13 @@ describe('a translator that only stubs `t`', () => {
     expect(wrapper.get('[data-testid="template-llm-model-error"]').text()).toBe(
       'avatar_templates.error.invalid_value'
     )
+  })
+})
+
+// Runs after the stubbing blocks above: nothing they stubbed may outlive them.
+describe('the translator stubs of the blocks above', () => {
+  it('leave the baseline `useI18n` in place', () => {
+    expect(baselineUseI18n).toBeDefined()
+    expect((globalThis as { useI18n?: unknown }).useI18n).toBe(baselineUseI18n)
   })
 })

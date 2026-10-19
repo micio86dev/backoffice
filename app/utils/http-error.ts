@@ -15,19 +15,30 @@ export function getErrorStatus(error: unknown): number | null {
 }
 
 /**
- * True for a request that never got an answer: a fetch `TypeError` (offline,
- * DNS, CORS, aborted connection) or an ofetch `FetchError` wrapping one. An
- * error that merely lacks an HTTP status (a thrown `Error`, a string) is NOT a
- * network failure, so callers must not tell the operator to check their
- * connection for it.
+ * True for a request that never got an answer: an ofetch `FetchError` with no
+ * response and no HTTP status, whose `cause` is the fetch failure itself (a
+ * `TypeError` from offline, DNS, CORS or an aborted connection).
+ *
+ * A bare `TypeError` is NOT a network failure: `undefined.x` throws one too, and
+ * telling the operator to check their connection for a programming fault hides
+ * it. The same goes for a thrown `Error`, a string, or a `FetchError` that did
+ * get an answer.
  */
 export function isNetworkError(error: unknown): boolean {
-  if (error instanceof TypeError) return true
   if (typeof error !== 'object' || error === null) return false
 
-  const { name, cause } = error as { name?: unknown; cause?: unknown }
+  const { name, cause, response } = error as {
+    name?: unknown
+    cause?: unknown
+    response?: unknown
+  }
 
-  return name === 'FetchError' && cause instanceof TypeError
+  return (
+    name === 'FetchError' &&
+    response === undefined &&
+    getErrorStatus(error) === null &&
+    cause instanceof TypeError
+  )
 }
 
 /**

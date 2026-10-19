@@ -64,7 +64,13 @@ describe('load error copy by failure class', () => {
   })
 
   it.each([
-    ['a network fault', new Error('boom')],
+    [
+      'a network fault',
+      Object.assign(new Error('[GET] "/api/avatar-templates": <no response> Failed to fetch'), {
+        name: 'FetchError',
+        cause: new TypeError('Failed to fetch'),
+      }),
+    ],
     ['an HTTP 500', http(500)],
   ])('says "try again" for %s', async (_label, error) => {
     const text = await failWith(error)

@@ -51,15 +51,15 @@
       <ChevronDownIcon class="size-4 shrink-0 opacity-60" aria-hidden="true" />
     </button>
     <!--
-      The announcement of the loading state while the panel is CLOSED. It lives
+      The ONE announcement of the loading state, open panel or not. It lives
       beside the trigger, not inside it: the children of a button are
-      presentational, so a status region there may never be exposed. An open
-      panel renders its own status line, and two live regions would announce
-      it twice.
+      presentational, so a status region there may never be exposed. The panel's
+      own loading line is visual only, so opening the panel never adds a second
+      live region that would announce it twice. The region is always mounted and
+      its text is set after mount: a live region inserted with its text already
+      inside is often not announced at all.
     -->
-    <span v-if="state === 'loading' && !isOpen" role="status" class="sr-only">
-      {{ t('avatar_templates.form.catalogue.loading') }}
-    </span>
+    <span role="status" class="sr-only">{{ announcement }}</span>
 
     <!--
       Inline, deliberately NOT teleported to <body>. A teleported list sits
@@ -95,7 +95,6 @@
       <p
         v-if="state === 'loading'"
         :data-testid="`${testIdPrefix}-loading`"
-        role="status"
         class="px-2 py-3 text-sm text-muted-foreground"
       >
         {{ t('avatar_templates.form.catalogue.loading') }}
@@ -123,6 +122,7 @@
           type="text"
           autocomplete="off"
           :value="modelValue"
+          v-bind="manualValidationAttrs()"
           :data-testid="`${testIdPrefix}-manual`"
           :aria-label="t('avatar_templates.form.catalogue.manualLabel')"
           :placeholder="t('avatar_templates.form.catalogue.manualLabel')"
@@ -146,6 +146,7 @@
           type="text"
           autocomplete="off"
           :value="modelValue"
+          v-bind="manualValidationAttrs()"
           :data-testid="`${testIdPrefix}-manual`"
           :aria-label="t('avatar_templates.form.catalogue.manualLabel')"
           :placeholder="t('avatar_templates.form.catalogue.manualLabel')"
@@ -538,6 +539,24 @@ const playingId = ref<string | null>(null)
 const failedImages = reactive(new Set<string>())
 
 const loaded = computed(() => state.value === 'ok' || state.value === 'empty')
+
+// What the live region says: filled after mount, while the catalogue loads,
+// and emptied when it settles.
+const announcement = ref('')
+const isLoading = computed(() => state.value === 'loading')
+function syncAnnouncement(): void {
+  announcement.value = isLoading.value ? t('avatar_templates.form.catalogue.loading') : ''
+}
+onMounted(syncAnnouncement)
+watch(isLoading, syncAnnouncement)
+
+// The form hands its validation wiring to the trigger through attrs; the manual
+// id input is the same control in another shape, so it carries the same two.
+// A function, not a computed: `attrs` is not reactive, the render is.
+const manualValidationAttrs = () => ({
+  'aria-invalid': attrs['aria-invalid'] as boolean | 'true' | 'false' | undefined,
+  'aria-describedby': attrs['aria-describedby'] as string | undefined,
+})
 
 // Monotonic request token. A provider switch mid-flight must not let the slow
 // answer for the OLD provider overwrite the list for the new one.

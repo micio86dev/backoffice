@@ -15,6 +15,22 @@ export function getErrorStatus(error: unknown): number | null {
 }
 
 /**
+ * True for a request that never got an answer: a fetch `TypeError` (offline,
+ * DNS, CORS, aborted connection) or an ofetch `FetchError` wrapping one. An
+ * error that merely lacks an HTTP status (a thrown `Error`, a string) is NOT a
+ * network failure, so callers must not tell the operator to check their
+ * connection for it.
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError) return true
+  if (typeof error !== 'object' || error === null) return false
+
+  const { name, cause } = error as { name?: unknown; cause?: unknown }
+
+  return name === 'FetchError' && cause instanceof TypeError
+}
+
+/**
  * Extracts a machine-facing `{data:{reason: string}}` refusal code from an
  * ofetch/$fetch rejection (participant-error-recovery D9 and D3's split
  * refusal reasons on the entry-link mints). Callers map this string onto an

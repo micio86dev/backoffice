@@ -500,7 +500,12 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
-import { getErrorFields, getErrorStatus, serverMessageCode } from '@/utils/http-error'
+import {
+  getErrorFields,
+  getErrorStatus,
+  isNetworkError,
+  serverMessageCode,
+} from '@/utils/http-error'
 import { translateServerCodeOrFallback } from '@/utils/server-message'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
@@ -574,12 +579,25 @@ function configCopy(code: string, fallbackKey: string = INVALID_VALUE_KEY): stri
   )
 }
 
-/** Save failures with no field, by HTTP status (`0`: no response at all). */
+/** Save failures with no field, by HTTP status. */
 const SAVE_FAILURE_KEYS: Record<number, string> = {
-  0: 'network',
   403: 'forbidden',
   404: 'not_found',
   409: 'conflict',
+}
+
+/**
+ * The `avatar_templates.error.save.*` segment for a failure, or undefined when
+ * the status says nothing the operator can act on (a framework 5xx sentence
+ * stays quiet). With no HTTP status at all, only a real network failure says
+ * "check your connection"; anything else is a generic save failure.
+ */
+function saveFailureKey(error: unknown): string | undefined {
+  const status = getErrorStatus(error)
+
+  if (status !== null) return SAVE_FAILURE_KEYS[status]
+
+  return isNetworkError(error) ? 'network' : 'failed'
 }
 
 const NAME_MAX_LENGTH = 120
@@ -1285,7 +1303,7 @@ watch(
       // 403, 404, 409 and a fault with no HTTP response each get their own
       // copy, so the drawer never stays open in silence. Any other status
       // with neither a code nor a field (a framework 5xx sentence) stays quiet.
-      const saveFailure = SAVE_FAILURE_KEYS[getErrorStatus(submitError) ?? 0]
+      const saveFailure = saveFailureKey(submitError)
       if (code !== null) {
         unmappedErrors.value.push(
           configCopy(

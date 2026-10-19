@@ -1384,7 +1384,8 @@
         "forbidden": "You do not have permission to save this template.",
         "not_found": "This template no longer exists. Reload the page.",
         "conflict": "The template cannot be saved right now. Try again in a moment.",
-        "network": "The template could not be saved. Check your connection and try again."
+        "network": "The template could not be saved. Check your connection and try again.",
+        "failed": "The template could not be saved. Try again, and contact support if it keeps failing."
       },
       "invalid_name": "This name was refused. Check it and try again.",
       "invalid_description": "This description was refused. Check it and try again.",

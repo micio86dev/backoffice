@@ -5,6 +5,7 @@
  * `aria-busy`; a sibling live region carries the announcement.
  */
 import { flushPromises, mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import AvatarTemplateProviderCombobox from '../../app/components/organisms/AvatarTemplateProviderCombobox.vue'
 
@@ -38,5 +39,38 @@ describe('closed-trigger loading announcement', () => {
     expect(trigger.find('[role="status"]').exists()).toBe(false)
     expect(regions[0]!.text()).toBe('avatar_templates.form.catalogue.loading')
     expect(trigger.attributes('aria-busy')).toBe('true')
+  })
+
+  // A live region announces CHANGES to its content: one inserted into the DOM
+  // with its text already inside is frequently not announced at all. So it is
+  // mounted empty, filled after mount, and emptied when loading ends.
+  it('mounts the region empty, fills it after mount and empties it when loaded', async () => {
+    let resolve!: (value: unknown) => void
+    fetchCatalogue.mockReturnValue(new Promise((r) => (resolve = r)))
+    const wrapper = mount(AvatarTemplateProviderCombobox, {
+      props: {
+        field: {
+          key: 'voiceId',
+          type: 'text' as const,
+          label_key: 'x',
+          catalogue_resource: 'voice' as const,
+        },
+        provider: 'heygen',
+        modelValue: '',
+      },
+      attachTo: document.body,
+    })
+
+    const region = wrapper.get('[role="status"]')
+    expect(region.text()).toBe('')
+
+    await nextTick()
+    expect(wrapper.get('[role="status"]').element).toBe(region.element)
+    expect(region.text()).toBe('avatar_templates.form.catalogue.loading')
+
+    resolve({ status: 'ok', items: [] })
+    await flushPromises()
+    expect(wrapper.get('[role="status"]').element).toBe(region.element)
+    expect(region.text()).toBe('')
   })
 })

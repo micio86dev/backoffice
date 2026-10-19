@@ -54,10 +54,33 @@ describe('template form: a save failure with no field and no code', () => {
     expect(wrapper.get(ERRORS).text()).toContain(key)
   })
 
-  it('shows network copy when the rejection carries no HTTP status', async () => {
-    const wrapper = await mountWith(new TypeError('Failed to fetch'))
+  // The network copy is for a request that never got an answer, not for any
+  // rejection that happens to lack a status.
+  it.each([
+    ['a fetch TypeError', new TypeError('Failed to fetch')],
+    [
+      'an ofetch network FetchError',
+      Object.assign(new Error('[POST] "/api/avatar-templates": <no response> Failed to fetch'), {
+        name: 'FetchError',
+        cause: new TypeError('Failed to fetch'),
+      }),
+    ],
+  ])('shows network copy for %s', async (_label, error) => {
+    const wrapper = await mountWith(error)
 
     expect(wrapper.get(ERRORS).text()).toContain('avatar_templates.error.save.network')
+    expect(wrapper.get(ERRORS).text()).not.toContain('avatar_templates.error.save.failed')
+  })
+
+  it.each([
+    ['a plain Error', new Error('boom')],
+    ['an object with no status', { data: {} }],
+    ['a string', 'boom'],
+  ])('shows generic save-failed copy, not the network copy, for %s', async (_label, error) => {
+    const wrapper = await mountWith(error)
+
+    expect(wrapper.get(ERRORS).text()).toContain('avatar_templates.error.save.failed')
+    expect(wrapper.get(ERRORS).text()).not.toContain('avatar_templates.error.save.network')
   })
 
   it('keeps a 503 framework prose message silent, as it is pinned today', async () => {
@@ -98,7 +121,7 @@ describe('template form: a save failure with no field and no code', () => {
     const save = (messages as unknown as { avatar_templates: { error: { save: object } } })
       .avatar_templates.error.save as Record<string, string>
 
-    for (const key of ['forbidden', 'not_found', 'conflict', 'network']) {
+    for (const key of ['forbidden', 'not_found', 'conflict', 'network', 'failed']) {
       expect(typeof save[key]).toBe('string')
       expect(save[key]!.length).toBeGreaterThan(0)
     }
@@ -123,5 +146,25 @@ describe('a coded refusal that has no copy under the config namespace', () => {
     const wrapper = await mountWith({ status: 503, data: { message: 'brand_new_nocopy' } })
 
     expect(wrapper.get(ERRORS).text()).toContain('avatar_templates.error.invalid_value')
+  })
+})
+
+describe('a translator that only stubs `t`', () => {
+  beforeEach(() => {
+    vi.stubGlobal('useI18n', () => ({ t: (key: string) => key }))
+  })
+
+  it('does not throw and shows the generic copy for an unknown code', async () => {
+    const wrapper = await mountWith({
+      status: 422,
+      data: { errors: { 'config.someKnob': ['brand_new_code'], llm_model_id: ['brand_new_code'] } },
+    })
+
+    // Without `te` nothing can be proved to have copy, so no key is echoed back.
+    expect(wrapper.get(ERRORS).text()).toContain('avatar_templates.error.invalid_value')
+    expect(wrapper.get(ERRORS).text()).not.toContain('brand_new_code')
+    expect(wrapper.get('[data-testid="template-llm-model-error"]').text()).toBe(
+      'avatar_templates.error.invalid_value'
+    )
   })
 })

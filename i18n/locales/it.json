@@ -1384,7 +1384,8 @@
         "forbidden": "Non hai i permessi per salvare questo template.",
         "not_found": "Questo template non esiste più. Ricarica la pagina.",
         "conflict": "Al momento il template non può essere salvato. Riprova tra poco.",
-        "network": "Non è stato possibile salvare il template. Controlla la connessione e riprova."
+        "network": "Non è stato possibile salvare il template. Controlla la connessione e riprova.",
+        "failed": "Non è stato possibile salvare il template. Riprova e, se il problema persiste, contatta il supporto."
       },
       "invalid_name": "Questo nome è stato rifiutato. Controllalo e riprova.",
       "invalid_description": "Questa descrizione è stata rifiutata. Controllala e riprova.",

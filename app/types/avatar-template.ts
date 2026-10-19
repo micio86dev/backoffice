@@ -73,6 +73,12 @@ export type CatalogueProvider = CatalogueQuery['provider']
 /** Third-party speech engines whose voices the API can list. */
 export const CATALOGUED_TTS_ENGINES = ['cartesia', 'elevenlabs'] as const
 
+/**
+ * Every external speech engine a Tavus template can bind: the catalogued ones
+ * plus Azure, which has no voice catalogue. The single list the form reads.
+ */
+export const EXTERNAL_TTS_ENGINES = [...CATALOGUED_TTS_ENGINES, 'azure'] as const
+
 type FieldSpecsBody =
   paths['/avatar-templates/field-specs']['get']['responses']['200']['content']['application/json']
 

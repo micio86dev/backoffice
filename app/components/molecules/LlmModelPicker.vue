@@ -7,6 +7,8 @@
       autocomplete="off"
       :class="formSelectClass"
       :value="modelValue ?? ''"
+      :aria-invalid="invalid ? 'true' : undefined"
+      :aria-describedby="describedby"
       @change="onChange"
     >
       <!--
@@ -26,7 +28,7 @@
         >
           {{ model.display_name }}
           <template v-if="!model.is_available">
-            {{ ' ' }}({{ $t('avatar_templates.llm.picker.withdrawn') }})
+            {{ ' ' }}{{ $t('avatar_templates.llm.picker.withdrawnOption') }}
           </template>
         </option>
       </optgroup>
@@ -79,6 +81,10 @@ const props = defineProps<{
   models: LlmModel[]
   /** The bound model's `key`, or `null` — no binding (provider default). */
   modelValue: string | null
+  /** The parent shows an error for this control. */
+  invalid?: boolean
+  /** Id of that error (and any hint), so a screen reader reads it on focus. */
+  describedby?: string
 }>()
 
 const emit = defineEmits<{
@@ -88,6 +94,12 @@ const emit = defineEmits<{
 const managedModels = computed(() => props.models.filter((model) => model.mode === 'managed'))
 const liveModels = computed(() => props.models.filter((model) => model.mode === 'native_duplex'))
 
+/**
+ * Which options the control OFFERS. This is a UI affordance only: the api
+ * enforces the same invariants (I2, I5) on write and stays authoritative, so a
+ * drift here at worst offers or hides a choice the server then accepts or
+ * refuses with a 422 that the form maps back onto this control.
+ */
 function isSelectable(model: LlmModel): boolean {
   if (model.is_available) return true
 

@@ -50,11 +50,15 @@
       data-testid="templates-error"
     >
       <AlertTitle>{{ $t('avatar_templates.error.load_title') }}</AlertTitle>
-      <!-- A 409 is "not ready yet", not a refusal: it says so instead of blaming the role. -->
+      <!--
+        The copy follows the failure class. Only a 403 is about the role: a 409
+        is "not ready yet", a 404 is "not found" and anything else is a plain
+        "try again", none of which should blame the administrator role.
+      -->
       <AlertDescription>{{
-        loadErrorState === 'not-ready'
-          ? $t(resourceErrorKey('not-ready', 'message'))
-          : $t('avatar_templates.error.load_body')
+        loadErrorState === 'forbidden' || loadErrorState === null
+          ? $t('avatar_templates.error.load_body')
+          : $t(resourceErrorKey(loadErrorState, 'message'))
       }}</AlertDescription>
     </Alert>
 

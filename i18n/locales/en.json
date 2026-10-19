@@ -1325,7 +1325,8 @@
         "none": "Provider default (no model bound)",
         "groupManaged": "Text (managed)",
         "groupLive": "Live — coming soon",
-        "withdrawn": "no longer available"
+        "withdrawn": "no longer available",
+        "withdrawnOption": "(withdrawn)"
       },
       "credential": {
         "label": "API credential",
@@ -1376,6 +1377,15 @@
         "credential_required": "Choose a credential: the model and the credential must be set together."
       },
       "write_title": "The change was not applied",
+      "save": {
+        "forbidden": "You do not have permission to save this template.",
+        "not_found": "This template no longer exists. Reload the page.",
+        "conflict": "The template cannot be saved right now. Try again in a moment.",
+        "network": "The template could not be saved. Check your connection and try again."
+      },
+      "invalid_name": "This name was refused. Check it and try again.",
+      "invalid_description": "This description was refused. Check it and try again.",
+      "invalid_value": "This value was refused. Check it and try again.",
       "projectCount": "{count} project is pinned to it. | {count} projects are pinned to it."
     },
     "palSync": {

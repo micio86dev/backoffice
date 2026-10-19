@@ -371,7 +371,7 @@ describe('server 422s (D6 — per-field placement via config.{knob} keys, unmapp
     expect(banner.text()).toContain('unknown')
   })
 
-  it('leaves a bare config error (non-array config) in the summary', () => {
+  it('leaves a bare config error (non-array config) in the summary, as localized copy', () => {
     const wrapper = mount(AvatarTemplateForm, {
       props: {
         template: { name: 'Test template', provider: 'heygen', config: {} },
@@ -382,12 +382,14 @@ describe('server 422s (D6 — per-field placement via config.{knob} keys, unmapp
       global: { mocks: { $t: (key: string) => key } },
     })
 
-    expect(wrapper.get('[data-testid="template-form-errors"]').text()).toContain(
-      'The config field must be an array.'
-    )
+    // The api's sentence is English only: the summary shows the form's own
+    // localized copy, never the prose.
+    const summary = wrapper.get('[data-testid="template-form-errors"]').text()
+    expect(summary).toContain('avatar_templates.error.invalid_value')
+    expect(summary).not.toContain('The config field must be an array.')
   })
 
-  it('maps a top-level name 422 onto the name field', () => {
+  it('maps a top-level name 422 onto the name field, as localized copy', () => {
     const wrapper = mount(AvatarTemplateForm, {
       props: {
         template: { name: 'Test template', provider: 'heygen', config: {} },
@@ -401,9 +403,10 @@ describe('server 422s (D6 — per-field placement via config.{knob} keys, unmapp
       global: { mocks: { $t: (key: string) => key } },
     })
 
-    expect(wrapper.get('[data-testid="template-name-error"]').text()).toContain(
-      'That name is already in use.'
-    )
+    // Localized copy, not the api's English sentence.
+    const error = wrapper.get('[data-testid="template-name-error"]').text()
+    expect(error).toContain('avatar_templates.error.invalid_name')
+    expect(error).not.toContain('That name is already in use.')
   })
 })
 

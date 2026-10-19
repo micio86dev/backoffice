@@ -1325,7 +1325,8 @@
         "none": "Predefinito del fornitore (nessun modello associato)",
         "groupManaged": "Testo (gestito)",
         "groupLive": "Live — in arrivo",
-        "withdrawn": "non più disponibile"
+        "withdrawn": "non più disponibile",
+        "withdrawnOption": "(ritirato)"
       },
       "credential": {
         "label": "Credenziale API",
@@ -1376,6 +1377,15 @@
         "credential_required": "Seleziona una credenziale: modello e credenziale vanno impostati insieme."
       },
       "write_title": "La modifica non è stata applicata",
+      "save": {
+        "forbidden": "Non hai i permessi per salvare questo template.",
+        "not_found": "Questo template non esiste più. Ricarica la pagina.",
+        "conflict": "Al momento il template non può essere salvato. Riprova tra poco.",
+        "network": "Non è stato possibile salvare il template. Controlla la connessione e riprova."
+      },
+      "invalid_name": "Questo nome è stato rifiutato. Controllalo e riprova.",
+      "invalid_description": "Questa descrizione è stata rifiutata. Controllala e riprova.",
+      "invalid_value": "Questo valore è stato rifiutato. Controllalo e riprova.",
       "projectCount": "{count} progetto lo utilizza. | {count} progetti lo utilizzano."
     },
     "palSync": {

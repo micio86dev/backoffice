@@ -192,6 +192,7 @@
           v-model="draft.provider"
           data-testid="template-field-provider"
           :disabled="!isNew"
+          :aria-describedby="isNew ? undefined : 'template-provider-locked'"
           autocomplete="off"
           :class="formSelectClass"
         >
@@ -199,7 +200,7 @@
             {{ $t(`avatar_templates.provider.${name}`) }}
           </option>
         </select>
-        <span v-if="!isNew" class="text-xs text-muted-foreground">
+        <span v-if="!isNew" id="template-provider-locked" class="text-xs text-muted-foreground">
           {{ $t('avatar_templates.form.provider_locked') }}
         </span>
         <!--
@@ -250,9 +251,8 @@
                 <abbr
                   v-if="field.required"
                   :title="$t('avatar_templates.form.required')"
-                  class="no-underline"
-                  >*</abbr
-                >
+                  class="no-underline after:content-['*']"
+                />
               </FieldLabel>
 
               <!--
@@ -423,8 +423,14 @@
           v-model="draft.llmModelKey"
           :label="$t('avatar_templates.llm.picker.label')"
           :models="models"
+          :invalid="Boolean(llmModelError)"
+          :describedby="llmModelError ? 'template-llm-model-error' : undefined"
         />
-        <FieldError v-if="llmModelError" data-testid="template-llm-model-error">
+        <FieldError
+          v-if="llmModelError"
+          id="template-llm-model-error"
+          data-testid="template-llm-model-error"
+        >
           {{ llmModelError }}
         </FieldError>
 
@@ -438,6 +444,7 @@
             data-testid="template-llm-credential"
             autocomplete="off"
             :aria-invalid="Boolean(llmCredentialError)"
+            :aria-describedby="llmCredentialError ? 'template-llm-credential-error' : undefined"
             :class="formSelectClass"
             :value="draft.llmCredentialId === null ? '' : String(draft.llmCredentialId)"
             @change="onCredentialChange"
@@ -447,7 +454,11 @@
               {{ credential.name }}
             </option>
           </select>
-          <FieldError v-if="llmCredentialError" data-testid="template-llm-credential-error">
+          <FieldError
+            v-if="llmCredentialError"
+            id="template-llm-credential-error"
+            data-testid="template-llm-credential-error"
+          >
             {{ llmCredentialError }}
           </FieldError>
         </Field>
@@ -484,8 +495,8 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
-import { getErrorFields, serverMessageCode } from '@/utils/http-error'
-import { translateServerCode } from '@/utils/server-message'
+import { getErrorFields, getErrorStatus, serverMessageCode } from '@/utils/http-error'
+import { translateServerCodeOrFallback } from '@/utils/server-message'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import { usePointerPressGuard } from '@/composables/usePointerPressGuard'
@@ -508,6 +519,7 @@ import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplat
 import type { VoicePreviewRequest } from '@/composables/useVoicePreview'
 import {
   CATALOGUED_TTS_ENGINES,
+  EXTERNAL_TTS_ENGINES,
   type AvatarTemplate,
   type AvatarTemplateSubmit,
   type CatalogueProvider,
@@ -528,6 +540,41 @@ const emit = defineEmits<{
 }>()
 
 const { t, te } = useI18n()
+
+/** The generic copy for a refused value the form has no specific copy for. */
+const INVALID_VALUE_KEY = 'avatar_templates.error.invalid_value'
+
+/**
+ * The api answers some fields in English sentences and some in codes. A code
+ * with copy is translated; a sentence, or a code with no copy, becomes
+ * `fallbackKey`, so nothing untranslated ever reaches the operator.
+ */
+function fieldCopy(message: string, fallbackKey: string): string {
+  return translateServerCodeOrFallback(
+    { t, te },
+    'avatar_templates.error.field',
+    message,
+    fallbackKey
+  )
+}
+
+/** A `config.{knob}` code, or `fallbackKey` (the generic copy) when it has none. */
+function configCopy(code: string, fallbackKey: string = INVALID_VALUE_KEY): string {
+  return translateServerCodeOrFallback(
+    { t, te },
+    'avatar_templates.error.config',
+    code,
+    fallbackKey
+  )
+}
+
+/** Save failures with no field, by HTTP status (`0`: no response at all). */
+const SAVE_FAILURE_KEYS: Record<number, string> = {
+  0: 'network',
+  403: 'forbidden',
+  404: 'not_found',
+  409: 'conflict',
+}
 
 const NAME_MAX_LENGTH = 120
 const DESCRIPTION_MAX_LENGTH = 500
@@ -822,8 +869,6 @@ function onCatalogueLoaded(key: string, ids: string[] | null): void {
   catalogueIds.value = { ...catalogueIds.value, [key]: ids }
 }
 
-const EXTERNAL_TTS_ENGINES = ['cartesia', 'elevenlabs', 'azure']
-
 function isCataloguedEngine(value: unknown): value is (typeof CATALOGUED_TTS_ENGINES)[number] {
   return (CATALOGUED_TTS_ENGINES as readonly unknown[]).includes(value)
 }
@@ -1095,7 +1140,7 @@ function validateReferences(): boolean {
   let ok = true
 
   const refuse = (key: string, code: string): void => {
-    configErrors.value[key] = t(`avatar_templates.error.config.${code}`)
+    configErrors.value[key] = configCopy(code)
     ok = false
   }
 
@@ -1115,7 +1160,8 @@ function validateReferences(): boolean {
     const engine = draft.value.config.ttsEngine
     const voice = draft.value.config.ttsExternalVoiceId
     const hasVoice = typeof voice === 'string' && voice.trim() !== ''
-    const external = typeof engine === 'string' && EXTERNAL_TTS_ENGINES.includes(engine)
+    const external =
+      typeof engine === 'string' && (EXTERNAL_TTS_ENGINES as readonly string[]).includes(engine)
 
     if (external && !hasVoice) refuse('ttsExternalVoiceId', 'tts_voice_required')
     else if (!external && hasVoice) refuse('ttsEngine', 'tts_engine_required')
@@ -1177,12 +1223,24 @@ watch(
       // A refusal no field can carry: a HeyGen bind outage answers 502/503
       // `{message: <code>}` with no `errors` object, so without this the
       // operator would see nothing at all. The code goes in the summary,
-      // through the same copy the per-knob branch uses, raw code as fallback.
+      // through the same copy the per-knob branch uses, generic copy when a
+      // code has none.
       const code = serverMessageCode(submitError)
+      // 403, 404, 409 and a fault with no HTTP response each get their own
+      // copy, so the drawer never stays open in silence. Any other status
+      // with neither a code nor a field (a framework 5xx sentence) stays quiet.
+      const saveFailure = SAVE_FAILURE_KEYS[getErrorStatus(submitError) ?? 0]
       if (code !== null) {
         unmappedErrors.value.push(
-          translateServerCode({ t, te }, 'avatar_templates.error.config', code)
+          configCopy(
+            code,
+            saveFailure === undefined
+              ? INVALID_VALUE_KEY
+              : `avatar_templates.error.save.${saveFailure}`
+          )
         )
+      } else if (submitError !== null && submitError !== undefined && saveFailure !== undefined) {
+        unmappedErrors.value.push(t(`avatar_templates.error.save.${saveFailure}`))
       }
       return
     }
@@ -1204,11 +1262,14 @@ watch(
       // for both, per design D9's existence-oracle doctrine, so this mapper
       // makes no attempt to tell them apart. Same `config.{key}` mechanism as
       // the branch below: a `te()`-gated translation, falling back to the
-      // raw server code when no copy exists for it yet.
+      // generic localized copy when no copy exists for the code yet.
       if (serverField === 'llm_model_id' || serverField === 'llm_credential_id') {
-        const translationKey = `avatar_templates.error.llm.${message}`
-        const hasTranslation = typeof te === 'function' ? te(translationKey) : true
-        const resolved = hasTranslation ? t(translationKey) : message
+        const resolved = translateServerCodeOrFallback(
+          { t, te },
+          'avatar_templates.error.llm',
+          message,
+          INVALID_VALUE_KEY
+        )
 
         if (serverField === 'llm_model_id') llmModelError.value = resolved
         else llmCredentialError.value = resolved
@@ -1220,21 +1281,10 @@ watch(
         const key = serverField.slice(CONFIG_PREFIX.length)
 
         if (activeKeys.has(key)) {
-          const translationKey = `avatar_templates.error.config.${message}`
-          // Falls back to the RAW server code when it has no translation —
-          // an untranslated code the operator can at least read beats an
-          // i18n key echoed back as if it were prose. `te` is optional here
-          // defensively: every REAL i18n instance provides it, but a test
-          // double that only stubs `t` should not crash the whole watcher.
-          const hasTranslation = typeof te === 'function' ? te(translationKey) : true
-          configErrors.value[key] = hasTranslation ? t(translationKey) : message
+          configErrors.value[key] = configCopy(message)
         } else {
-          // Same copy as a field would get, raw code when it has none.
-          const translated = translateServerCode(
-            { t, te },
-            'avatar_templates.error.config',
-            message
-          )
+          // Same copy as a field would get, generic copy when it has none.
+          const translated = configCopy(message)
           if (!unmappedErrors.value.includes(translated)) unmappedErrors.value.push(translated)
         }
 
@@ -1248,9 +1298,14 @@ watch(
         answerMinError.value = t(`avatar_templates.form.errors.${answerRefusalCode('min')}`)
       } else if (serverField === 'answer_max_seconds') {
         answerMaxError.value = t(`avatar_templates.form.errors.${answerRefusalCode('max')}`)
-      } else if (serverField === 'name') nameError.value = message
-      else if (serverField === 'description') descriptionError.value = message
-      else if (!unmappedErrors.value.includes(message)) unmappedErrors.value.push(message)
+      } else if (serverField === 'name') {
+        nameError.value = fieldCopy(message, 'avatar_templates.error.invalid_name')
+      } else if (serverField === 'description') {
+        descriptionError.value = fieldCopy(message, 'avatar_templates.error.invalid_description')
+      } else {
+        const copy = fieldCopy(message, INVALID_VALUE_KEY)
+        if (!unmappedErrors.value.includes(copy)) unmappedErrors.value.push(copy)
+      }
     }
   },
   { immediate: true }

@@ -9,6 +9,7 @@
 import type { paths } from '../../types/api'
 import type {
   AvatarTemplate,
+  PalSyncCode,
   PlatformTemplate,
   PlatformTemplateResponse,
   TemplateResponse,
@@ -23,9 +24,19 @@ type PlatformStored =
 
 export const templateResponseIsDerived: Equal<
   TemplateResponse,
-  Omit<Stored, 'data'> & { data: AvatarTemplate; warning?: string }
+  Omit<Stored, 'data'> & { data: AvatarTemplate; warning?: PalSyncCode }
 > = true
 export const platformResponseIsDerived: Equal<
   PlatformTemplateResponse,
-  Omit<PlatformStored, 'data'> & { data: PlatformTemplate; warning?: string }
+  Omit<PlatformStored, 'data'> & { data: PlatformTemplate; warning?: PalSyncCode }
+> = true
+
+// The `warning` is a persona-sync code (`TavusPalSync` puts its code in `message`,
+// `ValidatesAvatarTemplateWrites` forwards it), so it is the closed `PalSyncCode`
+// set the locale guard already covers, not a bare string.
+export const warningIsAPalSyncCode: Equal<TemplateResponse['warning'], PalSyncCode | undefined> =
+  true
+export const platformWarningIsAPalSyncCode: Equal<
+  PlatformTemplateResponse['warning'],
+  PalSyncCode | undefined
 > = true

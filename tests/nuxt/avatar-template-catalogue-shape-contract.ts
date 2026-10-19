@@ -11,10 +11,13 @@
  */
 import type { paths } from '../../types/api'
 import type {
+  PAL_SYNC_CODES,
   CatalogueEntry,
   CatalogueErrorCode,
   CatalogueStatus,
   PalSync,
+  PalSyncCode,
+  ProviderName,
   CatalogueEnvelope,
   CatalogueResponse,
   FieldSpec,
@@ -67,11 +70,8 @@ export const editableIsOptional: Equal<
   Pick<CatalogueEntry, 'editable'>,
   Pick<GeneratedEntry, 'editable'>
 > = true
-export const italianIsNarrowed: Equal<CatalogueEntry['italian'], 'native' | 'multilingual' | null> =
-  true
-
-// The closed sets Scramble types as plain strings. Each list is checked here
-// against the narrowed type (both directions) and exported, so the unit spec
+// The closed sets are generated enums. Each runtime list is checked here
+// against the generated type (both directions) and exported, so the unit spec
 // can compare the same list with the literals the api source emits.
 export const ITALIAN_VALUES = ['native', 'multilingual'] as const
 export const CATALOGUE_STATUSES = ['ok', 'empty', 'provider_error'] as const
@@ -103,3 +103,29 @@ export const palSyncStatusesExhaustive: Equal<
   (typeof PAL_SYNC_STATUSES)[number],
   NonNullable<PalSync['status']>
 > = true
+export const palSyncCodesExhaustive: Equal<(typeof PAL_SYNC_CODES)[number], PalSyncCode> = true
+
+// Requiredness and value types, not only keys: apart from the one re-narrowed
+// member, the derived types ARE the generated ones.
+export const fieldSpecMatchesGenerated: Equal<
+  Omit<FieldSpec, 'catalogue_resource'>,
+  Omit<GeneratedFieldSpec, 'catalogue_resource'>
+> = true
+export const catalogueResponseMatchesGenerated: Equal<
+  Omit<CatalogueResponse, 'items'>,
+  Omit<GeneratedCatalogue, 'items'>
+> = true
+
+// The provider key set. `ProviderName` types `Record<ProviderName, FieldSpec[]>`
+// and the platform templates; `hr_avatar` is the optional extra key, present
+// only on an organization template. A key the api adds breaks these.
+type GeneratedFieldSpecsData =
+  paths['/avatar-templates/field-specs']['get']['responses']['200']['content']['application/json']['data']
+type StoreProvider =
+  paths['/avatar-templates']['post']['requestBody']['content']['application/json']['provider']
+export const providerNameIsTheRequiredKeys: Equal<
+  ProviderName,
+  Exclude<keyof GeneratedFieldSpecsData, 'hr_avatar'>
+> = true
+export const templateProvidersAreTheStoreEnum: Equal<ProviderName | 'hr_avatar', StoreProvider> =
+  true

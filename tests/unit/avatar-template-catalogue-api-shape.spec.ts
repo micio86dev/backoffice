@@ -19,7 +19,7 @@ import {
   ITALIAN_VALUES,
   PAL_SYNC_STATUSES,
 } from '../nuxt/avatar-template-catalogue-shape-contract'
-import { PAL_SYNC_CODES } from '../../app/types/avatar-template'
+import { EXTERNAL_TTS_ENGINES, PAL_SYNC_CODES } from '../../app/types/avatar-template'
 
 const API_ROOT = process.env.API_ROOT ?? join(__dirname, '../../../api')
 const CATALOGUE = join(API_ROOT, 'app/Support/AvatarTemplates/AvatarProviderCatalogue.php')
@@ -80,5 +80,36 @@ describe.skipIf(!existsSync(PAL_SYNC))('persona sync types against the api sourc
 
   it('PAL_SYNC_CODES lists exactly the codes TavusPalSync emits', () => {
     expect(literals(sync, /'((?:tavus|pal)_[a-z_]+)'/g)).toEqual([...PAL_SYNC_CODES].sort())
+  })
+})
+
+// Not an api-source check: the closed sets must COME FROM the generated client,
+// so a value the api adds or drops reaches the types without a hand edit.
+describe('closed sets are derived from the generated client', () => {
+  const types = readFileSync(join(__dirname, '../../app/types/avatar-template.ts'), 'utf-8')
+
+  it.each([
+    ['FieldType', /export type FieldType\s*=\s*['"]/],
+    ['CatalogueStatus', /export type CatalogueStatus\s*=\s*['"]/],
+    ['CatalogueErrorCode', /export type CatalogueErrorCode\s*=\s*(?:\|\s*)?['"]/],
+    ['CatalogueEntry.italian', /italian:\s*['"]native['"]/],
+    ['PalSync.status', /status:\s*['"]synced['"]/],
+    ['PalSyncCode', /export type PalSyncCode\s*=\s*\(typeof/],
+  ])('has no hand-written union for %s', (_name, handWritten) => {
+    expect(types).not.toMatch(handWritten)
+  })
+})
+
+const FIELD_SPECS = join(API_ROOT, 'app/Support/AvatarTemplates/ProviderFieldSpecs.php')
+
+describe.skipIf(!existsSync(FIELD_SPECS))('external speech engines against the api source', () => {
+  it('are the Tavus ttsEngine options other than tavus-auto', () => {
+    const options = /options: \['tavus-auto', ([^\]]*)\], palPath: 'layers\/tts\/tts_engine'/.exec(
+      code(FIELD_SPECS)
+    )?.[1]
+    const engines = [...(options ?? '').matchAll(/'([a-z]+)'/g)].map((m) => m[1]!)
+
+    expect(engines.length).toBeGreaterThan(0)
+    expect([...EXTERNAL_TTS_ENGINES].sort()).toEqual(engines.sort())
   })
 })

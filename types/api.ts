@@ -3112,8 +3112,10 @@ export interface components {
                 } | null;
             };
             pal_sync: {
-                status: string | null;
-                code: string | null;
+                /** @enum {string|null} */
+                status: "skipped" | "synced" | "warning" | null;
+                /** @enum {string|null} */
+                code: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | null;
                 synced_at: string | null;
             };
             persona: {
@@ -3365,6 +3367,12 @@ export interface components {
             };
         };
         /**
+         * FieldType
+         * @description How a template field is entered and validated: free `text`, a `number` within `min`/`max`, one of a `select`'s `options`, or a `checkbox`.
+         * @enum {string}
+         */
+        FieldType: "text" | "number" | "select" | "checkbox";
+        /**
          * ForgotPasswordRequest
          * @description The body of `POST /api/auth/forgot-password`. Only the format of the email address is
          *     validated, so the response never reveals whether an account exists.
@@ -3575,8 +3583,10 @@ export interface components {
                 } | null;
             };
             pal_sync: {
-                status: string | null;
-                code: string | null;
+                /** @enum {string|null} */
+                status: "skipped" | "synced" | "warning" | null;
+                /** @enum {string|null} */
+                code: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | null;
                 synced_at: string | null;
             };
             persona: {
@@ -5086,7 +5096,7 @@ export interface operations {
                         data: {
                             heygen: {
                                 key: string;
-                                type: string;
+                                type: components["schemas"]["FieldType"];
                                 label_key: string;
                                 hint_key?: string;
                                 required?: boolean;
@@ -5105,7 +5115,7 @@ export interface operations {
                             }[];
                             tavus: {
                                 key: string;
-                                type: string;
+                                type: components["schemas"]["FieldType"];
                                 label_key: string;
                                 hint_key?: string;
                                 required?: boolean;
@@ -5124,7 +5134,7 @@ export interface operations {
                             }[];
                             hr_avatar?: {
                                 key: string;
-                                type: string;
+                                type: components["schemas"]["FieldType"];
                                 label_key: string;
                                 hint_key?: string;
                                 required?: boolean;
@@ -5174,7 +5184,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            status: string;
+                            /** @enum {string} */
+                            status: "ok" | "empty" | "provider_error";
                             items: {
                                 id: string;
                                 provider: string;
@@ -5183,14 +5194,16 @@ export interface operations {
                                 language: string | null;
                                 locale: string | null;
                                 accent: string | null;
-                                italian: string | null;
+                                /** @enum {string|null} */
+                                italian: "native" | "multilingual" | null;
                                 preview_image_url: string | null;
                                 preview_audio_url: string | null;
                                 preview_audio_via_api: boolean;
                                 preview_video_url: string | null;
                                 editable?: boolean | null;
                             }[];
-                            code?: string;
+                            /** @enum {string} */
+                            code?: "provider_key_missing" | "provider_unauthorized" | "provider_rate_limited" | "provider_unavailable" | "provider_unreachable" | "provider_rejected" | "provider_bad_response" | "unsupported_catalogue";
                         };
                     };
                 };
@@ -8607,7 +8620,7 @@ export interface operations {
                         data: {
                             heygen: {
                                 key: string;
-                                type: string;
+                                type: components["schemas"]["FieldType"];
                                 label_key: string;
                                 hint_key?: string;
                                 required?: boolean;
@@ -8626,7 +8639,7 @@ export interface operations {
                             }[];
                             tavus: {
                                 key: string;
-                                type: string;
+                                type: components["schemas"]["FieldType"];
                                 label_key: string;
                                 hint_key?: string;
                                 required?: boolean;

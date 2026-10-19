@@ -5,8 +5,6 @@
  * Also: one list of external speech engines, in the types file.
  */
 import { flushPromises, mount } from '@vue/test-utils'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import AvatarTemplateForm from '../../app/components/organisms/AvatarTemplateForm.vue'
 import LlmModelPicker from '../../app/components/molecules/LlmModelPicker.vue'
@@ -86,12 +84,38 @@ describe('external speech engines', () => {
     expect([...EXTERNAL_TTS_ENGINES]).toEqual([...CATALOGUED_TTS_ENGINES, 'azure'])
   })
 
-  it('are not redefined inside the form', () => {
-    const source = readFileSync(
-      join(__dirname, '../../app/components/organisms/AvatarTemplateForm.vue'),
-      'utf-8'
-    )
+  // Behavioural, not a source scan: the form decides "external engine, so a voice
+  // is required" for exactly the engines the types file lists. A stray local copy
+  // of the list (or one that drifted) would classify a different set.
+  it('are exactly the engines the form asks a voice for', async () => {
+    const candidates = ['tavus-auto', ...EXTERNAL_TTS_ENGINES, 'not-an-engine']
+    const askedForVoice: string[] = []
 
-    expect(source).not.toMatch(/const EXTERNAL_TTS_ENGINES/)
+    for (const engine of candidates) {
+      const wrapper = mount(AvatarTemplateForm, {
+        props: {
+          template: { name: 'T', provider: 'tavus', config: { ttsEngine: engine } },
+          fieldSpecs: {
+            heygen: [],
+            tavus: [
+              { key: 'ttsEngine', type: 'select', label_key: 'x', options: candidates },
+              { key: 'ttsExternalVoiceId', type: 'text', label_key: 'y' },
+            ],
+          },
+          saving: false,
+          submitError: null,
+        },
+        global: { mocks: { $t: (key: string) => key } },
+      })
+      await flushPromises()
+      await wrapper.get('form').trigger('submit')
+      await flushPromises()
+
+      if (wrapper.text().includes('avatar_templates.error.config.tts_voice_required')) {
+        askedForVoice.push(engine)
+      }
+    }
+
+    expect(askedForVoice).toEqual([...EXTERNAL_TTS_ENGINES])
   })
 })

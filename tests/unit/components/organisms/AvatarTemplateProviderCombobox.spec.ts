@@ -5,6 +5,12 @@
  * third-party engines do; tavus (its voice is chosen elsewhere) and hr_avatar
  * (a config id, not a voice) never do. The default heygen path is asserted
  * beside the new case so the narrowing cannot spread.
+ *
+ * The harness mounts a VOICE-resource field for every provider, so the
+ * `hr_avatar` cases here are a synthetic combination (a real hr_avatar field
+ * lists `avatar_config` entries, not voices): they pin the provider narrowing
+ * in the component, not the page wiring. Each case first proves the voice row
+ * is rendered, so "no preview control" can never pass on an empty list.
  */
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -60,6 +66,9 @@ async function open(provider: CatalogueProvider, modelValue = '') {
   return wrapper
 }
 
+const row = (wrapper: Awaited<ReturnType<typeof open>>) =>
+  wrapper.find(`[data-testid="${P}-item-v1"]`)
+
 const previews = (wrapper: Awaited<ReturnType<typeof open>>) =>
   wrapper
     .findAll('[data-testid]')
@@ -70,18 +79,21 @@ describe('voice preview controls by provider', () => {
   it('offers the Italian sample on a heygen voice row, as before', async () => {
     const wrapper = await open('heygen')
 
+    expect(row(wrapper).exists()).toBe(true)
     expect(previews(wrapper)).toContain(`${P}-italian-preview-v1`)
   })
 
   it.each(['tavus', 'hr_avatar'] as const)('offers none on a %s row', async (provider) => {
     const wrapper = await open(provider)
 
+    expect(row(wrapper).exists()).toBe(true)
     expect(previews(wrapper)).toEqual([])
   })
 
   it('falls back to the no-vendor provider for the selected-voice block', async () => {
     const wrapper = await open('hr_avatar', 'v1')
 
+    expect(row(wrapper).exists()).toBe(true)
     expect(wrapper.find(`[data-testid="${P}-voice-preview"]`).exists()).toBe(true)
     expect(previews(wrapper)).toEqual([])
   })

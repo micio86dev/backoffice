@@ -21,6 +21,10 @@ afterEach(() => {
 })
 
 async function failWith(error: unknown) {
+  // The page module caches the composable doubles it was first imported with,
+  // so every call starts from a clean module graph or later cases would
+  // silently re-run the first one.
+  vi.resetModules()
   vi.doMock('../../app/composables/useOrganization', organizationDouble)
   vi.doMock('../../app/composables/useCurrencies', currenciesDouble)
   vi.doMock('../../app/composables/useCurrentUser', () => ({
@@ -59,12 +63,13 @@ describe('load error copy by failure class', () => {
     expect(text).not.toContain('avatar_templates.error.load_body')
   })
 
-  it('says "try again" for a network fault or a server error', async () => {
-    for (const error of [new Error('boom'), http(500)]) {
-      const text = await failWith(error)
+  it.each([
+    ['a network fault', new Error('boom')],
+    ['an HTTP 500', http(500)],
+  ])('says "try again" for %s', async (_label, error) => {
+    const text = await failWith(error)
 
-      expect(text).toContain('errors.states.error.message')
-      expect(text).not.toContain('avatar_templates.error.load_body')
-    }
+    expect(text).toContain('errors.states.error.message')
+    expect(text).not.toContain('avatar_templates.error.load_body')
   })
 })

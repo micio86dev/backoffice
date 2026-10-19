@@ -94,7 +94,9 @@ describe('closed sets are derived from the generated client', () => {
     ['CatalogueErrorCode', /export type CatalogueErrorCode\s*=\s*(?:\|\s*)?['"]/],
     ['CatalogueEntry.italian', /italian:\s*['"]native['"]/],
     ['PalSync.status', /status:\s*['"]synced['"]/],
-    ['PalSyncCode', /export type PalSyncCode\s*=\s*\(typeof/],
+    // A literal union, or one derived from the hand-kept PAL_SYNC_CODES const (circular:
+    // that const is itself checked against this type).
+    ['PalSyncCode', /export type PalSyncCode\s*=\s*(?:\|\s*)?(?:['"]|\(typeof)/],
   ])('has no hand-written union for %s', (_name, handWritten) => {
     expect(types).not.toMatch(handWritten)
   })

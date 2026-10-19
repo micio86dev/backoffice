@@ -32,11 +32,23 @@ export const platformResponseIsDerived: Equal<
 > = true
 
 // The `warning` is a persona-sync code (`TavusPalSync` puts its code in `message`,
-// `ValidatesAvatarTemplateWrites` forwards it), so it is the closed `PalSyncCode`
-// set the locale guard already covers, not a bare string.
-export const warningIsAPalSyncCode: Equal<TemplateResponse['warning'], PalSyncCode | undefined> =
-  true
-export const platformWarningIsAPalSyncCode: Equal<
-  PlatformTemplateResponse['warning'],
-  PalSyncCode | undefined
+// `ValidatesAvatarTemplateWrites` forwards it). The generated envelope does not
+// carry it (conditional, attached by `additional()`), so it is compared with the
+// generated `pal_sync.code` enum of the SAME response, read straight from `paths`
+// and not through the types file's own aliases: a code the api adds or drops, or a
+// hand-written union that drifts, stops this compiling.
+export const warningIsTheGeneratedPalSyncCode: Equal<
+  NonNullable<TemplateResponse['warning']>,
+  NonNullable<Stored['data']['pal_sync']['code']>
+> = true
+export const platformWarningIsTheGeneratedPalSyncCode: Equal<
+  NonNullable<PlatformTemplateResponse['warning']>,
+  NonNullable<PlatformStored['data']['pal_sync']['code']>
+> = true
+
+// Sentinel for the day the api documents `warning` itself: the hand-added member
+// above is then redundant and must be derived from the generated one instead.
+export const generatedEnvelopesDoNotCarryWarningYet: Equal<
+  'warning' extends keyof Stored ? true : false,
+  false
 > = true

@@ -2,9 +2,9 @@
  * COMPILE-TIME contract — enforced by `bun run typecheck`, not by Vitest.
  *
  * The single-template envelopes are the generated store/update bodies with
- * `data` re-narrowed to the template shape and the conditional `warning` code
- * added (Scramble sees the resource, not the `additional()` an unhappy path
- * attaches). A change to the generated envelope breaks the derivation.
+ * `data` re-narrowed to the template shape. `warning` is the generated optional
+ * enum of the same envelope (persona-sync AND conversation-model codes), never a
+ * hand-written union. A change to the generated envelope breaks the derivation.
  */
 import type { paths } from '../../types/api'
 import type {
@@ -21,34 +21,56 @@ type Equal<A, B> =
 type Stored = paths['/avatar-templates']['post']['responses']['201']['content']['application/json']
 type PlatformStored =
   paths['/admin/avatar-templates']['post']['responses']['201']['content']['application/json']
+type Updated =
+  paths['/avatar-templates/{id}']['patch']['responses']['200']['content']['application/json']
+type Activated =
+  paths['/avatar-templates/{id}/activate']['post']['responses']['200']['content']['application/json']
+type PlatformUpdated =
+  paths['/admin/avatar-templates/{id}']['patch']['responses']['200']['content']['application/json']
 
 export const templateResponseIsDerived: Equal<
   TemplateResponse,
-  Omit<Stored, 'data'> & { data: AvatarTemplate; warning?: PalSyncCode }
+  Omit<Stored, 'data'> & { data: AvatarTemplate }
 > = true
 export const platformResponseIsDerived: Equal<
   PlatformTemplateResponse,
-  Omit<PlatformStored, 'data'> & { data: PlatformTemplate; warning?: PalSyncCode }
+  Omit<PlatformStored, 'data'> & { data: PlatformTemplate }
 > = true
 
-// The `warning` is a persona-sync code (`TavusPalSync` puts its code in `message`,
-// `ValidatesAvatarTemplateWrites` forwards it). The generated envelope does not
-// carry it (conditional, attached by `additional()`), so it is compared with the
-// generated `pal_sync.code` enum of the SAME response, read straight from `paths`
-// and not through the types file's own aliases: a code the api adds or drops, or a
-// hand-written union that drifts, stops this compiling.
-export const warningIsTheGeneratedPalSyncCode: Equal<
+// `warning` is the generated enum of the SAME envelope: the eight Tavus persona-sync
+// codes plus the four HeyGen `llm_*` codes. A code the api adds or drops stops this
+// compiling, and so does narrowing it back to `PalSyncCode` by hand.
+export const warningIsTheGeneratedEnum: Equal<
   NonNullable<TemplateResponse['warning']>,
-  NonNullable<Stored['data']['pal_sync']['code']>
+  NonNullable<Stored['warning']>
 > = true
-export const platformWarningIsTheGeneratedPalSyncCode: Equal<
+export const platformWarningIsTheGeneratedEnum: Equal<
   NonNullable<PlatformTemplateResponse['warning']>,
-  NonNullable<PlatformStored['data']['pal_sync']['code']>
+  NonNullable<PlatformStored['warning']>
 > = true
 
-// Sentinel for the day the api documents `warning` itself: the hand-added member
-// above is then redundant and must be derived from the generated one instead.
-export const generatedEnvelopesDoNotCarryWarningYet: Equal<
-  'warning' extends keyof Stored ? true : false,
-  false
+// The write routes document one and the same set, so one derived type serves all.
+export const updateWarningMatchesStore: Equal<
+  NonNullable<Updated['warning']>,
+  NonNullable<Stored['warning']>
+> = true
+export const activateWarningMatchesStore: Equal<
+  NonNullable<Activated['warning']>,
+  NonNullable<Stored['warning']>
+> = true
+export const platformUpdateWarningMatchesStore: Equal<
+  NonNullable<PlatformUpdated['warning']>,
+  NonNullable<PlatformStored['warning']>
+> = true
+export const platformWarningMatchesOrg: Equal<
+  NonNullable<PlatformStored['warning']>,
+  NonNullable<Stored['warning']>
+> = true
+
+// It is STRICTLY wider than the persona-sync set (the `llm_*` codes are extra), which
+// is why `PalSyncCode` must not type it: a non-empty difference, not a subset check,
+// so a collapse back to the Tavus set stops compiling.
+export const warningIsWiderThanPalSync: Equal<
+  [Exclude<NonNullable<TemplateResponse['warning']>, PalSyncCode>] extends [never] ? false : true,
+  true
 > = true

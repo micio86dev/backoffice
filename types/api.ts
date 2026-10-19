@@ -5232,6 +5232,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["AvatarTemplateResource"];
+                        /** @enum {string} */
+                        warning?: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | "llm_provider_unreachable" | "llm_credential_missing" | "llm_secret_failed" | "llm_config_failed";
                     };
                 };
             };
@@ -5328,6 +5330,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["AvatarTemplateResource"];
+                        /** @enum {string} */
+                        warning?: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | "llm_provider_unreachable" | "llm_credential_missing" | "llm_secret_failed" | "llm_config_failed";
                     };
                 };
             };
@@ -5444,6 +5448,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["AvatarTemplateResource"];
+                        /** @enum {string} */
+                        warning?: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | "llm_provider_unreachable" | "llm_credential_missing" | "llm_secret_failed" | "llm_config_failed";
                     };
                 };
             };
@@ -8725,6 +8731,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["PlatformAvatarTemplateResource"];
+                        /** @enum {string} */
+                        warning?: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | "llm_provider_unreachable" | "llm_credential_missing" | "llm_secret_failed" | "llm_config_failed";
                     };
                 };
             };
@@ -8833,6 +8841,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["PlatformAvatarTemplateResource"];
+                        /** @enum {string} */
+                        warning?: "tavus_key_missing" | "pal_id_missing" | "pal_not_editable" | "pal_sync_rejected" | "pal_sync_unauthorized" | "pal_not_found" | "pal_sync_failed" | "pal_sync_unreachable" | "llm_provider_unreachable" | "llm_credential_missing" | "llm_secret_failed" | "llm_config_failed";
                     };
                 };
             };

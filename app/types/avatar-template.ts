@@ -225,18 +225,19 @@ export type AvatarTemplate = OmitStrict<
 /**
  * A single template response.
  *
- * `warning` carries a STABLE CODE when the persona sync did not reach the
+ * `warning` carries a STABLE CODE when part of the save did not reach the
  * provider — never the provider's own words. The save itself succeeded; the
  * operator needs to know a knob has not taken effect yet, and telling them in
  * the vendor's language would name the vendor.
  *
- * Absent from the generated schema because it is conditional: Scramble sees the
- * resource, not the `additional()` an unhappy path attaches.
+ * Generated: an optional enum of the persona-sync codes (Tavus) and the
+ * conversation-model codes (HeyGen `llm_*`), so it is wider than `PalSyncCode`.
+ * Only `data` is re-narrowed here.
  */
 export type TemplateResponse = OmitStrict<
   paths['/avatar-templates']['post']['responses']['201']['content']['application/json'],
   'data'
-> & { data: AvatarTemplate; warning?: PalSyncCode }
+> & { data: AvatarTemplate }
 
 export type TemplateListResponse = OmitStrict<
   paths['/avatar-templates']['get']['responses']['200']['content']['application/json'],
@@ -287,11 +288,11 @@ export type PlatformTemplate = OmitStrict<
 
 export type PlatformTemplateUsage = GeneratedPlatformTemplate['usage']
 
-/** Same conditional `warning` code as `TemplateResponse`, for the platform routes. */
+/** Same generated `warning` code as `TemplateResponse`, for the platform routes. */
 export type PlatformTemplateResponse = OmitStrict<
   paths['/admin/avatar-templates']['post']['responses']['201']['content']['application/json'],
   'data'
-> & { data: PlatformTemplate; warning?: PalSyncCode }
+> & { data: PlatformTemplate }
 
 /** Derived from the generated list response; only `data` is re-narrowed. */
 export type PlatformTemplateListResponse = OmitStrict<

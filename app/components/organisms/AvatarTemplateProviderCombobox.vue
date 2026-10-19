@@ -13,7 +13,7 @@
       role="combobox"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
-      :aria-controls="panelId"
+      :aria-controls="isOpen ? panelId : undefined"
       :aria-busy="state === 'loading' ? 'true' : undefined"
       :class="cn(formSelectClass, 'flex items-center justify-between gap-2 text-left')"
       @click="toggle"
@@ -29,14 +29,12 @@
         <!--
           The catalogue can load while the panel is closed, and the panel is
           the only other place that says so. Shown on the trigger so a slow
-          provider never reads as a control that is simply empty. It carries
-          `role="status"` only while the panel is CLOSED: an open panel renders
-          its own status line, and two live regions would announce it twice.
+          provider never reads as a control that is simply empty. It is visual
+          only: the live-region announcement is the sibling below the button.
         -->
         <span
           v-if="state === 'loading'"
           :data-testid="`${testIdPrefix}-trigger-loading`"
-          :role="isOpen ? undefined : 'status'"
           class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
         >
           <LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
@@ -52,6 +50,16 @@
       </span>
       <ChevronDownIcon class="size-4 shrink-0 opacity-60" aria-hidden="true" />
     </button>
+    <!--
+      The announcement of the loading state while the panel is CLOSED. It lives
+      beside the trigger, not inside it: the children of a button are
+      presentational, so a status region there may never be exposed. An open
+      panel renders its own status line, and two live regions would announce
+      it twice.
+    -->
+    <span v-if="state === 'loading' && !isOpen" role="status" class="sr-only">
+      {{ t('avatar_templates.form.catalogue.loading') }}
+    </span>
 
     <!--
       Inline, deliberately NOT teleported to <body>. A teleported list sits
@@ -139,8 +147,23 @@
         {{ t('avatar_templates.form.catalogue.noMatch') }}
       </p>
 
-      <ul v-else role="listbox" class="flex max-h-72 flex-col gap-1 overflow-y-auto">
-        <li v-for="candidate in visibleEntries" :key="candidate.id" role="none">
+      <div
+        v-else
+        role="listbox"
+        :aria-label="t(field.label_key)"
+        class="flex max-h-72 flex-col gap-1 overflow-y-auto"
+      >
+        <!--
+          A listbox may own only options and groups. Each row is a labelled
+          group: its one option, plus (voices) the sample controls beside it,
+          which are not options and so must not be listbox children.
+        -->
+        <div
+          v-for="candidate in visibleEntries"
+          :key="candidate.id"
+          role="group"
+          :aria-label="candidate.label"
+        >
           <button
             type="button"
             role="option"
@@ -269,8 +292,8 @@
           >
             {{ sampleErrorText(candidate) }}
           </p>
-        </li>
-      </ul>
+        </div>
+      </div>
     </div>
 
     <!--
@@ -471,12 +494,15 @@ const resource = computed<CatalogueResource>(() => props.field.catalogue_resourc
 // Tavus's own stock voices have no synthesised sample (the button would only
 // ever be disabled), so a Tavus list row gets none.
 const previewProvider = computed<'heygen' | 'cartesia' | 'elevenlabs' | null>(() =>
-  props.provider === 'tavus' ? null : props.provider
+  props.provider === 'tavus' || props.provider === 'hr_avatar' ? null : props.provider
 )
-const blockPreview = computed(() => ({
-  provider: props.preview?.provider ?? props.provider,
-  ttsEngine: props.preview?.ttsEngine ?? null,
-}))
+const blockPreview = computed(() => {
+  // `tavus` is the no-voice-vendor value: the block that reads this renders only
+  // for a voice or persona list, never for an HR-Avatar config list.
+  const provider = props.preview?.provider ?? previewProvider.value ?? 'tavus'
+
+  return { provider, ttsEngine: props.preview?.ttsEngine ?? null }
+})
 const testIdPrefix = computed(() => `template-config-${props.field.key}`)
 const panelId = computed(() => `${testIdPrefix.value}-panel`)
 

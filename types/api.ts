@@ -333,10 +333,10 @@ export interface paths {
         };
         /**
          * List a provider's catalogue
-         * @description Returns what the provider offers for one resource type (voices, avatars, replicas or
-         *     personas), as the data source of the template picker. A provider failure is reported as
-         *     `{status: "unavailable", items: []}`, not as an error; an unrecognized `provider`/`resource`
-         *     pair answers `422`.
+         * @description Returns what the provider offers for one resource type (voices, avatars, replicas,
+         *     personas, or the organization's HR-Avatar configs), as the data source of the template picker.
+         *     A provider failure is reported as `{status: "provider_error", items: [], code: "<safe code>"}`,
+         *     not as an error; an unrecognized `provider`/`resource` pair answers `422`.
          */
         get: operations["avatarTemplate.catalogue"];
         put?: never;
@@ -3121,6 +3121,7 @@ export interface components {
             };
             answer_min_seconds: number;
             answer_max_seconds: number;
+            hr_avatar_config_id?: string;
         };
         /**
          * AvatarTemplateScope
@@ -3583,6 +3584,7 @@ export interface components {
             };
             answer_min_seconds: number;
             answer_max_seconds: number;
+            hr_avatar_config_id?: string;
             usage: {
                 organization_count: number;
                 project_count: number;
@@ -5120,6 +5122,25 @@ export interface operations {
                                 superseded_by_key?: string;
                                 superseded_by_values?: string[];
                             }[];
+                            hr_avatar?: {
+                                key: string;
+                                type: string;
+                                label_key: string;
+                                hint_key?: string;
+                                required?: boolean;
+                                options?: string[];
+                                min?: number;
+                                max?: number;
+                                step?: number;
+                                catalogue_resource?: string;
+                                options_depend_on?: string;
+                                options_by_value?: {
+                                    [key: string]: string[];
+                                };
+                                superadmin_only?: boolean;
+                                superseded_by_key?: string;
+                                superseded_by_values?: string[];
+                            }[];
                         };
                     };
                 };
@@ -5132,8 +5153,8 @@ export interface operations {
         parameters: {
             query: {
                 /** @description The provider to query: `heygen`, `tavus`, `cartesia` or `elevenlabs`. */
-                provider: "heygen" | "tavus" | "cartesia" | "elevenlabs";
-                resource: "voice" | "avatar" | "replica" | "pal";
+                provider: "heygen" | "tavus" | "cartesia" | "elevenlabs" | "hr_avatar";
+                resource: "voice" | "avatar" | "replica" | "pal" | "avatar_config";
                 /**
                  * @description Keep only genuinely Italian voices (`italian` = native). The
                  *     list is already sorted Italian-first without it.
@@ -5154,7 +5175,21 @@ export interface operations {
                     "application/json": {
                         data: {
                             status: string;
-                            items: unknown[];
+                            items: {
+                                id: string;
+                                provider: string;
+                                label: string;
+                                name: string;
+                                language: string | null;
+                                locale: string | null;
+                                accent: string | null;
+                                italian: string | null;
+                                preview_image_url: string | null;
+                                preview_audio_url: string | null;
+                                preview_audio_via_api: boolean;
+                                preview_video_url: string | null;
+                                editable?: boolean | null;
+                            }[];
                             code?: string;
                         };
                     };
@@ -5257,8 +5292,8 @@ export interface operations {
                      * @description Literal list — see catalogue()'s validation for why implode(self::PROVIDERS) is not used.
                      * @enum {string}
                      */
-                    provider: "heygen" | "tavus";
-                    config: string[];
+                    provider: "heygen" | "tavus" | "hr_avatar";
+                    config?: string[];
                     /** @description Bind a language model to the template. `llm_model_id` and `llm_credential_id` are both set or both null. */
                     llm_model_id?: number | null;
                     llm_credential_id?: number | null;
@@ -5267,6 +5302,7 @@ export interface operations {
                     persona?: {
                         display_name?: string | null;
                     };
+                    hr_avatar_config_id?: string | null;
                 };
             };
         };
@@ -5382,6 +5418,7 @@ export interface operations {
                     persona?: {
                         display_name?: string | null;
                     };
+                    hr_avatar_config_id?: string | null;
                 };
             };
         };
@@ -5462,15 +5499,14 @@ export interface operations {
                             description: string | null;
                             provider: string;
                             config: unknown[];
-                            /** @description Persona is optional: a template may be pure provider config. */
                             persona: unknown[] | null;
                             answer_min_seconds: number;
                             answer_max_seconds: number;
-                            /** @description The language model binding, by model key and credential name; `null` when the template has none. */
                             llm: {
                                 model_key: string;
                                 credential_name: string;
                             } | null;
+                            hr_avatar_config_id?: string;
                         }[];
                     };
                 };
@@ -7578,6 +7614,10 @@ export interface operations {
                         continuation?: {
                             conversation_id: string;
                             competency_code: string;
+                        };
+                        hr_avatar?: {
+                            base_url: string;
+                            publishable_key: string;
                         };
                     };
                 };

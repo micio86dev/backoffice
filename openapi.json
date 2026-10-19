@@ -1452,6 +1452,97 @@
                                                             "label_key"
                                                         ]
                                                     }
+                                                },
+                                                "hr_avatar": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "key": {
+                                                                "type": "string"
+                                                            },
+                                                            "type": {
+                                                                "type": "string"
+                                                            },
+                                                            "label_key": {
+                                                                "type": "string"
+                                                            },
+                                                            "hint_key": {
+                                                                "type": "string"
+                                                            },
+                                                            "required": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "options": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "min": {
+                                                                "anyOf": [
+                                                                    {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    {
+                                                                        "type": "number"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "max": {
+                                                                "anyOf": [
+                                                                    {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    {
+                                                                        "type": "number"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "step": {
+                                                                "anyOf": [
+                                                                    {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    {
+                                                                        "type": "number"
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "catalogue_resource": {
+                                                                "type": "string"
+                                                            },
+                                                            "options_depend_on": {
+                                                                "type": "string"
+                                                            },
+                                                            "options_by_value": {
+                                                                "type": "object",
+                                                                "additionalProperties": {
+                                                                    "type": "array",
+                                                                    "items": {
+                                                                        "type": "string"
+                                                                    }
+                                                                }
+                                                            },
+                                                            "superadmin_only": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "superseded_by_key": {
+                                                                "type": "string"
+                                                            },
+                                                            "superseded_by_values": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "key",
+                                                            "type",
+                                                            "label_key"
+                                                        ]
+                                                    }
                                                 }
                                             },
                                             "required": [
@@ -1479,7 +1570,7 @@
         "/avatar-templates/catalogue": {
             "get": {
                 "operationId": "avatarTemplate.catalogue",
-                "description": "Returns what the provider offers for one resource type (voices, avatars, replicas or\npersonas), as the data source of the template picker. A provider failure is reported as\n`{status: \"unavailable\", items: []}`, not as an error; an unrecognized `provider`/`resource`\npair answers `422`.",
+                "description": "Returns what the provider offers for one resource type (voices, avatars, replicas,\npersonas, or the organization's HR-Avatar configs), as the data source of the template picker.\nA provider failure is reported as `{status: \"provider_error\", items: [], code: \"<safe code>\"}`,\nnot as an error; an unrecognized `provider`/`resource` pair answers `422`.",
                 "summary": "List a provider's catalogue",
                 "tags": [
                     "AvatarTemplate"
@@ -1496,7 +1587,8 @@
                                 "heygen",
                                 "tavus",
                                 "cartesia",
-                                "elevenlabs"
+                                "elevenlabs",
+                                "hr_avatar"
                             ]
                         }
                     },
@@ -1510,7 +1602,8 @@
                                 "voice",
                                 "avatar",
                                 "replica",
-                                "pal"
+                                "pal",
+                                "avatar_config"
                             ]
                         }
                     },
@@ -1539,7 +1632,88 @@
                                                 },
                                                 "items": {
                                                     "type": "array",
-                                                    "items": {}
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string"
+                                                            },
+                                                            "provider": {
+                                                                "type": "string"
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            },
+                                                            "language": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "locale": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "accent": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "italian": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "preview_image_url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "preview_audio_url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "preview_audio_via_api": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "preview_video_url": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "editable": {
+                                                                "type": [
+                                                                    "boolean",
+                                                                    "null"
+                                                                ]
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "provider",
+                                                            "label",
+                                                            "name",
+                                                            "language",
+                                                            "locale",
+                                                            "accent",
+                                                            "italian",
+                                                            "preview_image_url",
+                                                            "preview_audio_url",
+                                                            "preview_audio_via_api",
+                                                            "preview_video_url"
+                                                        ]
+                                                    }
                                                 },
                                                 "code": {
                                                     "type": "string"
@@ -1726,15 +1900,15 @@
                                         "description": "Literal list \u2014 see catalogue()'s validation for why implode(self::PROVIDERS) is not used.",
                                         "enum": [
                                             "heygen",
-                                            "tavus"
+                                            "tavus",
+                                            "hr_avatar"
                                         ]
                                     },
                                     "config": {
                                         "type": "array",
                                         "items": {
                                             "type": "string"
-                                        },
-                                        "minItems": 1
+                                        }
                                     },
                                     "llm_model_id": {
                                         "type": [
@@ -1769,12 +1943,19 @@
                                                 ]
                                             }
                                         }
+                                    },
+                                    "hr_avatar_config_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "pattern": "^avc_[0-9A-Za-z]+$",
+                                        "maxLength": 64
                                     }
                                 },
                                 "required": [
                                     "name",
-                                    "provider",
-                                    "config"
+                                    "provider"
                                 ]
                             }
                         }
@@ -1925,6 +2106,14 @@
                                                 ]
                                             }
                                         }
+                                    },
+                                    "hr_avatar_config_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "pattern": "^avc_[0-9A-Za-z]+$",
+                                        "maxLength": 64
                                     }
                                 }
                             }
@@ -2184,7 +2373,6 @@
                                                             "array",
                                                             "null"
                                                         ],
-                                                        "description": "Persona is optional: a template may be pure provider config.",
                                                         "items": {}
                                                     },
                                                     "answer_min_seconds": {
@@ -2198,7 +2386,6 @@
                                                             "object",
                                                             "null"
                                                         ],
-                                                        "description": "The language model binding, by model key and credential name; `null` when the template has none.",
                                                         "properties": {
                                                             "model_key": {
                                                                 "type": "string"
@@ -2211,6 +2398,9 @@
                                                             "model_key",
                                                             "credential_name"
                                                         ]
+                                                    },
+                                                    "hr_avatar_config_id": {
+                                                        "type": "string"
                                                     }
                                                 },
                                                 "required": [
@@ -6771,6 +6961,21 @@
                                             "required": [
                                                 "conversation_id",
                                                 "competency_code"
+                                            ]
+                                        },
+                                        "hr_avatar": {
+                                            "type": "object",
+                                            "properties": {
+                                                "base_url": {
+                                                    "type": "string"
+                                                },
+                                                "publishable_key": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "base_url",
+                                                "publishable_key"
                                             ]
                                         }
                                     },
@@ -14894,6 +15099,9 @@
                     },
                     "answer_max_seconds": {
                         "type": "integer"
+                    },
+                    "hr_avatar_config_id": {
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -16733,6 +16941,9 @@
                     },
                     "answer_max_seconds": {
                         "type": "integer"
+                    },
+                    "hr_avatar_config_id": {
+                        "type": "string"
                     },
                     "usage": {
                         "type": "object",

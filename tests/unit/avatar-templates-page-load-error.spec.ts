@@ -72,6 +72,11 @@ describe('load error copy by failure class', () => {
       }),
     ],
     ['an HTTP 500', http(500)],
+    // Not a FetchError and carrying no status: a thrown programming fault or a
+    // rejected non-HTTP promise. It must still land on the generic state, not
+    // the role hint and not a blank alert.
+    ['a plain Error with no status', new Error('boom')],
+    ['a non-Error rejection', 'boom'],
   ])('says "try again" for %s', async (_label, error) => {
     const text = await failWith(error)
 

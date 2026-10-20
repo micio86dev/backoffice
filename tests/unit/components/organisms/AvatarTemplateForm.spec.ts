@@ -589,7 +589,7 @@ describe('AvatarTemplateForm — message-only 502/503 submit errors (H8)', () =>
     expect(summary.text()).toContain(`avatar_templates.error.config.${code}`)
   })
 
-  it('shows the raw code when no copy exists for it', async () => {
+  it('shows the generic localized copy, not the raw code, when no copy exists for it', async () => {
     const original = (globalThis as { useI18n?: unknown }).useI18n
     vi.stubGlobal(
       'useI18n',
@@ -606,8 +606,8 @@ describe('AvatarTemplateForm — message-only 502/503 submit errors (H8)', () =>
       await flushPromises()
 
       const summary = wrapper.get('[data-testid="template-form-errors"]')
-      expect(summary.text()).toContain('tts_new_outage')
-      expect(summary.text()).not.toContain('avatar_templates.error')
+      expect(summary.text()).toContain('avatar_templates.error.invalid_value')
+      expect(summary.text()).not.toContain('tts_new_outage')
     } finally {
       vi.stubGlobal('useI18n', original)
     }

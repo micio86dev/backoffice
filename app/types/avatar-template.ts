@@ -38,22 +38,38 @@
  * description, so the local type is re-widened here rather than the runtime
  * behavior changed.
  *
- * `CatalogueEntry`/`CatalogueResponse` are hand-written for a different reason:
- * the catalogue path IS in the generated client (its query types are derived
- * from it below), but Scramble reports the response body as
- * `{status: string, items: unknown[], code?: string}` because the payload is
- * assembled from provider responses. See each type's own docblock.
+ * `CatalogueEntry`/`CatalogueResponse` are derived like the rest: `provider`,
+ * `italian`, `status`, `items` and `code` are re-narrowed to their closed sets
+ * (Scramble types them as plain strings), and each hand-written set is pinned
+ * to the api source by `tests/unit/avatar-template-catalogue-api-shape.spec.ts`.
+ * See each type's own docblock.
  */
 
 import type { components, paths } from '../../types/api'
 
+/**
+ * `Omit` that REFUSES a key the type does not have. A plain `Omit` accepts any
+ * key, so a narrowing of a field the api later drops keeps compiling; this one
+ * stops compiling, which is what the header below promises.
+ */
+export type OmitStrict<T, K extends keyof T> = Omit<T, K>
+
 export type ProviderName = 'heygen' | 'tavus'
+
+/**
+ * An ORGANIZATION template's provider. `hr_avatar` exists only while the api
+ * reports it (hr-avatar-adapter D-BO-TYPES). `ProviderName` is deliberately
+ * left narrow: it keys `Record<ProviderName, …>` maps and types the platform
+ * templates, none of which can ever be `hr_avatar`.
+ */
+export type TemplateProvider = ProviderName | 'hr_avatar'
 
 type CatalogueQuery = NonNullable<
   paths['/avatar-templates/catalogue']['get']['parameters']['query']
 >
 
-export type FieldType = 'text' | 'number' | 'select' | 'checkbox'
+/** How a field is entered and validated. A named schema in the generated client. */
+export type FieldType = components['schemas']['FieldType']
 
 /**
  * Which provider catalogue resource a field's picker draws from
@@ -74,124 +90,93 @@ export type CatalogueProvider = CatalogueQuery['provider']
 export const CATALOGUED_TTS_ENGINES = ['cartesia', 'elevenlabs'] as const
 
 /**
- * One configurable knob, as the API describes it.
+ * Every external speech engine a Tavus template can bind: the catalogued ones
+ * plus Azure, which has no voice catalogue. The single list the form reads.
  *
- * Hand-written, because the endpoint returns a provider-keyed map of arbitrary
- * field descriptors and Scramble types it as `data: string`. There is nothing
- * to derive from.
+ * Hand-written because the api exposes it only as runtime `options` data on the
+ * `ttsEngine` field spec (a `list<string>` shared by every select), not as a schema
+ * enum; pinned to that source by `avatar-template-catalogue-api-shape.spec.ts`.
+ */
+export const EXTERNAL_TTS_ENGINES = [...CATALOGUED_TTS_ENGINES, 'azure'] as const
+
+type FieldSpecsBody =
+  paths['/avatar-templates/field-specs']['get']['responses']['200']['content']['application/json']
+
+/**
+ * One configurable knob, as the API describes it. DERIVED from the generated
+ * field-specs response; only `catalogue_resource`, which Scramble types as a
+ * plain string, is re-narrowed to its closed set.
  *
  * The form is BUILT from these rather than hand-written, so a knob added
  * server-side appears without a frontend change — and a knob the server does
  * not know about cannot appear at all.
  */
-export interface FieldSpec {
-  key: string
-  type: FieldType
-  label_key: string
-  /** i18n key for the one-line explanation shown under the control. */
-  hint_key?: string
-  required?: boolean
-  options?: string[]
-  min?: number
-  max?: number
-  step?: number
+export type FieldSpec = OmitStrict<
+  FieldSpecsBody['data']['heygen'][number],
+  'catalogue_resource'
+> & {
+  /**
+   * Which provider catalogue resource the field's picker draws from
+   * (avatar-template-catalogue design D2). Present on exactly `avatarId`/
+   * `voiceId` (heygen) and `faceId`/`palId` (tavus); absent on every other field.
+   */
   catalogue_resource?: CatalogueResource
-  /**
-   * Dependent options: this select's choices depend on the CURRENT value of
-   * the field named here. `options` stays the flat union (what a client that
-   * ignores dependence would offer); `options_by_value` maps each value of the
-   * parent field to the subset that is valid for it. A parent value with no
-   * entry means the field takes no value at all (Tavus `ttsModelName` for
-   * azure / tavus-auto / no engine).
-   */
-  options_depend_on?: string
-  options_by_value?: Record<string, string[]>
-  /**
-   * Present (and true) only on a field a SUPERADMIN alone may set (the external
-   * HeyGen voice, which binds a paid vendor voice). Both field-spec routes serve
-   * it to a superadmin and to nobody else, so a form never renders it for anyone
-   * the API would refuse.
-   */
-  superadmin_only?: boolean
-  /**
-   * This field is REPLACED by another's value: while `superseded_by_key` holds
-   * one of `superseded_by_values` it is not required and must be absent (the
-   * HeyGen native `voiceId` beside an external speech engine).
-   */
-  superseded_by_key?: string
-  superseded_by_values?: string[]
 }
 
+type CatalogueBody =
+  paths['/avatar-templates/catalogue']['get']['responses']['200']['content']['application/json']
+type GeneratedCatalogueEntry = CatalogueBody['data']['items'][number]
+
 /**
- * One provider catalogue entry.
- *
- * Hand-written narrowing: Scramble reports the catalogue body as
- * `{status: string, items: unknown[], code?: string}` because the payload is
- * assembled from provider responses, not from a typed resource. The request
- * query (`CatalogueProvider` / `CatalogueResource`) IS derived from the
- * generated client above, so a provider or resource added server-side breaks
- * this file's compile instead of drifting.
+ * One provider catalogue entry. DERIVED from the generated catalogue response;
+ * only `provider` (the service the entry came from), which Scramble types as a
+ * plain string, is re-narrowed to its closed set.
  *
  * `language`, `locale`, `accent` and the preview URLs are `null`, never a
  * guess, when the provider's resource carries no such attribute. `italian` is
  * the API's own classification: `native` for an Italian voice, `multilingual`
- * for a voice that can speak Italian, `null` otherwise.
+ * for a voice that can speak Italian, `null` otherwise. The request query
+ * (`CatalogueProvider` / `CatalogueResource`) is derived from the same client,
+ * so a provider or resource added server-side breaks this file's compile
+ * instead of drifting.
+ *
+ * `preview_audio_url` is a PUBLIC audio url the browser may play itself
+ * (ElevenLabs), never a key-gated vendor url; `preview_audio_via_api` is `true`
+ * when the vendor's clip needs the platform key (Cartesia), so the api serves
+ * its bytes at `GET /avatar-templates/catalogue-sample`. `editable` is on Tavus
+ * personas only: `true` = one of the account's own personas, `false` = a Tavus
+ * stock persona whose voice/persona settings Tavus refuses to modify,
+ * `null`/absent = unknown, which is never treated as editable.
  */
-export interface CatalogueEntry {
-  id: string
+export type CatalogueEntry = OmitStrict<GeneratedCatalogueEntry, 'provider'> & {
   provider: CatalogueProvider
-  label: string
-  name: string
-  language: string | null
-  locale: string | null
-  accent: string | null
-  italian: 'native' | 'multilingual' | null
-  preview_image_url: string | null
-  /** A PUBLIC audio url the browser may play itself (ElevenLabs). Never a key-gated vendor url. */
-  preview_audio_url: string | null
-  /**
-   * `true` when the vendor's clip needs the platform key (Cartesia): the api serves its bytes at
-   * `GET /avatar-templates/catalogue-sample`. Absent on payloads that predate the flag.
-   */
-  preview_audio_via_api?: boolean
-  /** Tavus faces only. */
-  preview_video_url: string | null
-  /**
-   * Tavus personas only: `true` = one of the account's own personas (Tavus
-   * `persona_type=user`), `false` = a Tavus stock persona whose voice/persona
-   * settings Tavus refuses to modify, `null`/absent = unknown. Unknown is
-   * never treated as editable.
-   */
-  editable?: boolean | null
 }
 
-export type CatalogueStatus = 'ok' | 'empty' | 'provider_error'
+export type CatalogueStatus = CatalogueBody['data']['status']
 
 /** Stable codes the API attaches to `provider_error`. Never the vendor's words. */
-export type CatalogueErrorCode =
-  | 'provider_key_missing'
-  | 'provider_unauthorized'
-  | 'provider_rate_limited'
-  | 'provider_unavailable'
-  | 'provider_unreachable'
-  | 'provider_rejected'
-  | 'provider_bad_response'
-  | 'unsupported_catalogue'
+export type CatalogueErrorCode = NonNullable<CatalogueBody['data']['code']>
 
 /**
  * A catalogue answer is always HTTP 200: a provider failure is a `status`, not
  * an exception, so the picker can say WHY it is empty instead of showing a
  * blank list that reads as a bug.
  */
-export interface CatalogueResponse {
-  status: CatalogueStatus
+export type CatalogueResponse = OmitStrict<CatalogueBody['data'], 'items'> & {
   items: CatalogueEntry[]
-  code?: CatalogueErrorCode
 }
 
-export type FieldSpecsResponse = {
-  data: Record<ProviderName, FieldSpec[]>
-}
+/** The `{data}` envelope `GET /avatar-templates/catalogue` answers with. */
+export type CatalogueEnvelope = OmitStrict<CatalogueBody, 'data'> & { data: CatalogueResponse }
+
+/**
+ * The field-specs map: `heygen` and `tavus` always, `hr_avatar` only when the
+ * api reports the capability (its presence IS the capability signal; its list
+ * is empty because an `hr_avatar` template has no provider knobs).
+ */
+export type FieldSpecMap = Record<ProviderName, FieldSpec[]> & { hr_avatar?: FieldSpec[] }
+
+export type FieldSpecsResponse = OmitStrict<FieldSpecsBody, 'data'> & { data: FieldSpecMap }
 
 type GeneratedTemplate = components['schemas']['AvatarTemplateResource']
 
@@ -200,6 +185,12 @@ type GeneratedTemplate = components['schemas']['AvatarTemplateResource']
  * (`pal_sync.code`, and the save response's top-level `warning`). Never the
  * vendor's words. Every code needs copy in both locales: the guard in
  * `pal-sync-i18n.spec.ts` derives from this list.
+ *
+ * The TYPE comes from the generated client (an enum there). The runtime LIST is
+ * needed for the locale guard, so it is written out and checked against that
+ * type in both directions by `tests/nuxt/avatar-template-catalogue-shape-contract.ts`,
+ * and against the api source (`App\\Support\\AvatarTemplates\\TavusPalSync`) by
+ * `tests/unit/avatar-template-catalogue-api-shape.spec.ts`.
  */
 export const PAL_SYNC_CODES = [
   'tavus_key_missing',
@@ -210,26 +201,23 @@ export const PAL_SYNC_CODES = [
   'pal_not_found',
   'pal_sync_failed',
   'pal_sync_unreachable',
-] as const
-
-export type PalSyncCode = (typeof PAL_SYNC_CODES)[number]
+] as const satisfies readonly PalSyncCode[]
 
 /**
- * Narrowed like `config`/`provider` above: Scramble types the three members as
- * plain `string | null`; the closed sets live in a PHP enum. `synced_at` is the
- * last SUCCESSFUL sync and survives a later failure.
+ * The persona sync state, straight from the generated client: `status` and
+ * `code` are enums there. `synced_at` is the last SUCCESSFUL sync and survives
+ * a later failure.
  */
-export type PalSync = Omit<GeneratedTemplate['pal_sync'], 'status' | 'code'> & {
-  status: 'synced' | 'skipped' | 'warning' | null
-  code: PalSyncCode | null
-}
+export type PalSync = GeneratedTemplate['pal_sync']
 
-export type AvatarTemplate = Omit<
+export type PalSyncCode = NonNullable<PalSync['code']>
+
+export type AvatarTemplate = OmitStrict<
   GeneratedTemplate,
   'config' | 'provider' | 'description' | 'pal_sync'
 > & {
   config: Record<string, unknown>
-  provider: ProviderName
+  provider: TemplateProvider
   description: string | null
   pal_sync: PalSync
 }
@@ -237,20 +225,21 @@ export type AvatarTemplate = Omit<
 /**
  * A single template response.
  *
- * `warning` carries a STABLE CODE when the persona sync did not reach the
+ * `warning` carries a STABLE CODE when part of the save did not reach the
  * provider — never the provider's own words. The save itself succeeded; the
  * operator needs to know a knob has not taken effect yet, and telling them in
  * the vendor's language would name the vendor.
  *
- * Absent from the generated schema because it is conditional: Scramble sees the
- * resource, not the `additional()` an unhappy path attaches.
+ * Generated: an optional enum of the persona-sync codes (Tavus) and the
+ * conversation-model codes (HeyGen `llm_*`), so it is wider than `PalSyncCode`.
+ * Only `data` is re-narrowed here.
  */
-export interface TemplateResponse {
-  data: AvatarTemplate
-  warning?: string
-}
+export type TemplateResponse = OmitStrict<
+  paths['/avatar-templates']['post']['responses']['201']['content']['application/json'],
+  'data'
+> & { data: AvatarTemplate }
 
-export type TemplateListResponse = Omit<
+export type TemplateListResponse = OmitStrict<
   paths['/avatar-templates']['get']['responses']['200']['content']['application/json'],
   'data'
 > & { data: AvatarTemplate[] }
@@ -287,7 +276,7 @@ type GeneratedPlatformTemplate = components['schemas']['PlatformAvatarTemplateRe
  * `usage` counts non-deleted pinning projects across EVERY organization and is
  * the only cross-tenant number the api exposes (never organization names).
  */
-export type PlatformTemplate = Omit<
+export type PlatformTemplate = OmitStrict<
   GeneratedPlatformTemplate,
   'config' | 'provider' | 'description' | 'pal_sync'
 > & {
@@ -299,15 +288,17 @@ export type PlatformTemplate = Omit<
 
 export type PlatformTemplateUsage = GeneratedPlatformTemplate['usage']
 
-/** Same conditional `warning` code as `TemplateResponse`, for the platform routes. */
-export interface PlatformTemplateResponse {
-  data: PlatformTemplate
-  warning?: string
-}
+/** Same generated `warning` code as `TemplateResponse`, for the platform routes. */
+export type PlatformTemplateResponse = OmitStrict<
+  paths['/admin/avatar-templates']['post']['responses']['201']['content']['application/json'],
+  'data'
+> & { data: PlatformTemplate }
 
-export interface PlatformTemplateListResponse {
-  data: PlatformTemplate[]
-}
+/** Derived from the generated list response; only `data` is re-narrowed. */
+export type PlatformTemplateListResponse = OmitStrict<
+  paths['/admin/avatar-templates']['get']['responses']['200']['content']['application/json'],
+  'data'
+> & { data: PlatformTemplate[] }
 
 type PlatformStoreBody =
   paths['/admin/avatar-templates']['post']['requestBody']['content']['application/json']
@@ -321,10 +312,10 @@ type PlatformUpdateBody = NonNullable<
  * `array` rule as a list) — the same narrowing `AvatarTemplate['config']` has,
  * pinned by `tests/nuxt/avatar-template-config-contract.ts`.
  */
-export type PlatformTemplateCreatePayload = Omit<PlatformStoreBody, 'config'> & {
+export type PlatformTemplateCreatePayload = OmitStrict<PlatformStoreBody, 'config'> & {
   config: Record<string, unknown>
 }
-export type PlatformTemplateUpdatePayload = Omit<PlatformUpdateBody, 'config'> & {
+export type PlatformTemplateUpdatePayload = OmitStrict<PlatformUpdateBody, 'config'> & {
   config?: Record<string, unknown>
 }
 
@@ -336,6 +327,33 @@ export type PersonaWrite = NonNullable<
   paths['/avatar-templates']['post']['requestBody']['content']['application/json']['persona']
 >
 
+type StoreBody = paths['/avatar-templates']['post']['requestBody']['content']['application/json']
+type UpdateBody = NonNullable<
+  paths['/avatar-templates/{id}']['patch']['requestBody']
+>['content']['application/json']
+
+/**
+ * The organization write bodies, derived from the generated client so a field
+ * the api gains or loses breaks this file's compile. `config` is re-narrowed to
+ * the string-keyed MAP the api really validates (the generated `string[]` is
+ * Scramble reading a PHP `array` rule as a list), like the platform bodies
+ * above. `provider` is absent from the update: the api refuses to change it.
+ */
+export type TemplateCreatePayload = OmitStrict<StoreBody, 'config'> & {
+  config: Record<string, unknown>
+}
+export type TemplateUpdatePayload = OmitStrict<UpdateBody, 'config'> & {
+  config?: Record<string, unknown>
+}
+
+/**
+ * The import answer, derived from the generated client. `data` is `unknown[]`
+ * (the controller maps records without a resource) and the page reads only its
+ * length; `tests/nuxt/avatar-template-import-response-contract.ts` pins it.
+ */
+export type ImportTemplatesResponse =
+  paths['/avatar-templates/import']['post']['responses']['201']['content']['application/json']
+
 /**
  * What the template form emits on submit.
  *
@@ -343,6 +361,6 @@ export type PersonaWrite = NonNullable<
  * because a WRITE says less: `{}` clears the interviewer name, and an absent key
  * leaves it untouched. See `useAvatarTemplates.updateTemplate`.
  */
-export type AvatarTemplateSubmit = Omit<Partial<AvatarTemplate>, 'persona'> & {
+export type AvatarTemplateSubmit = OmitStrict<Partial<AvatarTemplate>, 'persona'> & {
   persona?: PersonaWrite
 }

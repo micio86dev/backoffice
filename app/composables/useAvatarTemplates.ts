@@ -6,17 +6,19 @@
  * organization sees next, so a stale list here is worse than a second request.
  */
 import type {
-  AvatarTemplate,
+  CatalogueEnvelope,
   CatalogueProvider,
   CatalogueResource,
   CatalogueResponse,
   DuplicateTemplateResponse,
   FieldSpecsResponse,
-  PersonaWrite,
+  ImportTemplatesResponse,
+  TemplateCreatePayload,
   TemplateListResponse,
   TemplateOptionsResponse,
   TemplateResponse,
   TemplateScope,
+  TemplateUpdatePayload,
 } from '../types/avatar-template'
 import { useApi } from './useApi'
 
@@ -133,52 +135,27 @@ export function useAvatarTemplates() {
     provider: CatalogueProvider,
     resource: CatalogueResource
   ): Promise<CatalogueResponse> {
-    const response = await apiFetch<{ data: CatalogueResponse }>('/avatar-templates/catalogue', {
+    const response = await apiFetch<CatalogueEnvelope>('/avatar-templates/catalogue', {
       query: { provider, resource },
     })
 
     return response.data
   }
 
-  async function createTemplate(payload: {
-    name: string
-    description?: string | null
-    provider: AvatarTemplate['provider']
-    config: Record<string, unknown>
-    /**
-     * Both-or-neither (design D4, invariant I1 — a DB CHECK, not just a
-     * frontend convention). `null` is a meaningful value here, not "absent":
-     * `AvatarTemplateForm` sends it explicitly to unbind, so this composable
-     * must forward it as-is rather than treat it as an omittable field.
-     */
-    llm_model_id?: number | null
-    llm_credential_id?: number | null
-    /** `{display_name}` to name the interviewer; omitted to leave it unset. */
-    persona?: PersonaWrite
-    answer_min_seconds?: number
-    answer_max_seconds?: number
-  }): Promise<TemplateResponse> {
+  async function createTemplate(payload: TemplateCreatePayload): Promise<TemplateResponse> {
     return apiFetch<TemplateResponse>('/avatar-templates', { method: 'POST', body: payload })
   }
 
   async function updateTemplate(
     id: number | string,
-    payload: {
-      name?: string
-      description?: string | null
-      config?: Record<string, unknown>
-      llm_model_id?: number | null
-      llm_credential_id?: number | null
-      /** `{}` CLEARS the display name; absent leaves it untouched. Never an empty string. */
-      persona?: PersonaWrite
-      answer_min_seconds?: number
-      answer_max_seconds?: number
-    }
+    payload: TemplateUpdatePayload
   ): Promise<TemplateResponse> {
     // `provider` is deliberately absent from the accepted payload. The API
     // refuses to change it — every knob would then belong to the other
     // provider — and offering the field here would be an edit that always
-    // fails.
+    // fails. `llm_model_id`/`llm_credential_id` are both-or-neither (design
+    // D4, invariant I1) and `null` is meaningful: it unbinds, so it is
+    // forwarded as-is.
     return apiFetch<TemplateResponse>(`/avatar-templates/${id}`, { method: 'PATCH', body: payload })
   }
 
@@ -253,8 +230,11 @@ export function useAvatarTemplates() {
 
   async function importTemplates(
     document: Record<string, unknown>
-  ): Promise<{ data: Array<{ id: number; name: string; provider: string }> }> {
-    return apiFetch('/avatar-templates/import', { method: 'POST', body: document })
+  ): Promise<ImportTemplatesResponse> {
+    return apiFetch<ImportTemplatesResponse>('/avatar-templates/import', {
+      method: 'POST',
+      body: document,
+    })
   }
 
   return {

@@ -193,13 +193,16 @@
           data-testid="template-field-provider"
           :disabled="!isNew"
           autocomplete="off"
+          :aria-describedby="
+            isNew ? 'template-provider-hint' : 'template-provider-locked template-provider-hint'
+          "
           :class="formSelectClass"
         >
           <option v-for="name in providers" :key="name" :value="name">
             {{ $t(`avatar_templates.provider.${name}`) }}
           </option>
         </select>
-        <span v-if="!isNew" class="text-xs text-muted-foreground">
+        <span v-if="!isNew" id="template-provider-locked" class="text-xs text-muted-foreground">
           {{ $t('avatar_templates.form.provider_locked') }}
         </span>
         <!--
@@ -212,7 +215,7 @@
         Converges onto FieldDescription (D5/D6) — same string, no copy change,
         just no longer a raw <span> a Field-conversion could orphan.
       -->
-        <FieldDescription>
+        <FieldDescription id="template-provider-hint">
           {{ $t('avatar_templates.form.provider_hint') }}
         </FieldDescription>
       </Field>
@@ -250,9 +253,8 @@
                 <abbr
                   v-if="field.required"
                   :title="$t('avatar_templates.form.required')"
-                  class="no-underline"
-                  >*</abbr
-                >
+                  class="no-underline after:content-['*']"
+                />
               </FieldLabel>
 
               <!--
@@ -276,6 +278,7 @@
                 :aria-required="field.required ? 'true' : undefined"
                 :aria-describedby="describedBy(field)"
                 :preview="voicePreviewFor(field) ?? undefined"
+                :manual-on-empty="field.key === HR_AVATAR_ID_KEY"
                 @change="onFieldChange(field, $event)"
                 @loaded="onCatalogueLoaded(field.key, $event)"
               />
@@ -399,7 +402,9 @@
       (I2/I5 gate on the MODEL, not on `provider`), so it does not belong
       inside `activeFields`'s provider-keyed loop.
     -->
+      <!-- Hidden for `hr_avatar`: its conversation model lives in the HR-Avatar config. -->
       <fieldset
+        v-if="draft.provider !== 'hr_avatar'"
         class="flex flex-col gap-3 border-t border-border pt-4"
         data-testid="template-llm-section"
       >
@@ -423,8 +428,14 @@
           v-model="draft.llmModelKey"
           :label="$t('avatar_templates.llm.picker.label')"
           :models="models"
+          :invalid="Boolean(llmModelError)"
+          :describedby="llmModelError ? 'template-llm-model-error' : undefined"
         />
-        <FieldError v-if="llmModelError" data-testid="template-llm-model-error">
+        <FieldError
+          v-if="llmModelError"
+          id="template-llm-model-error"
+          data-testid="template-llm-model-error"
+        >
           {{ llmModelError }}
         </FieldError>
 
@@ -438,6 +449,7 @@
             data-testid="template-llm-credential"
             autocomplete="off"
             :aria-invalid="Boolean(llmCredentialError)"
+            :aria-describedby="llmCredentialError ? 'template-llm-credential-error' : undefined"
             :class="formSelectClass"
             :value="draft.llmCredentialId === null ? '' : String(draft.llmCredentialId)"
             @change="onCredentialChange"
@@ -447,7 +459,11 @@
               {{ credential.name }}
             </option>
           </select>
-          <FieldError v-if="llmCredentialError" data-testid="template-llm-credential-error">
+          <FieldError
+            v-if="llmCredentialError"
+            id="template-llm-credential-error"
+            data-testid="template-llm-credential-error"
+          >
             {{ llmCredentialError }}
           </FieldError>
         </Field>
@@ -484,8 +500,13 @@ import { FormFieldset } from '@/components/ui/form-fieldset'
 import { computed, onMounted, ref, watch } from 'vue'
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field'
 import { formControlClass, formSelectClass } from '@/components/ui/form-control'
-import { getErrorFields, serverMessageCode } from '@/utils/http-error'
-import { translateServerCode } from '@/utils/server-message'
+import {
+  getErrorFields,
+  getErrorStatus,
+  isNetworkError,
+  serverMessageCode,
+} from '@/utils/http-error'
+import { translateServerCodeOrFallback } from '@/utils/server-message'
 import { useLlmCredentials } from '@/composables/useLlmCredentials'
 import { useLlmModels } from '@/composables/useLlmModels'
 import { usePointerPressGuard } from '@/composables/usePointerPressGuard'
@@ -508,17 +529,19 @@ import AvatarTemplateProviderCombobox from '@/components/organisms/AvatarTemplat
 import type { VoicePreviewRequest } from '@/composables/useVoicePreview'
 import {
   CATALOGUED_TTS_ENGINES,
+  EXTERNAL_TTS_ENGINES,
   type AvatarTemplate,
   type AvatarTemplateSubmit,
   type CatalogueProvider,
   type FieldSpec,
-  type ProviderName,
+  type FieldSpecMap,
+  type TemplateProvider,
 } from '@/types/avatar-template'
 import type { LlmCredential, LlmModel } from '@/types/llm'
 
 const props = defineProps<{
   template: Partial<AvatarTemplate>
-  fieldSpecs: Record<ProviderName, FieldSpec[]>
+  fieldSpecs: FieldSpecMap
   saving: boolean
   submitError: unknown | null
 }>()
@@ -528,6 +551,54 @@ const emit = defineEmits<{
 }>()
 
 const { t, te } = useI18n()
+
+/** The generic copy for a refused value the form has no specific copy for. */
+const INVALID_VALUE_KEY = 'avatar_templates.error.invalid_value'
+
+/**
+ * The api answers some fields in English sentences and some in codes. A code
+ * with copy is translated; a sentence, or a code with no copy, becomes
+ * `fallbackKey`, so nothing untranslated ever reaches the operator.
+ */
+function fieldCopy(message: string, fallbackKey: string): string {
+  return translateServerCodeOrFallback(
+    { t, te },
+    'avatar_templates.error.field',
+    message,
+    fallbackKey
+  )
+}
+
+/** A `config.{knob}` code, or `fallbackKey` (the generic copy) when it has none. */
+function configCopy(code: string, fallbackKey: string = INVALID_VALUE_KEY): string {
+  return translateServerCodeOrFallback(
+    { t, te },
+    'avatar_templates.error.config',
+    code,
+    fallbackKey
+  )
+}
+
+/** Save failures with no field, by HTTP status. */
+const SAVE_FAILURE_KEYS: Record<number, string> = {
+  403: 'forbidden',
+  404: 'not_found',
+  409: 'conflict',
+}
+
+/**
+ * The `avatar_templates.error.save.*` segment for a failure, or undefined when
+ * the status says nothing the operator can act on (a framework 5xx sentence
+ * stays quiet). With no HTTP status at all, only a real network failure says
+ * "check your connection"; anything else is a generic save failure.
+ */
+function saveFailureKey(error: unknown): string | undefined {
+  const status = getErrorStatus(error)
+
+  if (status !== null) return SAVE_FAILURE_KEYS[status]
+
+  return isNetworkError(error) ? 'network' : 'failed'
+}
 
 const NAME_MAX_LENGTH = 120
 const DESCRIPTION_MAX_LENGTH = 500
@@ -548,13 +619,33 @@ const DEFAULT_ANSWER_MAX_SECONDS = 150
 // column starts pulling its own weight.
 const TWO_COLUMN_MIN_FIELDS = 5
 
-const providers: ProviderName[] = ['heygen', 'tavus']
+// hr-avatar-adapter: an `hr_avatar` template has no provider knobs, only the id
+// of the HR-Avatar config it points at. The id travels in `draft.config` under
+// this key so the picker, the required check and the per-field error placement
+// are the ones every other catalogue field already has, and it is lifted out
+// at submit (`config` is sent as `{}`, the id as `hr_avatar_config_id`).
+const HR_AVATAR_ID_KEY = 'hr_avatar_config_id'
+// Mirrors the api's format rule; the api stays authoritative.
+const HR_AVATAR_ID_PATTERN = /^avc_[0-9A-Za-z]+$/
+const HR_AVATAR_FIELD: FieldSpec = {
+  key: HR_AVATAR_ID_KEY,
+  type: 'text',
+  label_key: 'avatar_templates.field.hr_avatar_config_id',
+  hint_key: 'avatar_templates.hint.hr_avatar_config_id',
+  required: true,
+  catalogue_resource: 'avatar_config',
+}
 
 const draft = ref({
   name: props.template.name ?? '',
   description: props.template.description ?? '',
-  provider: (props.template.provider ?? 'heygen') as ProviderName,
-  config: { ...(props.template.config ?? {}) } as Record<string, unknown>,
+  provider: (props.template.provider ?? 'heygen') as TemplateProvider,
+  config: {
+    ...(props.template.config ?? {}),
+    ...(props.template.provider === 'hr_avatar' && props.template.hr_avatar_config_id
+      ? { [HR_AVATAR_ID_KEY]: props.template.hr_avatar_config_id }
+      : {}),
+  } as Record<string, unknown>,
   personaDisplayName: props.template.persona?.display_name ?? '',
   // `number | ''`: a cleared <input type="number"> yields '' under v-model.
   answerMinSeconds: (props.template.answer_min_seconds ?? DEFAULT_ANSWER_MIN_SECONDS) as
@@ -572,7 +663,25 @@ const draft = ref({
 
 const isNew = computed(() => props.template.id === undefined)
 
-const activeFields = computed(() => props.fieldSpecs[draft.value.provider] ?? [])
+/**
+ * The provider options, from the keys the api served: `heygen` and `tavus`
+ * always, in that order, and `hr_avatar` only when the api reports the
+ * capability. An EXISTING `hr_avatar` template keeps naming its provider even
+ * if the capability is gone, or the locked select would render blank.
+ */
+const providers = computed<TemplateProvider[]>(() => [
+  'heygen',
+  'tavus',
+  ...(props.fieldSpecs.hr_avatar !== undefined || draft.value.provider === 'hr_avatar'
+    ? (['hr_avatar'] as const)
+    : []),
+])
+
+const activeFields = computed(() =>
+  draft.value.provider === 'hr_avatar'
+    ? [HR_AVATAR_FIELD]
+    : (props.fieldSpecs[draft.value.provider] ?? [])
+)
 
 /**
  * The fields the form actually renders and validates: every spec field except
@@ -822,8 +931,6 @@ function onCatalogueLoaded(key: string, ids: string[] | null): void {
   catalogueIds.value = { ...catalogueIds.value, [key]: ids }
 }
 
-const EXTERNAL_TTS_ENGINES = ['cartesia', 'elevenlabs', 'azure']
-
 function isCataloguedEngine(value: unknown): value is (typeof CATALOGUED_TTS_ENGINES)[number] {
   return (CATALOGUED_TTS_ENGINES as readonly unknown[]).includes(value)
 }
@@ -868,9 +975,12 @@ function voicePreviewFor(field: FieldSpec): {
   voiceId: string
   ttsEngine?: string | null
 } | null {
+  const provider = draft.value.provider
+
+  // An HR-Avatar config has no voice sample.
+  if (provider === 'hr_avatar') return null
   if (field.catalogue_resource !== 'voice' && field.key !== 'ttsExternalVoiceId') return null
 
-  const provider = draft.value.provider
   const voiceId = stringValue(field.key)
 
   if (provider === 'tavus') {
@@ -1065,6 +1175,12 @@ function validateConfigField(field: FieldSpec): boolean {
     return false
   }
 
+  if (field.key === HR_AVATAR_ID_KEY && !HR_AVATAR_ID_PATTERN.test(String(value))) {
+    configErrors.value[field.key] = t('avatar_templates.form.errors.hrAvatarConfigIdInvalid')
+
+    return false
+  }
+
   if (field.type === 'number' && typeof value === 'number') {
     const belowMin = field.min !== undefined && field.min !== null && value < field.min
     const aboveMax = field.max !== undefined && field.max !== null && value > field.max
@@ -1095,12 +1211,15 @@ function validateReferences(): boolean {
   let ok = true
 
   const refuse = (key: string, code: string): void => {
-    configErrors.value[key] = t(`avatar_templates.error.config.${code}`)
+    configErrors.value[key] = configCopy(code)
     ok = false
   }
 
   for (const field of activeFields.value) {
     const value = draft.value.config[field.key]
+    // The proxy lists only configs that can start a conversation, and its list is
+    // cached: an id it does not show is not proof the api would refuse it.
+    if (field.key === HR_AVATAR_ID_KEY) continue
     if (typeof value !== 'string' || value === '' || catalogueFor(field) === null) continue
 
     const ids = catalogueIds.value[field.key]
@@ -1115,7 +1234,8 @@ function validateReferences(): boolean {
     const engine = draft.value.config.ttsEngine
     const voice = draft.value.config.ttsExternalVoiceId
     const hasVoice = typeof voice === 'string' && voice.trim() !== ''
-    const external = typeof engine === 'string' && EXTERNAL_TTS_ENGINES.includes(engine)
+    const external =
+      typeof engine === 'string' && (EXTERNAL_TTS_ENGINES as readonly string[]).includes(engine)
 
     if (external && !hasVoice) refuse('ttsExternalVoiceId', 'tts_voice_required')
     else if (!external && hasVoice) refuse('ttsEngine', 'tts_engine_required')
@@ -1177,12 +1297,24 @@ watch(
       // A refusal no field can carry: a HeyGen bind outage answers 502/503
       // `{message: <code>}` with no `errors` object, so without this the
       // operator would see nothing at all. The code goes in the summary,
-      // through the same copy the per-knob branch uses, raw code as fallback.
+      // through the same copy the per-knob branch uses, generic copy when a
+      // code has none.
       const code = serverMessageCode(submitError)
+      // 403, 404, 409 and a fault with no HTTP response each get their own
+      // copy, so the drawer never stays open in silence. Any other status
+      // with neither a code nor a field (a framework 5xx sentence) stays quiet.
+      const saveFailure = saveFailureKey(submitError)
       if (code !== null) {
         unmappedErrors.value.push(
-          translateServerCode({ t, te }, 'avatar_templates.error.config', code)
+          configCopy(
+            code,
+            saveFailure === undefined
+              ? INVALID_VALUE_KEY
+              : `avatar_templates.error.save.${saveFailure}`
+          )
         )
+      } else if (submitError !== null && submitError !== undefined && saveFailure !== undefined) {
+        unmappedErrors.value.push(t(`avatar_templates.error.save.${saveFailure}`))
       }
       return
     }
@@ -1204,14 +1336,24 @@ watch(
       // for both, per design D9's existence-oracle doctrine, so this mapper
       // makes no attempt to tell them apart. Same `config.{key}` mechanism as
       // the branch below: a `te()`-gated translation, falling back to the
-      // raw server code when no copy exists for it yet.
+      // generic localized copy when no copy exists for the code yet.
       if (serverField === 'llm_model_id' || serverField === 'llm_credential_id') {
-        const translationKey = `avatar_templates.error.llm.${message}`
-        const hasTranslation = typeof te === 'function' ? te(translationKey) : true
-        const resolved = hasTranslation ? t(translationKey) : message
+        const resolved = translateServerCodeOrFallback(
+          { t, te },
+          'avatar_templates.error.llm',
+          message,
+          INVALID_VALUE_KEY
+        )
 
         if (serverField === 'llm_model_id') llmModelError.value = resolved
         else llmCredentialError.value = resolved
+
+        continue
+      }
+
+      // A top-level field, not a `config.{knob}`: the picker carries it.
+      if (serverField === HR_AVATAR_ID_KEY) {
+        configErrors.value[HR_AVATAR_ID_KEY] = configCopy(message)
 
         continue
       }
@@ -1220,21 +1362,10 @@ watch(
         const key = serverField.slice(CONFIG_PREFIX.length)
 
         if (activeKeys.has(key)) {
-          const translationKey = `avatar_templates.error.config.${message}`
-          // Falls back to the RAW server code when it has no translation —
-          // an untranslated code the operator can at least read beats an
-          // i18n key echoed back as if it were prose. `te` is optional here
-          // defensively: every REAL i18n instance provides it, but a test
-          // double that only stubs `t` should not crash the whole watcher.
-          const hasTranslation = typeof te === 'function' ? te(translationKey) : true
-          configErrors.value[key] = hasTranslation ? t(translationKey) : message
+          configErrors.value[key] = configCopy(message)
         } else {
-          // Same copy as a field would get, raw code when it has none.
-          const translated = translateServerCode(
-            { t, te },
-            'avatar_templates.error.config',
-            message
-          )
+          // Same copy as a field would get, generic copy when it has none.
+          const translated = configCopy(message)
           if (!unmappedErrors.value.includes(translated)) unmappedErrors.value.push(translated)
         }
 
@@ -1248,9 +1379,14 @@ watch(
         answerMinError.value = t(`avatar_templates.form.errors.${answerRefusalCode('min')}`)
       } else if (serverField === 'answer_max_seconds') {
         answerMaxError.value = t(`avatar_templates.form.errors.${answerRefusalCode('max')}`)
-      } else if (serverField === 'name') nameError.value = message
-      else if (serverField === 'description') descriptionError.value = message
-      else if (!unmappedErrors.value.includes(message)) unmappedErrors.value.push(message)
+      } else if (serverField === 'name') {
+        nameError.value = fieldCopy(message, 'avatar_templates.error.invalid_name')
+      } else if (serverField === 'description') {
+        descriptionError.value = fieldCopy(message, 'avatar_templates.error.invalid_description')
+      } else {
+        const copy = fieldCopy(message, INVALID_VALUE_KEY)
+        if (!unmappedErrors.value.includes(copy)) unmappedErrors.value.push(copy)
+      }
     }
   },
   { immediate: true }
@@ -1318,7 +1454,9 @@ function submit(): void {
   const nameOk = validateName()
   const descriptionOk = validateDescription()
   const configOk = validateAllConfigFields()
-  const llmBindingOk = validateLlmBinding()
+  // The binding fieldset is not rendered for `hr_avatar`, so a half-set pair left
+  // over from another provider must not block a submit that never sends it.
+  const llmBindingOk = draft.value.provider === 'hr_avatar' || validateLlmBinding()
   const answerRangeOk = validateAnswerRange()
 
   if (!nameOk || !descriptionOk || !configOk || !llmBindingOk || !answerRangeOk) return
@@ -1328,9 +1466,13 @@ function submit(): void {
     name: draft.value.name,
     description: draft.value.description === '' ? null : draft.value.description,
     provider: draft.value.provider,
-    config: draft.value.config,
-    llm_model_id: effectiveModelId.value,
-    llm_credential_id: draft.value.llmCredentialId,
+    ...(draft.value.provider === 'hr_avatar'
+      ? { config: {}, [HR_AVATAR_ID_KEY]: stringValue(HR_AVATAR_ID_KEY) }
+      : {
+          config: draft.value.config,
+          llm_model_id: effectiveModelId.value,
+          llm_credential_id: draft.value.llmCredentialId,
+        }),
     answer_min_seconds: Number(draft.value.answerMinSeconds),
     answer_max_seconds: Number(draft.value.answerMaxSeconds),
     ...personaPayload(),

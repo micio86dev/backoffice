@@ -13,7 +13,7 @@
       role="combobox"
       aria-haspopup="listbox"
       :aria-expanded="isOpen"
-      :aria-controls="panelId"
+      :aria-controls="hasListbox ? listboxId : undefined"
       :aria-busy="state === 'loading' ? 'true' : undefined"
       :class="cn(formSelectClass, 'flex items-center justify-between gap-2 text-left')"
       @click="toggle"
@@ -29,14 +29,12 @@
         <!--
           The catalogue can load while the panel is closed, and the panel is
           the only other place that says so. Shown on the trigger so a slow
-          provider never reads as a control that is simply empty. It carries
-          `role="status"` only while the panel is CLOSED: an open panel renders
-          its own status line, and two live regions would announce it twice.
+          provider never reads as a control that is simply empty. It is visual
+          only: the live-region announcement is the sibling below the button.
         -->
         <span
           v-if="state === 'loading'"
           :data-testid="`${testIdPrefix}-trigger-loading`"
-          :role="isOpen ? undefined : 'status'"
           class="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
         >
           <LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
@@ -52,6 +50,16 @@
       </span>
       <ChevronDownIcon class="size-4 shrink-0 opacity-60" aria-hidden="true" />
     </button>
+    <!--
+      The ONE announcement of the loading state, open panel or not. It lives
+      beside the trigger, not inside it: the children of a button are
+      presentational, so a status region there may never be exposed. The panel's
+      own loading line is visual only, so opening the panel never adds a second
+      live region that would announce it twice. The region is always mounted and
+      its text is set after mount: a live region inserted with its text already
+      inside is often not announced at all.
+    -->
+    <span role="status" class="sr-only">{{ announcement }}</span>
 
     <!--
       Inline, deliberately NOT teleported to <body>. A teleported list sits
@@ -87,7 +95,6 @@
       <p
         v-if="state === 'loading'"
         :data-testid="`${testIdPrefix}-loading`"
-        role="status"
         class="px-2 py-3 text-sm text-muted-foreground"
       >
         {{ t('avatar_templates.form.catalogue.loading') }}
@@ -115,6 +122,7 @@
           type="text"
           autocomplete="off"
           :value="modelValue"
+          v-bind="manualValidationAttrs()"
           :data-testid="`${testIdPrefix}-manual`"
           :aria-label="t('avatar_templates.form.catalogue.manualLabel')"
           :placeholder="t('avatar_templates.form.catalogue.manualLabel')"
@@ -123,13 +131,29 @@
         />
       </div>
 
-      <p
-        v-else-if="state === 'empty'"
-        :data-testid="`${testIdPrefix}-empty`"
-        class="px-2 py-3 text-sm text-muted-foreground"
-      >
-        {{ t('avatar_templates.form.catalogue.empty') }}
-      </p>
+      <template v-else-if="state === 'empty'">
+        <p :data-testid="`${testIdPrefix}-empty`" class="px-2 py-3 text-sm text-muted-foreground">
+          {{ t('avatar_templates.form.catalogue.empty') }}
+        </p>
+        <!--
+          An organization's first HR-Avatar config may not exist yet, and the
+          form must never be blocked on it: the same manual entry the provider
+          error offers, opted into per field so every other list is unchanged.
+        -->
+        <!-- eslint-disable-next-line vuejs-accessibility/form-control-has-label -->
+        <input
+          v-if="manualOnEmpty"
+          type="text"
+          autocomplete="off"
+          :value="modelValue"
+          v-bind="manualValidationAttrs()"
+          :data-testid="`${testIdPrefix}-manual`"
+          :aria-label="t('avatar_templates.form.catalogue.manualLabel')"
+          :placeholder="t('avatar_templates.form.catalogue.manualLabel')"
+          :class="formControlClass"
+          @input="emit('change', ($event.target as HTMLInputElement).value)"
+        />
+      </template>
 
       <p
         v-else-if="visibleEntries.length === 0"
@@ -139,8 +163,24 @@
         {{ t('avatar_templates.form.catalogue.noMatch') }}
       </p>
 
-      <ul v-else role="listbox" class="flex max-h-72 flex-col gap-1 overflow-y-auto">
-        <li v-for="candidate in visibleEntries" :key="candidate.id" role="none">
+      <div
+        v-else
+        :id="listboxId"
+        role="listbox"
+        :aria-label="t(field.label_key)"
+        class="flex max-h-72 flex-col gap-1 overflow-y-auto"
+      >
+        <!--
+          A listbox may own only options and groups. Each row is a labelled
+          group: its one option, plus (voices) the sample controls beside it,
+          which are not options and so must not be listbox children.
+        -->
+        <div
+          v-for="candidate in visibleEntries"
+          :key="candidate.id"
+          role="group"
+          :aria-label="candidate.label"
+        >
           <button
             type="button"
             role="option"
@@ -217,7 +257,7 @@
             <img
               v-if="resource !== 'voice' && candidate.preview_image_url !== null"
               :src="candidate.preview_image_url"
-              :alt="candidate.label"
+              alt=""
               :data-testid="`${testIdPrefix}-thumb-${candidate.id}`"
               class="size-10 shrink-0 rounded object-cover"
               loading="lazy"
@@ -269,8 +309,8 @@
           >
             {{ sampleErrorText(candidate) }}
           </p>
-        </li>
-      </ul>
+        </div>
+      </div>
     </div>
 
     <!--
@@ -450,6 +490,8 @@ const props = defineProps<{
    * the vendor, not Tavus. Absent: sample the catalogue's own provider.
    */
   preview?: { provider: 'heygen' | 'tavus' | 'cartesia' | 'elevenlabs'; ttsEngine?: string | null }
+  /** Also offer manual entry of the id when the catalogue answers empty (default: only on a provider error). */
+  manualOnEmpty?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -470,15 +512,21 @@ const { isOpen, close, toggle } = useExclusivePopover(rootRef)
 const resource = computed<CatalogueResource>(() => props.field.catalogue_resource ?? 'voice')
 // Tavus's own stock voices have no synthesised sample (the button would only
 // ever be disabled), so a Tavus list row gets none.
+// An HR-Avatar config has no voice sample either, so it never gets one. The
+// `preview` prop type and `useVoicePreview` are deliberately untouched.
 const previewProvider = computed<'heygen' | 'cartesia' | 'elevenlabs' | null>(() =>
-  props.provider === 'tavus' ? null : props.provider
+  props.provider === 'tavus' || props.provider === 'hr_avatar' ? null : props.provider
 )
-const blockPreview = computed(() => ({
-  provider: props.preview?.provider ?? props.provider,
-  ttsEngine: props.preview?.ttsEngine ?? null,
-}))
+const blockPreview = computed(() => {
+  // `tavus` is the no-voice-vendor value: the block that reads this renders only
+  // for a voice or persona list, never for an HR-Avatar config list.
+  const provider = props.preview?.provider ?? previewProvider.value ?? 'tavus'
+
+  return { provider, ttsEngine: props.preview?.ttsEngine ?? null }
+})
 const testIdPrefix = computed(() => `template-config-${props.field.key}`)
 const panelId = computed(() => `${testIdPrefix.value}-panel`)
+const listboxId = computed(() => `${testIdPrefix.value}-listbox`)
 
 type State = 'loading' | 'ok' | 'empty' | 'provider_error'
 
@@ -491,6 +539,24 @@ const playingId = ref<string | null>(null)
 const failedImages = reactive(new Set<string>())
 
 const loaded = computed(() => state.value === 'ok' || state.value === 'empty')
+
+// What the live region says: filled after mount, while the catalogue loads,
+// and emptied when it settles.
+const announcement = ref('')
+const isLoading = computed(() => state.value === 'loading')
+function syncAnnouncement(): void {
+  announcement.value = isLoading.value ? t('avatar_templates.form.catalogue.loading') : ''
+}
+onMounted(syncAnnouncement)
+watch(isLoading, syncAnnouncement)
+
+// The form hands its validation wiring to the trigger through attrs; the manual
+// id input is the same control in another shape, so it carries the same two.
+// A function, not a computed: `attrs` is not reactive, the render is.
+const manualValidationAttrs = () => ({
+  'aria-invalid': attrs['aria-invalid'] as boolean | 'true' | 'false' | undefined,
+  'aria-describedby': attrs['aria-describedby'] as string | undefined,
+})
 
 // Monotonic request token. A provider switch mid-flight must not let the slow
 // answer for the OLD provider overwrite the list for the new one.
@@ -548,6 +614,16 @@ const visibleEntries = computed(() => {
   })
 })
 
+/** A listbox is rendered only when the panel is open on a non-empty, ready list. */
+const hasListbox = computed(
+  () =>
+    isOpen.value &&
+    state.value !== 'loading' &&
+    state.value !== 'provider_error' &&
+    state.value !== 'empty' &&
+    visibleEntries.value.length > 0
+)
+
 function describe(candidate: CatalogueEntry): string {
   return [
     t(`avatar_templates.provider.${candidate.provider}`),
@@ -571,6 +647,7 @@ const showsImagePreview = computed(
   () =>
     resource.value !== 'voice' &&
     resource.value !== 'pal' &&
+    resource.value !== 'avatar_config' &&
     props.modelValue !== '' &&
     selected.value !== null
 )

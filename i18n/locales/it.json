@@ -536,7 +536,8 @@
     },
     "avatarProvider": {
       "heygen": "HeyGen",
-      "tavus": "Tavus"
+      "tavus": "Tavus",
+      "hr_avatar": "HR-Avatar"
     },
     "delete": {
       "title": "Elimina questo progetto",
@@ -1190,7 +1191,8 @@
       "heygen": "HeyGen",
       "tavus": "Tavus",
       "cartesia": "Cartesia",
-      "elevenlabs": "ElevenLabs"
+      "elevenlabs": "ElevenLabs",
+      "hr_avatar": "HR-Avatar"
     },
     "action": {
       "new": "Nuovo template",
@@ -1245,7 +1247,8 @@
         "answerInvalid": "Questo valore non è stato accettato. Controllalo e riprova.",
         "descriptionTooLong": "La descrizione deve avere al massimo 500 caratteri.",
         "fieldRequired": "Questa impostazione è obbligatoria.",
-        "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito."
+        "numberOutOfRange": "Inserisci un valore compreso nell'intervallo consentito.",
+        "hrAvatarConfigIdInvalid": "Inserisci un ID di configurazione valido: avc_ seguito da lettere e cifre."
       },
       "ttsVoiceNote": "Il salvataggio scrive questa voce sulla persona Tavus e sostituisce la voce che la persona aveva. Con un motore esterno (Cartesia, ElevenLabs, Azure) vengono inviati motore, modello e voce scelti qui; lascia il motore su \"tavus-auto\" e non viene scritta alcuna voce esterna, quindi la voce la sceglie Tavus.",
       "voicePreview": {
@@ -1325,7 +1328,8 @@
         "none": "Predefinito del fornitore (nessun modello associato)",
         "groupManaged": "Testo (gestito)",
         "groupLive": "Live — in arrivo",
-        "withdrawn": "non più disponibile"
+        "withdrawn": "non più disponibile",
+        "withdrawnOption": "(ritirato)"
       },
       "credential": {
         "label": "Credenziale API",
@@ -1376,6 +1380,16 @@
         "credential_required": "Seleziona una credenziale: modello e credenziale vanno impostati insieme."
       },
       "write_title": "La modifica non è stata applicata",
+      "save": {
+        "forbidden": "Non hai i permessi per salvare questo template.",
+        "not_found": "Questo template non esiste più. Ricarica la pagina.",
+        "conflict": "Al momento il template non può essere salvato. Riprova tra poco.",
+        "network": "Non è stato possibile salvare il template. Controlla la connessione e riprova.",
+        "failed": "Non è stato possibile salvare il template. Riprova e, se il problema persiste, contatta il supporto."
+      },
+      "invalid_name": "Questo nome è stato rifiutato. Controllalo e riprova.",
+      "invalid_description": "Questa descrizione è stata rifiutata. Controllala e riprova.",
+      "invalid_value": "Questo valore è stato rifiutato. Controllalo e riprova.",
       "projectCount": "{count} progetto lo utilizza. | {count} progetti lo utilizzano."
     },
     "palSync": {
@@ -1432,7 +1446,8 @@
       "turnTakingPatience": "Pazienza nei turni di parola",
       "interruptibility": "Interrompibilità",
       "voiceIsolation": "Isolamento vocale",
-      "idleEngagement": "Coinvolgimento nelle pause"
+      "idleEngagement": "Coinvolgimento nelle pause",
+      "hr_avatar_config_id": "ID configurazione avatar"
     },
     "portability": {
       "export": "Esporta JSON",
@@ -1473,7 +1488,8 @@
       "voiceSpeed": "Quanto veloce parla l'avatar. 1 = normale; sotto 1 più lento, sopra 1 più veloce (intervallo 0,8–1,2).",
       "voiceStability": "Quanto è costante il tono (0–1). Valori alti = voce più uniforme e prevedibile; valori bassi = più espressiva ma variabile.",
       "voiceStyle": "Quanta enfasi/espressività aggiungere (0–1). 0 = neutro. Valori alti possono suonare esagerati.",
-      "voiceUseSpeakerBoost": "Rende la voce più chiara e presente, più simile all'originale. Costa un filo di latenza in più. Di solito conviene tenerlo attivo."
+      "voiceUseSpeakerBoost": "Rende la voce più chiara e presente, più simile all'originale. Costa un filo di latenza in più. Di solito conviene tenerlo attivo.",
+      "hr_avatar_config_id": "La configurazione HR-Avatar usata da questo template. Sceglila dall'elenco; se l'elenco non è disponibile, inserisci il suo ID (inizia con avc_)."
     },
     "llmForecastIntro": "Ogni template qui sotto riporta una stima di quanto costa in token dell'LLM di conversazione una singola intervista tipica. I minuti dell'avatar sono fatturati da un fornitore diverso su un contatore diverso e non sono inclusi.",
     "llmForecast": "{amount} in token LLM per un'intervista tipica di {minutes} minuti e {turns} turni. È una stima, ed è il totale di quell'intera intervista — non una tariffa al minuto.",

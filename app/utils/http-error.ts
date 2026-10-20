@@ -15,6 +15,33 @@ export function getErrorStatus(error: unknown): number | null {
 }
 
 /**
+ * True for a request that never got an answer: an ofetch `FetchError` with no
+ * response and no HTTP status, whose `cause` is the fetch failure itself (a
+ * `TypeError` from offline, DNS, CORS or an aborted connection).
+ *
+ * A bare `TypeError` is NOT a network failure: `undefined.x` throws one too, and
+ * telling the operator to check their connection for a programming fault hides
+ * it. The same goes for a thrown `Error`, a string, or a `FetchError` that did
+ * get an answer.
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+
+  const { name, cause, response } = error as {
+    name?: unknown
+    cause?: unknown
+    response?: unknown
+  }
+
+  return (
+    name === 'FetchError' &&
+    response === undefined &&
+    getErrorStatus(error) === null &&
+    cause instanceof TypeError
+  )
+}
+
+/**
  * Extracts a machine-facing `{data:{reason: string}}` refusal code from an
  * ofetch/$fetch rejection (participant-error-recovery D9 and D3's split
  * refusal reasons on the entry-link mints). Callers map this string onto an
@@ -64,8 +91,19 @@ export function getErrorFields(error: unknown): Record<string, string[]> | null 
   const data = (error as { data?: unknown }).data
   if (typeof data !== 'object' || data === null) return null
   const errors = (data as { errors?: unknown }).errors
-  if (typeof errors !== 'object' || errors === null) return null
-  return errors as Record<string, string[]>
+  if (typeof errors !== 'object' || errors === null || Array.isArray(errors)) return null
+
+  // The body is untrusted: a field whose value is not an array of strings
+  // (`"boom"[0]` is "b") is dropped rather than cast through. When every field
+  // is malformed the body carries nothing usable, so null sends the caller to
+  // its generic banner instead of an empty map that looks like "no errors".
+  const entries = Object.entries(errors).filter(
+    (entry): entry is [string, string[]] =>
+      Array.isArray(entry[1]) && entry[1].every((message) => typeof message === 'string')
+  )
+  if (entries.length === 0 && Object.keys(errors).length > 0) return null
+
+  return Object.fromEntries(entries)
 }
 
 /**
